@@ -1,0 +1,116 @@
+/*
+
+pid tracker...
+
+*/
+
+
+rule pidtrack
+{
+
+  state init
+  {
+    if (.rawsnare.syscall == "(2) SYS_fork")
+      goto newpid;
+
+   if (.rawsnare.syscall == "(190) SYS_vfork")
+      goto newpid;
+  }
+
+  state newpid
+  {
+    $pid = .rawsnare.retcode;
+    $uid = .rawsnare.euid;
+    $gid = .rawsnare.egid;
+    cut("init");
+/*
+    $query =  "property(Login, user, uid, "
+             + str_from_int($uid) + "), property(Login, user, realname, Name)";
+    $user = prolog($query, "Name");
+    $str = str_from_int($pid) + " started by " + $user;
+    print($str); */
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(11) SYS_execve" &&
+        .rawsnare.path != "/bin/sh" &&
+        .rawsnare.euid != $uid)
+      goto update_uid;
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(208) SYS_setresuid32")
+      goto update_setuid;
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(203) SYS_setreuid32")
+      goto update_setuid;
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(214) SYS_setgid32")
+      goto update_setuid;
+
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(11) SYS_execve" &&
+        .rawsnare.path != "/bin/sh" &&
+        .rawsnare.egid != $gid)
+      goto update_gid;
+
+    /* should exclude set*id and execve+setuid here */
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.euid != $uid)
+      goto alert;
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.egid != $gid)
+      goto alert;
+
+    if (.rawsnare.pid == $pid &&
+        .rawsnare.syscall == "(1) SYS_exit")
+      goto end;
+
+    if (.rawsnare.syscall == "(37) SYS_kill" &&
+        .rawsnare.kill_sig == "(9) SIGKILL" &&
+        .rawsnare.kill_pid == $pid)
+      goto end;
+  }
+
+  state update_uid
+  {
+    cut("newpid");
+    /* print("newuid"); */
+    $uid = .rawsnare.euid;
+    goto newpid;
+  }
+
+  state update_setuid
+  {
+    cut("newpid");
+    /* print("setuid");
+    print_event(); */
+    $uid = .rawsnare.target_id;
+    goto newpid;
+  }
+
+  state update_gid
+  {
+    cut("newpid");
+    /* print("newgid"); */
+    $gid = .rawsnare.egid;
+    goto newpid;
+  }
+
+  state alert
+  {
+    print("Alert report :");
+    dump_stack();
+    report();
+    /* shutdown(); */
+  }
+
+  state end
+  {
+    /* do nothing */
+    /* $str2 = "end pid: " + str_from_int($pid);
+    print($str2); */
+  }
+}

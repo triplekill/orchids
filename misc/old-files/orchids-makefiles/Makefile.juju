@@ -1,0 +1,406 @@
+##
+## orchids Makefile
+##
+
+##
+## Author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+##
+## See end of file for LICENSE and COPYRIGHT informations.
+##
+
+CC = gcc
+RM = rm -f
+STRIP = strip
+LEX = flex
+YACC = bison
+PL = pl
+#should use BSD Yacc instead of bison,
+#because it's in BSD license, and it's faster :)
+DOXYGEN = doxygen
+
+##
+BUILD_DIR=./build
+
+##
+
+NAME = orchids
+SRCS = main.c mod_mgr.c orchids_api.c evt_mgr.c \
+       engine.c issdl.tab.c issdl.yy.c rule_compiler.c \
+       orchids_cfg.c lang.c ovm.c graph_output.c html_output.c file_cache.c
+IPATH = -I. -I./util
+LPATH =
+
+# -fomit-frame-pointer -funroll-loops -fexpensive-optimizations -fschedule-insns2 for release
+CFLAGS = -O0 -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe 
+LDFLAGS = -Wall $(LPATH) -pipe -ldl -rdynamic #-lcrypto -lsnmp
+LIBS = 
+OBJS = $(SRCS:.c=.o)
+
+UTIL_SRCDIR = ./util
+UTIL_SRCS = array.c crc32.c hash.c list.c queue.c safelib.c stack.c \
+            strhash.c string_util.c tree.c linux_process_info.c debuglog.c \
+            misc.c objhash.c
+UTIL_OBJS = $(UTIL_SRCS:.c=.o)
+
+MODULES_SRCDIR = ./modules
+MODULES_SRCS = mod_textfile.c mod_udp.c mod_syslog.c mod_rawsnare.c \
+               mod_generic.c mod_remoteadm.c mod_test.c mod_test2.c \
+               mod_snare.c snare.yy.c snare.tab.c \
+               mod_netfilter.c netfilter.yy.c netfilter.tab.c \
+               mod_sunbsm.c mod_cisco.c mod_snmp.c mod_snmptrap.c \
+               mod_win32evt.c mod_consoles.c mod_autohtml.c mod_sockunix.c
+MODULES_OBJS = $(MODULES_SRCS:.c=.o)
+
+###
+
+.PHONY : all \
+         debug debug-clean release release-clean \
+         dmalloc dmalloc-clean turbo turbo-clean \
+         profile profile-clean clean
+
+all: debug release dmalloc turbo profile
+
+###
+
+$(MODULES_SRCDIR)/netfilter.tab.h $(MODULES_SRCDIR)/netfilter.tab.c: \
+                                             $(MODULES_SRCDIR)/netfilter.y
+	$(YACC) -p netfilter -d -b netfilter $(MODULES_SRCDIR)/netfilter.y -o $(MODULES_SRCDIR)/netfilter.tab.c
+
+$(MODULES_SRCDIR)/netfilter.yy.c: $(MODULES_SRCDIR)/netfilter.l \
+                                  $(MODULES_SRCDIR)/netfilter.tab.h
+	$(LEX) -f -Pnetfilter -o$(MODULES_SRCDIR)/netfilter.yy.c $(MODULES_SRCDIR)/netfilter.l
+
+$(MODULES_SRCDIR)/snare.tab.h $(MODULES_SRCDIR)/snare.tab.c: $(MODULES_SRCDIR)/snare.y
+	$(YACC) -p snare -d -b snare $(MODULES_SRCDIR)/snare.y -o $(MODULES_SRCDIR)/snare.tab.c
+
+$(MODULES_SRCDIR)/snare.yy.c: $(MODULES_SRCDIR)/snare.l $(MODULES_SRCDIR)/snare.tab.h
+	$(LEX) -f -Psnare -o$(MODULES_SRCDIR)/snare.yy.c $(MODULES_SRCDIR)/snare.l
+
+###
+
+# DEBUG BUILD
+debug: $(BUILD_DIR)/$(NAME).debug
+
+DEBUG_OBJDIR = $(BUILD_DIR)/debug
+DEBUG_CFLAGS = -g -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DENABLE_PREPROC
+
+$(BUILD_DIR)/$(NAME).debug: $(addprefix $(DEBUG_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(DEBUG_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(DEBUG_OBJDIR)/modules/, $(MODULES_OBJS)) \
+                            pl_engine.c
+#	plld -v -g -o $@ -nostate $^
+#	$(PL) -f none -F none -g true \
+# -t "consult([]),qsave_program('orchids.prc',[toplevel=prolog,initfile=none])"
+	$(LINK.o) $(DEBUG_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(DEBUG_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(DEBUG_CFLAGS) $< -o $@
+
+$(DEBUG_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(DEBUG_CFLAGS) $< -o $@
+
+$(DEBUG_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(DEBUG_CFLAGS) $< -o $@
+
+debug-clean :
+	$(RM) $(addprefix $(DEBUG_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(DEBUG_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(DEBUG_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).debug
+
+
+# SHARED BUILD
+shared: $(BUILD_DIR)/$(NAME).shared
+
+SHARED_OBJDIR = $(BUILD_DIR)/shared
+SHARED_CFLAGS = -g -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DENABLE_PREPROC -DORCHIDS_SHARED
+SHARED_BUILTIN = mod_textfile.o mod_udp.o mod_syslog.o mod_snare.o mod_consoles.o snare.yy.o snare.tab.o
+
+$(BUILD_DIR)/$(NAME).shared: $(addprefix $(SHARED_OBJDIR)/, $(OBJS)) \
+                             $(addprefix $(SHARED_OBJDIR)/util/, $(UTIL_OBJS)) \
+                             $(addprefix $(SHARED_OBJDIR)/modules/, $(SHARED_BUILTIN)) \
+                             pl_engine.c
+#	plld -v -g -o $@ -nostate $^
+#	$(PL) -f none -F none -g true \
+# -t "consult([]),qsave_program('orchids.prc',[toplevel=prolog,initfile=none])"
+	$(LINK.o) $(SHARED_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(SHARED_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(SHARED_CFLAGS) $< -o $@
+
+$(SHARED_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(SHARED_CFLAGS) $< -o $@
+
+$(SHARED_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(SHARED_CFLAGS) $< -o $@
+
+modules/mod_snmptrap.so: modules/mod_snmptrap.c
+	gcc -shared -lcrypto -lsnmp $(CFLAGS) $(DEBUG_CFLAGS) $< -o $@
+
+shared-clean :
+	$(RM) $(addprefix $(SHARED_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(SHARED_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(SHARED_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).shared
+
+
+
+#
+#
+SHARED_MODULES = $(addprefix modules/, $(MODULES_SRCS:.c=.so))
+
+shared-modules: $(SHARED_MODULES)
+
+modules/%.so: ./modules/%.c
+	gcc -shared $(CFLAGS) $(DEBUG_CFLAGS) $< -o $@
+
+
+# release: $(BUILD_DIR)/$(NAME).release
+release: $(BUILD_DIR)/$(NAME).release
+
+RELEASE_OBJDIR = $(BUILD_DIR)/release
+RELEASE_CFLAGS = -g -DACTMON -DENABLE_PREPROC
+
+$(BUILD_DIR)/$(NAME).release: $(addprefix $(RELEASE_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(RELEASE_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(RELEASE_OBJDIR)/modules/, $(MODULES_OBJS)) \
+			    pl_engine.c
+#	plld -v -g -o $@ -nostate $^
+#	$(PL) -f none -F none -g true \
+# -t "consult([]),qsave_program('orchids.prc',[toplevel=prolog,initfile=none])"
+	$(LINK.o) $(RELEASE_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(RELEASE_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(RELEASE_CFLAGS) $< -o $@
+
+$(RELEASE_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(RELEASE_CFLAGS) $< -o $@
+
+$(RELEASE_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(RELEASE_CFLAGS) $< -o $@
+
+release-clean :
+	$(RM) $(addprefix $(RELEASE_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(RELEASE_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(RELEASE_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).release
+
+# prolog
+prolog: $(BUILD_DIR)/$(NAME).prolog
+
+PROLOG_OBJDIR = $(BUILD_DIR)/prolog
+PROLOG_CFLAGS = -g -DACTMON -DENABLE_PREPROC -DHAVE_SWIPROLOG
+
+$(BUILD_DIR)/$(NAME).prolog: $(addprefix $(PROLOG_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(PROLOG_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(PROLOG_OBJDIR)/modules/, $(MODULES_OBJS)) \
+			    pl_engine.c
+	plld -DHAVE_SWIPROLOG -v -g -o $@ -nostate $^
+	$(PL) -f none -F none -g true \
+          -t "consult([]),qsave_program('orchids.prc',[toplevel=prolog,initfile=none])"
+#	$(LINK.o) $(RELEASE_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(PROLOG_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(PROLOG_CFLAGS) $< -o $@
+
+$(PROLOG_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(PROLOG_CFLAGS) $< -o $@
+
+$(PROLOG_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(PROLOG_CFLAGS) $< -o $@
+
+prolog-clean:
+	$(RM) $(addprefix $(PROLOG_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(PROLOG_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(PROLOG_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).prolog
+
+
+
+# release
+demo: $(BUILD_DIR)/$(NAME).demo
+
+DEMO_OBJDIR = $(BUILD_DIR)/demo
+DEMO_CFLAGS = -DACTMON -DORCHIDS_DEMO -DENABLE_PREPROC
+
+$(BUILD_DIR)/$(NAME).demo: $(addprefix $(DEMO_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(DEMO_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(DEMO_OBJDIR)/modules/, $(MODULES_OBJS))
+	$(LINK.o) $(DEMO_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(DEMO_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(DEMO_CFLAGS) $< -o $@
+
+$(DEMO_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(DEMO_CFLAGS) $< -o $@
+
+$(DEMO_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(DEMO_CFLAGS) $< -o $@
+
+demo-clean :
+	$(RM) $(addprefix $(DEMO_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(DEMO_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(DEMO_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).demo
+
+
+
+# dmalloc: $(BUILD_DIR)/$(NAME).dmalloc
+dmalloc: $(BUILD_DIR)/$(NAME).dmalloc
+
+DMALLOC_OBJDIR = $(BUILD_DIR)/dmalloc
+DMALLOC_CFLAGS = -g -DDMALLOC -DENABLE_DEBUGLOG -DENABLE_PREPROC -DORCHIDS_DEBUG
+DMALLOC_LDFLAGS = -ldmalloc
+
+$(BUILD_DIR)/$(NAME).dmalloc: $(addprefix $(DMALLOC_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(DMALLOC_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(DMALLOC_OBJDIR)/modules/, $(MODULES_OBJS))
+	$(LINK.o) $(DMALLOC_CFLAGS) $^ $(DMALLOC_LDFLAGS) -o $@
+
+$(DMALLOC_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(DMALLOC_CFLAGS) $< -o $@
+
+$(DMALLOC_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(DMALLOC_CFLAGS) $< -o $@
+
+$(DMALLOC_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(DMALLOC_CFLAGS) $< -o $@
+
+dmalloc-clean :
+	$(RM) $(addprefix $(DMALLOC_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(DMALLOC_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(DMALLOC_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).dmalloc
+
+
+# turbo: $(BUILD_DIR)/$(NAME).turbo
+turbo: $(BUILD_DIR)/$(NAME).turbo
+
+TURBO_OBJDIR = $(BUILD_DIR)/turbo
+TURBO_CFLAGS = -DLIBUBSAFE
+TURBO_LDFLAGS =
+
+$(BUILD_DIR)/$(NAME).turbo: $(addprefix $(TURBO_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(TURBO_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(TURBO_OBJDIR)/modules/, $(MODULES_OBJS))
+	$(LINK.o) $(TURBO_CFLAGS) $^ $(TURBO_LDFLAGS) -o $@
+	$(STRIP) -s $(BUILD_DIR)/$(NAME).turbo
+
+$(TURBO_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(TURBO_CFLAGS) $< -o $@
+
+$(TURBO_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(TURBO_CFLAGS) $< -o $@
+
+$(TURBO_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(TURBO_CFLAGS) $< -o $@
+
+turbo-clean :
+	$(RM) $(addprefix $(TURBO_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(TURBO_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(TURBO_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).turbo
+
+# profile
+profile: $(BUILD_DIR)/$(NAME).profile
+
+PROFILE_OBJDIR = $(BUILD_DIR)/profile
+PROFILE_CFLAGS = -g -pg
+
+$(BUILD_DIR)/$(NAME).profile: $(addprefix $(PROFILE_OBJDIR)/, $(OBJS)) \
+                            $(addprefix $(PROFILE_OBJDIR)/util/, $(UTIL_OBJS)) \
+                            $(addprefix $(PROFILE_OBJDIR)/modules/, $(MODULES_OBJS))
+	$(LINK.o) $(PROFILE_CFLAGS) $^ $(LDLIBS) -o $@
+
+$(PROFILE_OBJDIR)/%.o: %.c
+	$(COMPILE.c) $(PROFILE_CFLAGS) $< -o $@
+
+$(PROFILE_OBJDIR)/util/%.o: ./util/%.c
+	$(COMPILE.c) $(PROFILE_CFLAGS) $< -o $@
+
+$(PROFILE_OBJDIR)/modules/%.o: ./modules/%.c
+	$(COMPILE.c) $(PROFILE_CFLAGS) $< -o $@
+
+profile-clean :
+	$(RM) $(addprefix $(PROFILE_OBJDIR)/, $(OBJS)) \
+              $(addprefix $(PROFILE_OBJDIR)/util/, $(UTIL_OBJS)) \
+              $(addprefix $(PROFILE_OBJDIR)/modules/, $(MODULES_OBJS)) \
+              $(BUILD_DIR)/$(NAME).profile
+
+
+##
+issdl.tab.h: issdl.tab.c
+
+issdl.tab.c: issdl.y
+	$(YACC) -p issdl -d -b issdl issdl.y
+
+issdl.yy.c: issdl.l issdl.tab.h
+	$(LEX) -f -Pissdl -oissdl.yy.c issdl.l
+
+./util/libutil.a: ./util/array.c ./util/crc32.c ./util/hash.c ./util/list.c \
+                  ./util/queue.c ./util/safelib.c ./util/stack.c \
+                  ./util/strhash.c ./util/string_util.c ./util/tree.c \
+                  ./util/linux_process_info.c
+	make -C ./util
+
+./modules/libmods.a: ./modules/mod_generic.c ./modules/mod_remoteadm.c \
+                     ./modules/mod_syslog.c ./modules/mod_textfile.c \
+                     ./modules/mod_rawsnare.c ./modules/mod_snare.c \
+                     ./modules/mod_template.c ./modules/mod_udp.c \
+                     ./modules/mod_test.c ./modules/mod_test2.c
+	(cd modules ; make)
+
+##
+## Hard-linked modlib
+##
+$(NAME): $(OBJS) ./util/libutil.a ./modules/libmods.a
+	make -C util
+	make -C modules
+	$(CC) -o $(NAME) $(LDFLAGS) $(OBJS) $(LIBS)
+##
+
+doc: $(SRCS) orchids.doxygen
+	$(DOXYGEN) orchids.doxygen
+
+##
+arch: clean
+	(cd ../.. ; tar czvf $(NAME)-$(shell date +%Y-%m-%d-%H%M).tar.gz $(NAME)/ )
+##
+clean: debug-clean release-clean dmalloc-clean turbo-clean profile-clean
+	$(RM) $(OBJS) issdl.tab.[ch] issdl.yy.c \
+              $(NAME) \
+              *~ \#* .\#* core core.[0-9]*
+	(cd util; make clean)
+	(cd modules; make clean)
+##
+distclean: clean
+	$(RM) -r ./doc/
+##
+re: clean all
+##
+
+
+## Copyright (c) 2002-2003 by Laboratoire Spécification et Vérification (LSV),
+## CNRS UMR 8643 & ENS Cachan.
+## Written by Julien OLIVAIN.  Not derived from licensed software.
+##
+## Permission is granted to anyone to use this software for any
+## purpose on any computer system, and to redistribute it freely,
+## subject to the following restrictions:
+##
+##   1. Neither the author nor its employer is responsible for the consequences
+##      of use of this software, no matter how awful, even if they arise from
+##      defects in it.
+##
+##   2. The origin of this software must not be misrepresented, either
+##      by explicit claim or by omission.
+##
+##   3. Altered versions must be plainly marked as such, and must not
+##      be misrepresented as being the original software.
+##
+##   4. This software is restricted to non-commercial use only.
+##      Commercial use is subject to a specific license, obtainable from LSV.
+
+##
+## End-of-file
+##

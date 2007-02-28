@@ -1,0 +1,59 @@
+/*
+
+openssl-too-open attack
+
+Check Apache error log for
+
+[Thu Sep 23 17:50:19 2004] [error] OpenSSL: error:1406908F:lib(20):func(105):reason(143)
+[Thu Sep 23 17:51:08 2004] [error] mod_ssl: SSL handshake failed (server mure.lsv.ens-cachan.fr:443, ...
+
+    lib(20) == ERR_LIB_SSL                       in ./crypto/err/err.h
+  func(105) == SSL_F_GET_CLIENT_FINISHED         in ./crypto/ssl/ssl.h
+reason(143) == SSL_R_CONNECTION_ID_IS_DIFFERENT  in ./crypto/ssl/ssl.h
+
+*/
+
+
+rule apachessl
+{
+  state init
+  {
+    if (.entropy.message == "RISING ALARM" &&
+        .entropy.dst_port == 443)
+      goto entropy_alert;
+  }
+
+  state entropy_alert
+  {
+    $attacker = .entropy.src_ip;
+    $port = .entropy.src_port;
+    print("entropy alert");
+
+    if (.sslerror.module  == "mod_ssl" &&
+        .sslerror.severity == "error" &&
+        .sslerror.message == "SSL handshake failed" &&
+        .sslerror.cli_addr == $attacker)
+        goto ssl_error;
+  }
+
+  state ssl_error
+  {
+    print("SSL error");
+
+    if (.sslerror.module  == "OpenSSL" &&
+        .sslerror.severity == "error" &&
+        .sslerror.message == "error" &&
+        .sslerror.openssl_code == "1406908F" )
+      goto ssl_alert;
+  }
+
+  state ssl_alert {
+    $response = "ssh root@10.0.0.100 '/sbin/iptables --append orchids --proto TCP --source-port 443 --destination " +
+                str_from_ipv4( $attacker ) + " --destination-port " + str_from_int( $port ) + " --jump DROP' &";
+
+    system( $response );
+
+    dump_stack();
+    report();
+  }
+}

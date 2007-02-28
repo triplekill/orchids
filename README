@@ -1,0 +1,27 @@
+Quick Installation Guide:
+configure && make && make install
+_should_ be enought.
+
+
+For testing orchids as an user:
+
+configure --prefix=/tmp/orchids --with-runtime-user=$USER && \
+make && \
+make install
+
+
+
+Configure options spicific to Orchids:
+--enable-debug    Enable debugging mode (more messages, less forks, no daemon)
+--enable-dmalloc  Turn on dmalloc (default off)
+--enable-actmon   enable activity monitor (default is off)
+--enable-preproc  enable preprocessor (default is on)
+--enable-debug    enable debugging (default is off)
+
+--with-gnuplot          use gnuplot (default is yes)
+--with-graphviz-dot     use GraphViz dot (default is yes)
+--with-epstopdf         use epstopdf (default is yes)
+--with-convert          use ImageMagick convert (default is yes)
+--with-swiprolog        use SWI Prolog (default is yes)
+--with-doxygen          use doxygen (default is yes)
+--with-runtime-user     user id to use for runtime (default is nobody)

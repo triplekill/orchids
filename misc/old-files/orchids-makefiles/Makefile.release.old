@@ -1,0 +1,76 @@
+##
+## orchids Makefile
+##
+
+CC = gcc
+RM = rm -f
+STRIP = strip
+LEX = flex
+YACC = bison
+#should use BSD Yacc instead of bison,
+#because it's in BSD license, and it's faster :)
+
+##
+
+NAME = orchids.release
+SRCS = main.c module_manager.c orchids_api.c event_dispatcher.c \
+       engine.c issdl.tab.c issdl.yy.c rule_compiler.c \
+       orchids_config.c lang.c ovm.c graph_output.c
+IPATH = -I. -I./util
+LPATH =
+
+DEBUG = #-g -DDEBUG #-pg
+
+# -fomit-frame-pointer -funroll-loops -fexpensive-optimizations -fschedule-insns2 for release
+CFLAGS = -O2 -pedantic -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe $(DEBUG)
+LDFLAGS = -O2 -pedantic -Wall $(LPATH) -pipe $(DEBUG)
+LIBS = -L ./modules -lmods -L ./util -lutil
+OBJS = $(SRCS:.c=.o)
+
+##
+
+all: $(NAME)
+##
+
+issdl.tab.h: issdl.tab.c
+
+issdl.tab.c: issdl.y
+	$(YACC) -p issdl -d -b issdl issdl.y
+
+issdl.yy.c: issdl.l issdl.tab.h
+	$(LEX) -f -Pissdl -oissdl.yy.c issdl.l
+
+./util/libutil.a: ./util/array.c ./util/crc32.c ./util/hash.c ./util/list.c \
+                  ./util/queue.c ./util/safelib.c ./util/stack.c \
+                  ./util/strhash.c ./util/string_util.c ./util/tree.c
+	(cd util ; make -f Makefile.release)
+
+./modules/libmods.a: ./modules/mod_generic.c ./modules/mod_remoteadm.c \
+                     ./modules/mod_syslog.c ./modules/mod_textfile.c \
+                     ./modules/mod_rawsnare.c ./modules/mod_snare.c \
+                     ./modules/mod_temptale.c ./modules/mod_udp.c \
+                     ./modules/mod_test.c ./modules/mod_test2.c
+	(cd modules ; make -f Makefile.release)
+
+##
+## Hard-linked modlib
+##
+$(NAME): $(OBJS) ./util/libutil.a ./modules/libmods.a
+	(cd util ; make -f Makefile.release)
+	(cd modules ; make -f Makefile.release)
+	$(CC) -o $(NAME) $(LDFLAGS) $(OBJS) $(LIBS)
+	$(STRIP) -s $(NAME)
+##
+arch: rclean
+	(cd ../.. ; tar czvf $(NAME)-$(shell date +%Y-%m-%d-%H%M).tar.gz $(NAME)/ )
+##
+clean:
+	$(RM) $(OBJS) issdl.tab.[ch] issdl.yy.c *~ \#* .\#* core core.[0-9]*
+	(cd util; make clean)
+	(cd modules; make clean)
+##
+rclean: clean
+	$(RM) $(NAME)
+##
+re: clean all
+##

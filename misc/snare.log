@@ -1,0 +1,10 @@
+cassis	LinuxAudit	event,open(O_WRONLY|O_CREAT|O_TRUNC),Wed Feb 12 16:33:09 2003	user,root(0),root(0),root(0),root(0)	process,1170,snare	path,/etc/audit/audit.conf	attributes,rw-rw-rw-	return,6	sequence,25840
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:09 2003	user,root(0),root(0),root(0),root(0)	process,1170,snare	path,/proc/auditinfo	return,6	sequence,25841
+cassis	LinuxAudit	event,opn(O_RDONLY),Wed Feb 12 16:33:09 2003	user,root(0),root(0),root(0),root(0)	process,1170,snare	path,/usr/share/pixmaps/gnome-info.png	return,6	sequence,25842
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:10 2003	user,root(0),root(0),root(0),root(0)	process,1170,snare	path,/var/log/audit.log	return,6	sequence,25843
+cassis	LinuxAudit	event,execve(),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,bash	path,/bin/ls	arguments,ls --color=tty -l --color=tty /etc	return,0	sequence,25844
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,ls	path,/etc/ld.so.preload	return,-2	sequence,25845
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,ls	path,/etc/ld.so.cache	return,3	sequence,25846
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,ls	path,/lib/libtermcap.so.2.0.8	return,3	sequence,25847
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,ls	path,/lib/libc-2.2.5.so	return,3	sequence,25848
+cassis	LinuxAudit	event,open(O_RDONLY),Wed Feb 12 16:33:20 2003	user,root(0),root(0),root(0),root(0)	process,1173,ls	path,/usr/share/locale/locale.alias	return,3	sequence,25849

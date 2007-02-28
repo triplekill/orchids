@@ -1,0 +1,96 @@
+
+/* Quick and dirty dhcp lease check detector, through snort.
+*/
+
+rule dhcp_lease_check {
+  state init {
+    if (.dhcpd.method == "DHCPDISCOVER")
+      goto discover;
+  }
+
+  state discover {
+    $mac = .dhcpd.mac;
+    print ("DHCP discover: a machine is waking up to the network");
+
+    if (.dhcpd.method == "DHCPOFFER" &&
+	.dhcpd.mac == $mac)
+      goto offer;
+    if (.dhcpd.method != "DHCPOFFER" &&
+	.dhcpd.mac == $mac)
+      goto alert_offer;
+  }
+
+  state alert_offer {
+    print ("DHCP expecting offer, did not get any");
+    report ();
+  }
+
+  state offer {
+    $ip = .dhcpd.ip;
+    cut ("discover");
+
+    if (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip)
+      goto request;
+    if (.dhcpd.method == "DHCPRELEASE" &&
+	.dhcpd.mac == $mac)
+      goto release;
+    if (.dhcpd.method != "DHCPREQUEST" &&
+	.dhcpd.method != "DHCPRELEASE" &&
+	.dhcpd.mac == $mac)
+      goto alert_request;
+  }
+
+  state alert_request {
+    print ("DHCP offer gotten, should have gotten request");
+    report ();
+  }
+
+  state request {
+    cut ("offer");
+
+    if (.dhcpd.method == "DHCPACK" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip)
+      goto offer;
+    if (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip == $ip)
+      goto request;
+    if (.dhcpd.method == "DHCPREQUEST" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip != $ip)
+      goto alert_client_request;
+    if (.dhcpd.method == "DHCPRELEASE" &&
+	.dhcpd.mac == $mac)
+      goto release;
+    if (.dhcpd.method != "DHCPACK" &&
+	.dhcpd.method != "DHCPRELEASE" &&
+	.dhcpd.mac == $mac)
+      goto alert_ack;
+    if (.dhcpd.method == "DHCPACK" &&
+	.dhcpd.mac == $mac &&
+	.dhcpd.ip != $ip)
+      goto alert_bad_ip;
+  }
+
+  state alert_client_request {
+    print ("DHCP client requests a new IP without first releasing");
+    report ();
+  }
+
+  state alert_ack {
+    print ("DHCP request, no ack answered");
+    report ();
+  }
+
+  state alert_bad_ip {
+    print ("DHCP server tried to change client ip address!");
+    report ();
+  }
+
+  state release {
+    print ("DHCP release, OK");
+  }
+}

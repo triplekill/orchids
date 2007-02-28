@@ -1,0 +1,73 @@
+dnl
+dnl a tester:
+dnl  - HAVE_SWI_PROLOG = true si pl ET plld existent
+dnl  - HAVE_OPENSSL_CRYPTO = true si la libcrypto existe
+dnl  - HAVE_OPENSSL = true si la libssl ET la libcrypto existent
+dnl  - HAVE_NETSNMP = true (a determiner)
+dnl  - HAVE_LIBXML2 = true si la libxml est la
+dnl  - HAVE_GRAPHVIZ_DOT = true si dot est la
+dnl  - HAVE_EPSTOPDF si epstopdf est la
+dnl  - HAVE_IMAGEMAGICK_CONVERT si convert est la
+dnl  - HAVE_DOXYGEN si doxygen est la
+dnl  - HAVE_DMALLOC si dmalloc est la (puis ENABLE_DMALLOC apres)
+dnl  - HAVE_GNUPLOT si gnuplot est la
+
+AC_INIT(Orchids, 0.1, orchids-bug-report@lsv.ens-cachan.fr)
+AC_CONFIG_HEADERS(config.h)
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
+AM_INIT_AUTOMAKE
+
+
+AM_MAINTAINER_MODE
+
+dnl Checks for programs
+AC_REQUIRE_CPP
+AC_PROG_CC
+
+dnl Obsolete
+dnl AC_ISC_POSIX
+
+dnl Checks for libraries
+AC_STDC_HEADERS
+
+AC_PROG_LEX
+AC_PROG_YACC
+
+AC_ARG_ENABLE(debug,
+              [  --enable-debug    Turn on debugging],
+              [case "${enableval}" in
+                yes) debug=true ;;
+                no)  debug=false ;;
+                *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
+                esac], [debug=false]
+)
+AM_CONDITIONAL(ORCHIDS_DEBUG, test x$debug = xtrue)
+
+
+AC_ARG_ENABLE(dmalloc,
+              [  --enable-dmalloc    Turn on dmalloc],
+              [case "${enableval}" in
+                yes) dmalloc=true ;;
+                no)  dmalloc=false ;;
+                *) AC_MSG_ERROR(bad value ${enableval} for --enable-dmalloc) ;;
+                esac], [dmalloc=false]
+)
+AM_CONDITIONAL(ORCHIDS_DMALLOC, test x$dmalloc = xtrue)
+
+
+# Check for doxygen
+AC_PATH_PROG(DOXYGEN, doxygen)
+# AC_CHECK_PROG(HAVE_DOXYGEN, doxygen, "yes", "no")
+AM_CONDITIONAL(HAVE_DOXYGEN, test x$HAVE_DOXYGEN = xyes)
+
+# Check for SWI prolog
+AC_PATH_PROG(SWIPROLOG, pl)
+AC_CHECK_PROG(HAVE_SWIPROLOG, pl, "yes", "no")
+AM_CONDITIONAL(HAVE_SWIPROLOG, test x$HAVE_SWIPROLOG = xyes)
+
+
+AC_OUTPUT(Makefile 
+          src/Makefile
+)

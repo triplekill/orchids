@@ -1,0 +1,42 @@
+##
+## libmods Makefile
+##
+
+CC = gcc
+RM = rm -f
+AR = ar
+RANLIB = ranlib
+
+##
+
+NAME = libmods.a
+SRCS = mod_textfile.c mod_udp.c mod_syslog.c mod_snare.c mod_rawsnare.c \
+       mod_generic.c mod_remoteadm.c mod_test.c mod_test2.c
+IPATH = -I. -I.. -I../util
+LPATH =
+
+DEBUG = #-g -DDEBUG #-pg
+
+# -fomit-frame-pointer for release
+CFLAGS = -O2 -pedantic -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe $(DEBUG)
+LDFLAGS = -O2 -pedantic -Wall $(LPATH) -pipe $(DEBUG)
+LIBS =
+OBJS = $(SRCS:.c=.o)
+
+##
+
+all: $(NAME)
+##
+
+$(NAME): $(OBJS)
+	$(AR) -rv $(NAME) $(OBJS)
+	$(RANLIB) $(NAME)
+##
+clean:
+	$(RM) $(NAME) $(OBJS) *~ \#* .\#* core
+##
+rclean: clean
+	$(RM) $(NAME)
+##
+re: clean all
+##

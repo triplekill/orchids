@@ -1,0 +1,114 @@
+##
+## orchids Makefile
+##
+
+##
+## Author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+##
+## See end of file for LICENSE and COPYRIGHT informations.
+##
+
+CC = gcc
+RM = rm -f
+STRIP = strip
+LEX = flex
+YACC = bison
+#should use BSD Yacc instead of bison,
+#because it's in BSD license, and it's faster :)
+DOXYGEN = doxygen
+
+##
+
+NAME = orchids.dmalloc
+SRCS = main.c mod_mgr.c orchids_api.c evt_mgr.c \
+       engine.c issdl.tab.c issdl.yy.c rule_compiler.c \
+       orchids_cfg.c lang.c ovm.c graph_output.c html_output.c
+IPATH = -I. -I./util
+LPATH =
+
+DEBUG = -g -DDMALLOC -DORCHIDS_DEBUG -DENABLE_DEBUGLOG #-DACTMON # -g #-pg
+
+# -fomit-frame-pointer -funroll-loops -fexpensive-optimizations -fschedule-insns2 for release
+CFLAGS = -O2 -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe $(DEBUG)
+LDFLAGS = -O2 -Wall $(LPATH) -pipe $(DEBUG)
+LIBS = -ldmalloc -L ./modules -lmods -L ./util -lutil 
+OBJS = $(SRCS:.c=.o)
+
+##
+
+all: $(NAME)
+##
+
+issdl.tab.h: issdl.tab.c
+
+issdl.tab.c: issdl.y
+	$(YACC) -p issdl -d -b issdl issdl.y
+
+issdl.yy.c: issdl.l issdl.tab.h
+	$(LEX) -f -Pissdl -oissdl.yy.c issdl.l
+
+./util/libutil.a: ./util/array.c ./util/crc32.c ./util/hash.c ./util/list.c \
+                  ./util/queue.c ./util/safelib.c ./util/stack.c \
+                  ./util/strhash.c ./util/string_util.c ./util/tree.c \
+                  ./util/linux_process_info.c
+	make -C ./util/ -f Makefile.dmalloc
+
+./modules/libmods.a: ./modules/mod_generic.c ./modules/mod_remoteadm.c \
+                     ./modules/mod_syslog.c ./modules/mod_textfile.c \
+                     ./modules/mod_rawsnare.c ./modules/mod_snare.c \
+                     ./modules/mod_template.c ./modules/mod_udp.c \
+                     ./modules/mod_test.c ./modules/mod_test2.c
+	make -C ./modules/ -f Makefile.dmalloc
+
+##
+## Hard-linked modlib
+##
+$(NAME): $(OBJS) ./util/libutil.a ./modules/libmods.a
+	$(CC) -o $(NAME) $(LDFLAGS) $(OBJS) $(LIBS)
+##
+
+doc: $(SRCS) orchids.doxygen
+	$(DOXYGEN) orchids.doxygen
+
+##
+arch: clean
+	(cd ../.. ; tar czvf $(NAME)-$(shell date +%Y-%m-%d-%H%M).tar.gz $(NAME)/ )
+##
+clean:
+	$(RM) $(OBJS) issdl.tab.[ch] issdl.yy.c \
+              $(NAME) \
+              *~ \#* .\#* core core.[0-9]*
+	(cd util; make clean)
+	(cd modules; make clean)
+##
+distclean: clean
+	$(RM) -r ./doc/
+##
+re: clean all
+##
+
+
+## Copyright (c) 2002-2003 by Laboratoire Spécification et Vérification (LSV),
+## CNRS UMR 8643 & ENS Cachan.
+## Written by Julien OLIVAIN.  Not derived from licensed software.
+##
+## Permission is granted to anyone to use this software for any
+## purpose on any computer system, and to redistribute it freely,
+## subject to the following restrictions:
+##
+##   1. Neither the author nor its employer is responsible for the consequences
+##      of use of this software, no matter how awful, even if they arise from
+##      defects in it.
+##
+##   2. The origin of this software must not be misrepresented, either
+##      by explicit claim or by omission.
+##
+##   3. Altered versions must be plainly marked as such, and must not
+##      be misrepresented as being the original software.
+##
+##   4. This software is restricted to non-commercial use only.
+##      Commercial use is subject to a specific license, obtainable from LSV.
+
+##
+## End-of-file
+##

@@ -1,0 +1,1335 @@
+/**
+ ** @file mod_generic.c
+ ** Generic event generator from misc text sources.
+ **
+ ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ **
+ ** @version 0.1
+ ** @ingroup modules
+ **
+ ** @date  Started on: Wed Jan 15 17:08:11 2003
+ ** @date Last update: Wed Oct 26 16:12:38 2005
+ **/
+
+/*
+ * See end of file for LICENSE and COPYRIGHT informations.
+ */
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include "orchids.h"
+
+#include "dlist.h"
+
+#define MAX_HOOK 64
+
+input_module_t mod_generic;
+
+typedef struct generic_field_s generic_field_t;
+struct generic_field_s
+{
+  STAILQ_ENTRY(generic_field_t) fields;
+  STAILQ_ENTRY(generic_field_t) globfields;
+  int field_id;
+  int type;
+  char *name;
+  int substring;
+  char *description;
+};
+
+
+typedef struct generic_match_s generic_match_t;
+struct generic_match_s
+{
+  STAILQ_ENTRY(generic_match_t) matches;
+  /* field list */
+  STAILQ_HEAD(fields, generic_field_t) field_list;
+  int fields;
+  char *regex_str;
+  regex_t regex;
+};
+
+typedef struct generic_vmod_s generic_vmod_t;
+struct generic_vmod_s
+{
+  STAILQ_ENTRY(generic_vmod_t) vmods;
+  STAILQ_ENTRY(generic_vmod_t) globvmods;
+  /* match list */
+  STAILQ_HEAD(matches, generic_match_t) match_list;
+  STAILQ_HEAD(globfields, generic_field_t) field_globlist;
+  char *name;
+  input_module_t mod_entry;
+  field_t *field_array;
+  ovm_var_t **field_values;
+  strhash_t *field_hash;
+  int fields;
+};
+
+typedef struct generic_hook_s generic_hook_t;
+struct generic_hook_s
+{
+/*   STAILQ_ENTRY(generic_hook_t) hooks; */
+  /* vmod list */
+  STAILQ_HEAD(vmods, generic_vmod_t) vmod_list;
+  dissect_t dissect;
+  char *module;
+  char *condition;
+};
+
+
+typedef struct mod_generic_cfg_s mod_generic_cfg_t;
+struct mod_generic_cfg_s {
+  /* hook array */
+  generic_hook_t hook_array[ MAX_HOOK ];
+  int used_hook;
+  strhash_t *mod_hash;
+  int mods;
+  STAILQ_HEAD(globvmods, generic_vmod_t) vmod_globlist;
+};
+
+mod_generic_cfg_t *gen_cfg_g;
+
+
+static int
+generic_dissect(orchids_t *ctx, event_t *event, generic_hook_t *hook)
+{
+  char *txt_line;
+  int txt_len;
+  generic_vmod_t *vmod;
+  generic_field_t *field;
+  generic_match_t *match;
+  regmatch_t regmatch[256];
+  int ret;
+/*   int i; */
+  char buf[4096];
+
+  if (TYPE(event->value) == T_STR) {
+    txt_line = STR(event->value);
+    txt_len = STRLEN(event->value);
+  } else if (TYPE(event->value) == T_VSTR) {
+    txt_line = VSTR(event->value);
+    txt_len = VSTRLEN(event->value);
+  } else {
+    DebugLog(DF_MOD, DS_ERROR, "bad input type\n");
+    return (1);
+  }
+
+  memcpy(buf, txt_line, txt_len);
+  buf[ txt_len ] = '\0';
+
+  DebugLog(DF_MOD, DS_DEBUG, "process line [%s]\n", buf);
+
+  STAILQ_FOREACH(vmod, &hook->vmod_list, vmods) {
+    DebugLog(DF_MOD, DS_DEBUG, "enter vmod [%s]\n", vmod->name);
+
+    STAILQ_FOREACH(match, &vmod->match_list, matches) {
+      DebugLog(DF_MOD, DS_DEBUG, "  enter match [%s]\n", match->regex_str);
+
+      ret = regexec(&match->regex, buf, 255, regmatch, 0);
+      if (ret) {
+        char err_buf[64];
+        regerror(ret, &match->regex, err_buf, sizeof (err_buf));
+        DebugLog(DF_MOD, DS_DEBUG, "regexec() error (%s)\n", err_buf);
+        continue ;
+      }
+
+      DebugLog(DF_MOD, DS_DEBUG, "regexec() MATCH\n");
+
+      memset(vmod->field_values, 0, vmod->fields * sizeof (ovm_var_t *));
+
+      STAILQ_FOREACH(field, &match->field_list, fields) {
+        char buff[4096];
+        size_t res_sz;
+        ovm_var_t *res;
+/*         event_t *new_event; */
+
+        res_sz = regmatch[ field->substring ].rm_eo - regmatch[ field->substring ].rm_so;
+        if (res_sz >= sizeof (buff))
+          res_sz = sizeof (buff) - 1;
+        memcpy(buff, &txt_line[ regmatch[ field->substring ].rm_so ], res_sz);
+        buff[ res_sz ] = '\0';
+        DebugLog(DF_MOD, DS_DEBUG, "field '%s' %i (%i): \"%s\"\n", field->name, field->substring, field->field_id, buff);
+
+        switch (field->type) {
+
+        case T_VSTR:
+          res = ovm_vstr_new();
+          VSTR(res) = &txt_line[ regmatch[ field->substring ].rm_so ];
+          VSTRLEN(res) = res_sz;
+          break;
+
+        case T_INT:
+          res = ovm_int_new();
+          INT(res) = atoi(buff);
+          break;
+
+        case T_IPV4:
+          res = ovm_ipv4_new();
+          if ( inet_aton(buff, &IPV4(res)) == 0) {
+            DebugLog(DF_MOD, DS_ERROR, "Error in IPV4 convertion of (%s)\n", buff);
+            return (1);
+          }
+          break;
+
+        case T_FLOAT:
+          res = ovm_float_new();
+          FLOAT(res) = atof(buff);
+          break;
+
+        default:
+          DebugLog(DF_MOD, DS_ERROR, "Unknown field type\n", field->type);
+          return (1);
+          break;
+        }
+
+        vmod->field_values[ field->field_id ] = res;
+
+/*         new_event = Xzmalloc(sizeof (event_t)); */
+/* /\*         new_event->field_id = res; *\/ */
+/*         new_event->value = res; */
+/*         new_event->next = event; */
+/*         event = new_event; */
+      }
+
+      add_fields_to_event(ctx, vmod->mod_entry.mod_id, &event, vmod->field_values, vmod->fields);
+
+      post_event(ctx, vmod->mod_entry.mod_id, event);
+
+      return (0);
+    }
+  }
+
+  DebugLog(DF_MOD, DS_DEBUG, "No match\n");
+
+  return (1); /* 1  E_NOMATCH */
+}
+
+static int
+generic_dissect_hook0(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #0\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[0]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook1(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #1\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[1]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook2(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #2\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[2]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook3(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #3\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[3]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook4(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #4\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[4]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook5(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #5\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[5]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook6(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #6\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[6]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook7(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #7\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[7]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook8(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #8\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[8]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook9(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #9\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[9]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook10(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #10\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[10]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook11(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #11\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[11]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook12(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #12\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[12]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook13(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #13\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[13]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook14(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #14\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[14]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook15(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #15\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[15]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook16(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #16\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[16]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook17(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #17\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[17]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook18(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #18\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[18]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook19(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #19\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[19]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook20(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #20\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[20]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook21(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #21\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[21]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook22(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #22\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[22]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook23(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #23\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[23]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook24(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #24\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[24]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook25(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #25\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[25]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook26(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #26\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[26]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook27(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #27\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[27]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook28(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #28\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[28]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook29(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #29\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[29]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook30(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #30\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[30]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook31(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #31\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[31]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook32(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #32\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[32]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook33(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #33\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[33]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook34(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #34\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[34]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook35(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #35\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[35]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook36(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #36\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[36]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook37(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #37\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[37]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook38(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #38\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[38]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook39(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #39\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[39]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook40(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #40\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[40]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook41(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #41\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[41]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook42(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #42\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[42]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook43(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #43\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[43]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook44(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #44\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[31]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook45(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #45\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[45]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook46(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #46\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[46]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook47(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #47\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[47]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook48(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #48\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[48]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook49(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #49\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[49]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook50(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #50\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[50]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook51(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #51\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[51]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook52(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #52\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[52]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook53(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #53\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[53]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook54(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #54\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[54]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook55(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #55\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[55]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook56(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #56\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[56]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook57(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #57\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[57]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook58(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #58\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[58]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook59(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #59\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[59]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook60(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #60\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[60]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook61(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #61\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[61]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook62(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #62\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[62]);
+
+  return (ret);
+}
+
+static int
+generic_dissect_hook63(orchids_t *ctx, event_t *event, void *data)
+{
+  int ret;
+
+  DebugLog(DF_MOD, DS_DEBUG, "Enter dissect hook #63\n");
+
+  ret = generic_dissect(ctx, event, &gen_cfg_g->hook_array[63]);
+
+  return (ret);
+}
+
+static void *
+generic_preconfig(orchids_t *ctx)
+{
+  mod_generic_cfg_t *mod_cfg;
+
+  DebugLog(DF_MOD, DS_DEBUG, "load() generic@%p\n", (void *) &mod_generic);
+
+  mod_cfg = Xzmalloc(sizeof (mod_generic_cfg_t));
+  gen_cfg_g = mod_cfg;
+  mod_cfg->hook_array[0].dissect = generic_dissect_hook0;
+  mod_cfg->hook_array[1].dissect = generic_dissect_hook1;
+  mod_cfg->hook_array[2].dissect = generic_dissect_hook2;
+  mod_cfg->hook_array[3].dissect = generic_dissect_hook3;
+  mod_cfg->hook_array[4].dissect = generic_dissect_hook4;
+  mod_cfg->hook_array[5].dissect = generic_dissect_hook5;
+  mod_cfg->hook_array[6].dissect = generic_dissect_hook6;
+  mod_cfg->hook_array[7].dissect = generic_dissect_hook7;
+  mod_cfg->hook_array[8].dissect = generic_dissect_hook8;
+  mod_cfg->hook_array[9].dissect = generic_dissect_hook9;
+  mod_cfg->hook_array[10].dissect = generic_dissect_hook10;
+  mod_cfg->hook_array[11].dissect = generic_dissect_hook11;
+  mod_cfg->hook_array[12].dissect = generic_dissect_hook12;
+  mod_cfg->hook_array[13].dissect = generic_dissect_hook13;
+  mod_cfg->hook_array[14].dissect = generic_dissect_hook14;
+  mod_cfg->hook_array[15].dissect = generic_dissect_hook15;
+  mod_cfg->hook_array[16].dissect = generic_dissect_hook16;
+  mod_cfg->hook_array[17].dissect = generic_dissect_hook17;
+  mod_cfg->hook_array[18].dissect = generic_dissect_hook18;
+  mod_cfg->hook_array[19].dissect = generic_dissect_hook19;
+  mod_cfg->hook_array[20].dissect = generic_dissect_hook20;
+  mod_cfg->hook_array[21].dissect = generic_dissect_hook21;
+  mod_cfg->hook_array[22].dissect = generic_dissect_hook22;
+  mod_cfg->hook_array[23].dissect = generic_dissect_hook23;
+  mod_cfg->hook_array[24].dissect = generic_dissect_hook24;
+  mod_cfg->hook_array[25].dissect = generic_dissect_hook25;
+  mod_cfg->hook_array[26].dissect = generic_dissect_hook26;
+  mod_cfg->hook_array[27].dissect = generic_dissect_hook27;
+  mod_cfg->hook_array[28].dissect = generic_dissect_hook28;
+  mod_cfg->hook_array[29].dissect = generic_dissect_hook29;
+  mod_cfg->hook_array[30].dissect = generic_dissect_hook30;
+  mod_cfg->hook_array[31].dissect = generic_dissect_hook31;
+  mod_cfg->hook_array[32].dissect = generic_dissect_hook32;
+  mod_cfg->hook_array[33].dissect = generic_dissect_hook33;
+  mod_cfg->hook_array[34].dissect = generic_dissect_hook34;
+  mod_cfg->hook_array[35].dissect = generic_dissect_hook35;
+  mod_cfg->hook_array[36].dissect = generic_dissect_hook36;
+  mod_cfg->hook_array[37].dissect = generic_dissect_hook37;
+  mod_cfg->hook_array[38].dissect = generic_dissect_hook38;
+  mod_cfg->hook_array[39].dissect = generic_dissect_hook39;
+  mod_cfg->hook_array[40].dissect = generic_dissect_hook40;
+  mod_cfg->hook_array[41].dissect = generic_dissect_hook41;
+  mod_cfg->hook_array[42].dissect = generic_dissect_hook42;
+  mod_cfg->hook_array[43].dissect = generic_dissect_hook43;
+  mod_cfg->hook_array[44].dissect = generic_dissect_hook44;
+  mod_cfg->hook_array[45].dissect = generic_dissect_hook45;
+  mod_cfg->hook_array[46].dissect = generic_dissect_hook46;
+  mod_cfg->hook_array[47].dissect = generic_dissect_hook47;
+  mod_cfg->hook_array[48].dissect = generic_dissect_hook48;
+  mod_cfg->hook_array[49].dissect = generic_dissect_hook49;
+  mod_cfg->hook_array[50].dissect = generic_dissect_hook50;
+  mod_cfg->hook_array[51].dissect = generic_dissect_hook51;
+  mod_cfg->hook_array[52].dissect = generic_dissect_hook52;
+  mod_cfg->hook_array[53].dissect = generic_dissect_hook53;
+  mod_cfg->hook_array[54].dissect = generic_dissect_hook54;
+  mod_cfg->hook_array[55].dissect = generic_dissect_hook55;
+  mod_cfg->hook_array[56].dissect = generic_dissect_hook56;
+  mod_cfg->hook_array[57].dissect = generic_dissect_hook57;
+  mod_cfg->hook_array[58].dissect = generic_dissect_hook58;
+  mod_cfg->hook_array[59].dissect = generic_dissect_hook59;
+  mod_cfg->hook_array[60].dissect = generic_dissect_hook60;
+  mod_cfg->hook_array[61].dissect = generic_dissect_hook61;
+  mod_cfg->hook_array[62].dissect = generic_dissect_hook62;
+  mod_cfg->hook_array[63].dissect = generic_dissect_hook63;
+
+  mod_cfg->mod_hash = new_strhash(257);
+  STAILQ_INIT(&mod_cfg->vmod_globlist);
+
+  return (mod_cfg);
+}
+
+static void
+generic_postconfig(orchids_t *ctx)
+{
+  generic_hook_t *hook;
+  generic_vmod_t *vmod;
+  generic_field_t *field;
+  int i;
+  char field_name[128]; /* XXX: correct this ! */
+
+  /* register hooks (as generic modules)
+   * then, the registered callback will post event as the virtual mod matching the field */
+
+  STAILQ_FOREACH(vmod, &gen_cfg_g->vmod_globlist, globvmods) {
+    DebugLog(DF_MOD, DS_DEBUG, "*** adding mod [%s]\n", vmod->name);
+
+    vmod->field_array = Xmalloc(vmod->fields * sizeof (field_t));
+    vmod->field_values = Xzmalloc(vmod->fields * sizeof (ovm_var_t *));
+
+    /* build field array */
+    i = 0;
+    STAILQ_FOREACH(field, &vmod->field_globlist, globfields) {
+      snprintf(field_name, sizeof (field_name), "%s.%s", vmod->name, field->name);
+      DebugLog(DF_MOD, DS_DEBUG, "  *** adding field %i [%s]\n", i, field_name);
+      vmod->field_array[i].name = strdup(field_name);
+      vmod->field_array[i].type = field->type;
+      vmod->field_array[i].desc = field->description;
+      i++;
+    }
+
+    /* add modules */
+    add_module(ctx, &vmod->mod_entry);
+
+    /* register fields */
+    register_fields(ctx, vmod->mod_entry.mod_id, vmod->field_array, vmod->fields);
+  }
+
+  /* register vmod hook stubs */
+  for (i = 0, hook = gen_cfg_g->hook_array;
+       (i < gen_cfg_g->used_hook); hook++, i++) {
+    register_conditional_dissector(ctx, hook->module, hook->condition,
+                                   strlen(hook->condition),
+                                   hook->dissect, NULL);
+  }
+
+  return ;
+}
+
+static void
+add_field(orchids_t *ctx,
+          generic_vmod_t *v,
+          generic_match_t *m,
+          config_directive_t *field_dir)
+{
+  generic_field_t *f, *f2;
+  char buf[256]; /* <- argh ! */
+  char comment_buf[64]; /* <- argh ! */
+  /* add a field match here */
+
+  f = Xzmalloc(sizeof (generic_field_t));
+
+  if ( !strcmp(field_dir->directive, "str_field") ) {
+    f->type = T_VSTR;
+  }
+  else if ( !strcmp(field_dir->directive, "int_field") ) {
+    f->type = T_INT;
+  }
+  else if ( !strcmp(field_dir->directive, "ip4_field") ) {
+    f->type = T_IPV4;
+  }
+  else if ( !strcmp(field_dir->directive, "flt_field") ) {
+    f->type = T_FLOAT;
+  }
+  else {
+    DebugLog(DF_MOD, DS_FATAL, "Unimplemented type '%s'\n", field_dir->directive);
+    exit(EXIT_FAILURE);
+  }
+
+  buf[0] = '\0';
+  comment_buf[0] = '\0';
+  sscanf(field_dir->args, "%64s %i %64[^\n]", buf, &f->substring, comment_buf);
+  f->name = strdup(buf);
+  if (comment_buf[0] != '\0')
+    f->description = strdup(comment_buf);
+
+  STAILQ_INSERT_TAIL(&m->field_list, f, fields);
+  m->fields++;
+
+  if ((f2 = strhash_get(v->field_hash, f->name)) == NULL) {
+    DebugLog(DF_MOD, DS_DEBUG, "    Adding field [%s] into hash and globlist\n", f->name, f->substring);
+    strhash_add(v->field_hash, f, f->name);
+    f->field_id = v->fields++;
+    STAILQ_INSERT_TAIL(&v->field_globlist, f, globfields);
+  } else {
+    f->field_id = f2->field_id;
+  }
+
+  DebugLog(DF_MOD, DS_DEBUG, "    Adding field [%s] %i\n", f->name, f->substring);
+}
+
+static void
+add_fmatch(orchids_t *ctx, generic_vmod_t *v, config_directive_t *fmatch_dir)
+{
+  generic_match_t *m;
+  config_directive_t *field_dir;
+  int ret;
+
+  m = Xzmalloc(sizeof (generic_match_t));
+  STAILQ_INIT(&m->field_list);
+  m->regex_str = strdup(fmatch_dir->args + 1);
+  m->regex_str[ strlen(m->regex_str) - 2] = '\0';
+
+  ret = regcomp(&m->regex, m->regex_str, REG_EXTENDED);
+  if (ret) {
+    char err_buf[64];
+
+    DebugLog(DF_MOD, DS_FATAL, "regex compilation error (%s)\n", m->regex_str);
+    regerror(ret, &m->regex, err_buf, sizeof (err_buf));
+    exit(EXIT_FAILURE);
+  }
+
+  DebugLog(DF_MOD, DS_DEBUG, "    Adding field match [%s]\n", m->regex_str);
+
+  for (field_dir = fmatch_dir->first_child; field_dir; field_dir = field_dir->next) {
+    add_field(ctx, v, m, field_dir);
+  }
+  STAILQ_INSERT_TAIL(&v->match_list, m, matches);
+}
+
+static void
+add_vmod(orchids_t *ctx, generic_hook_t *h, config_directive_t *vmod_dir)
+{
+  generic_vmod_t *vmod;
+  config_directive_t *fmatch_dir;
+  char *mod_name;
+  /* add a virtual module */
+
+  mod_name = strdup(vmod_dir->args);
+  mod_name[ strlen(mod_name) - 1 ] = '\0';
+
+  vmod = strhash_get(gen_cfg_g->mod_hash, mod_name);
+
+  if (vmod == NULL) {
+  vmod = Xzmalloc(sizeof (generic_vmod_t));
+  STAILQ_INIT(&vmod->match_list);
+  STAILQ_INIT(&vmod->field_globlist);
+  vmod->name = mod_name;
+  vmod->mod_entry.magic = MOD_MAGIC;
+  vmod->mod_entry.version = ORCHIDS_VERSION;
+  vmod->mod_entry.mod_id = -1;
+  vmod->mod_entry.name = vmod->name;
+  vmod->field_hash = new_strhash(257);
+
+  DebugLog(DF_MOD, DS_DEBUG, "  Adding virtual module [%s]\n", vmod->name);
+
+  if (find_module(ctx, vmod->name) != NULL) {
+    DebugLog(DF_MOD, DS_DEBUG, "warning! module [%s] already loaded...\n", vmod->name);
+    exit(EXIT_FAILURE);
+  }
+
+  strhash_add(gen_cfg_g->mod_hash, vmod, vmod->name);
+  gen_cfg_g->mods++;
+  STAILQ_INSERT_TAIL(&h->vmod_list, vmod, vmods);
+  STAILQ_INSERT_TAIL(&gen_cfg_g->vmod_globlist, vmod, globvmods);
+
+  }
+  else {
+    DebugLog(DF_MOD, DS_DEBUG, "  Reuse virtual module [%s]\n", vmod->name);
+  }
+
+
+  for (fmatch_dir = vmod_dir->first_child; fmatch_dir; fmatch_dir = fmatch_dir->next) {
+    if (strcmp(fmatch_dir->directive, "<fieldmatch")) {
+      fprintf(stderr, "bad directive ('%s' instead of '<fieldmatch')\n", fmatch_dir->directive);
+      exit(EXIT_FAILURE);
+    }
+    add_fmatch(ctx, vmod, fmatch_dir);
+  }
+  DebugLog(DF_MOD, DS_DEBUG, "end\n");
+}
+
+
+static void
+add_hook(orchids_t *ctx, config_directive_t *dir)
+{
+  generic_hook_t *h;
+  config_directive_t *vmod_dir;
+  char mod_buf[64], mod_cond[256];
+
+  if (gen_cfg_g->used_hook >= MAX_HOOK) {
+    DebugLog(DF_MOD, DS_WARN, "Hook limit reached.\n");
+    exit(EXIT_FAILURE);
+/*     return ; */
+  }
+
+  DebugLog(DF_MOD, DS_DEBUG, "Adding hook #%i [%s]\n", gen_cfg_g->used_hook, dir->args);
+
+  h = &gen_cfg_g->hook_array[ gen_cfg_g->used_hook++ ];
+  STAILQ_INIT(&h->vmod_list);
+  sscanf(dir->args, "%s \"%[^\"]\"", mod_buf, mod_cond);
+  h->module = strdup(mod_buf);
+  h->condition = strdup(mod_cond);
+
+  for (vmod_dir = dir->first_child; vmod_dir; vmod_dir = vmod_dir->next) {
+    if (strcmp(vmod_dir->directive, "<vmod")) {
+      fprintf(stderr, "bad directive ('%s' instead of '<vmod')\n", vmod_dir->directive);
+      exit(EXIT_FAILURE);
+    }
+    add_vmod(ctx, h, vmod_dir);
+  }
+}
+
+
+/* static mod_cfg_cmd_t fieldmatch_config_commands[] = { */
+/*   { "str_field", NULL, "add a string field descriptor" }, */
+/*   { "int_field", NULL, "Add an integer field descriptor"} */
+/* }; */
+
+/* static mod_cfg_cmd_t vmod_config_commands[] = { */
+/*   { "<fieldmatch", NULL, "Add a matching rule" } */
+/* }; */
+
+/* static mod_cfg_cmd_t hook_config_commands[] = { */
+/*   { "<vmod", NULL, "Add a matching rule" } */
+/* }; */
+
+static mod_cfg_cmd_t generic_config_commands[] = 
+{
+  { "<hook", add_hook, "Begin a (conditionnal or unconditional) hook section" },
+  { NULL, NULL, NULL }
+};
+
+input_module_t mod_generic = {
+  MOD_MAGIC,
+  ORCHIDS_VERSION,
+  -1,
+  NULL,
+  NULL,
+  "generic",
+  NULL,
+  generic_config_commands,
+  generic_preconfig,
+  generic_postconfig,
+  NULL
+};
+
+
+
+/*
+** Copyright (c) 2002-2003 by Laboratoire Spécification et Vérification (LSV),
+** CNRS UMR 8643 & ENS Cachan.
+** Written by Julien OLIVAIN.  Not derived from licensed software.
+**
+** Permission is granted to anyone to use this software for any
+** purpose on any computer system, and to redistribute it freely,
+** subject to the following restrictions:
+** 
+**   1. Neither the author nor its employer is responsible for the consequences
+**      of use of this software, no matter how awful, even if they arise from
+**      defects in it.
+** 
+**   2. The origin of this software must not be misrepresented, either
+**      by explicit claim or by omission.
+** 
+**   3. Altered versions must be plainly marked as such, and must not
+**      be misrepresented as being the original software.
+** 
+**   4. This software is restricted to non-commercial use only.
+**      Commercial use is subject to a specific license, obtainable from LSV.
+*/
+
+/* End-of-file */

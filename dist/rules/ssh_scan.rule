@@ -1,0 +1,22 @@
+
+rule ssh_scan {
+  state init {
+    $ip = .sshd.src_ip;
+    $counter = 0;
+
+    if (.sshd.action == "Illegal user")
+      goto bad_user;
+  }
+
+  sate bad_user {
+   $counter = $counter + 1;
+
+   if (.sshd.action == "Illegal user" && .sshd.src_ip == $ip)
+     goto bad_user;
+
+   if ($counter == 10)
+     goto alert;
+  }
+
+  
+}

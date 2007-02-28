@@ -1,0 +1,588 @@
+                                   _     _     _
+      __/\_______    ___  _ __ ___| |__ (_) __| |___   _______/\__
+ _____\    /_____|  / _ \| '__/ __| '_ \| |/ _` / __| |_____\    /_____
+|_____/_  _\_____| | (_) | | | (__| | | | | (_| \__ \ |_____/_  _\_____|
+        \/          \___/|_|  \___|_| |_|_|\__,_|___/         \/
+[pid 7549] Running...
+  -  \  |  /  -  \  |  /  -  \  |  /  -  \  |  /  -  \  |  /  -  \  |  /  -  \  |  /  -  \  |  /  - (KEEP|CONST) str[20] : "Preliminary report :"
+>>>> rule: ptrace <<<<<
+***** state: ptrace_detach *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+    current_env[3]: ($str) (TEMP|UNKNOWN) str[139] : "ssh root@mure 'echo You have been kicked by OrchIDS... | write user && kill -9 $(ps -u 500 -o pid= | xargs) && chsh -s /sbin/nologin user'&"
+-------------------------[ event id: 0x80b2de0 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[18] : "(17) PTRACE_DETACH"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.921663) = Fri Feb 13 16:23:45 2004 (+921663 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@?.......................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.922316) = Fri Feb 13 16:23:45 2004 (+922316 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_poketext *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad950 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : 0x1feb9090
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : 0x4000ed4d
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(4) PTRACE_POKETEXT"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.916160) = Fri Feb 13 16:23:45 2004 (+916160 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.........M..@....F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916693) = Fri Feb 13 16:23:45 2004 (+916693 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_getregs *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad600 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : 0xbffff6c4
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(12) PTRACE_GETREGS"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.915715) = Fri Feb 13 16:23:45 2004 (+915715 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916319) = Fri Feb 13 16:23:45 2004 (+916319 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_syscall *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad290 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(24) PTRACE_SYSCALL"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.915361) = Fri Feb 13 16:23:45 2004 (+915361 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916122) = Fri Feb 13 16:23:45 2004 (+916122 us)
+-----+--------------------------+---------------------------------
+***** state: exec_modprobe *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80acf40 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  32 | rawsnare.cmdline         | (KEEP|UNKNOWN) vstr[33] : "/sbin/modprobe -s -k -- net-pf-14"
+  29 | rawsnare.path            | (KEEP|UNKNOWN) vstr[14] : "/sbin/modprobe"
+  28 | rawsnare.workdir         | (KEEP|UNKNOWN) vstr[1] : "/"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1605
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1606
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 0
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 0
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 0
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(11) SYS_execve"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 3
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.914858) = Fri Feb 13 16:23:45 2004 (+914858 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[1596] : "..........,@........................F...E...ptrace-kmod...../sbin/modprobe................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................../.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................../sbin/modprobe -s -k -- net-pf-14............/ptrace-kmod....[rG..bH.=.1.SK.J(..'...S.i...K..iT...Q.w..I....r..!...:5.~0"..i.+.}...YL...F.....r....).H_......v.. .........7.......i...6d xH.......p.O.......m.c....'.Y`..`]$I.?&..t....z<......od.v....d.B..`-(..'.>.BF..B.rX.@...).!.....o.TY..%.Dn.p\E.bm4&....TT.....!i.....l.1).Cm.'&....|n...Rf....bl`.g...D....#....h.O4.[...D.3%3(k}9.J.bS.../A0`2...<Ni3F...aS..]..b.g.N9.zx..*.c.M.|....5......{...ApM..*...............'.e................#.Y..H$'......[.]9..V.Z....f"
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916079) = Fri Feb 13 16:23:45 2004 (+916079 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_attach *****
+    current_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+    current_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+    current_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ac588 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[18] : "(16) PTRACE_ATTACH"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.852105) = Fri Feb 13 16:23:45 2004 (+852105 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.852732) = Fri Feb 13 16:23:45 2004 (+852732 us)
+-----+--------------------------+---------------------------------
+***** state: init *****
+            env[0]: ($attack_pid) nil
+            env[1]: ($target_pid) nil
+            env[2]: ($attacker_uid) nil
+            env[3]: ($str) nil
+no event.
+ \  |  / (KEEP|CONST) str[14] : "Final report :"
+>>>> rule: ptrace <<<<<
+***** state: make_report *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+  inherited_env[3]: ($str) (TEMP|UNKNOWN) str[139] : "ssh root@mure 'echo You have been kicked by OrchIDS... | write user && kill -9 $(ps -u 500 -o pid= | xargs) && chsh -s /sbin/nologin user'&"
+-------------------------[ event id: 0x80b5918 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[8] : "modprobe"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1606
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 0
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 0
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 0
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[12] : "(1) SYS_exit"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 2
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.922482) = Fri Feb 13 16:23:45 2004 (+922482 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[60] : "..........,@r.......................F...D...modprobe........"
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.929725) = Fri Feb 13 16:23:45 2004 (+929725 us)
+-----+--------------------------+---------------------------------
+***** state: audit_loop *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+  inherited_env[3]: ($str) (TEMP|UNKNOWN) str[139] : "ssh root@mure 'echo You have been kicked by OrchIDS... | write user && kill -9 $(ps -u 500 -o pid= | xargs) && chsh -s /sbin/nologin user'&"
+-------------------------[ event id: 0x80b5690 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  31 | rawsnare.createmode      | (KEEP|UNKNOWN) int : 3565
+  30 | rawsnare.mode            | (KEEP|UNKNOWN) int : 0
+  29 | rawsnare.path            | (KEEP|UNKNOWN) vstr[47] : "/local/home/user/ptrace-exploit-kit/ptrace-kmod"
+  28 | rawsnare.workdir         | (KEEP|UNKNOWN) vstr[1] : "/"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[8] : "modprobe"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1606
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 0
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 0
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 0
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[14] : "(15) SYS_chmod"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 1
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.922228) = Fri Feb 13 16:23:45 2004 (+922228 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[1092] : "....$.....,@t.......................F...D...modprobe......../local/home/user/ptrace-exploit-kit/ptrace-kmod.al/home/user/ptrace-exploit-kit/ptrace-kmod.n/modprobe........................................................................................................................................................................................................................................................................................................................................................................................................................../......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.929700) = Fri Feb 13 16:23:45 2004 (+929700 us)
+-----+--------------------------+---------------------------------
+***** state: audit_loop *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+  inherited_env[3]: ($str) (TEMP|UNKNOWN) str[139] : "ssh root@mure 'echo You have been kicked by OrchIDS... | write user && kill -9 $(ps -u 500 -o pid= | xargs) && chsh -s /sbin/nologin user'&"
+-------------------------[ event id: 0x80b4f80 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  41 | rawsnare.owner_gid       | (KEEP|UNKNOWN) int : 0
+  40 | rawsnare.owner_uid       | (KEEP|UNKNOWN) int : 0
+  29 | rawsnare.path            | (KEEP|UNKNOWN) vstr[47] : "/local/home/user/ptrace-exploit-kit/ptrace-kmod"
+  28 | rawsnare.workdir         | (KEEP|UNKNOWN) vstr[1] : "/"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[8] : "modprobe"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1606
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 0
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 0
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 0
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(182) SYS_chown"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 6
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.921948) = Fri Feb 13 16:23:45 2004 (+921948 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[1092] : "....$.....,@\.......................F...D...modprobe......../local/home/user/ptrace-exploit-kit/ptrace-kmod.n/modprobe....................................................................................................................................................................................................................................................................................................................................................................................................................................................................../......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.929664) = Fri Feb 13 16:23:45 2004 (+929664 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_detach *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+    current_env[3]: ($str) (TEMP|UNKNOWN) str[139] : "ssh root@mure 'echo You have been kicked by OrchIDS... | write user && kill -9 $(ps -u 500 -o pid= | xargs) && chsh -s /sbin/nologin user'&"
+-------------------------[ event id: 0x80b2de0 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[18] : "(17) PTRACE_DETACH"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.921663) = Fri Feb 13 16:23:45 2004 (+921663 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@?.......................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.922316) = Fri Feb 13 16:23:45 2004 (+922316 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_poketext *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad950 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : 0x1feb9090
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : 0x4000ed4d
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(4) PTRACE_POKETEXT"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.916160) = Fri Feb 13 16:23:45 2004 (+916160 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.........M..@....F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916693) = Fri Feb 13 16:23:45 2004 (+916693 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_getregs *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad600 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : 0xbffff6c4
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(12) PTRACE_GETREGS"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.915715) = Fri Feb 13 16:23:45 2004 (+915715 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916319) = Fri Feb 13 16:23:45 2004 (+916319 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_syscall *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ad290 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[19] : "(24) PTRACE_SYSCALL"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.915361) = Fri Feb 13 16:23:45 2004 (+915361 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916122) = Fri Feb 13 16:23:45 2004 (+916122 us)
+-----+--------------------------+---------------------------------
+***** state: exec_modprobe *****
+  inherited_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+  inherited_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+  inherited_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80acf40 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  32 | rawsnare.cmdline         | (KEEP|UNKNOWN) vstr[33] : "/sbin/modprobe -s -k -- net-pf-14"
+  29 | rawsnare.path            | (KEEP|UNKNOWN) vstr[14] : "/sbin/modprobe"
+  28 | rawsnare.workdir         | (KEEP|UNKNOWN) vstr[1] : "/"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1605
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1606
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 0
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 0
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 0
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(11) SYS_execve"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 3
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.914858) = Fri Feb 13 16:23:45 2004 (+914858 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[1596] : "..........,@........................F...E...ptrace-kmod...../sbin/modprobe................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................../.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................../sbin/modprobe -s -k -- net-pf-14............/ptrace-kmod....[rG..bH.=.1.SK.J(..'...S.i...K..iT...Q.w..I....r..!...:5.~0"..i.+.}...YL...F.....r....).H_......v.. .........7.......i...6d xH.......p.O.......m.c....'.Y`..`]$I.?&..t....z<......od.v....d.B..`-(..'.>.BF..B.rX.@...).!.....o.TY..%.Dn.p\E.bm4&....TT.....!i.....l.1).Cm.'&....|n...Rf....bl`.g...D....#....h.O4.[...D.3%3(k}9.J.bS.../A0`2...<Ni3F...aS..]..b.g.N9.zx..*.c.M.|....5......{...ApM..*...............'.e................#.Y..H$'......[.]9..V.Z....f"
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.916079) = Fri Feb 13 16:23:45 2004 (+916079 us)
+-----+--------------------------+---------------------------------
+***** state: ptrace_attach *****
+    current_env[0]: ($attack_pid) (KEEP|UNKNOWN) int : 1605
+    current_env[1]: ($target_pid) (KEEP|UNKNOWN) int : 1606
+    current_env[2]: ($attacker_uid) (KEEP|UNKNOWN) int : 500
+            env[3]: ($str) nil
+-------------------------[ event id: 0x80ac588 ]------------------
+ fid |         attribute        |         value
+-----+--------------------------+---------------------------------
+  49 | rawsnare.ptrace_data     | (KEEP|UNKNOWN) ptr32 : (nil)
+  48 | rawsnare.ptrace_addr     | (KEEP|UNKNOWN) ptr32 : (nil)
+  47 | rawsnare.ptrace_pid      | (KEEP|UNKNOWN) int : 1606
+  46 | rawsnare.ptrace_req      | (KEEP|UNKNOWN) vstr[18] : "(16) PTRACE_ATTACH"
+  27 | rawsnare.retcode         | (KEEP|UNKNOWN) int : 0
+  26 | rawsnare.procname        | (KEEP|UNKNOWN) vstr[11] : "ptrace-kmod"
+  25 | rawsnare.ppid            | (KEEP|UNKNOWN) int : 1604
+  24 | rawsnare.pid             | (KEEP|UNKNOWN) int : 1605
+  23 | rawsnare.egid            | (KEEP|UNKNOWN) int : 500
+  22 | rawsnare.euid            | (KEEP|UNKNOWN) int : 500
+  21 | rawsnare.rgid            | (KEEP|UNKNOWN) int : 500
+  20 | rawsnare.ruid            | (KEEP|UNKNOWN) int : 500
+  19 | rawsnare.syscall         | (KEEP|UNKNOWN) vstr[15] : "(26) SYS_ptrace"
+  18 | rawsnare.class           | (KEEP|UNKNOWN) int : 10
+  17 | rawsnare.time            | (KEEP|MONO) timeval : (1076685825.852105) = Fri Feb 13 16:23:45 2004 (+852105 us)
+   9 | udp.msg                  | (KEEP|UNKNOWN) bstr[76] : "....,.....,@........................E...D...ptrace-kmod.................F..."
+   8 | udp.dst_port             | (KEEP|UNKNOWN) int : 6262
+   5 | udp.src_addr             | (KEEP|UNKNOWN) ipv4 : 138.231.81.128 (name=mure alias=mure.lsv.ens-cachan.fr)
+   4 | udp.time                 | (KEEP|MONO) timeval : (1076685825.852732) = Fri Feb 13 16:23:45 2004 (+852732 us)
+-----+--------------------------+---------------------------------
+***** state: init *****
+            env[0]: ($attack_pid) nil
+            env[1]: ($target_pid) nil
+            env[2]: ($attacker_uid) nil
+            env[3]: ($str) nil
+no event.
+
+/* Generated by orchids */
+
+digraph "ptrace" {
+  "init.0x80ac5b0" [ label="init" ]
+  "ptrace_attach.0x80ac670" [ label="ptrace_attach" ]
+  "init.0x80ac5b0" -> "ptrace_attach.0x80ac670" [ ]
+  "exec_modprobe.0x80ad028" [ label="exec_modprobe" ]
+  "ptrace_attach.0x80ac670" -> "exec_modprobe.0x80ad028" [ ]
+  "ptrace_syscall.0x80ad378" [ label="ptrace_syscall" ]
+  "exec_modprobe.0x80ad028" -> "ptrace_syscall.0x80ad378" [ ]
+  "ptrace_poketext.0x80b2b78" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b2b78" [ ]
+  "ptrace_poketext.0x80b27a0" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b27a0" [ ]
+  "ptrace_poketext.0x80b23c8" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b23c8" [ ]
+  "ptrace_poketext.0x80b1ff0" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b1ff0" [ ]
+  "ptrace_poketext.0x80b1c18" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b1c18" [ ]
+  "ptrace_poketext.0x80b1840" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b1840" [ ]
+  "ptrace_poketext.0x80b1468" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b1468" [ ]
+  "ptrace_poketext.0x80b1090" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b1090" [ ]
+  "ptrace_poketext.0x80b0cb8" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b0cb8" [ ]
+  "ptrace_poketext.0x80b08e0" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b08e0" [ ]
+  "ptrace_poketext.0x80b0508" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b0508" [ ]
+  "ptrace_poketext.0x80b0130" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80b0130" [ ]
+  "ptrace_poketext.0x80afd58" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80afd58" [ ]
+  "ptrace_poketext.0x80af980" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80af980" [ ]
+  "ptrace_poketext.0x80af5a8" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80af5a8" [ ]
+  "ptrace_poketext.0x80af1d0" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80af1d0" [ ]
+  "ptrace_poketext.0x80aedf8" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80aedf8" [ ]
+  "ptrace_poketext.0x80aea20" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80aea20" [ ]
+  "ptrace_poketext.0x80ae648" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80ae648" [ ]
+  "ptrace_poketext.0x80ae270" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80ae270" [ ]
+  "ptrace_poketext.0x80ade98" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80ade98" [ ]
+  "ptrace_poketext.0x80adac0" [ label="ptrace_poketext" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_poketext.0x80adac0" [ ]
+  "ptrace_getregs.0x80ad6e8" [ label="ptrace_getregs" ]
+  "ptrace_syscall.0x80ad378" -> "ptrace_getregs.0x80ad6e8" [ ]
+  "ptrace_poketext.0x80b2af0" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b2af0" [ ]
+  "ptrace_poketext.0x80b2718" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b2718" [ ]
+  "ptrace_poketext.0x80b2340" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b2340" [ ]
+  "ptrace_poketext.0x80b1f68" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b1f68" [ ]
+  "ptrace_poketext.0x80b1b90" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b1b90" [ ]
+  "ptrace_poketext.0x80b17b8" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b17b8" [ ]
+  "ptrace_poketext.0x80b13e0" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b13e0" [ ]
+  "ptrace_poketext.0x80b1008" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b1008" [ ]
+  "ptrace_poketext.0x80b0c30" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b0c30" [ ]
+  "ptrace_poketext.0x80b0858" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b0858" [ ]
+  "ptrace_poketext.0x80b0480" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b0480" [ ]
+  "ptrace_poketext.0x80b00a8" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80b00a8" [ ]
+  "ptrace_poketext.0x80afcd0" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80afcd0" [ ]
+  "ptrace_poketext.0x80af8f8" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80af8f8" [ ]
+  "ptrace_poketext.0x80af520" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80af520" [ ]
+  "ptrace_poketext.0x80af148" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80af148" [ ]
+  "ptrace_poketext.0x80aed70" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80aed70" [ ]
+  "ptrace_poketext.0x80ae998" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80ae998" [ ]
+  "ptrace_poketext.0x80ae5c0" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80ae5c0" [ ]
+  "ptrace_poketext.0x80ae1e8" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80ae1e8" [ ]
+  "ptrace_poketext.0x80ade10" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80ade10" [ ]
+  "ptrace_poketext.0x80ada38" [ label="ptrace_poketext" ]
+  "ptrace_getregs.0x80ad6e8" -> "ptrace_poketext.0x80ada38" [ ]
+  "ptrace_detach.0x80b2ec8" [ label="ptrace_detach" ]
+  "ptrace_poketext.0x80ada38" -> "ptrace_detach.0x80b2ec8" [ ]
+  "audit_loop.0x80b56d8" [ label="audit_loop" ]
+  "ptrace_detach.0x80b2ec8" -> "audit_loop.0x80b56d8" [ ]
+  "audit_loop.0x80b4fc8" [ label="audit_loop" ]
+  "ptrace_detach.0x80b2ec8" -> "audit_loop.0x80b4fc8" [ ]
+  "audit_loop.0x80b56a0" [ label="audit_loop" ]
+  "audit_loop.0x80b4fc8" -> "audit_loop.0x80b56a0" [ ]
+  "make_report.0x80b5960" [ label="make_report" ]
+  "audit_loop.0x80b56a0" -> "make_report.0x80b5960" [ ]
+  "audit_loop.0x80b5928" [ label="audit_loop" ]
+  "audit_loop.0x80b56a0" -> "audit_loop.0x80b5928" [ ]
+}
+-----------------------------[ orchids statistics ]-------------------------
+           property |  value
+--------------------+-------------------------------------------------------
+        Real uptime : 1 s
+          User time : 0.010 s
+        System time : 0.000 s
+     total CPU time : 0.010 s
+   Average CPU load :  1.00 %
+   Pre-config. time : 0.626 ms
+  Rules compil time : 0.306 ms
+  Post-config. time : 0.468 ms
+- - - - - - - - - - + - - - - -[ linux specific ]- - - - - - - - - - - - - -
+                pid : 7549
+               ppid : 31409
+             tty_nr : 34817
+           priority : 13
+               nice : 0
+              vsize : 2031616 bytes (1.938 MB)
+                rss : 279 pages (1.090 MB)
+               rlim : 4294967295 bytes
+            blocked : 0x00000000
+          sigignore : 0x00000000
+           sigcatch : 0x00000000
+          processor : 0
+- - - - - - - - - - + - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+current config file : 'orchids.conf'
+     loaded modules : 12
+current poll period : 30
+    registed fields : 140
+    injected events : 43
+      active events : 29
+     rule instances : 1
+    state instances : 0
+     ovm stack size : 128
+--------------------+-------------------------------------------------------
+explicit shutdown on 'ptrace:make_report' request
+Changing shell for user.
+Shell changed.

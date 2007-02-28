@@ -1,0 +1,202 @@
+%{
+
+/*
+** netfilter.l -- parser for event_generator
+**
+** grep NF_ netfilter.l | sed 's/^[^(]*(\(NF_[A-Z]*\))[^)]*$/\1/g'
+*/
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/stat.h> /* for open() modes */
+
+#include "netfilter.tab.h"
+
+  /* #include "netfilter.h" */
+
+#include "orchids.h"
+
+int netfilterlex(void);
+void netfiltererror(char *s);
+
+extern void netfilter_set_str(char *str, size_t s);
+extern void netfilter_set_attrs(ovm_var_t **attr_fields);
+extern int netfilterparse(void);
+extern void netfilter_reset(void);
+
+static char *input_string_g = NULL;
+static int   input_string_sz_g = 0;
+static char *input_string_ptr_g = NULL;
+static int input_offset = 0;
+static YY_BUFFER_STATE state_g;
+
+int my_yyinput(char *buf, int max_size);
+
+/* #define YY_INPUT(b, r, ms) (r = my_yyinput(b, ms)) */
+
+%}
+
+%option nounput never-interactive
+
+%%
+
+ /* reserved keywords and operators */
+"IN"      { input_offset += 2; return (NF_IN);      }
+"PHYSIN"  { input_offset += 6; return (NF_PHYSIN);      }
+"OUT"     { input_offset += 3; return (NF_OUT);       }
+"PHYSOUT" { input_offset += 7; return (NF_PHYSOUT);    }
+"MAC"     { input_offset += 3; return (NF_MAC);    }
+
+"SRC" { input_offset += 3; return (NF_SRC); }
+"DST" { input_offset += 3; return (NF_DST); }
+"LEN" { input_offset += 3; return (NF_LEN); }
+"TOS" { input_offset += 3; return (NF_TOS); }
+"PREC" { input_offset += 4; return (NF_PREC); }
+"TTL" { input_offset += 3; return (NF_TTL); }
+"ID" { input_offset += 2; return (NF_ID); }
+"CE" { input_offset += 2; return (NF_CE); }
+"DF" { input_offset += 2; return (NF_DF); }
+"MF" { input_offset += 2; return (NF_MF); }
+"FRAG" { input_offset += 4; return (NF_FRAG); }
+"OPT" { input_offset += 3; return (NF_OPT); }
+
+"PROTO" { input_offset += 5; return (NF_PROTO); }
+"INCOMPLETE" { input_offset += 9; return (NF_INCOMPLETE); }
+
+"TCP" { input_offset += 3; return (NF_TCP); }
+"SPT" { input_offset += 3; return (NF_SPT); }
+"DPT" { input_offset += 3; return (NF_DPT); }
+"SEQ" { input_offset += 3; return (NF_SEQ); }
+"ACK" { input_offset += 3; return (NF_ACK); }
+"WINDOW" { input_offset += 6; return (NF_WINDOW); }
+"RES" { input_offset += 3; return (NF_RES); }
+
+"CWR" { input_offset += 3; return (NF_CWR); }
+"ECE" { input_offset += 3; return (NF_ECE); }
+"URG" { input_offset += 3; return (NF_URG); }
+"PSH" { input_offset += 4; return (NF_PSH); }
+"RST" { input_offset += 3; return (NF_RST); }
+"SYN" { input_offset += 3; return (NF_SYN); }
+"FIN" { input_offset += 3; return (NF_FIN); }
+
+"URGP" { input_offset += 4; return (NF_URGP); }
+
+"UDP" { input_offset += 3; return (NF_UDP); }
+
+"ICMP" { input_offset += 4; return (NF_ICMP); }
+"TYPE" { input_offset += 4; return (NF_TYPE); }
+"CODE" { input_offset += 4; return (NF_CODE); }
+"PARAMETER" { input_offset += 9; return (NF_PARAM); }
+"GATEWAY" { input_offset += 7; return (NF_GATEWAY); }
+"MTU" { input_offset += 3; return (NF_MTU); }
+
+"bytes" { input_offset += 5; return (NF_BYTES); }
+
+[0-9]+ {
+  netfilterlval.integer = atoi(netfiltertext);
+  input_offset += netfilterleng;
+  return (INTEGER);
+}
+[a-zA-Z][a-zA-Z0-9_\-]+ {
+  netfilterlval.string = strdup(netfiltertext);
+  input_offset += netfilterleng;
+  return (STRING);
+}
+0x[0-9A-F][0-9A-F] {
+  sscanf(netfiltertext, "0x%02X", &netfilterlval.integer);
+  input_offset += netfilterleng;
+  return (HEXBYTE);
+}
+([0-9]{1,3}\.){3}[0-9]{1,3} {
+  netfilterlval.ipv4addr.s_addr = inet_addr(netfiltertext);
+  input_offset += netfilterleng;
+  return (INETADDR);
+}
+([0-9a-f]{2}:)+[0-9a-f]{2} {
+  int i;
+  int mac_len;
+  int digit;
+
+  mac_len = (netfilterleng + 1) / 3;
+  DPRINTF( ("MACINFO sz=%i \n", mac_len) );
+  netfilterlval.mac_info = NULL;
+#if 0
+  netfilterlval.mac_info = malloc(mac_len);
+  for (i = 0; i < mac_len; i++) {
+    netfiltertext[ i * 3 + 2 ] = '\0';
+    sscanf(&netfiltertext[ i * 3 ], "%02x", &digit);
+    netfilterlval.mac_info[i] = (unsigned char) digit;
+  }
+#endif
+
+  input_offset += netfilterleng;
+  return (MACINFO);
+}
+\n /* skip new lines */;
+
+. { input_offset++; return (netfiltertext[0]); }
+
+
+%%
+
+/* <ADDRESS>([0-9]{1,3}\.){3}[0-9]{1,3} { snarelval.ipv4addr.s_addr = inet_addr(snaretext); return (INETADDR); } */
+/* <ADDRESS>[0-9]+ { snarelval.integer = atoi(snaretext); return (INTEGER); } */
+/* <ADDRESS>\t { BEGIN INITIAL; return (snaretext[0]); } */
+/* <ADDRESS>. { return (snaretext[0]); } */
+
+/*
+** yywrap()
+*/
+
+int
+my_yyinput(char *buf, int max_size)
+{
+  int n;
+
+  DPRINTF( ("my_yyinput(%p, %i)\n", buf, max_size) );
+
+  if (max_size > (input_string_g + input_string_sz_g - input_string_ptr_g))
+    n = (input_string_g + input_string_sz_g - input_string_ptr_g);
+  else
+    n = max_size;
+
+  if (n > 0)
+    {
+      memcpy(buf, input_string_ptr_g, n);
+      input_string_ptr_g += n;
+    }
+
+  return (n);
+}
+
+void
+netfilter_reset(void)
+{
+/*   netfilter_flush_buffer(YY_CURRENT_BUFFER); */
+  /* BEGIN(INITIAL); */
+  netfilter_delete_buffer(state_g);
+}
+
+void
+netfilter_set_str(char *str, size_t s)
+{
+/*   input_string_g = str; */
+/*   input_string_sz_g = s; */
+/*   input_string_ptr_g = str; */
+  state_g = netfilter_scan_bytes(str, s);
+}
+
+int
+netfilterwrap(void)
+{
+  return (1);
+}

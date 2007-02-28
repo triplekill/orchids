@@ -1,0 +1,39 @@
+#
+# Doxygen configuration for orchids
+#
+
+PROJECT_NAME = "Orchids Modules"
+
+OUTPUT_DIRECTORY = doc/modules
+
+# RECURSIVE = YES
+
+INPUT = modules/
+FILE_PATTERNS = *.h *.c
+EXCLUDE = modules/snare.tab.c modules/snare.tab.h modules/snare.yy.c \
+      modules/netfilter.tab.c modules/netfilter.tab.h modules/netfilter.yy.c
+EXTRACT_ALL = YES
+JAVADOC_AUTOBRIEF = YES
+SOURCE_BROWSER = YES
+GENERATE_HTML = YES
+GENERATE_LATEX = YES
+GENERATE_TREEVIEW = YES
+HAVE_DOT = YES
+CALL_GRAPH = YES
+OPTIMIZE_OUTPUT_FOR_C = YES
+EXTRACT_STATIC = YES
+# USE_PDFLATEX = YES
+PDF_HYPERLINKS = YES
+
+ENABLE_PREPROCESSING = YES
+MACRO_EXPANSION = YES
+EXPAND_ONLY_PREDEF = YES
+#PREDEFINED = DEBUG
+
+INLINE_SOURCES = YES
+
+COMPACT_LATEX = YES
+PAPER_TYPE = a4
+
+EXTRA_PACKAGES = a4wide
+

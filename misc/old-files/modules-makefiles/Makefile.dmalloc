@@ -1,0 +1,69 @@
+##
+## libmods Makefile
+##
+
+CC = gcc
+RM = rm -f
+AR = ar
+RANLIB = ranlib
+LEX = flex
+YACC = bison
+
+##
+
+NAME = libmods.a
+SRCS = mod_textfile.c mod_udp.c mod_syslog.c mod_rawsnare.c \
+       mod_generic.c mod_remoteadm.c mod_test.c mod_test2.c \
+       mod_snare.c snare.yy.c snare.tab.c \
+       mod_netfilter.c netfilter.yy.c netfilter.tab.c \
+       mod_sunbsm.c mod_cisco.c mod_snmp.c mod_win32evt.c
+IPATH = -I. -I.. -I../util
+LPATH =
+
+DEBUG = -g -DDMALLOC #-g -DORCHIDS_DEBUG -DENABLE_DEBUGLOG #-pg
+
+# -fomit-frame-pointer for release
+CFLAGS = -O2 -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe $(DEBUG)
+LDFLAGS = -O2 -Wall $(LPATH) -pipe $(DEBUG)
+LIBS = -ldmalloc
+OBJS = $(SRCS:.c=.o)
+
+##
+
+all: $(NAME)
+##
+
+
+netfilter.tab.h: netfilter.tab.c
+
+netfilter.tab.c: netfilter.y
+	$(YACC) -p netfilter -d -b netfilter netfilter.y
+
+netfilter.yy.c: netfilter.l netfilter.tab.h
+	$(LEX) -f -Pnetfilter -onetfilter.yy.c netfilter.l
+
+
+snare.tab.h: snare.tab.c
+
+snare.tab.c: snare.y
+	$(YACC) -p snare -d -b snare snare.y
+
+snare.yy.c: snare.l snare.tab.h
+	$(LEX) -f -Psnare -osnare.yy.c snare.l
+
+
+$(NAME): $(OBJS)
+	$(AR) -rv $(NAME) $(OBJS)
+	$(RANLIB) $(NAME)
+##
+clean:
+	$(RM) $(NAME) $(OBJS) \
+        netfilter.tab.c netfilter.tab.h netfilter.yy.c \
+	snare.yy.c snare.tab.c snare.tab.h \
+        *~ \#* .\#* core core.[0-9]*
+##
+rclean: clean
+	$(RM) -r ./doc/
+##
+re: clean all
+##

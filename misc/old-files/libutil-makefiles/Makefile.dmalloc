@@ -1,0 +1,39 @@
+##
+## libutil Makefile
+##
+
+CC = gcc
+RM = rm -f
+AR = ar
+RANLIB = ranlib
+
+##
+
+NAME = libutil.a
+SRCS = crc32.c hash.c strhash.c list.c safelib.c stack.c string_util.c \
+       tree.c ringqueue.c queue.c array.c linux_process_info.c debuglog.c
+IPATH = -I. -I..
+LPATH =
+
+DEBUG = -DDMALLOC -DORCHIDS_DEBUG -DENABLE_DEBUGLOG #-g  #-pg
+
+# -fomit-frame-pointer for release
+CFLAGS = -O2 -Wall -Wstrict-prototypes -Wmissing-prototypes $(IPATH) -pipe $(DEBUG)
+LDFLAGS = -O2 -Wall $(LPATH) -pipe $(DEBUG)
+LIBS = -ldmalloc
+OBJS = $(SRCS:.c=.o)
+
+##
+
+all: $(NAME)
+##
+
+$(NAME): $(OBJS)
+	$(AR) -rv $(NAME)  $(OBJS)
+	$(RANLIB) $(NAME)
+##
+clean:
+	$(RM) $(NAME) $(OBJS) *~ \#* .\#* core
+##
+re: clean all
+##

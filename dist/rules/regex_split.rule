@@ -1,0 +1,23 @@
+/*
+** rule for testing regex splitting
+*/
+
+rule regex_split {
+
+  state init {
+    $a = "abc:def:ghi:jkl";
+    / $a / "^([a-z]*):([a-z]*):([a-z]*):([a-z]*)$" / $b / $c / $d / $e;
+    print($a); /* "abc:def:ghi:jkl" */
+    print($b); /* "abc" */
+    print($c); /* "def" */
+    print($d); /* "ghi" */
+    print($e); /* "jkl" */
+
+    goto end;
+  }
+
+  state end {
+    print("end\n");
+  }
+
+}

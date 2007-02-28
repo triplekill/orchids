@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# Startup script for orchids
+#
+# chkconfig: - 80 20
+# description: OrchIDS
+# processname: orchids
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source net-entropy config
+if [ -f /etc/sysconfig/orchids ]; then
+        . /etc/sysconfig/orchids
+fi
+
+RETVAL=0
+
+start() {
+    echo -n $"Starting OrchIDS: "
+    daemon /usr/bin/orchids -D $ORCHIDS_OPTIONS
+    RETVAL=$?
+    echo
+    [ $RETVAL = 0 ] && touch /var/lock/subsys/orchids
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Stopping OrchIDS: "
+    killproc orchids
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/orchids
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+	status orchids
+	;;
+  restart)
+	stop
+	start
+	;;
+  *)
+	echo $"Usage: orchids {start|stop|restart|status}"
+	exit 1
+esac
+
+exit $RETVAL
+

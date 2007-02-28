@@ -1,0 +1,110 @@
+- Ajouter les files temps reel
+- faire une api pour ajouter des fonctions de maniere dynamique
+- idem pour les type de donnees
+- faire un module de timestamping d'horloge
+- ajouter les parametres arbitraires aux fonctions des sous-decodeurs
+- faire une fonction de sauvegarde de flot d'evenement
+
+------
+
+- dans mod_netfilter, decoder le header ethernet dans le cas ou MAC=blah
+  est de 14 octets (eth dst, eth src, proto).
+
+- creer un cache central des mibs snmp, avec regles de detections.
+
+- ajouter un catch-all de evenements non identifies vers une console de secu ?
+
+- terminer l'analyseur frequentiel
+
+- creer le module mod_snmptrap
+ - utiliser le module orchids mod_udp plutot que le snmp_read()
+ - parser les donnees avec snmp_pdu_parse() et reecrire l'equivalent
+   de _snmp_parse() pour snmp v1 et v2c.
+
+--------
+
+- ajouter des stats dans les transitions ??
+ - nombre de threads attendant sur cette transition ?
+
+- rediriger les sorties d'executions de programmes dans un automate
+  vers un fichier qui sera inclus dans le rapport final.
+
+- ajouter dans le compilateur, un precalcul et un hachage des constantes.
+  Les constantes equivalentes seront regroupees. De plus, les operations
+  sur des constantes peuvent etre executees a la compilation.
+  (Reduction du nombre d'instructions, et du nombre de constantes).
+
+- ajouter la propagation de l'information de monotonie au runtime
+  (evaluation des actions).
+
+- ajouter dans les codes de retours de la vm d'evaluation :
+ - un code pour dire que l'evenement MATCH une condition
+ - un code pour dire que l'evenement ne MATCH PAS, mais _aurait_ pu matcher
+   (c-a-d qui a les bon champs mais pas les bonnes valeurs: mm domaine)
+   l'evt pourra etre reutilise ulterieurement... (reinjection apres tri ?)
+ - un code pour dire que l'evt ne MATCH PAS car il n'a pas les bon champs
+   (elimination statique)
+
+- ajouter une liste d'evenements actifs avec un comptage de references.
+
+- ajouter une fonction comit_path()/explicit_cut() pour faire une coupure et
+  un elagage explicite
+
+- faire une options dans le dump de l'arbre des chemins pour "illuminer" le
+  chemin qui a mene a un l'etat faisant l'appel.
+
+- on ne peut pas entrer de mnombre negatif actuelement. modif la grammaire.
+
+- dans le langage orchids (issdl) on ne peut pas avoir de fonctions
+  encapsulees (ex. print( random() ) ) modifier la grammaire en consequence
+  et ajouter un typage pour le retour des fonctions (et faire une verif
+  de type a la compil).
+
+- changer les type de noeuds NODE_INT NODE_STR NODE_*
+  en NODE_CONST ou NODE_TERM, l'info de type est stocke dans le type
+  de la valeur.
+
+- ajouter le support des constructeurs a la compilation
+  (teste avec _IPV4("127.0.0.1")) ajouter:
+  - _CTIME( int_value )
+  - _CTIME( "Date String" );
+  - _IPV4( "host_name_or_ip" );
+  - _TIMEVAL( sec, tvsec);
+  - _TIMEVAL( "date string", tvsec);
+  - _COUNTER( start_value );
+
+- ajouter une structure "d'enregistrement d'evenement" pour mettre en place
+  un comptage de reference (pour faire un gc minimal).
+
+- ajouter un mode 'batch' entierement en ligne de commande
+
+- ajouter des fonctions de conversion de type (pour le language orchids)
+  ex. string_from_ipv4($host)
+  etablir la liste des conversions possible avec une matrice des types.
+
+- implementer les opcodes de l'ovm (+ la gestion des conversions
+  implicites de types: vstr/str vbinstr/binstr timeval/ctime ?...)
+
+- corriger la fonction de simulation et la gestion des transitions
+   blocantes/non-blocantes (DONE ?).
+
+- refaire de bytecode_buffer de sorte qu'il soit entierement dynamique
+  (comme les listes du compilo)
+
+- faire la gestion des conditions de demarrage (appartenance a un domaine)
+  a partir des champs utilises dans les conditions et dans les actions
+  (affectations).
+
+- faire une version iterative de l'algo de simulation
+
+- tester
+ - ULTRIX ogpsrv.unice.fr 4.4 0 RISC
+ - OSF1 daneel V4.0 1229 alpha
+ - Linux cassis.lsv.ens-cachan.fr 2.4.18-3 i686 unknown
+ - FreeBSD goofy.cultdeadsheep.org 4.6-STABLE FreeBSD 4.6-STABLE
+- ajouter une verification et une conversion vers un nom de 
+  fichier absolu dans le module mod_syslog
+
+- convertir la SafeLib en macro cpp
+ - cela permetra d'avoir le vrai point d'erreur
+ - ce sera beaucoup plus performant

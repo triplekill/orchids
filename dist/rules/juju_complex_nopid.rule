@@ -1,0 +1,54 @@
+/*
+** JuJu Rule
+*/
+
+rule complex
+{
+  state init {
+    $a = 1;
+    if (.test.eventtype == 0)
+      goto state_0;
+  }
+
+  state state_0 {
+    print("enter state_0");
+    $a = $a + 1;
+    if (.test.eventtype == 1)
+      goto state_1;
+    if (.test.eventtype == 2)
+      goto state_2;
+  }
+
+  state state_1 {
+    $a = $a + 2;
+    print("enter state_1");
+    if (.test.eventtype == 3)
+      goto state_0;
+    if (.test.eventtype == 4)
+      goto state_1;
+    if (.test.eventtype == 5)
+      goto state_2;
+  }
+
+  state state_2 {
+    $a = $a + 3;
+    print("enter state_2");
+    if (.test.eventtype == 6)
+      goto state_3;
+  }
+
+  state state_3 {
+    $a = $a + 4;
+    print("enter state_3");
+    if (.test.eventtype == 7)
+      goto state_0;
+    if (.test.eventtype == 8)
+      goto fin;
+  }
+
+  state fin {
+    print("fin complex.");
+    dump_stack();
+    shutdown();
+  }
+}
