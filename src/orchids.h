@@ -1992,8 +1992,8 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len);
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
-** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire SpÃ©cification
+** et VÃ©rification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **

@@ -2174,8 +2174,8 @@ ovm_exec_old(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
-** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire SpÃ©cification
+** et VÃ©rification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **
