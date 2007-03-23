@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Fri Mar 23 12:24:03 2007
+ ** @date Last update: Fri Mar 23 12:28:13 2007
  **/
 
 /*
@@ -53,19 +53,17 @@ hash_resize(hash_t *hash, size_t newsize)
   old_htable = hash->htable;
   hash->htable = Xzmalloc(newsize * sizeof (hash_elmt_t *));
 
-  for (i = 0; i < hash->size; ++i)
-    {
-      hash_elmt_t *tmp;
+  for (i = 0; i < hash->size; ++i) {
+    hash_elmt_t *tmp;
 
-      for (tmp = old_htable[i]; tmp; tmp = tmp->next)
-        {
-          unsigned long hcode;
+    for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
+      unsigned long hcode;
 
-          hcode = hash->hash(tmp->key, tmp->keylen) % newsize;
-          tmp->next = hash->htable[hcode];
-          hash->htable[hcode] = tmp;
-        }
+      hcode = hash->hash(tmp->key, tmp->keylen) % newsize;
+      tmp->next = hash->htable[hcode];
+      hash->htable[hcode] = tmp;
     }
+  }
 
   Xfree(old_htable);
   hash->size = newsize;
@@ -95,12 +93,11 @@ hash_get(hash_t *hash, void *key, size_t keylen)
   int len;
 
   elmt = hash->htable[hash->hash(key, keylen) % hash->size];
-  for (; elmt; elmt = elmt->next)
-    {
-      len = keylen < elmt->keylen ? keylen : elmt->keylen;
-      if (!memcmp(key, elmt->key, len))
-        return (elmt->data);
-    }
+  for (; elmt; elmt = elmt->next) {
+    len = keylen < elmt->keylen ? keylen : elmt->keylen;
+    if (!memcmp(key, elmt->key, len))
+      return (elmt->data);
+  }
 
   return (NULL);
 }
@@ -110,17 +107,15 @@ hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data)
 {
   int   i;
 
-  for (i = 0; i < hash->size; i++)
-    {
-      hash_elmt_t *tmp;
-      int status;
+  for (i = 0; i < hash->size; i++) {
+    hash_elmt_t *tmp;
+    int status;
 
-      for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
-        {
-          if ((status = func(tmp->data, data)) != 0)
-            return (status);
-        }
+    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
+      if ((status = func(tmp->data, data)) != 0)
+        return (status);
     }
+  }
   return (0);
 }
 
@@ -139,15 +134,13 @@ hash_pjw(void *key, size_t keylen)
 
   h = 0;
   p = (char *) key;
-  for (; keylen > 0; keylen--)
-    {
-      h = (h << 4) + *p++;
-      if ((g = h & 0xF0000000U) != 0)
-        {
-          h = h ^ (g >> 28);
-          h = h ^ g;
-        }
+  for (; keylen > 0; keylen--) {
+    h = (h << 4) + *p++;
+    if ((g = h & 0xF0000000U) != 0) {
+      h = h ^ (g >> 28);
+      h = h ^ g;
     }
+  }
 
   return (h);
 }
@@ -161,15 +154,13 @@ hash_pjw_typo(void *key, size_t keylen)
 
   h = 0;
   p = (char *) key;
-  for (; keylen > 0; keylen--)
-    {
-      h = (h << 4) + *p++;
-      if ((g = h & 0xF0000000U) != 0)
-        {
-          h = h ^ (g >> 24);
-          h = h ^ g;
-        }
+  for (; keylen > 0; keylen--) {
+    h = (h << 4) + *p++;
+    if ((g = h & 0xF0000000U) != 0) {
+      h = h ^ (g >> 24);
+      h = h ^ g;
     }
+  }
 
   return (h);
 }
@@ -182,11 +173,10 @@ hash_pow(void *key, size_t keylen)
 
   hcode = 0;
   k = (char *) key;
-  for (; keylen > 0; keylen--)
-    {
-      hcode += *k * *k;
-      k++;
-    }
+  for (; keylen > 0; keylen--) {
+    hcode += *k * *k;
+    k++;
+  }
 
   return (hcode);
 }
@@ -247,11 +237,10 @@ hash_rs(void *key, size_t keylen)
   unsigned char *k;
 
   a = 63689;  
-  for(k = (unsigned char *)key; keylen > 0; k++, keylen--)
-    {
-      hcode = hcode * a + (*k);
-      a *= 378551;
-    }
+  for(k = (unsigned char *)key; keylen > 0; k++, keylen--) {
+    hcode = hcode * a + (*k);
+    a *= 378551;
+  }
 
   return (hcode);
 }
@@ -263,14 +252,13 @@ hash_collide_count(hash_t *hash)
   int   i;
 
   count = 0;
-  for (i = 0; i < hash->size; i++)
-    {
-      hash_elmt_t *tmp;
+  for (i = 0; i < hash->size; i++) {
+    hash_elmt_t *tmp;
 
-      for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
-        if (tmp->next)
-          count++;
-    }
+    for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
+      if (tmp->next)
+        count++;
+  }
 
   return (count);
 }
@@ -293,11 +281,10 @@ hash_test(void)
 
   h = new_hash(2053);
   h->hash = hash_pow;
-  for (i = 0; i < 1000; i++)
-    {
-      sprintf(buf, "%i", i * 65599);
-      hash_add(h, (void *)(i * 65599), buf, strlen(buf));
-    }
+  for (i = 0; i < 1000; i++) {
+    sprintf(buf, "%i", i * 65599);
+    hash_add(h, (void *)(i * 65599), buf, strlen(buf));
+  }
   hash_walk(h, print_elmt, NULL);
 
   printf("collides : %i\n", hash_collide_count(h));
