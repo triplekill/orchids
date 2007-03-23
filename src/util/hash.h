@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Tue Nov 29 11:28:26 2005
+ ** @date Last update: Fri Mar 23 12:02:49 2007
  **/
 
 /*
@@ -48,8 +48,10 @@ int hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data);
 int hash_collide_count(hash_t *hash);
 
 unsigned long hash_pjw(void *key, size_t keylen);
+unsigned long hash_pjw_typo(void *key, size_t keylen);
 unsigned long hash_pow(void *key, size_t keylen);
 unsigned long hash_x65599(void *key, size_t keylen);
+unsigned long hash_x65599_fast(void *key, size_t keylen);
 unsigned long hash_quad(void *key, size_t keylen);
 
 #endif /* HASH_H */

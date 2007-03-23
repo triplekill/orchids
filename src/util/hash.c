@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Tue Nov 29 11:25:35 2005
+ ** @date Last update: Fri Mar 23 12:24:03 2007
  **/
 
 /*
@@ -129,8 +129,31 @@ hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data)
 ** fast hash function samples
 */
 
+/* Peter J. Weinberger */
 unsigned long
 hash_pjw(void *key, size_t keylen)
+{
+  unsigned long h;
+  unsigned long g;
+  char *p;
+
+  h = 0;
+  p = (char *) key;
+  for (; keylen > 0; keylen--)
+    {
+      h = (h << 4) + *p++;
+      if ((g = h & 0xF0000000U) != 0)
+        {
+          h = h ^ (g >> 28);
+          h = h ^ g;
+        }
+    }
+
+  return (h);
+}
+
+unsigned long
+hash_pjw_typo(void *key, size_t keylen)
 {
   unsigned long h;
   unsigned long g;
@@ -168,6 +191,7 @@ hash_pow(void *key, size_t keylen)
   return (hcode);
 }
 
+/* SDBM hash function */
 unsigned long
 hash_x65599(void *key, size_t keylen)
 {
@@ -178,6 +202,21 @@ hash_x65599(void *key, size_t keylen)
   k = (char *) key;
   for (; keylen > 0; keylen--, k++)
     hcode += *k * 65599;
+
+  return (hcode);
+}
+
+/* SDBM hash function, faster */
+unsigned long
+hash_x65599_fast(void *key, size_t keylen)
+{
+  unsigned long hcode;
+  char *k;
+
+  hcode = 0;
+  k = (char *) key;
+  for (; keylen > 0; keylen--, k++)
+    hcode = *k + (hcode << 6) + (hcode << 16) - hcode;
 
   return (hcode);
 }
@@ -197,6 +236,24 @@ hash_quad(void *key, size_t keylen)
     h += *val++;
 
   return (h);
+}
+
+/* Robert Sedgwicks, in book "Algorithms in C" */
+unsigned long
+hash_rs(void *key, size_t keylen)
+{
+  unsigned long hcode = 0;
+  unsigned long a;
+  unsigned char *k;
+
+  a = 63689;  
+  for(k = (unsigned char *)key; keylen > 0; k++, keylen--)
+    {
+      hcode = hcode * a + (*k);
+      a *= 378551;
+    }
+
+  return (hcode);
 }
 
 int
