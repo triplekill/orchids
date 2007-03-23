@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Fri Mar 23 12:02:49 2007
+ ** @date Last update: Fri Mar 23 13:19:20 2007
  **/
 
 /*
@@ -20,16 +20,19 @@
 
 #define DEFAULT_HASH_FUNCTION hash_pjw
 
+/* key are arbitraty binary data (unsigned char) */
+typedef unsigned char hkey_t;
+
 typedef struct hash_elmt_s hash_elmt_t;
 struct hash_elmt_s
 {
-  void *key;
+  hkey_t *key;
   size_t keylen;
   void *data;
   hash_elmt_t *next;
 };
 
-typedef unsigned long (*hashfunc_t)(void *key, size_t keylen);
+typedef unsigned long (*hashfunc_t)(hkey_t *key, size_t keylen);
 
 typedef struct hash_s hash_t;
 struct hash_s
@@ -40,19 +43,21 @@ struct hash_s
   hashfunc_t hash;
 };
 
+typedef int (*hash_walk_func_t)(void *elmt, void *data);
+
 hash_t *new_hash(size_t hsize);
 void hash_resize(hash_t *hash, size_t newsize);
 void hash_add(hash_t *hash, void *data, void *key, size_t keylen);
 void *hash_get(hash_t *hash, void *key, size_t keylen);
-int hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data);
+int hash_walk(hash_t *hash, hash_walk_func_t func, void *data);
 int hash_collide_count(hash_t *hash);
 
-unsigned long hash_pjw(void *key, size_t keylen);
-unsigned long hash_pjw_typo(void *key, size_t keylen);
-unsigned long hash_pow(void *key, size_t keylen);
-unsigned long hash_x65599(void *key, size_t keylen);
-unsigned long hash_x65599_fast(void *key, size_t keylen);
-unsigned long hash_quad(void *key, size_t keylen);
+unsigned long hash_pjw(hkey_t *key, size_t keylen);
+unsigned long hash_pjw_typo(hkey_t *key, size_t keylen);
+unsigned long hash_pow(hkey_t *key, size_t keylen);
+unsigned long hash_x65599(hkey_t *key, size_t keylen);
+unsigned long hash_x65599_fast(hkey_t *key, size_t keylen);
+unsigned long hash_quad(hkey_t *key, size_t keylen);
 
 #endif /* HASH_H */
 

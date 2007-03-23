@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Fri Mar 23 12:28:13 2007
+ ** @date Last update: Fri Mar 23 13:27:01 2007
  **/
 
 /*
@@ -76,11 +76,11 @@ hash_add(hash_t *hash, void *data, void *key, size_t keylen)
   unsigned long hcode;
 
   elmt = Xmalloc(sizeof (hash_elmt_t));
-  elmt->key = key;
+  elmt->key = (hkey_t *) key;
   elmt->keylen = keylen;
   elmt->data = data;
 
-  hcode = hash->hash(key, keylen) % hash->size;
+  hcode = hash->hash((hkey_t *) key, keylen) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -92,7 +92,7 @@ hash_get(hash_t *hash, void *key, size_t keylen)
   hash_elmt_t *elmt;
   int len;
 
-  elmt = hash->htable[hash->hash(key, keylen) % hash->size];
+  elmt = hash->htable[hash->hash((hkey_t *)key, keylen) % hash->size];
   for (; elmt; elmt = elmt->next) {
     len = keylen < elmt->keylen ? keylen : elmt->keylen;
     if (!memcmp(key, elmt->key, len))
@@ -103,7 +103,7 @@ hash_get(hash_t *hash, void *key, size_t keylen)
 }
 
 int
-hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data)
+hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
 {
   int   i;
 
@@ -126,16 +126,14 @@ hash_walk(hash_t *hash, int (func)(void *elmt, void *data), void *data)
 
 /* Peter J. Weinberger */
 unsigned long
-hash_pjw(void *key, size_t keylen)
+hash_pjw(hkey_t *key, size_t keylen)
 {
   unsigned long h;
   unsigned long g;
-  char *p;
 
   h = 0;
-  p = (char *) key;
   for (; keylen > 0; keylen--) {
-    h = (h << 4) + *p++;
+    h = (h << 4) + *key++;
     if ((g = h & 0xF0000000U) != 0) {
       h = h ^ (g >> 28);
       h = h ^ g;
@@ -146,16 +144,14 @@ hash_pjw(void *key, size_t keylen)
 }
 
 unsigned long
-hash_pjw_typo(void *key, size_t keylen)
+hash_pjw_typo(hkey_t *key, size_t keylen)
 {
   unsigned long h;
   unsigned long g;
-  char *p;
 
   h = 0;
-  p = (char *) key;
   for (; keylen > 0; keylen--) {
-    h = (h << 4) + *p++;
+    h = (h << 4) + *key++;
     if ((g = h & 0xF0000000U) != 0) {
       h = h ^ (g >> 24);
       h = h ^ g;
@@ -166,16 +162,15 @@ hash_pjw_typo(void *key, size_t keylen)
 }
 
 unsigned long
-hash_pow(void *key, size_t keylen)
+hash_pow(hkey_t *key, size_t keylen)
 {
   unsigned long hcode;
-  char *k;
+  int k;
 
   hcode = 0;
-  k = (char *) key;
   for (; keylen > 0; keylen--) {
-    hcode += *k * *k;
-    k++;
+    k = *key++;
+    hcode += k * k;
   }
 
   return (hcode);
@@ -183,36 +178,32 @@ hash_pow(void *key, size_t keylen)
 
 /* SDBM hash function */
 unsigned long
-hash_x65599(void *key, size_t keylen)
+hash_x65599(hkey_t *key, size_t keylen)
 {
   unsigned long hcode;
-  char *k;
 
   hcode = 0;
-  k = (char *) key;
-  for (; keylen > 0; keylen--, k++)
-    hcode += *k * 65599;
+  for (; keylen > 0; keylen--)
+    hcode += (*key++) * 65599;
 
   return (hcode);
 }
 
 /* SDBM hash function, faster */
 unsigned long
-hash_x65599_fast(void *key, size_t keylen)
+hash_x65599_fast(hkey_t *key, size_t keylen)
 {
   unsigned long hcode;
-  char *k;
 
   hcode = 0;
-  k = (char *) key;
-  for (; keylen > 0; keylen--, k++)
-    hcode = *k + (hcode << 6) + (hcode << 16) - hcode;
+  for (; keylen > 0; keylen--)
+    hcode = (*key++) + (hcode << 6) + (hcode << 16) - hcode;
 
   return (hcode);
 }
 
 unsigned long
-hash_quad(void *key, size_t keylen)
+hash_quad(hkey_t *key, size_t keylen)
 {
   int quads;
   int i;
@@ -230,15 +221,15 @@ hash_quad(void *key, size_t keylen)
 
 /* Robert Sedgwicks, in book "Algorithms in C" */
 unsigned long
-hash_rs(void *key, size_t keylen)
+hash_rs(hkey_t *key, size_t keylen)
 {
-  unsigned long hcode = 0;
+  unsigned long hcode;
   unsigned long a;
-  unsigned char *k;
 
+  hcode = 0;
   a = 63689;  
-  for(k = (unsigned char *)key; keylen > 0; k++, keylen--) {
-    hcode = hcode * a + (*k);
+  for ( ; keylen > 0; keylen--) {
+    hcode = hcode * a + (*key++);
     a *= 378551;
   }
 
