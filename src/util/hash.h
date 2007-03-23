@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Fri Mar 23 13:19:20 2007
+ ** @date Last update: Fri Mar 23 18:28:07 2007
  **/
 
 /*
@@ -22,6 +22,8 @@
 
 /* key are arbitraty binary data (unsigned char) */
 typedef unsigned char hkey_t;
+
+typedef unsigned long hcode_t;
 
 typedef struct hash_elmt_s hash_elmt_t;
 struct hash_elmt_s
@@ -52,12 +54,23 @@ void *hash_get(hash_t *hash, void *key, size_t keylen);
 int hash_walk(hash_t *hash, hash_walk_func_t func, void *data);
 int hash_collide_count(hash_t *hash);
 
-unsigned long hash_pjw(hkey_t *key, size_t keylen);
-unsigned long hash_pjw_typo(hkey_t *key, size_t keylen);
-unsigned long hash_pow(hkey_t *key, size_t keylen);
-unsigned long hash_x65599(hkey_t *key, size_t keylen);
-unsigned long hash_x65599_fast(hkey_t *key, size_t keylen);
-unsigned long hash_quad(hkey_t *key, size_t keylen);
+hcode_t hash_pjw(hkey_t *key, size_t keylen);
+hcode_t hash_pjw_typo(hkey_t *key, size_t keylen);
+hcode_t hash_pow(hkey_t *key, size_t keylen);
+hcode_t hash_x65599(hkey_t *key, size_t keylen);
+hcode_t hash_quad(hkey_t *key, size_t keylen);
+hcode_t hash_rs(hkey_t *key, size_t keylen);
+hcode_t hash_ptr(hkey_t *key, size_t keylen);
+hcode_t hash_jglbr(hkey_t *key, size_t keylen);
+hcode_t hash_elf(hkey_t *key, size_t keylen);
+hcode_t hash_old_cpp(hkey_t *key, size_t keylen);
+hcode_t hash_bkdr(hkey_t *key, size_t keylen);
+hcode_t hash_djb(hkey_t *key, size_t keylen);
+hcode_t hash_ap(hkey_t *key, size_t keylen);
+hcode_t hash_dk(hkey_t *key, size_t keylen);
+hcode_t hash_sfh(hkey_t *key, size_t keylen);
+
+
 
 #endif /* HASH_H */
 

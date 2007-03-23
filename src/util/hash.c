@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Fri Mar 23 13:27:01 2007
+ ** @date Last update: Fri Mar 23 17:33:07 2007
  **/
 
 /*
@@ -57,7 +57,7 @@ hash_resize(hash_t *hash, size_t newsize)
     hash_elmt_t *tmp;
 
     for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
-      unsigned long hcode;
+      hcode_t hcode;
 
       hcode = hash->hash(tmp->key, tmp->keylen) % newsize;
       tmp->next = hash->htable[hcode];
@@ -73,7 +73,7 @@ void
 hash_add(hash_t *hash, void *data, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
-  unsigned long hcode;
+  hcode_t hcode;
 
   elmt = Xmalloc(sizeof (hash_elmt_t));
   elmt->key = (hkey_t *) key;
@@ -124,12 +124,13 @@ hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
 ** fast hash function samples
 */
 
-/* Peter J. Weinberger */
-unsigned long
+
+/* Peter J. Weinberger with the 24 corrected to 28 in the dragon book */
+hcode_t
 hash_pjw(hkey_t *key, size_t keylen)
 {
-  unsigned long h;
-  unsigned long g;
+  hcode_t h;
+  hcode_t g;
 
   h = 0;
   for (; keylen > 0; keylen--) {
@@ -143,11 +144,13 @@ hash_pjw(hkey_t *key, size_t keylen)
   return (h);
 }
 
-unsigned long
+
+/* Peter J. Weinberger with typo on 24 in the dragon book */
+hcode_t
 hash_pjw_typo(hkey_t *key, size_t keylen)
 {
-  unsigned long h;
-  unsigned long g;
+  hcode_t h;
+  hcode_t g;
 
   h = 0;
   for (; keylen > 0; keylen--) {
@@ -161,10 +164,11 @@ hash_pjw_typo(hkey_t *key, size_t keylen)
   return (h);
 }
 
-unsigned long
+
+hcode_t
 hash_pow(hkey_t *key, size_t keylen)
 {
-  unsigned long hcode;
+  hcode_t hcode;
   int k;
 
   hcode = 0;
@@ -176,42 +180,31 @@ hash_pow(hkey_t *key, size_t keylen)
   return (hcode);
 }
 
+
 /* SDBM hash function */
-unsigned long
+hcode_t
 hash_x65599(hkey_t *key, size_t keylen)
 {
-  unsigned long hcode;
+  hcode_t h;
 
-  hcode = 0;
+  h = 0;
   for (; keylen > 0; keylen--)
-    hcode += (*key++) * 65599;
+    h = (*key++) + (h << 6) + (h << 16) - h; /* h += (*key++) * 65599; */
 
-  return (hcode);
+  return (h);
 }
 
-/* SDBM hash function, faster */
-unsigned long
-hash_x65599_fast(hkey_t *key, size_t keylen)
-{
-  unsigned long hcode;
 
-  hcode = 0;
-  for (; keylen > 0; keylen--)
-    hcode = (*key++) + (hcode << 6) + (hcode << 16) - hcode;
-
-  return (hcode);
-}
-
-unsigned long
+hcode_t
 hash_quad(hkey_t *key, size_t keylen)
 {
   int quads;
   int i;
-  unsigned long h;
-  unsigned long *val;
+  hcode_t h;
+  hcode_t *val;
 
-  val = (unsigned long *) key;
-  quads = keylen / sizeof (unsigned long);
+  val = (hcode_t *) key;
+  quads = keylen / sizeof (hcode_t);
   h = 0;
   for (i = 0; i < quads; i++)
     h += *val++;
@@ -219,12 +212,13 @@ hash_quad(hkey_t *key, size_t keylen)
   return (h);
 }
 
-/* Robert Sedgwicks, in book "Algorithms in C" */
-unsigned long
+
+/* Robert Sedgewick, in book "Algorithms in C" */
+hcode_t
 hash_rs(hkey_t *key, size_t keylen)
 {
-  unsigned long hcode;
-  unsigned long a;
+  hcode_t hcode;
+  hcode_t a;
 
   hcode = 0;
   a = 63689;  
@@ -235,6 +229,180 @@ hash_rs(hkey_t *key, size_t keylen)
 
   return (hcode);
 }
+
+
+/* Ugly hack.  But usefull on huge keys. */
+hcode_t
+hash_ptr(hkey_t *key, size_t keylen)
+{
+  return ((hcode_t)key);
+}
+
+
+/* Jean Goubault-Larrecq reversed bit pointer trick */
+hcode_t
+hash_jglbr(hkey_t *key, size_t keylen)
+{
+  int b;
+  hcode_t i;
+  hcode_t j;
+
+  i = (hcode_t) key;
+  j = 0;
+  for (b = 0;
+       b < ((sizeof (hcode_t) * 8) - 1);
+       b++, i >>= 1, j <<= 1)
+    j |= i & 0x1;
+
+  return (j);
+}
+
+
+/* GNU libc ELF hash function
+ in glibc (2.3.6) sources, sysdeps/generic/dl-hash.h */
+hcode_t
+hash_elf(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+  hcode_t g;
+
+  h = 0;
+  for ( ; keylen > 0; key++, keylen--) {
+    h = (h << 4) + *key;
+    if ( (g = h & 0xF0000000U) != 0) {
+      h ^= (g >> 24);
+      h &= ~g;
+    }
+  }
+  return (h);
+}
+
+
+/* Hash function from gcc cpp 2.95 in gcc/cpphash.h */
+hcode_t
+hash_old_cpp(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--)
+    h = (h << 2) + *key++;
+
+  return (h);
+}
+
+
+/* by Brian Kernighan and Dennis Ritchie's book
+   "The C Programming Language" */
+hcode_t
+hash_bkdr(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--)
+    h = (h * 131313) + *key++; /* 31 131 1313 13131 131313 etc.. */
+
+  return (h);
+}
+
+
+/* by Daniel Bernstein, in comp.lang.c */
+hcode_t
+hash_djb(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 5381;
+  for ( ; keylen > 0; keylen--)
+    h = ((h << 5) + h) + (*key++);  /* h = h * 33 + (*key++); */
+
+  return (h);
+}
+
+
+/* by Donald Knuth, in the Art of Computer Programming Vol. 3.  Sect 6.4 */
+hcode_t
+hash_dk(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = keylen; 
+  for ( ; keylen > 0; keylen--)
+    h = ((h << 5) ^ (h >> 27)) ^ (*key++);
+
+  return (h);
+}
+
+
+/* from Arash Partow */
+hcode_t
+hash_ap(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for( ; keylen > 0; keylen--)
+    h ^= ((keylen & 1) == 0) ? (  (h <<  7) ^ (*key++) ^ (h >> 3)) :
+                               (~((h << 11) ^ (*key++) ^ (h >> 5)));
+
+  return (h);
+}
+
+
+/* by Paul Hsieh, SuperFastHash function */
+hcode_t
+hash_sfh(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+  hcode_t t;
+  int rem;
+
+  h = keylen;
+  rem = keylen & 3;
+  keylen >>= 2;
+
+  for ( ; keylen > 0; keylen--) {
+    h += *(unsigned short *)(key);
+    t = ( (*(unsigned short *)(key+2)) << 11) ^ h;
+    h = (h << 16) ^ t;
+    key += 2 * sizeof (unsigned short);
+    h += h >> 11;
+  }
+
+  switch (rem) {
+
+  case 3:
+    h += *(unsigned short *)(key);
+    h ^= h << 16;
+    h ^= key[sizeof (unsigned short)] << 18;
+    h += h >> 11;
+    break;
+
+  case 2:
+    h += *(unsigned short *)(key);
+    h ^= h << 11;
+    h += h >> 17;
+    break;
+
+  case 1:
+    h += *key;
+    h ^= h << 10;
+    h += h >> 1;
+  }
+
+  h ^= h << 3;
+  h += h >> 5;
+  h ^= h << 4;
+  h += h >> 17;
+  h ^= h << 25;
+  h += h >> 6;
+
+  return (h);
+}
+
+
+
 
 int
 hash_collide_count(hash_t *hash)
