@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:28:19 2003
- ** @date Last update: Mon Mar 26 15:18:01 2007
+ ** @date Last update: Mon Mar 26 15:21:48 2007
  **/
 
 /*
@@ -125,7 +125,7 @@ strhash_resize(strhash_t *hash, size_t newsize)
     strhash_elmt_t *tmp;
 
     for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
-      unsigned long hcode;
+      strhcode_t hcode;
 
       hcode = hash->hash(tmp->key) % newsize;
       tmp->next = hash->htable[hcode];
@@ -141,7 +141,7 @@ void
 strhash_add(strhash_t *hash, void *data, char *key)
 {
   strhash_elmt_t *elmt;
-  unsigned long hcode;
+  strhcode_t hcode;
 
   elmt = Xmalloc(sizeof (strhash_elmt_t));
   elmt->key = key;
@@ -190,11 +190,11 @@ strhash_walk(strhash_t *hash, int (func)(void *elmt, void *data), void *data)
 ** fast hash function samples
 */
 
-unsigned long
+strhcode_t
 strhash_pjw(char *key)
 {
-  unsigned long h;
-  unsigned long g;
+  strhcode_t h;
+  strhcode_t g;
 
   h = 0;
   while (*key) {
@@ -208,10 +208,10 @@ strhash_pjw(char *key)
   return (h);
 }
 
-unsigned long
+strhcode_t
 strhash_pow(char *key)
 {
-  unsigned long hcode;
+  strhcode_t hcode;
 
   hcode = 0;
   while (*key) {
@@ -222,10 +222,10 @@ strhash_pow(char *key)
   return (hcode);
 }
 
-unsigned long
+strhcode_t
 strhash_x65599(char *key)
 {
-  unsigned long hcode;
+  strhcode_t hcode;
 
   hcode = 0;
   while (*key)
@@ -234,12 +234,12 @@ strhash_x65599(char *key)
   return (hcode);
 }
 
-unsigned long
+strhcode_t
 strhash_quad(char *key)
 {
   int quads;
   int i;
-  unsigned long h;
+  strhcode_t h;
   unsigned long *val;
 
   val = (unsigned long *) key;

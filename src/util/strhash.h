@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:26:30 2003
- ** @date Last update: Tue Nov 29 11:38:20 2005
+ ** @date Last update: Mon Mar 26 15:20:56 2007
  **/
 
 /*
@@ -28,7 +28,8 @@ struct strhash_elmt_s
   strhash_elmt_t *next;
 };
 
-typedef unsigned long (*strhashfunc_t)(char *key);
+typedef unsigned long strhcode_t;
+typedef strhcode_t (*strhashfunc_t)(char *key);
 
 typedef struct strhash_s strhash_t;
 struct strhash_s
@@ -49,10 +50,10 @@ void *strhash_get(strhash_t *hash, char *key);
 int strhash_walk(strhash_t *hash, int (func)(void *elmt, void *data), void *data);
 int strhash_collide_count(strhash_t *hash);
 
-unsigned long strhash_pjw(char *key);
-unsigned long strhash_pow(char *key);
-unsigned long strhash_x65599(char *key);
-unsigned long strhash_quad(char *key);
+strhcode_t strhash_pjw(char *key);
+strhcode_t strhash_pow(char *key);
+strhcode_t strhash_x65599(char *key);
+strhcode_t strhash_quad(char *key);
 
 #endif /* HASH_H */
 
