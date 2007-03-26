@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:28:19 2003
- ** @date Last update: Mon Mar 26 15:21:48 2007
+ ** @date Last update: Mon Mar 26 15:28:29 2007
  **/
 
 /*
@@ -250,6 +250,21 @@ strhash_quad(char *key)
 
   return (h);
 }
+
+/* by Daniel Bernstein, in comp.lang.c */
+strhcode_t
+strhash_djb(char *key)
+{
+  strhcode_t h;
+  int c;
+
+  h = 5381;
+  while (*key)
+    h = ((h << 5) + h) + (*key++);  /* h = h * 33 + (*key++); */
+
+  return (h);
+}
+
 
 int
 strhash_collide_count(strhash_t *hash)

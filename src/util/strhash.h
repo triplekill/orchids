@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:26:30 2003
- ** @date Last update: Mon Mar 26 15:20:56 2007
+ ** @date Last update: Mon Mar 26 15:28:49 2007
  **/
 
 /*
@@ -54,6 +54,7 @@ strhcode_t strhash_pjw(char *key);
 strhcode_t strhash_pow(char *key);
 strhcode_t strhash_x65599(char *key);
 strhcode_t strhash_quad(char *key);
+strhcode_t strhash_djb(char *key);
 
 #endif /* HASH_H */
 
