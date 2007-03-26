@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:28:19 2003
- ** @date Last update: Tue Nov 29 11:38:11 2005
+ ** @date Last update: Mon Mar 26 15:18:01 2007
  **/
 
 /*
@@ -47,18 +47,16 @@ clear_strhash(strhash_t *hash, void (*elmt_free)(void *e))
   strhash_elmt_t *tmp;
   strhash_elmt_t *tmp_next;
 
-  for (i = 0; i < hash->size; i++)
-    {
-      tmp = hash->htable[i];
-      while (tmp)
-        {
-          tmp_next = tmp->next;
-          if (elmt_free)
-            elmt_free(tmp->data);
-          Xfree(tmp);
-          tmp = tmp_next;
-        }
+  for (i = 0; i < hash->size; i++) {
+    tmp = hash->htable[i];
+    while (tmp) {
+      tmp_next = tmp->next;
+      if (elmt_free)
+        elmt_free(tmp->data);
+      Xfree(tmp);
+      tmp = tmp_next;
     }
+  }
   hash->elmts = 0;
   memset(hash->htable, 0, hash->size * sizeof (void *));
 }
@@ -96,18 +94,16 @@ free_strhash(strhash_t *hash, void (*elmt_free)(void *e))
   strhash_elmt_t *tmp;
   strhash_elmt_t *tmp_next;
 
-  for (i = 0; i < hash->size; i++)
-    {
-      tmp = hash->htable[i];
-      while (tmp)
-        {
-          tmp_next = tmp->next;
-          if (elmt_free)
-            elmt_free(tmp->data);
-          Xfree(tmp);
-          tmp = tmp_next;
-        }
+  for (i = 0; i < hash->size; i++) {
+    tmp = hash->htable[i];
+    while (tmp) {
+      tmp_next = tmp->next;
+      if (elmt_free)
+        elmt_free(tmp->data);
+      Xfree(tmp);
+      tmp = tmp_next;
     }
+  }
 
   Xfree(hash->htable);
   Xfree(hash);
@@ -125,19 +121,17 @@ strhash_resize(strhash_t *hash, size_t newsize)
   old_htable = hash->htable;
   hash->htable = Xzmalloc(newsize * sizeof (strhash_elmt_t *));
 
-  for (i = 0; i < hash->size; ++i)
-    {
-      strhash_elmt_t *tmp;
+  for (i = 0; i < hash->size; ++i) {
+    strhash_elmt_t *tmp;
 
-      for (tmp = old_htable[i]; tmp; tmp = tmp->next)
-        {
-          unsigned long hcode;
+    for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
+      unsigned long hcode;
 
-          hcode = hash->hash(tmp->key) % newsize;
-          tmp->next = hash->htable[hcode];
-          hash->htable[hcode] = tmp;
-        }
+      hcode = hash->hash(tmp->key) % newsize;
+      tmp->next = hash->htable[hcode];
+      hash->htable[hcode] = tmp;
     }
+  }
 
   Xfree(old_htable);
   hash->size = newsize;
@@ -165,11 +159,10 @@ strhash_get(strhash_t *hash, char *key)
   strhash_elmt_t *elmt;
 
   elmt = hash->htable[hash->hash(key) % hash->size];
-  for (; elmt; elmt = elmt->next)
-    {
-      if (!strcmp(key, elmt->key))
-        return (elmt->data);
-    }
+  for (; elmt; elmt = elmt->next) {
+    if (!strcmp(key, elmt->key))
+      return (elmt->data);
+  }
 
   return (NULL);
 }
@@ -179,17 +172,16 @@ strhash_walk(strhash_t *hash, int (func)(void *elmt, void *data), void *data)
 {
   int i;
 
-  for (i = 0; i < hash->size; i++)
-    {
-      strhash_elmt_t *tmp;
-      int status;
+  for (i = 0; i < hash->size; i++) {
+    strhash_elmt_t *tmp;
+    int status;
 
-      for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
-        {
-          if ((status = func(tmp->data, data)) != 0)
-            return (status);
-        }
+    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
+      if ((status = func(tmp->data, data)) != 0)
+        return (status);
     }
+  }
+
   return (0);
 }
 
@@ -205,15 +197,13 @@ strhash_pjw(char *key)
   unsigned long g;
 
   h = 0;
-  while (*key)
-    {
-      h = (h << 4) + *key++;
-      if ((g = h & 0xF0000000U) != 0)
-        {
-          h = h ^ (g >> 24);
-          h = h ^ g;
-        }
+  while (*key) {
+    h = (h << 4) + *key++;
+    if ((g = h & 0xF0000000U) != 0) {
+      h = h ^ (g >> 24);
+      h = h ^ g;
     }
+  }
 
   return (h);
 }
@@ -224,11 +214,10 @@ strhash_pow(char *key)
   unsigned long hcode;
 
   hcode = 0;
-  while (*key)
-    {
-      hcode += (*key) * (*key);
-      key++;
-    }
+  while (*key) {
+    hcode += (*key) * (*key);
+    key++;
+  }
 
   return (hcode);
 }
@@ -269,14 +258,13 @@ strhash_collide_count(strhash_t *hash)
   int i;
 
   count = 0;
-  for (i = 0; i < hash->size; i++)
-    {
-      strhash_elmt_t *tmp;
+  for (i = 0; i < hash->size; i++) {
+    strhash_elmt_t *tmp;
 
-      for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
-        if (tmp->next)
-          count++;
-    }
+    for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
+      if (tmp->next)
+        count++;
+  }
 
   return (count);
 }
@@ -299,11 +287,10 @@ hash_test(void)
 
   h = new_hash(2053);
   h->hash = hash_pow;
-  for (i = 0; i < 1000; i++)
-    {
-      sprintf(buf, "%i", i * 65599);
-      hash_add(h, (void *)(i * 65599), buf, strlen(buf));
-    }
+  for (i = 0; i < 1000; i++) {
+    sprintf(buf, "%i", i * 65599);
+    hash_add(h, (void *)(i * 65599), buf, strlen(buf));
+  }
   hash_walk(h, print_elmt, NULL);
 
   printf("collides : %i\n", hash_collide_count(h));
