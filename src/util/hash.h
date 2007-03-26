@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Fri Mar 23 18:28:07 2007
+ ** @date Last update: Mon Mar 26 15:42:26 2007
  **/
 
 /*
@@ -34,7 +34,7 @@ struct hash_elmt_s
   hash_elmt_t *next;
 };
 
-typedef unsigned long (*hashfunc_t)(hkey_t *key, size_t keylen);
+typedef hcode_t (*hashfunc_t)(hkey_t *key, size_t keylen);
 
 typedef struct hash_s hash_t;
 struct hash_s
