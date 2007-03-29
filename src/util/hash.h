@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Mon Mar 26 15:42:26 2007
+ ** @date Last update: Thu Mar 29 14:33:58 2007
  **/
 
 /*
@@ -18,7 +18,7 @@
 #ifndef HASH_H
 #define HASH_H
 
-#define DEFAULT_HASH_FUNCTION hash_pjw
+#define DEFAULT_HASH_FUNCTION hash_djb
 
 /* key are arbitraty binary data (unsigned char) */
 typedef unsigned char hkey_t;
@@ -49,8 +49,15 @@ typedef int (*hash_walk_func_t)(void *elmt, void *data);
 
 hash_t *new_hash(size_t hsize);
 void hash_resize(hash_t *hash, size_t newsize);
+void clear_hash(hash_t *hash, void (*elmt_free)(void *e));
+void free_hash(hash_t *hash, void (*elmt_free)(void *e));
 void hash_add(hash_t *hash, void *data, void *key, size_t keylen);
+void *hash_check_and_add(hash_t *hash, void *data, void *key, size_t keylen);
+void *hash_del(hash_t *hash, void *key, size_t keylen);
 void *hash_get(hash_t *hash, void *key, size_t keylen);
+void *hash_update(hash_t *hash, void *new_data, void *key, size_t keylen);
+void *hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen);
+hash_t *hash_clone(hash_t *hash, void *(clone)(void *elmt));
 int hash_walk(hash_t *hash, hash_walk_func_t func, void *data);
 int hash_collide_count(hash_t *hash);
 
@@ -58,17 +65,33 @@ hcode_t hash_pjw(hkey_t *key, size_t keylen);
 hcode_t hash_pjw_typo(hkey_t *key, size_t keylen);
 hcode_t hash_pow(hkey_t *key, size_t keylen);
 hcode_t hash_x65599(hkey_t *key, size_t keylen);
+hcode_t hash_x65599_opt(hkey_t *key, size_t keylen);
 hcode_t hash_quad(hkey_t *key, size_t keylen);
 hcode_t hash_rs(hkey_t *key, size_t keylen);
 hcode_t hash_ptr(hkey_t *key, size_t keylen);
 hcode_t hash_jglbr(hkey_t *key, size_t keylen);
 hcode_t hash_elf(hkey_t *key, size_t keylen);
-hcode_t hash_old_cpp(hkey_t *key, size_t keylen);
+hcode_t hash_gcc295_cpp(hkey_t *key, size_t keylen);
 hcode_t hash_bkdr(hkey_t *key, size_t keylen);
 hcode_t hash_djb(hkey_t *key, size_t keylen);
 hcode_t hash_ap(hkey_t *key, size_t keylen);
 hcode_t hash_dk(hkey_t *key, size_t keylen);
 hcode_t hash_sfh(hkey_t *key, size_t keylen);
+hcode_t hash_jr(hkey_t *key, size_t keylen);
+hcode_t hash_fnv0(hkey_t *key, size_t keylen);
+hcode_t hash_fnv0_opt(hkey_t *key, size_t keylen);
+hcode_t hash_fnv1(hkey_t *key, size_t keylen);
+hcode_t hash_fnv1_opt(hkey_t *key, size_t keylen);
+hcode_t hash_fnv1a(hkey_t *key, size_t keylen);
+hcode_t hash_fnv1a_opt(hkey_t *key, size_t keylen);
+hcode_t hash_lcg32dk(hkey_t *key, size_t keylen);
+hcode_t hash_rot13(hkey_t *key, size_t keylen);
+hcode_t hash_hsh1113_8bits(hkey_t *key, size_t keylen);
+hcode_t hash_hsh1113_32bits(hkey_t *key, size_t keylen);
+hcode_t hash_oat(hkey_t *key, size_t keylen);
+hcode_t hash_ethz(hkey_t *key, size_t keylen);
+
+
 
 
 

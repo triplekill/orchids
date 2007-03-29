@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.2
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:26:30 2003
- ** @date Last update: Mon Mar 26 15:46:07 2007
+ ** @date Last update: Thu Mar 29 14:46:08 2007
  **/
 
 /*
@@ -18,7 +18,7 @@
 #ifndef STRHASH_H
 #define STRHASH_H
 
-#define DEFAULT_STRHASH_FUNCTION strhash_pjw
+#define DEFAULT_STRHASH_FUNCTION strhash_djb
 
 typedef struct strhash_elmt_s strhash_elmt_t;
 struct strhash_elmt_s
@@ -51,10 +51,32 @@ int strhash_walk(strhash_t *hash, int (func)(void *elmt, void *data), void *data
 int strhash_collide_count(strhash_t *hash);
 
 strhcode_t strhash_pjw(char *key);
+strhcode_t strhash_pjw_typo(char *key);
 strhcode_t strhash_pow(char *key);
 strhcode_t strhash_x65599(char *key);
+strhcode_t strhash_x65599_opt(char *key);
 strhcode_t strhash_quad(char *key);
+strhcode_t strhash_rs(char *key);
+strhcode_t strhash_ptr(char *key);
+strhcode_t strhash_jglbr(char *key);
+strhcode_t strhash_elf(char *key);
+strhcode_t strhash_gcc295_cpp(char *key);
+strhcode_t strhash_bkdr(char *key);
 strhcode_t strhash_djb(char *key);
+strhcode_t strhash_ap(char *key);
+strhcode_t strhash_dk(char *key);
+strhcode_t strhash_sfh(char *key);
+strhcode_t strhash_rz(char *key);
+strhcode_t strhash_fnv0(char *key);
+strhcode_t strhash_fnv0_opt(char *key);
+strhcode_t strhash_fnv1(char *key);
+strhcode_t strhash_fnv1_opt(char *key);
+strhcode_t strhash_fnv1a(char *key);
+strhcode_t strhash_fnv1a_opt(char *key);
+strhcode_t strhash_lcg32dk(char *key);
+strhcode_t strhash_rot13(char *key);
+strhcode_t strhash_oat(char *key);
+strhcode_t strhash_ethz(char *key);
 
 #endif /* STRHASH_H */
 

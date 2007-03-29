@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.2
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Fri Mar 23 17:33:07 2007
+ ** @date Last update: Thu Mar 29 14:18:15 2007
  **/
 
 /*
@@ -27,6 +27,7 @@
 
 #include "hash.h"
 
+
 hash_t *
 new_hash(size_t hsize)
 {
@@ -41,14 +42,82 @@ new_hash(size_t hsize)
   return (h);
 }
 
+
+void
+clear_hash(hash_t *hash, void (*elmt_free)(void *e))
+{
+  int i;
+  hash_elmt_t *tmp;
+  hash_elmt_t *tmp_next;
+
+  for (i = 0; i < hash->size; i++) {
+    tmp = hash->htable[i];
+    while (tmp) {
+      tmp_next = tmp->next;
+      if (elmt_free)
+        elmt_free(tmp->data);
+      Xfree(tmp);
+      tmp = tmp_next;
+    }
+  }
+  hash->elmts = 0;
+  memset(hash->htable, 0, hash->size * sizeof (void *));
+}
+
+
+void *
+hash_to_array(hash_t *hash)
+{
+  void **array;
+  hash_elmt_t *helmt;
+  int elmts;
+  int i;
+  int hsize;
+  int j;
+
+  hsize = hash->size;
+  elmts = hash->elmts;
+  array = Xmalloc(elmts * sizeof (void *));
+  j = 0;
+  for (i = 0; i < hsize; i++) {
+    for (helmt = hash->htable[i]; helmt; helmt = helmt->next) {
+      array[j] = helmt->data;
+      j++;
+    }
+  }
+
+  return (array);
+}
+
+
+void
+free_hash(hash_t *hash, void (*elmt_free)(void *e))
+{
+  int i;
+  hash_elmt_t *tmp;
+  hash_elmt_t *tmp_next;
+
+  for (i = 0; i < hash->size; i++) {
+    tmp = hash->htable[i];
+    while (tmp) {
+      tmp_next = tmp->next;
+      if (elmt_free)
+        elmt_free(tmp->data);
+      Xfree(tmp);
+      tmp = tmp_next;
+    }
+  }
+
+  Xfree(hash->htable);
+  Xfree(hash);
+}
+
+
 void
 hash_resize(hash_t *hash, size_t newsize)
 {
   hash_elmt_t **old_htable;
   int i;
-
-  /* XXX: Not tested !!! */
-  printf("Not tested !...\n");
 
   old_htable = hash->htable;
   hash->htable = Xzmalloc(newsize * sizeof (hash_elmt_t *));
@@ -69,6 +138,7 @@ hash_resize(hash_t *hash, size_t newsize)
   hash->size = newsize;
 }
 
+
 void
 hash_add(hash_t *hash, void *data, void *key, size_t keylen)
 {
@@ -86,21 +156,151 @@ hash_add(hash_t *hash, void *data, void *key, size_t keylen)
   hash->elmts++;
 }
 
+
+void *
+hash_check_and_add(hash_t *hash, void *data, void *key, size_t keylen)
+{
+  hash_elmt_t *elmt;
+  hcode_t hcode;
+
+  elmt = hash->htable[hash->hash((hkey_t *)key, keylen) % hash->size];
+  for (; elmt; elmt = elmt->next) {
+    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
+      return (elmt->data);
+  }
+
+  elmt = Xmalloc(sizeof (hash_elmt_t));
+  elmt->key = (hkey_t *) key;
+  elmt->keylen = keylen;
+  elmt->data = data;
+
+  hcode = hash->hash((hkey_t *) key, keylen) % hash->size;
+  elmt->next = hash->htable[hcode];
+  hash->htable[hcode] = elmt;
+  hash->elmts++;
+
+  return (NULL);
+}
+
+
+void *
+hash_update(hash_t *hash, void *new_data, void *key, size_t keylen)
+{
+  hash_elmt_t *elmt;
+  void *old_data;
+
+  elmt = hash->htable[hash->hash(key, keylen) % hash->size];
+  for (; elmt; elmt = elmt->next) {
+    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
+      old_data = elmt->data;
+      elmt->data = new_data;
+
+      return (old_data);
+    }
+  }
+
+  return (NULL);
+}
+
+
+void *
+hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen)
+{
+  hash_elmt_t *elmt;
+  void *old_data;
+  hcode_t hcode;
+
+  elmt = hash->htable[hash->hash(key, keylen) % hash->size];
+  for (; elmt; elmt = elmt->next) {
+    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
+      old_data = elmt->data;
+      elmt->data = new_data;
+
+      return (old_data);
+    }
+  }
+
+  elmt = Xmalloc(sizeof (hash_elmt_t));
+  elmt->key = key;
+  elmt->keylen = keylen;
+  elmt->data = new_data;
+
+  hcode = hash->hash(key, keylen) % hash->size;
+  elmt->next = hash->htable[hcode];
+  hash->htable[hcode] = elmt;
+  hash->elmts++;
+
+  return (NULL);
+}
+
+
+void *
+hash_del(hash_t *hash, void *key, size_t keylen)
+{
+  hash_elmt_t **head;
+  hash_elmt_t  *elmt;
+  hash_elmt_t  *prev;
+  void         *data;
+
+  prev = NULL;
+  head = &hash->htable[hash->hash(key, keylen) % hash->size];
+  for (elmt = *head; elmt; elmt = elmt->next) {
+    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
+      data = elmt->data;
+      if (prev)
+        prev->next = elmt->next;
+      else
+        *head = elmt->next;
+      Xfree(elmt);
+
+      return (data);
+    }
+    prev = elmt;
+  }
+
+  return (NULL);
+}
+
+
 void *
 hash_get(hash_t *hash, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
-  int len;
 
   elmt = hash->htable[hash->hash((hkey_t *)key, keylen) % hash->size];
   for (; elmt; elmt = elmt->next) {
-    len = keylen < elmt->keylen ? keylen : elmt->keylen;
-    if (!memcmp(key, elmt->key, len))
+    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
       return (elmt->data);
   }
 
   return (NULL);
 }
+
+
+hash_t *
+hash_clone(hash_t *hash, void *(clone)(void *elmt))
+{
+  hash_t *h;
+  hash_elmt_t *tmp;
+  int i;
+  int hsize;
+  void *data;
+ 
+  if (clone == NULL)
+    return (NULL);
+
+  hsize = hash->size;
+  h = new_hash(hsize);
+  for (i = 0; i < hsize; i++) {
+    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
+      data = clone(tmp->data);
+      hash_add(h, data, tmp->key, tmp->keylen);
+    }
+  }
+
+  return (h);
+}
+
 
 int
 hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
@@ -116,6 +316,7 @@ hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
         return (status);
     }
   }
+
   return (0);
 }
 
@@ -184,6 +385,19 @@ hash_pow(hkey_t *key, size_t keylen)
 /* SDBM hash function */
 hcode_t
 hash_x65599(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for (; keylen > 0; keylen--)
+    h += (*key++) * 65599;
+
+  return (h);
+}
+
+/* SDBM hash function */
+hcode_t
+hash_x65599_opt(hkey_t *key, size_t keylen)
 {
   hcode_t h;
 
@@ -267,8 +481,8 @@ hash_elf(hkey_t *key, size_t keylen)
   hcode_t g;
 
   h = 0;
-  for ( ; keylen > 0; key++, keylen--) {
-    h = (h << 4) + *key;
+  for ( ; keylen > 0; keylen--) {
+    h = (h << 4) + *key++;
     if ( (g = h & 0xF0000000U) != 0) {
       h ^= (g >> 24);
       h &= ~g;
@@ -280,7 +494,7 @@ hash_elf(hkey_t *key, size_t keylen)
 
 /* Hash function from gcc cpp 2.95 in gcc/cpphash.h */
 hcode_t
-hash_old_cpp(hkey_t *key, size_t keylen)
+hash_gcc295_cpp(hkey_t *key, size_t keylen)
 {
   hcode_t h;
 
@@ -401,6 +615,250 @@ hash_sfh(hkey_t *key, size_t keylen)
   return (h);
 }
 
+/* by M.V. Ramakrishna and Justin Zobel,
+   from paper "Performance in Practice of String Hashing Functions" */
+hcode_t
+hash_rz(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for( ; keylen > 0; keylen--)
+    h ^= ((h << 5) + (*key++) + (h >> 2));
+
+  return (h);
+}
+
+
+/* by Fowler / Noll / Vo initial historic version */
+hcode_t
+hash_fnv0(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--) {
+    h *= 0x01000193;
+    h ^= *key++;
+  }
+
+  return (h);
+}
+
+/* by Fowler / Noll / Vo faster on some processors */
+hcode_t
+hash_fnv0_opt(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--) {
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    h ^= *key++;
+  }
+
+  return (h);
+}
+
+/* by Fowler / Noll / Vo updated version with a new initial value */
+hcode_t
+hash_fnv1(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0x811c9dc5;
+  for ( ; keylen > 0; keylen--) {
+    h *= 0x01000193;
+    h ^= *key++;
+  }
+
+  return (h);
+}
+
+/* Fowler / Noll / Vo version 1 faster on some processors */
+hcode_t
+hash_fnv1_opt(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0x811c9dc5;
+  for ( ; keylen > 0; keylen--) {
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    h ^= *key++;
+  }
+
+  return (h);
+}
+
+/* by Fowler / Noll / Vo version 1a */
+hcode_t
+hash_fnv1a(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0x811c9dc5;
+  for ( ; keylen > 0; keylen--) {
+    h ^= *key++;
+    h *= 0x01000193;
+  }
+
+  return (h);
+}
+
+/* Fowler / Noll / Vo version 1a faster on some processors */
+hcode_t
+hash_fnv1a_opt(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0x811c9dc5;
+  for ( ; keylen > 0; keylen--) {
+    h ^= *key++;
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+
+  return (h);
+}
+
+/* LCG hash, by Donald Knuth, LCG 2^32 */
+hcode_t
+hash_lcg32dk(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+ 
+  h = 0;
+  for ( ; keylen > 0; keylen--)
+    h = (h * 1664525) + (*key++) + 1013904223;
+
+  return (h);
+}
+
+/* rotating hash. GCC 4 should produce bit rotation instructions ;) */
+hcode_t
+hash_rot13(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--) {
+    h += (*key++);
+    h -= (h << 13) | (h >> 19);
+  }
+
+  return (h);
+}
+
+hcode_t
+hash_hsh1113_8bits(hkey_t *key, size_t keylen)
+{
+  hcode_t state;
+  hcode_t h;
+  int rotval;
+  int precision;
+
+  state = 0x40490FDB; /* or  0xC0C0C0C0, 0x03030303, 1 */
+  h = 0;
+  for ( ; keylen > 0; keylen--) {
+    h ^= *key++;
+    for (precision = 0; precision < 7; precision++) {
+      state = (state << 11) | (state >> 21);
+      h = (h << 13) | (h >> 19);
+      h ^= state;
+      rotval = state & 0x1F; /* mod 32 */
+      h = (h << rotval) | (h >> (32 - rotval));
+      rotval = h & 0x1F; /* mod 32 */
+      state = (state << rotval) | (state >> (32 - rotval));
+    }
+  }
+
+  return (h);
+}
+
+hcode_t
+hash_hsh1113_32bits(hkey_t *key, size_t keylen)
+{
+  hcode_t state;
+  hcode_t h;
+  int rotval;
+  int precision;
+  int rem;
+
+  rem = keylen & 0x3; /* mod 4 */
+  state = 0x40490FDB; /* or  0xC0C0C0C0, 0x03030303, 1 */
+  h = 0;
+  for ( ; keylen > sizeof (unsigned long); keylen -= sizeof (unsigned long)) {
+    h ^= *(unsigned long *)key;
+    key += sizeof (unsigned long);
+    for (precision = 0; precision < 31; precision++) {
+      state = (state << 11) | (state >> 21);
+      h = (h << 13) | (h >> 19);
+      h ^= state;
+      rotval = state & 0x1F; /* mod 32 */
+      h = (h << rotval) | (h >> (32 - rotval));
+      rotval = h & 0x1F; /* mod 32 */
+      state = (state << rotval) | (state >> (32 - rotval));
+    }
+  }
+
+  /* remaining data */
+  switch (rem) {
+  case 3:
+    h ^= ((key[0]) | (key[1] << 8) | (key[2] << 16));
+    break ;
+  case 2:
+    h ^= ((key[0]) | (key[1] << 8));
+    break ;
+  case 1:
+    h ^= key[0];
+    break ;
+  case 0:
+    return (h);
+  }
+
+  for (precision = 0; precision < 31; precision++) {
+    state = (state << 11) | (state >> 21);
+    h = (h << 13) | (h >> 19);
+    h ^= state;
+    rotval = state & 0x1F; /* mod 32 */
+    h = (h << rotval) | (h >> (32 - rotval));
+    rotval = h & 0x1F; /* mod 32 */
+    state = (state << rotval) | (state >> (32 - rotval));
+  }
+
+  return (h);
+}
+
+/* One at time hash, by Bob Jenkins */
+hcode_t
+hash_oat(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0; keylen--) {
+    h += *key++;
+    h += (h << 10);
+    h ^= (h >> 6);
+  }
+  h += (h << 3);
+  h ^= (h >> 11);
+  h += (h << 15);
+  
+  return (h);
+}
+
+/* ETH Zurich hash function */
+hcode_t
+hash_ethz(hkey_t *key, size_t keylen)
+{
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0 ; keylen++)
+    h = (*key++) * (h % 257) + 1;
+
+  return (h);
+}
 
 
 
