@@ -25,7 +25,8 @@ pkglib_LTLIBRARIES = \
   mod_textfile.la \
   mod_udp.la \
   mod_win32evt.la \
-  mod_period.la
+  mod_period.la \
+  mod_htmlstate.la
 
 if USE_SWIPROLOG
 pkglib_LTLIBRARIES += mod_prolog.la
@@ -144,3 +145,9 @@ mod_udp_la_LDFLAGS = -module -avoid-version
 
 mod_win32evt_la_SOURCES = mod_win32evt.c
 mod_win32evt_la_LDFLAGS = -module -avoid-version
+
+mod_htmlstate_la_SOURCES = mod_htmlstate.c html_output.c file_cache.c
+mod_htmlstate_la_LDFLAGS = -module -avoid-version
+
+
+# End-of-file

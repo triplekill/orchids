@@ -8,7 +8,7 @@ orchids_SOURCES = \
 	orchids_cfg.c \
         lang.c lang.h \
         ovm.c ovm.h ovm_private.h \
-        graph_output.c html_output.c file_cache.c \
+        graph_output.c \
 	issdl.yy.c issdl.tab.c issdl.tab.h \
  \
 	util/array.c               util/array.h           \

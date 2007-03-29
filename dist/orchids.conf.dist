@@ -10,6 +10,7 @@
 SetModuleDir @@LIBDIR@@/orchids
 
 # ORCHIDS Global parameters
+LoadMobule htmlstate
 LoadModule remoteadm
 LoadModule textfile
 LoadModule sockunix

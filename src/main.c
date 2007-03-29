@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Tue Dec  6 17:03:49 2005
+ ** @date Last update: Thu Mar 29 15:09:35 2007
  **/
 
 /*
@@ -125,8 +125,6 @@ main(int argc, char *argv[])
   proceed_post_config(ctx);
   compile_rules(ctx);
   proceed_post_compil(ctx);
-
-  html_output_preconfig(ctx); /* XXX: Move this in a module */
 
   /* change run id here */
   if (ctx->runtime_user)

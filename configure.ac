@@ -152,6 +152,19 @@ if test "$orchids_preproc" = "true" ; then
    AC_DEFINE([ENABLE_PREPROC], 1, [Set to 1 if PREPROC is requested])
 fi
 
+AC_ARG_ENABLE(htmloutput,
+AS_HELP_STRING([--enable-htmloutput], [enable HTML Output (default is on)]),
+[case "${enableval}" in
+    yes) orchids_htmloutput=true ;;
+    no)  orchids_htmloutput=false ;;
+    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-htmloutput) ;;
+esac],
+[orchids_htmloutput=true]
+)
+if test "$orchids_htmloutput" = "true" ; then
+   AC_DEFINE([ENABLE_HTMLOUTPUT], 1, [Set to 1 if HTMLOUTPUT is requested])
+fi
+
 
 AC_ARG_ENABLE(debug,
 AS_HELP_STRING([--enable-debug], [enable debugging (default is off)]),
