@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:49 2003
- ** @date Last update: Thu Mar 29 14:33:58 2007
+ ** @date Last update: Fri Mar 30 11:37:46 2007
  **/
 
 /*
@@ -90,6 +90,7 @@ hcode_t hash_hsh1113_8bits(hkey_t *key, size_t keylen);
 hcode_t hash_hsh1113_32bits(hkey_t *key, size_t keylen);
 hcode_t hash_oat(hkey_t *key, size_t keylen);
 hcode_t hash_ethz(hkey_t *key, size_t keylen);
+hcode_t hash_kazlib(hkey_t *key, size_t keylen);
 
 
 

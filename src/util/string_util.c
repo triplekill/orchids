@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Tue Feb 18 17:15:32 2003
- ** @date Last update: Tue Nov 29 11:38:28 2005
+ ** @date Last update: Fri Mar 30 11:10:55 2007
  **/
 
 /*
@@ -67,6 +67,41 @@ my_strspn(const char *pos, const char *eot, size_t n)
     }
 
   return (token_size);
+}
+
+bool_t
+fnmatch_test(const char *pattern)
+{
+  int nesting;
+
+  nesting = 0;
+
+  while (*pattern) {
+    switch (*pattern) {
+
+    case '?':
+    case '*':
+      return (TRUE);
+
+    case '\\':
+      if (*pattern++ == '\0')
+        return (FALSE);
+      break;
+
+    /* '[' is only a glob if it has a matching ']' */
+    case '[':       
+      ++nesting;
+      break;
+
+    case ']':
+      if (nesting)
+        return (TRUE);
+      break;
+    }
+    ++pattern;
+  }
+
+  return (FALSE);
 }
 
 

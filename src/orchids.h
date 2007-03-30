@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Mar 30 10:34:23 2007
+ ** @date Last update: Fri Mar 30 11:07:19 2007
  **/
 
 /*
@@ -58,6 +58,8 @@ extern unsigned long dmalloc_orchids;
 #ifndef FALSE
 #define FALSE 0
 #endif
+
+typedef int bool_t;
 
 #define NO_CACHE 0
 #define USE_CACHE 1

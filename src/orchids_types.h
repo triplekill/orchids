@@ -8,7 +8,7 @@
  ** @ingroup core
  ** 
  ** @date  Started on: Fri Nov 28 15:32:53 2003
- ** @date Last update: Tue Nov 29 11:16:05 2005
+ ** @date Last update: Fri Mar 30 11:07:04 2007
  **/
 
 /*
@@ -31,6 +31,8 @@ typedef unsigned long uint16_t;
 typedef signed   long  int32_t;
 typedef unsigned long uint32_t;
 #endif /* HAVE_STDINT */
+
+
 
 /* #ifdef HAVE_LONGLONG */
 /* typedef signed   long long  int64_t; */

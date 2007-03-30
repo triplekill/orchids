@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Jan 20 16:41:14 2003
- ** @date Last update: Thu Mar 29 14:18:15 2007
+ ** @date Last update: Fri Mar 30 11:41:53 2007
  **/
 
 /*
@@ -395,6 +395,7 @@ hash_x65599(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* SDBM hash function */
 hcode_t
 hash_x65599_opt(hkey_t *key, size_t keylen)
@@ -615,6 +616,7 @@ hash_sfh(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* by M.V. Ramakrishna and Justin Zobel,
    from paper "Performance in Practice of String Hashing Functions" */
 hcode_t
@@ -645,6 +647,7 @@ hash_fnv0(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* by Fowler / Noll / Vo faster on some processors */
 hcode_t
 hash_fnv0_opt(hkey_t *key, size_t keylen)
@@ -659,6 +662,7 @@ hash_fnv0_opt(hkey_t *key, size_t keylen)
 
   return (h);
 }
+
 
 /* by Fowler / Noll / Vo updated version with a new initial value */
 hcode_t
@@ -675,6 +679,7 @@ hash_fnv1(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* Fowler / Noll / Vo version 1 faster on some processors */
 hcode_t
 hash_fnv1_opt(hkey_t *key, size_t keylen)
@@ -689,6 +694,7 @@ hash_fnv1_opt(hkey_t *key, size_t keylen)
 
   return (h);
 }
+
 
 /* by Fowler / Noll / Vo version 1a */
 hcode_t
@@ -705,6 +711,7 @@ hash_fnv1a(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* Fowler / Noll / Vo version 1a faster on some processors */
 hcode_t
 hash_fnv1a_opt(hkey_t *key, size_t keylen)
@@ -720,6 +727,7 @@ hash_fnv1a_opt(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* LCG hash, by Donald Knuth, LCG 2^32 */
 hcode_t
 hash_lcg32dk(hkey_t *key, size_t keylen)
@@ -732,6 +740,7 @@ hash_lcg32dk(hkey_t *key, size_t keylen)
 
   return (h);
 }
+
 
 /* rotating hash. GCC 4 should produce bit rotation instructions ;) */
 hcode_t
@@ -747,6 +756,7 @@ hash_rot13(hkey_t *key, size_t keylen)
 
   return (h);
 }
+
 
 hcode_t
 hash_hsh1113_8bits(hkey_t *key, size_t keylen)
@@ -773,6 +783,7 @@ hash_hsh1113_8bits(hkey_t *key, size_t keylen)
 
   return (h);
 }
+
 
 hcode_t
 hash_hsh1113_32bits(hkey_t *key, size_t keylen)
@@ -828,6 +839,7 @@ hash_hsh1113_32bits(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* One at time hash, by Bob Jenkins */
 hcode_t
 hash_oat(hkey_t *key, size_t keylen)
@@ -847,6 +859,7 @@ hash_oat(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
 /* ETH Zurich hash function */
 hcode_t
 hash_ethz(hkey_t *key, size_t keylen)
@@ -860,6 +873,31 @@ hash_ethz(hkey_t *key, size_t keylen)
   return (h);
 }
 
+
+/* default hash function from Kazlib */
+hcode_t
+hash_kazlib(hkey_t *key, size_t keylen)
+{
+  static unsigned long randbox[] = {
+    0x49848f1bU, 0xe6255dbaU, 0x36da5bdcU, 0x47bf94e9U,
+    0x8cbcce22U, 0x559fc06aU, 0xd268f536U, 0xe10af79aU,
+    0xc1af4d69U, 0x1d2917b5U, 0xec4c304dU, 0x9ee5016cU,
+    0x69232f74U, 0xfead7bb3U, 0xe9089ab6U, 0xf012f6aeU,
+  };
+  hcode_t h;
+
+  h = 0;
+  for ( ; keylen > 0 ; keylen-- ) {
+    h ^= randbox[(*key + h) & 0xf];
+    h = (h << 1) | (h >> 31);
+    h &= 0xffffffffU;
+    h ^= randbox[((*key++ >> 4) + h) & 0xf];
+    h = (h << 2) | (h >> 30);
+    h &= 0xffffffffU;
+  }
+
+  return (h);
+}
 
 
 int

@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:28:19 2003
- ** @date Last update: Thu Mar 29 14:41:30 2007
+ ** @date Last update: Fri Mar 30 11:41:58 2007
  **/
 
 /*
@@ -760,6 +760,34 @@ strhash_ethz(char *key)
   h = 0;
   while (*key)
     h = (*key++) * (h % 257) + 1;
+
+  return (h);
+}
+
+
+/* default hash function from Kazlib */
+strhcode_t
+strhash_kazlib(char *key)
+{
+  static unsigned long randbox[] = {
+    0x49848f1bU, 0xe6255dbaU, 0x36da5bdcU, 0x47bf94e9U,
+    0x8cbcce22U, 0x559fc06aU, 0xd268f536U, 0xe10af79aU,
+    0xc1af4d69U, 0x1d2917b5U, 0xec4c304dU, 0x9ee5016cU,
+    0x69232f74U, 0xfead7bb3U, 0xe9089ab6U, 0xf012f6aeU,
+  };
+  const unsigned char *str;
+  strhcode_t h;
+
+  h = 0;
+  str = (unsigned char *) key;
+  while ( *str ) {
+    h ^= randbox[(*str + h) & 0xf];
+    h = (h << 1) | (h >> 31);
+    h &= 0xffffffffU;
+    h ^= randbox[((*str++ >> 4) + h) & 0xf];
+    h = (h << 2) | (h >> 30);
+    h &= 0xffffffffU;
+  }
 
   return (h);
 }
