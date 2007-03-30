@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup output
  **
  ** @date  Started on: Fri May 23 12:18:40 2003
- ** @date Last update: Tue Nov 29 11:15:07 2005
+ ** @date Last update: Fri Mar 30 09:19:22 2007
  **/
 
 /*
@@ -72,7 +72,7 @@ fprintf_rule_dot(FILE *fp, rule_t *rule)
 static void
 fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options)
 {
-  /* XXX UGLY HACK : USE state pointer to identify state instance */
+  /* XXX UGLY HACK: USE state pointer to identify state instance */
 
   if ((options & DOT_SHOWONLYONCE) && (state->flags & SF_ONLYONCE))
     fprintf(fp, "  \"%s.%p\" [ label=\"%s\", style=filled, fillcolor=\"#E0E0E0\" ]\n",
@@ -141,31 +141,33 @@ fprintf_rule_instance_dot(FILE *fp, rule_instance_t *rule, int options, wait_thr
 ** default config header
 ** build a graph display config structure to modify values
 */
-/* static void */
-/* fprintf_header(FILE *fp) */
-/* { */
-/*   fprintf(fp, "  graph [\n"); */
-/*   fprintf(fp, "    fontsize = \"14\"\n"); */
-/*   fprintf(fp, "    fontname = \"Times-Roman\"\n"); */
-/*   fprintf(fp, "    fontcolor = \"black\"\n"); */
-/*   fprintf(fp, "    color = \"black\"\n"); */
-/*   fprintf(fp, "  ]\n"); */
+#if 0
+static void
+fprintf_header(FILE *fp)
+{
+  fprintf(fp, "  graph [\n");
+  fprintf(fp, "    fontsize = \"14\"\n");
+  fprintf(fp, "    fontname = \"Times-Roman\"\n");
+  fprintf(fp, "    fontcolor = \"black\"\n");
+  fprintf(fp, "    color = \"black\"\n");
+  fprintf(fp, "  ]\n");
 
-/*   fprintf(fp, "  node [\n"); */
-/*   fprintf(fp, "    fontsize = \"14\"\n"); */
-/*   fprintf(fp, "    fontname = \"Times-Roman\"\n"); */
-/*   fprintf(fp, "    fontcolor = \"black\"\n"); */
-/*   fprintf(fp, "    shape = \"ellipse\"\n"); */
-/*   fprintf(fp, "    color = \"black\"\n"); */
-/*   fprintf(fp, "  ]\n"); */
+  fprintf(fp, "  node [\n");
+  fprintf(fp, "    fontsize = \"14\"\n");
+  fprintf(fp, "    fontname = \"Times-Roman\"\n");
+  fprintf(fp, "    fontcolor = \"black\"\n");
+  fprintf(fp, "    shape = \"ellipse\"\n");
+  fprintf(fp, "    color = \"black\"\n");
+  fprintf(fp, "  ]\n");
 
-/*   fprintf(fp, "  edge [\n"); */
-/*   fprintf(fp, "    fontsize = \"14\"\n"); */
-/*   fprintf(fp, "    fontname = \"Times-Roman\"\n"); */
-/*   fprintf(fp, "    fontcolor = \"black\"\n"); */
-/*   fprintf(fp, "    color = \"black\"\n"); */
-/*   fprintf(fp, "  ]\n"); */
-/* } */
+  fprintf(fp, "  edge [\n");
+  fprintf(fp, "    fontsize = \"14\"\n");
+  fprintf(fp, "    fontname = \"Times-Roman\"\n");
+  fprintf(fp, "    fontcolor = \"black\"\n");
+  fprintf(fp, "    color = \"black\"\n");
+  fprintf(fp, "  ]\n");
+}
+#endif /* 0 */
 
 
 /*

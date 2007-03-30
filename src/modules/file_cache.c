@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:48:03 2004
- ** @date Last update: Tue Nov 29 11:15:02 2005
+ ** @date Last update: Fri Mar 30 10:31:52 2007
  **/
 
 /*
@@ -146,7 +146,6 @@ cached_file(const char *path)
 {
   struct stat stat_buf;
   int ret;
-  FILE *fp;
 
   ret = stat(path, &stat_buf);
   if (ret) {

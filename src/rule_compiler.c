@@ -8,7 +8,7 @@
  ** @ingroup compiler
  **
  ** @date  Started on: Sat Feb 22 17:57:07 2003
- ** @date Last update: Wed Nov 30 13:20:07 2005
+ ** @date Last update: Fri Mar 30 10:20:06 2007
  **/
 
 /*
@@ -213,7 +213,6 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
  * @param n Number to append.
  * @return Anallocated string buffer containing the new name.
  **/
-/* CHECK IF STATIC IS NEEDED */
 char *
 build_substate_name(const char *refname, int n)
 {
@@ -230,12 +229,6 @@ build_substate_name(const char *refname, int n)
 
 
 /* Abstract syntax tree building functions (called by the yaccer issdl.y) */
-
-/* --DOXY GROUP TEST
- * @defgroup bf Build functions
- * Abstract syntax tree building functions
- * @{ 
- */
 
 /**
  * Build a 'statelist' node and add the first state.
@@ -292,18 +285,6 @@ build_state(node_actionlist_t *actions, node_translist_t *transitions)
 {
   node_state_t *s;
 
-#if 0
-  if(actions && transitions) {
-      DPRINTF( ("building state (actions and transitions)\n") );
-  } else if (actions && !transitions) {
-    DPRINTF( ("building state (actions only) (TERMINAL STATE)\n") );
-  } else if (!actions && transitions) {
-    DPRINTF( ("building state (transitions only)\n") );
-  } else {
-    DPRINTF( ("Oooops ?!... state with no actions and no transitions\n") );
-  }
-#endif /* ORCHIDS_DEBUG */
-
   s = Xzmalloc(sizeof (node_state_t));
   s->actionlist = actions;
   s->translist = transitions;
@@ -322,11 +303,8 @@ build_state(node_actionlist_t *actions, node_translist_t *transitions)
 node_state_t *
 set_state_label(rule_compiler_t *ctx, node_state_t *state, symbol_token_t *sym, unsigned long flags)
 {
-  /* XXX: Debug Assertions */
   if (state == NULL)
     return (NULL);
-
-  /* DPRINTF( ("set label state [%s] at line %i\n", sym->name, sym->line) ); */
 
   state->name = sym->name;
   state->line = sym->line;
@@ -353,8 +331,6 @@ node_paramlist_t *
 build_paramlist(node_expr_t *first_param)
 {
   node_paramlist_t *pl;
-
-  /* DPRINTF( ("building paramlist\n") ); */
 
   pl = Xmalloc(sizeof (node_paramlist_t));
   pl->params_nb = 1;
@@ -393,8 +369,6 @@ node_varlist_t *
 build_varlist(node_expr_t *first_param)
 {
   node_varlist_t *vl;
-
-  /* DPRINTF( ("building varlist\n") ); */
 
   vl = Xmalloc(sizeof (node_varlist_t));
   vl->vars_nb = 1;
@@ -475,8 +449,6 @@ build_unconditional_transition(char *dest)
   node_trans_t *n;
   node_translist_t *nl;
 
-  /* DPRINTF( ("building direct unconditional transition to state [%s]\n", dest) ); */
-
   n = build_direct_transition(NULL, dest);
   nl = build_transitionlist(n);
 
@@ -487,8 +459,6 @@ node_trans_t *
 build_unconditional_transition_test(char *dest)
 {
   node_trans_t *n;
-
-  /* DPRINTF( ("building direct unconditional transition to state [%s]\n", dest) ); */
 
   n = build_direct_transition(NULL, dest);
 
@@ -507,8 +477,6 @@ node_trans_t *
 build_direct_transition(node_expr_t *cond, char *dest)
 {
   node_trans_t *trans;
-
-  /* DPRINTF( ("building direct transition to state [%s]\n", dest) ); */
 
   trans = Xzmalloc(sizeof (node_trans_t));
   trans->cond = cond;
@@ -529,8 +497,6 @@ build_indirect_transition(node_expr_t *cond, node_state_t *substate)
 {
   node_trans_t *trans;
 
-  /* DPRINTF( ("building indirect transition\n") ); */
-
   trans = Xzmalloc(sizeof (node_trans_t));
   trans->cond = cond;
   trans->sub_state_dest = substate;
@@ -545,8 +511,6 @@ node_translist_t *
 build_transitionlist(node_trans_t *trans)
 {
   node_translist_t *tl;
-
-  /* DPRINTF( ("building transitionlist\n") ); */
 
   /* XXX: Hard-coded allocation parameters !!! */
   tl = Xmalloc(sizeof (node_translist_t));
@@ -586,8 +550,6 @@ node_actionlist_t *
 build_actionlist(node_action_t *first_action)
 {
   node_actionlist_t *al;
-
-  /* DPRINTF( ("building actionlist\n") ); */
 
   /* XXX: Hard-coded allocation parameters !!! */
   al = Xmalloc(sizeof (node_actionlist_t));
@@ -633,8 +595,6 @@ build_rule(symbol_token_t   *sym,
            node_syncvarlist_t   *sync_vars)
 {
   node_rule_t *new_rule;
-
-  /* DPRINTF( ("building rule [%s] at line %i\n", sym->name, sym->line) ); */
 
   new_rule = Xzmalloc(sizeof (node_rule_t));
   new_rule->name = sym->name;
@@ -684,8 +644,6 @@ build_expr(int op, node_expr_t *left_node, node_expr_t *right_node)
 {
   node_expr_t *n;
 
-  /* DPRINTF( ("building binary expression type %s (%i)\n", get_opcode_name(op), op) ); */
-
   n = Xmalloc(sizeof (node_expr_t));
   n->type = NODE_BINOP;
   n->bin.op = op;
@@ -706,8 +664,6 @@ node_expr_t *
 build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr)
 {
   node_expr_t *n;
-
-  /* DPRINTF( ("building association\n") ); */
 
   n = Xmalloc(sizeof (node_expr_t));
   n->type = NODE_BINOP;
@@ -745,8 +701,6 @@ build_function_call(rule_compiler_t  *ctx,
   call_node->call.paramlist = paramlist;
   call_node->call.res_id = func->id;
 
-  /* DPRINTF( ("building function call [%s] (%i)\n", sym->name, func->id) ); */
-
   return (call_node);
 }
 
@@ -761,8 +715,6 @@ build_fieldname(rule_compiler_t *ctx, char *fieldname)
 {
   field_record_t *f;
   node_expr_t *n;
-
-  /* DPRINTF( ("building fieldname [%s]\n", fieldname) ); */
 
   /* check if field exists */
   /* XXX: resolution can be in the descendant phase (2) */
@@ -809,8 +761,6 @@ build_varname(rule_compiler_t *ctx, char *varname)
     n->sym.res_id = tmp->sym.res_id;
   }
 
-  /* DPRINTF( ("building varname [%s] res_id [%i]\n", varname, n->sym.res_id) ); */
-
   return (n);
 }
 
@@ -827,8 +777,6 @@ build_integer(rule_compiler_t *ctx, int i)
 {
   ovm_var_t    *integer;
   node_expr_t  *n;
-
-  /* DPRINTF( ("building integer [%i]\n", i) ); */
 
   integer = ovm_int_new();
   integer->flags |= TYPE_CONST;
@@ -859,13 +807,9 @@ build_double(rule_compiler_t *ctx, double f)
   ovm_var_t    *fpdouble;
   node_expr_t  *n;
 
-  /* DPRINTF( ("building integer [%i]\n", i) ); */
-
   fpdouble = ovm_float_new();
   fpdouble->flags |= TYPE_CONST;
   FLOAT(fpdouble) = f;
-
-  /* XXX Add hash for constant sharing here */
 
   n = Xmalloc(sizeof (node_expr_t));
   n->type = NODE_CONST;
@@ -892,12 +836,9 @@ build_string(rule_compiler_t *ctx, char *str)
   node_expr_t *n;
   ovm_var_t   *string;
 
-  /* DPRINTF( ("building string [%s]\n", str) ); */
-
   string_len = strlen(str);
   string = ovm_str_new(string_len);
   string->flags |= TYPE_CONST;
-/*   memcpy(STR(string), str, string_len); */
   strcpy(STR(string), str);
   Xfree(str); /* free string memory allocated by the lexer */
 
@@ -925,8 +866,6 @@ build_ipv4(rule_compiler_t *ctx, char *hostname)
   ovm_var_t *addr;
   node_expr_t *n;
   struct hostent  *hptr;
-
-  /* DPRINTF( ("building integer [%i]\n", i) ); */
 
   /* XXX Add hash for constant sharing here */
 
@@ -1038,8 +977,6 @@ build_counter(rule_compiler_t *ctx, long initial_value)
   ovm_var_t    *counter;
   node_expr_t  *n;
 
-  /* DPRINTF( ("building counter [%i]\n", i) ); */
-
   counter = ovm_counter_new();
   counter->flags |= TYPE_MONO;
   COUNTER(counter) = initial_value;
@@ -1126,8 +1063,6 @@ build_fields_hash(orchids_t *ctx)
   strhash_t *h;
   int        f;
 
-  /* DPRINTF( ("build_fields_hash(): build fieldnames symbol table\n") ); */
-
   h = ctx->rule_compiler->fields_hash;
   for (f = 0; f < ctx->num_fields; f++)
     strhash_add(h, &ctx->global_fields[f], ctx->global_fields[f].name);
@@ -1149,10 +1084,7 @@ build_functions_hash(orchids_t *ctx)
   int               f;
   int               nf;
 
-  /* DPRINTF( ("build_functions_hash(): build internal functions symbol table\n") ); */
-
   h = ctx->rule_compiler->functions_hash;
-/*   func_tbl = get_issdl_functions(); */
   func_tbl = ctx->vm_func_tbl;
   nf = ctx->vm_func_tbl_sz;
   for (f = 0; f < nf; f++) {
@@ -1200,31 +1132,13 @@ datahash_pjw(unsigned long h, void *key, size_t keylen)
   for (; keylen > 0; keylen--) {
     h = (h << 4) + *p++;
     if ((g = h & 0xF0000000U) != 0) {
-      h = h ^ (g >> 24);
+      h = h ^ (g >> 28);
       h = h ^ g;
     }
   }
 
   return (h);
 }
-
-#if 0
-static unsigned long
-datahash_test(unsigned long h, void *key, size_t keylen)
-{
-  char *p;
-
-  DebugLog(DF_ENG, DS_INFO, "hash h=%08lx key=%p keylen=%i\n",h,key,keylen);
-
-  p = (char *) key;
-  h += keylen;
-  for (; keylen > 0; keylen--) {
-    h += *p++;
-  }
-
-  return (h);
-}
-#endif
 
 static unsigned long
 objhash_rule_instance(void *state_inst)
@@ -1462,6 +1376,7 @@ compile_state_ast(rule_compiler_t *ctx,
   compile_transitions_ast(ctx, rule, state, node_state->translist);
 }
 
+
 /**
  ** Compile an action list node abstract syntax tree.
  ** @param ctx Rule compiler context.
@@ -1475,28 +1390,20 @@ compile_actions_ast(rule_compiler_t   *ctx,
                     state_t           *state,
                     node_actionlist_t *actionlist)
 {
-/*   int i; */
-
   DebugLog(DF_OLC, DS_DEBUG,
            "compiling actions in state \"%s\" in rule \"%s\"\n",
            state->name, rule->name);
 
   if (actionlist) {
-    /*       for (i = 0; i < actionlist->actions_nb; i++) */
-    /*         { */
-    /*           DPRINTF( ("action %i: \n", i) ); */
-    /*           fprintf_expr(stdout, actionlist->actions[i]); */
-    /*         } */
     state->action = compile_actions_bytecode(actionlist->actions,
                                              actionlist->actions_nb,
                                              state);
-#if 0
-    fprintf_bytecode(stdout, state->action);
-#endif /* ORCHIDS_DEBUG */
-  } else {
+  }
+  else {
     DebugLog(DF_OLC, DS_INFO, "state \"%s\" have no action\n", state->name);
   }
 }
+
 
 /**
  * Compile a list of action expressions into bytecode.
@@ -1539,6 +1446,7 @@ compile_actions_bytecode(node_expr_t **expr, int n, state_t *state)
   return (bytecode);
 }
 
+
 /**
  * Compile an evaluation expression into bytecode.
  *   @param expr  An evaluation expression.
@@ -1577,6 +1485,7 @@ compile_bytecode(node_expr_t *expr, transition_t *trans)
 
   return (trans->eval_code);
 }
+
 
 /**
  * Bytecode compiler recursive sub-routine.
@@ -1704,6 +1613,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
   }
 }
 
+
 /**
  * Compile a transition list node abstract syntax tree.
  * @param ctx Rule compiler context.
@@ -1736,7 +1646,8 @@ compile_transitions_ast(rule_compiler_t  *ctx,
         if (translist->trans[i]->sub_state_dest) {
           /* Conditional undirect transition */
           DebugLog(DF_OLC, DS_TRACE, "Undirect transition (substates).\n");
-        } else {
+        }
+        else {
           /* Conditional direct transition (general case) */
           node_state_t *s;
           s = strhash_get(ctx->statenames_hash,
@@ -1745,28 +1656,19 @@ compile_transitions_ast(rule_compiler_t  *ctx,
             DebugLog(DF_OLC, DS_TRACE,
                      "resolve dest %s %i\n", s->name, s->state_id);
             state->trans[i].dest = &rule->state[ s->state_id ];
-          } else {
+          }
+          else {
             DebugLog(DF_OLC, DS_FATAL,
                      "undefined state reference '%s'\n",
                      translist->trans[i]->dest);
             exit (EXIT_FAILURE);
           }
         }
-#if 0
-        fprintf_expr(stdout, translist->trans[i]->cond);
-        fprintf_expr_infix(stdout, translist->trans[i]->cond);
-        printf("\n");
-#endif /* ORCHIDS_DEBUG */
 
-        /* state->trans[i].eval_code = */
         compile_bytecode(translist->trans[i]->cond, &state->trans[i]);
 
-        
-
-#if 0
-        fprintf_bytecode(stdout, state->trans[i].eval_code);
-#endif /* ORCHIDS_DEBUG */
-      } else {
+      }
+      else {
         node_state_t *s;
 
         /* Unconditional transition */
@@ -1778,7 +1680,8 @@ compile_transitions_ast(rule_compiler_t  *ctx,
           DebugLog(DF_OLC, DS_TRACE,
                    "resolve dest %s %i\n", s->name, s->state_id);
           state->trans[i].dest = &rule->state[ s->state_id ];
-        } else {
+        }
+        else {
           DebugLog(DF_OLC, DS_FATAL,
                    "undefined state reference '%s'\n",
                    translist->trans[i]->dest);
@@ -1786,13 +1689,15 @@ compile_transitions_ast(rule_compiler_t  *ctx,
         }
       }
     }
-  } else {
+  }
+  else {
     /* Terminal state */
     DebugLog(DF_OLC, DS_TRACE,
              "state \"%s\" have no transition (TERMINAL STATE)\n",
              state->name);
   }
 }
+
 
 /**
  * Reset a compiler context.
@@ -1805,15 +1710,12 @@ compiler_reset(rule_compiler_t *ctx)
   DebugLog(DF_OLC, DS_DEBUG,
            "*** compiler reset (clear rule specific hashes) ***\n");
 
-#if 0
-  fprintf_rule_environment(stdout, ctx);
-#endif /* ORCHIDS_DEBUG */
-
   clear_strhash(ctx->statenames_hash, NULL);
   clear_strhash(ctx->rule_env, NULL);
   ctx->statics_nb = 0;
   ctx->dyn_var_name_nb = 0;
 }
+
 
 /**
  * Display the current rule environment in the compiler context.
@@ -1833,6 +1735,7 @@ fprintf_rule_environment(FILE *fp, rule_compiler_t *ctx)
   }
   fprintf(fp, "  dynamic environment size : %i\n", ctx->rule_env->elmts);
 }
+
 
 /**
  * fprintf_expr() sub-routine : display a terminal expression node.
@@ -1888,6 +1791,7 @@ fprintf_term_expr(FILE *fp, node_expr_t *expr)
     }
 }
 
+
 /**
  * Display a expression tree in a postfix order.
  * @param fp Output stream.
@@ -1896,13 +1800,12 @@ fprintf_term_expr(FILE *fp, node_expr_t *expr)
 void
 fprintf_expr(FILE *fp, node_expr_t *expr)
 {
-  if (expr->type == NODE_BINOP)
-    {
-      fprintf_expr(fp, expr->bin.lval);
-      fprintf_expr(fp, expr->bin.rval);
-      fprintf(fp, "opcode %s (%i)\n",
-              get_opcode_name(expr->bin.op), expr->bin.op);
-    }
+  if (expr->type == NODE_BINOP) {
+    fprintf_expr(fp, expr->bin.lval);
+    fprintf_expr(fp, expr->bin.rval);
+    fprintf(fp, "opcode %s (%i)\n",
+            get_opcode_name(expr->bin.op), expr->bin.op);
+  }
   else
     fprintf_term_expr(fp, expr);
 }
@@ -1910,7 +1813,6 @@ fprintf_expr(FILE *fp, node_expr_t *expr)
 static void
 fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
 {
-/*   int i; */
 
   switch (expr->type)
     {
@@ -1939,10 +1841,6 @@ fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
       break;
 
     case NODE_CALL:
-/*       if (expr->call.paramlist) */
-/*         if (expr->call.paramlist->params_nb) */
-/*           for (i = expr->call.paramlist->params_nb - 1; i >= 0; --i) */
-/*             fprintf_expr(fp, expr->call.paramlist->params[i]); */
       fprintf(fp, "%s() ", expr->call.symbol);
       break;
 
@@ -1951,31 +1849,31 @@ fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
     }
 }
 
+
 void
 fprintf_expr_infix(FILE *fp, node_expr_t *expr)
 {
-  if (expr->type == NODE_BINOP)
-    {
-      fprintf(fp, "( ");
-      fprintf_expr_infix(fp, expr->bin.lval);
-      switch (expr->bin.op)
-        {
-        case OP_CEQ:
-          fprintf(fp, "== ");
-          break;
-        case OP_CGT:
-          fprintf(fp, "> ");
-          break;
-        case OP_CLE:
-          fprintf(fp, "<= ");
-          break;
-        case ANDAND:
-          fprintf(fp, "&& ");
-          break;
-        }
-      fprintf_expr_infix(fp, expr->bin.rval);
-      fprintf(fp, ") ");
+  if (expr->type == NODE_BINOP) {
+    fprintf(fp, "( ");
+    fprintf_expr_infix(fp, expr->bin.lval);
+    switch (expr->bin.op) {
+
+    case OP_CEQ:
+      fprintf(fp, "== ");
+      break;
+    case OP_CGT:
+      fprintf(fp, "> ");
+      break;
+    case OP_CLE:
+      fprintf(fp, "<= ");
+      break;
+    case ANDAND:
+      fprintf(fp, "&& ");
+      break;
     }
+    fprintf_expr_infix(fp, expr->bin.rval);
+    fprintf(fp, ") ");
+  }
   else
     fprintf_term_expr_infix(fp, expr);
 }

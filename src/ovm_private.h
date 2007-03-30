@@ -4,11 +4,11 @@
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** 
- ** @version 0.1.0
+ ** @version 1.0
  ** @ingroup ovm
  ** 
  ** @date  Started on: Thu Dec  4 12:06:04 2003
- ** @date Last update: Tue Nov 29 11:16:20 2005
+ ** @date Last update: Fri Mar 30 10:25:48 2007
  **/
 
 /*

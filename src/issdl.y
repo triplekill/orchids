@@ -6,10 +6,10 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:02 2003
- ** @date Last update: Tue Nov 29 11:15:23 2005
+ ** @date Last update: Fri Mar 30 09:32:50 2007
  **/
 
 /*
@@ -41,7 +41,6 @@ static rule_compiler_t *compiler_ctx_g = NULL;
   char *string;
   unsigned long flags;
   double fp_double;
-  /* ovm_var_t *val; */
   symbol_token_t sym;
   node_rule_t *node_rule;
   node_statelist_t *node_statelist;
@@ -96,11 +95,13 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 
 %%
 
+
 globaldef:
   /* empty rule */
     { DPRINTF( ("*** warning *** empty rule file.\n") ); }
 | rulelist
 ;
+
 
 rulelist:
   rulelist rule
@@ -115,24 +116,12 @@ rulelist:
     }
 ;
 
+
 rule:
   RULE SYMNAME synchro O_BRACE firststate states C_BRACE
     { $$ = build_rule(&($2), $5, $6, $3); }
 ;
 
-/* rule_options: */
-/*   /\* no options *\/ */
-/*   { ; } */
-/* | rule_options_list */
-/*   { ; } */
-/* ; */
-
-/* rule_options_list: */
-/*   rule_options_list rule_option */
-/* { /\* other options *\/} */
-/* | rule_option */
-/* { /\* first option *\/ } */
-/* ; */
 
 synchro:
   /* no synchro */
@@ -140,6 +129,7 @@ synchro:
 | SYNCHRONIZE O_PARENT sync_var_list C_PARENT
     { $$ = $3; }
 ;
+
 
 sync_var_list:
   sync_var_list COMMA VARIABLE
@@ -156,6 +146,7 @@ states:
     { $$ = $1; }
 ;
 
+
 statelist:
   statelist state
     { statelist_add($1, $2); $$ = $1; }
@@ -163,15 +154,18 @@ statelist:
     { $$ = build_statelist($1); }
 ;
 
+
 firststate:
   STATE INIT state_options O_BRACE statedefs C_BRACE
     { $$ = set_state_label(compiler_ctx_g, $5, &($2), $3); }
 ;
 
+
 state:
   STATE SYMNAME state_options O_BRACE statedefs C_BRACE
     { $$ = set_state_label(compiler_ctx_g, $5, &($2), $3); }
 ;
+
 
 state_options:
   /* empty */
@@ -180,12 +174,14 @@ state_options:
     { $$ |= SF_ONLYONCE; }
 ;
 
+
 string:
   string STRING
     { $$ = build_concat_string($1, $2); }
 | STRING
     { $$ = $1; }
 ;
+
 
 statedefs:
   /* empty state */
@@ -202,6 +198,7 @@ statedefs:
     { $$ = NULL; /* XXX not used */ }
 ;
 
+
 actionlist:
   actionlist action
     { actionlist_add($1, $2); $$ = $1; }
@@ -209,15 +206,18 @@ actionlist:
     { $$ = build_actionlist($1); }
 ;
 
+
 var:
   VARIABLE
     { $$ = build_varname(compiler_ctx_g, $1); }
 ;
 
+
 regsplit:
   string
     { $$ = build_split_regex(compiler_ctx_g, $1); }
 ;
+
 
 var_list:
   var_list O_DIV var
@@ -226,20 +226,14 @@ var_list:
     { $$ = build_varlist($2); }
 ;
 
+
 action:
   expr SEMICOLUMN
     { $$ = $1; }
-/* | VARIABLE EQ expr SEMICOLUMN */
-/*     { $$ = build_assoc(build_varname($1), $3); } */
-/* | VARIABLE EQ expr */
-/*     { $$ = build_assoc(compiler_ctx_g, $1, $3); } */
 | O_DIV var O_DIV regsplit var_list SEMICOLUMN
     { $$ = build_string_split($2, $4, $5); }
-/* | SYMNAME O_PARENT params C_PARENT SEMICOLUMN */
-/*     { $$ = build_function_call(&($1), $3); } */
-/* | SEMICOLUMN No Operation -- ignoring */ 
-/*    { DPRINTF( ("*** warning *** NoOp\n") ); $$ = NULL; } */
 ;
+
 
 expr:
   O_PARENT expr C_PARENT
@@ -284,6 +278,7 @@ expr:
     { $$ = build_assoc(compiler_ctx_g, $1, $3); }
 ;
 
+
 params:
   /* empty */
     { $$ = NULL; }
@@ -291,12 +286,14 @@ params:
     { $$ = $1; }
 ;
 
+
 paramlist:
   paramlist COMMA param
     { paramlist_add($1, $3); $$ = $1; }
 | param
     { $$ = build_paramlist($1); }
 ;
+
 
 param:
   NUMBER
@@ -309,24 +306,14 @@ param:
   { $$ = build_fieldname(compiler_ctx_g, $1); }
 ;
 
-/* transitionlist: */
-/*   transitionlist IF O_PARENT condexpr C_PARENT O_BRACE statedefs C_BRACE */
-/*     { DPRINTF( ("transisionlist\n") ); $$ = NULL } */
-/* | IF O_PARENT condexpr C_PARENT O_BRACE statedefs C_BRACE */
-/*     { DPRINTF( ("transision\n") ); $$ = NULL } */
-/* | GOTO SYMNAME SEMICOLUMN */
-/*     { DPRINTF( ("goto\n") ); $$ = NULL } */
-/* ; */
 
 transitionlist:
   transitionlist transition
     { transitionlist_add($1, $2); $$ = $1; }
 | transition
     { $$ = build_transitionlist($1); }
-  /* | GOTO SYMNAME SEMICOLUMN
-    { $$ = build_unconditional_transition($2.name); DPRINTF( ("goto [%s]\n", $2.name) ); }
-  */
 ;
+
 
 transition:
   IF O_PARENT condexpr C_PARENT GOTO SYMNAME SEMICOLUMN
@@ -334,16 +321,9 @@ transition:
 | IF O_PARENT condexpr C_PARENT O_BRACE statedefs C_BRACE
     { $$ = build_indirect_transition($3, $6); }
 | GOTO SYMNAME SEMICOLUMN
-    { $$ = build_unconditional_transition_test($2.name); DPRINTF( ("goto [%s]\n", $2.name) ); }
+    { $$ = build_unconditional_transition_test($2.name); }
 ;
 
-
-/* transition: */
-/*   GOTO SYMNAME SEMICOLUMN */
-/*   { $$ = NULL; DPRINTF( ("goto %s\n", $2) ); } */
-/* | IF O_PARENT condexpr C_PARENT O_BRACE statedefs C_BRACE */
-/*   { $$ = NULL; } */
-/* ; */
 
 condexpr:
   NUMBER
@@ -397,8 +377,8 @@ condexpr:
 void
 issdlerror(char *s)
 {
-  DPRINTF( ("%s on line %i at '%s'.\n", s, issdllineno_g, issdltext) );
-  DPRINTF( ("have to clear current compiler context (XXX: ToDo)\n") );
+  DebugLog(DF_OLC, DS_ERROR, "%s on line %i at '%s'.\n", s, issdllineno_g, issdltext);
+  DebugLog(DF_OLC, DS_DEBUG, "have to clear current compiler context (XXX: ToDo)\n");
 }
 
 void
@@ -410,8 +390,8 @@ set_yaccer_context(rule_compiler_t *ctx)
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
-** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire SpÃ©cification
+** et VÃ©rification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **

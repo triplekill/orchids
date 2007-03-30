@@ -6,10 +6,10 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:38 2003
- ** @date Last update: Tue Nov 29 11:15:16 2005
+ ** @date Last update: Fri Mar 30 09:19:57 2007
  **/
 
 /*
@@ -313,38 +313,11 @@ issdlwrap(void)
   return (1);
 }
 
-/*
-int
-issdlwrap(void)
-{
-  DPRINTF( ("issdlwrap()\n") );
-
-  if (compiler_ctx_g == NULL)
-    {
-      DPRINTF( ("compiler context not configured.\n") );
-      return (1);
-      exit(EXIT_FAILURE);
-    }
-
-  if (compiler_ctx_g->currfile->next)
-    {
-      compiler_ctx_g->currfile = compiler_ctx_g->currfile->next;
-      DPRINTF( ("opening rulefile %s\n", compiler_ctx_g->currfile->filename) );
-      issdlin = xfopen(compiler_ctx_g->currfile->filename, "r");
-
-      return (0);
-    }
-
-  DPRINTF( ("no more rule file.\n") );
-
-  return (1);
-}
-*/
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
-** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire SpÃ©cification
+** et VÃ©rification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **

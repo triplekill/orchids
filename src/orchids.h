@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Tue Nov 29 11:15:47 2005
+ ** @date Last update: Fri Mar 30 10:34:23 2007
  **/
 
 /*
@@ -273,17 +273,6 @@ struct field_record_s
       (t)->flags |= THREAD_KILLED
 
 
-#if 0
-#define KILL_THREAD_OLD(ctx, t) \
-  do { \
-    if ( ! THREAD_IS_KILLED(t) ) { \
-      (t)->flags |= THREAD_KILLED; \
-      (t)->state_instance->rule_instance->threads--; \
-      (ctx)->threads--; \
-    } \
-  } while (0)
-#endif
-
 #define NO_MORE_THREAD(r) ((r)->threads == 0)
 
 #define INIT_STATE_INST 0x00000001
@@ -498,7 +487,6 @@ struct sync_lock_list_s {
 struct rule_instance_s
 {
   rule_t *rule;
-  /* int rule_id; */ /* XXX: NOT USED */
   ovm_var_t       **rigid_env;
   size_t            rigid_env_sz;
   state_instance_t *first_state;
@@ -568,14 +556,13 @@ struct state_instance_s
   int               event_level;
   unsigned long     flags;
   state_t          *state;
-  /* int state_id; */ /* XXX: NOT USED */
   rule_instance_t  *rule_instance;
-  ovm_var_t **inherit_env;
-  ovm_var_t **current_env;
+  ovm_var_t       **inherit_env;
+  ovm_var_t       **current_env;
   state_instance_t *global_next;
   state_instance_t *retrig_next;
   int               depth;
-  wait_thread_t *thread_list;
+  wait_thread_t    *thread_list;
   state_instance_t *next_report_elmt;
 };
 
@@ -1018,6 +1005,7 @@ struct orchids_s
   FILE *evt_fb_fp;
 
   /* global temporal information container */
+  /* XXX: Move this into mod_period */
   strhash_t        *temporal;
 
   /* Runtime User */
@@ -1109,15 +1097,6 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
 /**   @var input_module_s::version
  **     Version of Orchids. See ORCHIDS_VERSION.
  **/
-/**   @var input_module_s::mod_id
- **     Module identifier.
- **/
-/**   @var input_module_s::next
- **     Next module in list.
- **/
-/**   @var input_module_s::config
- **     Module configuration structure.
- **/
 /**   @var input_module_s::name
  **     Module name.
  **/
@@ -1143,11 +1122,6 @@ struct input_module_s
 {
   unsigned long          magic;
   unsigned long          version;
-#if 0
-  int                    mod_id; /* MOVE THIS TO MOD ENTRY */
-  struct input_module_s *next;   /* MOVE THIS TO MOD ENTRY */
-  void                  *config; /* MOVE THIS TO MOD ENTRY */
-#endif
   char                  *name;
   char                  *license;
   char                 **dependencies;
@@ -1903,6 +1877,12 @@ void
 html_output_cache_flush(orchids_t *ctx);
 void
 html_output_cache_cleanup(orchids_t *ctx);
+int
+cached_html_file(orchids_t *ctx, char *file);
+void
+generate_htmlfile_hardlink(orchids_t *ctx, char *file, char *link);
+
+
 
 
 /*
@@ -1931,6 +1911,9 @@ cache_gc(char *dir,
 
 FILE *
 fopen_cached(const char *path);
+
+int
+cached_file(const char *path);
 
 
 /*

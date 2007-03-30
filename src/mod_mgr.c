@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Wed Nov 30 13:15:01 2005
+ ** @date Last update: Fri Mar 30 09:44:29 2007
  **/
 
 /*
@@ -91,30 +91,25 @@ add_module(orchids_t *ctx, input_module_t *mod)
     }
 
   /* 1 - Check if already registered */
-  if (find_module(ctx, mod->name) != NULL)
-    {
-      DPRINTF( ("warning! module [%s] already loaded...\n", mod->name) );
-      return (-1);
-    }
+  if (find_module(ctx, mod->name) != NULL) {
+    DPRINTF( ("warning! module [%s] already loaded...\n", mod->name) );
+    return (-1);
+  }
 
   /* 2 - Check dependencies */
-  if (mod->dependencies)
-    {
-      char **d;
+  if (mod->dependencies) {
+    char **d;
 
-      for (d = mod->dependencies; *d; d++)
-	if (find_module(ctx, *d) == NULL)
-	  {
-	    DPRINTF( ("failed module dependencie '%s' for module '%s'\n",
-                      *d, mod->name) );
-            exit(EXIT_FAILURE); /* XXX: Keep This ??? */
-            return (-1);
-          }
-    }
+    for (d = mod->dependencies; *d; d++)
+      if (find_module(ctx, *d) == NULL) {
+        DPRINTF( ("failed module dependencie '%s' for module '%s'\n",
+                  *d, mod->name) );
+        exit(EXIT_FAILURE); /* XXX: Keep This ??? */
+        return (-1);
+      }
+  }
 
   /* 3 - Add to core list (and hashlist ?) */
-  /*   mod->next = ctx->mod_list; DO NOT USED MODLIST */
-  /*   ctx->mod_list = mod; DO NOT USED MODLIST */
   mod_id = ctx->loaded_modules;
   ctx->mods[mod_id].mod_id = mod_id;
   ctx->mods[mod_id].mod = mod;
@@ -159,11 +154,6 @@ remove_module(orchids_t *ctx, char *name)
 input_module_t *
 find_module(orchids_t *ctx, char *name)
 {
-/*   input_module_t *m; */
-
-/*   for (m = ctx->mod_list; m; m = m->next) */
-/*     if (strcmp(m->name, name) == 0) */
-/*       return (m); */
   mod_entry_t *m;
   int nm;
   int i;

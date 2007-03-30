@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Thu Mar 29 15:09:35 2007
+ ** @date Last update: Fri Mar 30 08:46:11 2007
  **/
 
 /*
@@ -211,13 +211,6 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       exit(EXIT_FAILURE);
     }
   }
-
-/*   if (ctx->off_line_mode != MODE_ONLINE) */
-/*     { */
-/*       DPRINTF( ("off-line mode not yet implemented\n") ); */
-/*       exit(EXIT_FAILURE); */
-/*     } */
-
 }
 
 static void

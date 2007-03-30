@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Tue Nov 29 11:14:53 2005
+ ** @date Last update: Fri Mar 30 09:17:11 2007
  **/
 
 /*
@@ -34,11 +34,6 @@
 /* WARNING -- Field list in event_t, and field ids in int array must
    be sorted in decreasing order */
 
-/* static int simul_and_eval_state_instance(orchids_t *ctx, */
-/*                                          state_instance_t *state, */
-/*                                          event_t *event); */
-/* static rule_instance_t *try_to_launch_rule(orchids_t *ctx, */
-/*                                            rule_t *rule, event_t *event); */
 static void
 free_rule_instance(orchids_t *ctx,
                    rule_instance_t *rule_instance);
@@ -61,7 +56,6 @@ static void
 mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 {
   wait_thread_t *t;
-  /* rule_instance_t *r; */
 
   /* mark threads */
   for (t = ctx->cur_retrig_qh; t; t = t->next) {
@@ -88,14 +82,12 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
   for (t = ctx->new_qh; t; t = t->next) {
     if ((t->state_instance->rule_instance == rule) && !THREAD_IS_KILLED(t)) {
 #ifndef ORCHIDS_DEMO
-      printf("forgotten thread ? (new)\n");
+      printf("maybe forgotten thread ? (new)\n");
 #endif /* ORCHIDS_DEMO */
     }
   }
 
-  /* mark rule */
-/*   for (r = ctx->first_rule_instance; r && r != rule; r = r->next) */
-/*     ; */
+  /* mark rule as killed */
   rule->flags |= THREAD_KILLED;
 }
 
@@ -112,10 +104,7 @@ rip_dead_rule(orchids_t *ctx, rule_instance_t *rule)
   for (r = ctx->first_rule_instance; r; r = next_rule) {
     next_rule = r->next;
     if (r == rule) {
-/*      if ( NO_MORE_THREAD(r->threads) ) { */
       DebugLog(DF_ENG, DS_TRACE, "ripping killed rule %p\n", r);
-/*       if (r->threads > 0) */
-/*         DebugLog(DF_ENG, DS_ERROR, "ouch, r->thread > 0 (%u)\n", r->threads); */
       if (prev_rule) {
         prev_rule->next = r->next;
       } else {
@@ -193,7 +182,7 @@ simulate_state_and_create_threads(orchids_t        *ctx,
     return (-1);
   }
 
-  /* XXX test sync vars here, if sync, return */
+  /* test sync vars here, if sync, return */
   if (state->rule_instance->rule->sync_lock) {
     DebugLog(DF_ENG, DS_INFO, "Checking synchronization variables\n");
     if ( sync_var_env_is_defined(ctx, state) ) {
@@ -288,6 +277,7 @@ simulate_state_and_create_threads(orchids_t        *ctx,
   return (created_threads);
 }
 
+
 /**
  * Create initial threads of each rules, put the COMMIT flags
  * and merge to the current wait queue.
@@ -311,16 +301,11 @@ create_rule_initial_threads(orchids_t *ctx,
     new_rule->rule = r;
     new_rule->first_state = init;
     new_rule->state_instances = 1;
-    /* new_rule->max_depth = 0; */
-    /* new_rule->threads = 0; */
-    /* new_rule->state_list = NULL; */
-    /* new_rule->retrig_list = NULL; */
     init->rule_instance = new_rule; /* move in create_init_inst() ? */
     /* link rule */
 /*     ctx->state_instances++; */
 
     ret = simulate_state_and_create_threads(ctx, init, event, THREAD_ONLYONCE);
-    /* XXX BUG HERE: if init doesn't create thread, empty rule will be linked */
 
     if (ret <= 0) {
       DebugLog(DF_ENG, DS_DEBUG, "No initial threads for rule %s\n",
@@ -388,7 +373,8 @@ backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
   if (thread->trans->dest->trans_nb > 0 &&
       !(thread->trans->dest->flags & BYTECODE_HAVE_PUSHFIELD))
     return (TRUE);
-  /* XXX: Destination MUST NOT be a cut-point. */
+  /* XXX: Destination MUST NOT be a cut-point.
+     Destination cuts should be resolved at compilation-time instead of runtime ? */
 #endif
 
   return (FALSE);
@@ -451,7 +437,6 @@ inject_event(orchids_t *ctx, event_t *event)
     fprintf(stdout, "begin next retrig queue\n");
     fprintf_thread_queue(stdout, ctx, ctx->retrig_qh);
 #endif
-
 
   /* q-init */
   DebugLog(DF_ENG, DS_DEBUG, "STEP 1 - create initial threads (q-init)\n");
@@ -654,12 +639,12 @@ inject_event(orchids_t *ctx, event_t *event)
 
   /* free unreferenced event here (the the current event didn't passed any
      transition, Xfree() it) */
-/*   if (passed_threads == 0) { */
   if (active_event->refs == 0) {
     DebugLog(DF_ENG, DS_DEBUG, "free unreferenced event (%p/%p)\n", active_event, active_event->event);
     free_event(active_event->event);
     Xfree(active_event);
-  } else {
+  }
+  else {
     gettimeofday(&ctx->last_evt_act, NULL);
     DebugLog(DF_ENG, DS_DEBUG,
              "Keep new event: active_event->refs = %i (linking) %i\n",
@@ -672,8 +657,6 @@ inject_event(orchids_t *ctx, event_t *event)
       ctx->active_event_tail->next = active_event;
       ctx->active_event_tail = active_event;
     }
-/*     active_event->next = ctx->active_event_tail; */
-/*     ctx->active_event_tail = active_event; */
     ctx->active_events++;
   }
 
@@ -687,6 +670,7 @@ inject_event(orchids_t *ctx, event_t *event)
 }
 
 
+
 /**
  * Create an instance of a state and inherits environment from parent.
  * This function doesn't link new state instance and its parent.
@@ -698,7 +682,9 @@ inject_event(orchids_t *ctx, event_t *event)
  **/
 /* Environments managment really needs _HEAVY_ optimizations */
 static state_instance_t *
-create_state_instance(orchids_t *ctx, state_t *state, const state_instance_t *parent)
+create_state_instance(orchids_t *ctx,
+                      state_t *state,
+                      const state_instance_t *parent)
 {
   state_instance_t *new_state;
   int env_sz;
@@ -721,7 +707,7 @@ create_state_instance(orchids_t *ctx, state_t *state, const state_instance_t *pa
   ** a reference to parent envs (PBs for desallocating) */
 
   /* shadow_env construction
-     -- XXX: optimize this, remove pointer resolution !!! */
+     XXX: optimize this, remove pointer resolution !!! */
   for (i = 0; i < state->rule->dynamic_env_sz; ++i) {
     if (parent->current_env[i])
       new_state->inherit_env[i] = parent->current_env[i];
@@ -733,6 +719,7 @@ create_state_instance(orchids_t *ctx, state_t *state, const state_instance_t *pa
 
   return (new_state);
 }
+
 
 /**
  * Create an instance of the initial state of a rule.
@@ -802,7 +789,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
     Xfree(lock_elmt);
   }
 
-  /* free init state (MEMLEAK WAS HERE ;) */
+  /* free init state */
   if (rule_instance->first_state->inherit_env)
     Xfree(rule_instance->first_state->inherit_env);
 
@@ -820,17 +807,16 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
   ctx->state_instances--;
 
   si = rule_instance->state_list;
-/*   printf("si=%p\n", si); */
   while (si) {
     next_si = si->retrig_next;
-    if (si->inherit_env) /* can be null for init state (XXX MEMLEAK HERE) */
+    if (si->inherit_env) /* can be null for init state */
       Xfree(si->inherit_env);
 
     /* free all 'current dynamic environment' variables */
     dyn_env_sz = rule_instance->rule->dynamic_env_sz;
-    if (dyn_env_sz > 0) { /* Bug here: try to free() un-malloc()ed memory ! */
+    if (dyn_env_sz > 0) {
       for (i = 0, cur_env = si->current_env; i < dyn_env_sz; ++i)
-        if (cur_env[i] && CAN_FREE_VAR(cur_env[i]) ) { /* Double free was here ! ;-( Free only TYPE_TEMP */
+        if (cur_env[i] && CAN_FREE_VAR(cur_env[i]) ) {
           Xfree(cur_env[i]);
         }
       Xfree(si->current_env);
@@ -838,53 +824,47 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
 
     /* update event reference count */
     if (si->event) {
+
       si->event->refs--;
 
-    /* unreferenced active events are freed in inject_event() */
-    if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
-      gettimeofday(&ctx->last_evt_act, NULL);
-      if (si->event->refs < 0) {
-        printf("refs < 0 ?!\n");
-      }
-      DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
-      free_event(si->event->event);
-      si->event->event = NULL;
-      ctx->active_events--;
-      /* unlink */
-      if (!si->event->prev) { /* si l'element est le premier */
+      /* unreferenced active events are freed in inject_event() */
+      if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
+        gettimeofday(&ctx->last_evt_act, NULL);
+        DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
+        free_event(si->event->event);
+        si->event->event = NULL;
+        ctx->active_events--;
+        /* unlink */
+        if (!si->event->prev) { /* if we are in the first event reference */
 
-        if (!si->event->next) { /* si l'element est le dernier */
-          /* alors c'est le dernier de la liste */
-          ctx->active_event_head = NULL;
-          ctx->active_event_tail = NULL;
-        } else {
-          /* alors c'est le premier de la liste, avec des elements deriere */
-          ctx->active_event_head = si->event->next;
-          ctx->active_event_head->prev = NULL;
+          if (!si->event->next) { /* if it is also the last (it is alone) */
+            ctx->active_event_head = NULL;
+            ctx->active_event_tail = NULL;
+          }
+          else {
+            /* else it is the first, and there is other references after it */
+            ctx->active_event_head = si->event->next;
+            ctx->active_event_head->prev = NULL;
+          }
+          /* si->event->next->prev = si->event->prev; */
         }
-/*         si->event->next->prev = si->event->prev; */
+        else { /* ...else the event reference is not the first */
 
-      } else { /* si l'element c'est pas le permier */
-
-        if (!si->event->next) { /* si l'element est le dernier */
-          /* donc l'element est le dernier, avec d'autre elements avant */
-          si->event->prev->next = NULL;
-          ctx->active_event_tail = si->event->prev;
-        } else { /* sinon, l'element n'est pas le dernier */
-          /* donc l'element est en plein milieu de la liste */
-          si->event->prev->next = si->event->next;
-          si->event->next->prev = si->event->prev;
+          if (!si->event->next) { /* if it is exactly the last one */
+            /* ...there is other event references before... */
+            si->event->prev->next = NULL;
+            ctx->active_event_tail = si->event->prev;
+          }
+          else { /* ...else the event reference is not the last
+                    we are in the middle of the list */
+            si->event->prev->next = si->event->next;
+            si->event->next->prev = si->event->prev;
+          }
+          /* ctx->active_event_tail = si->event->prev; */
         }
-/*         ctx->active_event_tail = si->event->prev; */
+
+        Xfree(si->event);
       }
-
-
-/*         si->event->prev->next = si->event->next; */
-/*       } else { /\* sinon l'element n'est le premier *\/ */
-/*         ctx->active_event_head = si->event->next; */
-/*       } */
-      Xfree(si->event);
-    }
     }
     Xfree(si);
     si = next_si;

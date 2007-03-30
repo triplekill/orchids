@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Tue Dec  6 16:22:15 2005
+ ** @date Last update: Fri Mar 30 09:42:27 2007
  **/
 
 /*
@@ -1917,32 +1917,30 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
 
   /* display variable info: affected to a named variable, or temp result */
   if (FLAGS(val) & TYPE_CANFREE)
-/*     fprintf(fp, "(TEMP|"); */
-    fprintf(fp, "F");
+    fputc('F', fp);
   else
-/*     fprintf(fp, "(KEEP|"); */
-    fprintf(fp, "K");
+    fputc('K', fp);
 
   /* display nomotony info */
-  switch (val->flags & MONOTONY_MASK)
-    {
-    case TYPE_UNKNOWN:
-/*       fprintf(fp, "UNKNOWN) "); */
-      fprintf(fp, "U ");
-      break;
-    case TYPE_MONO:
-/*       fprintf(fp, "MONO) "); */
-      fprintf(fp, "M ");
-      break;
-    case TYPE_ANTI:
-/*       fprintf(fp, "ANTI) "); */
-      fprintf(fp, "A ");
-      break;
-    case TYPE_CONST:
-/*       fprintf(fp, "CONST) "); */
-      fprintf(fp, "C ");
-      break;
-    }
+  switch (val->flags & MONOTONY_MASK) {
+
+  case TYPE_UNKNOWN:
+    fputc('U', fp);
+    break;
+
+  case TYPE_MONO:
+    fputc('M', fp);
+    break;
+
+  case TYPE_ANTI:
+    fputc('A', fp);
+    break;
+
+  case TYPE_CONST:
+    fputc('C', fp);
+    break;
+  }
+  fputc(' ', fp);
 
   /* display data */
   switch (val->type)
@@ -2090,8 +2088,6 @@ issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
 static void
 issdl_printevent(orchids_t *ctx, state_instance_t *state)
 {
-  /* XXX TEST THIS FUNCTION */
-
   DebugLog(DF_OVM, DS_DEBUG, "issdl_printevent()\n");
   for ( ; state && state->event == NULL; state = state->parent)
     ;
@@ -2292,40 +2288,6 @@ issdl_cut(orchids_t *ctx, state_instance_t *state)
   do_recursive_cut(si);
 }
 
-#if 0
-static void
-issdl_temporal(orchids_t *ctx, state_instance_t *state)
-{
-  ovm_var_t *str;
-  void *temp_ctx;
-  char *key;
-
-  /* XXX: if str is temp, clone ! */
-  str = stack_pop(ctx->ovm_stack);
-  if (TYPE(str) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    return ;
-  }
-
-  DebugLog(DF_ENG, DS_INFO, "Updating temporal information for container %s\n", STR(str));
-
-  key = ovm_strdup(str);
-
-  temp_ctx = strhash_get(ctx->temporal, key);
-
-  if (temp_ctx == NULL) {
-    DebugLog(DF_ENG, DS_INFO, "New container %s\n", key);
-    /* create container ctx */
-    /* add to hash */
-    strhash_add(ctx->temporal, (void *)1, key);
-  }
-  else {
-    Xfree(key);
-  }
-
-  /* update temporal info */
-}
-#endif
 
 char *
 ovm_strdup(ovm_var_t *str)
@@ -2396,17 +2358,6 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_ENG, DS_INFO, "Generating report\n");
 
   /* walk report list */
-/*   for ( ; report_events; report_events = report_events->next_report_elmt) { */
-/*     fprintf(fp, "***** state: %s *****\n", report_events->state->name); */
-/*     fprintf_state_env(fp, report_events); */
-/*     if (report_events->event) */
-/*       fprintf_event(fp, ctx, report_events->event->event); */
-/*     else */
-/*       fprintf(fp, "no event.\n"); */
-/*   } */
-
-/*   fprintf_html_header(fp, "Report"); */
-
   fprintf(fp, "<center>\n");
   for (i = 0 ; report_events ; report_events = report_events->next_report_elmt, i++) {
 
@@ -2446,7 +2397,6 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
     }
   }
   fprintf(fp, "</center>\n");
-/*   fprintf_html_trailer(fp); */
   Xfclose(fp);
 
   ctx->reports++;
@@ -2916,28 +2866,11 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_sendmail, 18, "sendmail", 4, "Send a mail" },
   { issdl_sendmail_report, 19, "sendmail_report", 4, "Send a report by mail" },
   { issdl_timeout, 20, "timeout", 2, "Real-time timeout" },
-
   { issdl_bindist, 21, "bitdist", 2, "Number of different bits" },
   { issdl_bytedist, 22, "bytedist", 2, "Number of different bytes" },
-
   { issdl_vstr_from_regex, 23, "vstr_from_regex", 1, "Return the source virtual string of a compiled regex" },
   { issdl_str_from_regex, 24, "str_from_regex", 1, "Return the source string of a compiled regex" },
-
   { issdl_regex_from_str, 25, "regex_from_str", 1, "Compile a regex from a string" },
-
-#if 0
-#ifdef HAVE_SWIPROLOG
-  { issdl_prolog, 0, "prolog", 2, "query the prolog engine" },
-#else
-  { issdl_noop, 0, "no_prolog", 2, "prolog engine unavailable" },
-#endif /* HAVE_SWIPROLOG */
-
-  { issdl_temporal, 0, "temporal", 1, "Temporal analysis" },
-
-  { issdl_console_msg, 0, "console_msg", 2, "Console message output" },
-  { issdl_console_evt, 0, "console_evt", 1, "Console event output" },
-#endif
-
   { NULL, 0, NULL, 0, NULL }
 };
 

@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Tue Dec  6 15:37:04 2005
+ ** @date Last update: Fri Mar 30 10:23:53 2007
  **/
 
 /*
@@ -41,6 +41,7 @@
 
 #include "orchids.h"
 
+#ifdef ORCHIDS_STATIC
 /* declare builtins modules */
 extern input_module_t mod_remoteadm;
 extern input_module_t mod_textfile;
@@ -62,6 +63,7 @@ extern input_module_t mod_win32evt;
 extern input_module_t mod_consoles;
 extern input_module_t mod_autohtml;
 extern input_module_t mod_sockunix;
+#endif
 
 static config_directive_t *
 build_config_section(FILE *fp, config_directive_t *parent);
@@ -341,17 +343,11 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 static void
 add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  /*  char filepath[PATH_MAX]; */
   rulefile_t *rulefile;
 
   DebugLog(DF_CORE, DS_INFO, "adding rule file %s\n", dir->args);
-/*   compile_and_add_rulefile(ctx, dir->args); */
 
   rulefile = Xmalloc(sizeof (rulefile_t));
-/*
-  Xrealpath(dir->args, filepath);
-  rulefile->name = strdup(filepath);
-*/
   rulefile->name = dir->args;
   rulefile->next = NULL;
 
@@ -392,13 +388,15 @@ module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       i++;
     if (c[i].cmd) {
       c[i].cmd(ctx, m, d);
-    } else {
+    }
+    else {
       DebugLog(DF_CORE, DS_WARN,
                "no handler defined in module [%s] for [%s] directive\n",
-                m->mod->name, d->directive);
+               m->mod->name, d->directive);
     }
   }
 }
+
 
 #ifdef ORCHIDS_STATIC
 static void
@@ -439,6 +437,7 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 #endif /* ORCHIDS_STATIC */
 
+
 static void
 config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -448,13 +447,12 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   if (input_mod == NULL) {
     DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", dir->args);
     return ;
-/*     exit(EXIT_FAILURE); */
   }
 
   add_module(ctx, input_mod);
 }
 
-
+/* XXX move this to mod_htmlstate */
 static void
 set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -466,20 +464,6 @@ set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   /* check if the output directory exists */
   Xstat(ctx->html_output_dir, &stat_buf);
-/*   if (ret < 0) { */
-/*     if (errno == ENOENT) { */
-/*       /\* create output dir *\/ */
-/*       DebugLog(DF_CORE, DS_INFO, "Creating output directory '%s'.\n", */
-/*                ctx->html_output_dir); */
-/*       mkdir(ctx->html_output_dir, 493); */
-/*     } */
-/*     else { */
-/*       fprintf(stderr, "%s:%i:stat(%s): errno=%i: %s\n", */
-/*               __FILE__, __LINE__, ctx->html_output_dir, */
-/*               errno, strerror(errno)); */
-/*       exit(EXIT_FAILURE); */
-/*     } */
-/*   } */
 }
 
 
@@ -491,6 +475,7 @@ set_idmef_dtd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ctx->idmef_dtd = dir->args;
 }
 
+
 static void
 set_idmef_analyzer_id(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -499,6 +484,7 @@ set_idmef_analyzer_id(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ctx->idmef_analyzer_id = dir->args;
 }
+
 
 static void
 set_idmef_analyzer_loc(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -509,6 +495,7 @@ set_idmef_analyzer_loc(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir
   ctx->idmef_analyzer_loc = dir->args;
 }
 
+
 static void
 set_idmef_sensor_hostname(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -518,6 +505,7 @@ set_idmef_sensor_hostname(orchids_t *ctx, mod_entry_t *mod, config_directive_t *
   ctx->idmef_sensor_hostname = dir->args;
 }
 
+
 static void
 set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -526,6 +514,7 @@ set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ctx->runtime_user = dir->args;
 }
+
 
 static void
 set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -541,6 +530,7 @@ set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   Xstat(ctx->report_dir, &stat_buf);
 }
 
+
 static void
 set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -548,6 +538,7 @@ set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ctx->report_prefix = dir->args;
 }
+
 
 static void
 set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -557,6 +548,7 @@ set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ctx->report_ext = dir->args;
 }
 
+
 static void
 set_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -564,6 +556,7 @@ set_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ctx->preproc_cmd = dir->args;
 }
+
 
 static void
 set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -597,6 +590,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { NULL, NULL, NULL }
 };
 
+
 static void
 proceed_config_tree(orchids_t *ctx)
 {
@@ -611,7 +605,8 @@ proceed_config_tree(orchids_t *ctx)
       i++;
     if (config_dir_g[i].cmd) {
       config_dir_g[i].cmd(ctx, NULL, d);
-    } else {
+    }
+    else {
       DebugLog(DF_CORE, DS_WARN,
                "No handler defined for [%s] direcrive\n", d->directive);
     }
@@ -626,37 +621,33 @@ fprintf_cfg_mib_sub(FILE *f, config_directive_t *section, char *base)
 {
   char *newbase;
 
-  for (; section; section = section->next)
-    {
-      if (section->first_child)
-        {
-          /*          if (section->args[0] == '\0')
-            fprintf(f, "Section %s>\n", section->directive);
-          else
-          fprintf(f, "Section %s %s\n", section->directive, section->args);*/
-          if (base)
-            {
-              /* 3 = ">." + '\0' */
-              newbase = Xmalloc(strlen(base) + strlen(section->directive) + 3);
-              strcpy(newbase, base);
-              strcat(newbase, ">.");
-              strcat(newbase, section->directive);
-            }
-          else
-            newbase = strdup(section->directive);
-
-          fprintf_cfg_mib_sub(f, section->first_child, newbase);
-
-          /* free(newbase); */
-        }
+  for (; section; section = section->next) {
+    if (section->first_child) {
+      /* if (section->args[0] == '\0')
+         fprintf(f, "Section %s>\n", section->directive);
+         else
+         fprintf(f, "Section %s %s\n", section->directive, section->args); */
+      if (base) {
+        /* 3 = ">." + '\0' */
+        newbase = Xmalloc(strlen(base) + strlen(section->directive) + 3);
+        strcpy(newbase, base);
+        strcat(newbase, ">.");
+        strcat(newbase, section->directive);
+      }
       else
-        {
-          if (base)
-            fprintf(f, "%s.%s %s\n", base, section->directive, section->args);
-          else
-            fprintf(f, "%s %s\n", section->directive, section->args);
-        }
+        newbase = strdup(section->directive);
+
+      fprintf_cfg_mib_sub(f, section->first_child, newbase);
+
+      /* free(newbase); */
     }
+    else {
+      if (base)
+        fprintf(f, "%s.%s %s\n", base, section->directive, section->args);
+      else
+        fprintf(f, "%s %s\n", section->directive, section->args);
+    }
+  }
 }
 
 void
@@ -666,6 +657,7 @@ fprintf_cfg_mib(FILE *f, config_directive_t *section)
   fprintf_cfg_mib_sub(f, section, NULL);
   fprintf(f, "---[ end of config mib test ]---\n\n");
 }
+
 
 void
 fprintf_directives(FILE *fp, orchids_t *ctx)
@@ -681,19 +673,18 @@ fprintf_directives(FILE *fp, orchids_t *ctx)
   for (d = config_dir_g; (*d).cmd; d++)
     fprintf(fp, "%20s | %.32s\n", (*d).name, (*d).help);
 
-  for (mod = 0; mod < ctx->loaded_modules; mod++)
-    {
-      fprintf(fp, "\nmod %s directives :\n", ctx->mods[mod].mod->name);
-      fprintf(fp, "---------------------------------------------\n");
-      if (ctx->mods[mod].mod->cfg_cmds)
-        {
-          for (d = ctx->mods[mod].mod->cfg_cmds; d->name; d++)
-            fprintf(fp, "%20s | %.32s\n", d->name, d->help);
-        }
-      else
-        fprintf(fp, "no directive.\n");
+  for (mod = 0; mod < ctx->loaded_modules; mod++) {
+    fprintf(fp, "\nmod %s directives :\n", ctx->mods[mod].mod->name);
+    fprintf(fp, "---------------------------------------------\n");
+    if (ctx->mods[mod].mod->cfg_cmds) {
+      for (d = ctx->mods[mod].mod->cfg_cmds; d->name; d++)
+        fprintf(fp, "%20s | %.32s\n", d->name, d->help);
     }
+    else
+      fprintf(fp, "no directive.\n");
+  }
 }
+
 
 void
 proceed_post_config(orchids_t *ctx)
@@ -712,7 +703,7 @@ proceed_post_config(orchids_t *ctx)
 
   gettimeofday(&ctx->postconfig_time, NULL);
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
-  /* move this into orhcids stats */
+  /* move this into orchids stats */
   DebugLog(DF_CORE, DS_NOTICE, "post-config (real) time: %li.%03li ms\n",
            (diff_time.tv_sec) * 1000 + (diff_time.tv_usec) / 1000,
            (diff_time.tv_usec) % 1000);

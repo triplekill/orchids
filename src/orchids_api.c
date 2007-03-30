@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Tue Nov 29 11:15:53 2005
+ ** @date Last update: Fri Mar 30 10:05:42 2007
  **/
 
 /*
@@ -106,14 +106,12 @@ orchids_t *
 new_orchids_context(void)
 {
   orchids_t *ctx;
-/*   char config_filepath[PATH_MAX]; */
 
   ctx = Xzmalloc(sizeof (orchids_t));
 
-  /* XXX -- do default initialisation here */
-  /* Xrealpath(DEFAULT_CONFIG_FILE, config_filepath); */
-  /* ctx->config_file = strdup(config_filepath); */
-  ctx->config_file = strdup(DEFAULT_CONFIG_FILE);
+  /* do default initialisation here */
+  ctx->preproc_cmd = DEFAULT_PREPROC_CMD;
+  ctx->config_file = DEFAULT_CONFIG_FILE;
   ctx->poll_period.tv_sec = DEFAULT_IN_PERIOD;
   gettimeofday(&ctx->start_time, NULL);
   ctx->last_ruleinst_act = ctx->start_time;
@@ -127,8 +125,7 @@ new_orchids_context(void)
   /* initialise OVM stack */
   ctx->ovm_stack = new_stack(128, 128);
 
-  /* VM callable function table */
-  /* ctx->vm_func_tbl = get_issdl_functions(); */
+  /* Register core VM functions */
   register_core_functions(ctx);
 
   /* initialise other stuffs here... */
@@ -139,7 +136,7 @@ new_orchids_context(void)
 
   ctx->pid = getpid();
 
-  ctx->modules_dir = strdup(DEFAULT_MODULES_DIR);
+  ctx->modules_dir = DEFAULT_MODULES_DIR;
 
   return (ctx);
 }
@@ -151,8 +148,6 @@ add_polled_input_callback(orchids_t *ctx,
                           void *data)
 {
   polled_input_t *pi;
-
-  /* DPRINTF( ("polled input registration from [%s]\n", mod->name) ); */
 
   pi = Xzmalloc(sizeof (polled_input_t));
   pi->cb = cb;
@@ -193,9 +188,6 @@ add_input_descriptor(orchids_t *ctx,
   realtime_input_t *rti;
 
   DebugLog(DF_CORE, DS_INFO, "Adding intput descriptor (%i)...\n", fd);
-
-/*   DPRINTF( ("realtime input registration from [%s] for fd=%d\n", */
-/*   mod->name, fd) ); */
 
   /* input fd MUST be a socket (and a fifo ???) XXX - Put sanity checks */
 
@@ -298,13 +290,6 @@ register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
   DebugLog(DF_CORE, DS_TRACE, "registering fields for module '%s'.\n",
            mod->mod->name);
 
-  /* 0 - Fields already registered ? */
-/*   if (ctx->mods[mod_id].fields) */
-/*     { */
-/*       DPRINTF( ("Error... Fields already registred ?\n") ); */
-/*       exit(EXIT_FAILURE); */
-/*     } */
-
   /* 1 - Allocate some memory in global field list */
   /* Is it the first allocation ?? */
   if (ctx->global_fields == NULL)
@@ -367,21 +352,6 @@ add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
   }
 }
 
-/* void */
-/* add_value_to_event(event_t **event, char *attr, ovm_var_t *val) */
-/* { */
-/*   event_t *new_evt; */
-
-/*   if (val == NULL) */
-/*     return ; */
-
-/*   new_evt = Xmalloc(sizeof (event_t)); */
-/*   new_evt->field_id = 0; */
-/*   new_evt->value = val; */
-/*   new_evt->next = *event; */
-
-/*   *event = new_evt; */
-/* } */
 
 void
 fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
@@ -398,34 +368,15 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
   fprintf(fp, "-----+--------------------------+---------------------------------\n");
 }
 
-#if 0
-void
-rollback_event(event_t *event, event_t *orig_event)
-{
-  event_t *e;
-
-  while (event != orig_event) {
-    e = event->next;
-    Xfree(event->value);
-    Xfree(event);
-    event = e;
-  }
-}
-#endif
-
 void
 free_event(event_t *event)
 {
   event_t *e;
 
   while (event) {
-    //fprintf(stderr, "free event: %p field: %i value: %p\n", event, event->field_id, event->value);
     e = event->next;
-    //fprintf(stderr, "free value\n");
     Xfree(event->value);
-    //fprintf(stderr, "free event\n");
     Xfree(event);
-    //fprintf(stderr, "freed\n");
     event = e;
   }
 }
@@ -696,26 +647,22 @@ fprintf_state_env(FILE *fp, const state_instance_t *state)
 {
   int i;
 
-  for (i = 0; i < state->rule_instance->rule->dynamic_env_sz; ++i)
-    {
-      if (state->current_env[i])
-        {
-          fprintf(fp, "    current_env[%i]: ($%s) ",
-                  i, state->rule_instance->rule->var_name[i]);
-          fprintf_issdl_val(fp, state->current_env[i]);
-        }
-      else if (state->inherit_env && state->inherit_env[i])
-        {
-          fprintf(fp, "  inherited_env[%i]: ($%s) ",
-                  i, state->rule_instance->rule->var_name[i]);
-          fprintf_issdl_val(fp, state->inherit_env[i]);
-        }
-      else
-        {
-          fprintf(fp, "            env[%i]: ($%s) nil\n",
-                  i, state->rule_instance->rule->var_name[i]);
-        }
+  for (i = 0; i < state->rule_instance->rule->dynamic_env_sz; ++i) {
+    if (state->current_env[i]) {
+      fprintf(fp, "    current_env[%i]: ($%s) ",
+              i, state->rule_instance->rule->var_name[i]);
+      fprintf_issdl_val(fp, state->current_env[i]);
     }
+    else if (state->inherit_env && state->inherit_env[i]) {
+      fprintf(fp, "  inherited_env[%i]: ($%s) ",
+              i, state->rule_instance->rule->var_name[i]);
+      fprintf_issdl_val(fp, state->inherit_env[i]);
+    }
+    else {
+      fprintf(fp, "            env[%i]: ($%s) nil\n",
+              i, state->rule_instance->rule->var_name[i]);
+    }
+  }
 }
 
 

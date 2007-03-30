@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Wed Nov 30 17:50:17 2005
+ ** @date Last update: Fri Mar 30 10:31:20 2007
  **/
 
 /*
@@ -645,6 +645,10 @@ struct ovm_double_s
 /*----------------------------------------------------------------------------*
 ** function prototypes                                                       **
 *----------------------------------------------------------------------------*/
+
+issdl_type_t *
+issdlgettypes(void);
+
 
 int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2);
 

@@ -4,11 +4,11 @@
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
- ** @date Last update: Tue Dec  6 16:05:13 2005
+ ** @date Last update: Fri Mar 30 09:18:25 2007
  **/
 
 /*
@@ -213,81 +213,6 @@ event_dispatcher_main_loop(orchids_t *ctx)
   }
 }
 
-
-
-#if 0
-
-void
-event_dispatcher_main_loop_old(orchids_t *ctx)
-{
-  fd_set rfds;
-  time_t curr_time;
-  struct timeval tv;
-  int retval;
-  polled_input_t *pi;
-  realtime_input_t *rti;
-
-  if ((ctx->poll_handler_list == NULL) && (ctx->realtime_handler_list == NULL))
-    {
-      DebugLog(DF_CORE, DS_FATAL,
-               "Nothing to do... No modules have requested input...\n");
-      exit(EXIT_FAILURE);
-    }
-
-  curr_time = time(NULL);
-  ctx->last_poll = curr_time;
-
-  /* retreive all polled data now...
-  ** inject or skip them... (module config specific) */
-
-  DebugLog(DF_CORE, DS_TRACE,
-           "*** entering in event dispatcher main loop ***\n");
-
-  printf("[pid %i] Running...\n ", getpid());
-
-#ifdef DMALLOC
-  dmalloc_orchids = dmalloc_mark();
-#endif
-
-  for (;;) {
-    DebugLog(DF_CORE, DS_DEBUG,
-             "*** waiting for realtime event (or timeout) ***\n");
-    Monitor_Activity();
-    memcpy(&rfds, &ctx->fds, sizeof(fd_set));
-    memcpy(&tv, &ctx->poll_period, sizeof(struct timeval));
-    retval = Xselect(ctx->maxfd + 1, &rfds, NULL, NULL, &tv);
-
-    if (retval) {
-      DebugLog(DF_CORE, DS_INFO, "New realtime input data.... (%i)\n", retval);
-      for (rti = ctx->realtime_handler_list; rti && retval; ) {
-        realtime_input_t *next; /* when a rti delete itself
-                                ** we need to know next rti BEFORE exec cb */
-        next = rti->next;
-        if (FD_ISSET(rti->fd, &rfds)) {
-          retval--;
-          (rti->cb)(ctx, rti->fd, rti->data);
-        }
-        rti = next;
-      }
-
-      curr_time = time(NULL);
-      if ((curr_time - ctx->last_poll) > ctx->poll_period.tv_sec) {
-        ctx->last_poll = curr_time;
-        DebugLog(DF_CORE, DS_DEBUG,
-                 "Need to check polled data while recv rt event.\n");
-        for (pi = ctx->poll_handler_list; pi; pi = pi->next)
-          pi->cb(ctx, pi->data);
-      }
-    } else {
-      DebugLog(DF_CORE, DS_DEBUG, "Idle... Check polled inputs...\n");
-      curr_time = time(NULL);
-      for (pi = ctx->poll_handler_list; pi; pi = pi->next)
-        pi->cb(ctx, pi->data);
-    }
-  }
-}
-
-#endif /* 0 */
 
 #ifdef ENABLE_ACTMON
 
