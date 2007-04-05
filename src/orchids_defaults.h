@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Tue Jan 14 14:00:41 2003
- ** @date Last update: Fri Mar 30 10:06:33 2007
+ ** @date Last update: Thu Apr  5 15:55:00 2007
  **/
 
 
@@ -73,8 +73,8 @@
 # define PATH_TO_SENDMAIL "/usr/sbin/sendmail"
 #endif /* PATH_TO_SENDMAIL */
 
-#define ORCHIDS_LOCKFILE    LOCALSTATEDIR "/run/orchids/orchids.lock"
-#define OUTPUTHTML_LOCKFILE LOCALSTATEDIR "/run/orchids/orchids-outputhtml.lock"
+#define DEFAULT_ORCHIDS_LOCKFILE    LOCALSTATEDIR "/run/orchids/orchids.lock"
+#define DEFAULT_OUTPUTHTML_LOCKFILE LOCALSTATEDIR "/run/orchids/orchids-outputhtml.lock"
 
 #define HTML_AUTOREFRESH "20"
 

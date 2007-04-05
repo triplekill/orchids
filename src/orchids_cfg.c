@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Thu Apr  5 09:41:13 2007
+ ** @date Last update: Thu Apr  5 15:56:53 2007
  **/
 
 /*
@@ -704,6 +704,14 @@ set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ctx->modules_dir = dir->args;
 }
 
+static void
+set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting lock file to '%s'\n", dir->args);
+
+  ctx->lockfile = dir->args;
+}
+
 
 static mod_cfg_cmd_t config_dir_g[] = 
 {
@@ -725,6 +733,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "ReportExt", set_report_ext, "Set the report extension" },
   { "SetPreprocessorCmd", set_preproc_cmd, "Set the preprocessor command" },
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
+  { "SetLockFile", set_lock_file, "Set the lock file name" },
   { NULL, NULL, NULL }
 };
 

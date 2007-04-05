@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Tue Dec  6 16:44:32 2005
+ ** @date Last update: Thu Apr  5 16:00:30 2007
  **/
 
 /*
@@ -115,11 +115,11 @@ html_output_preconfig(orchids_t *ctx)
   /* XXX: TODO: Check that lockdir is accessible */
 
   /* if an old lockfile exists, try to remove it */
-  ret = unlink(OUTPUTHTML_LOCKFILE);
+  ret = unlink(DEFAULT_OUTPUTHTML_LOCKFILE);
   if (ret == -1 && errno != ENOENT) {
     fprintf(stderr,
             "unlink(pathname=\"%s\"): error %i: %s\n",
-            OUTPUTHTML_LOCKFILE, errno, strerror(errno));
+            DEFAULT_OUTPUTHTML_LOCKFILE, errno, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -1533,7 +1533,7 @@ do_html_output(orchids_t *ctx)
   int ret;
 
   /* acquire lock or return */
-  fd = Xopen(OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  fd = Xopen(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
   ret = Write_lock(fd, 0, SEEK_SET, 0);
   if (ret) {
     if (errno == EACCES || errno == EAGAIN) {

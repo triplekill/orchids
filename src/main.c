@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Fri Mar 30 08:46:11 2007
+ ** @date Last update: Thu Apr  5 16:10:40 2007
  **/
 
 /*
@@ -92,8 +92,6 @@ main(int argc, char *argv[])
 {
   orchids_t *ctx;
 
-  orchids_lock();
-
 #ifdef ORCHIDS_DEBUG
   debuglog_enable_all(); /* enable ALL messages in debug mode */
   libdebug_openlog("orchids",
@@ -122,6 +120,9 @@ main(int argc, char *argv[])
               LOCALSTATEDIR "/orchids/log/orchids.stderr");
 
   proceed_pre_config(ctx);
+
+  orchids_lock(ctx->lockfile);
+
   proceed_post_config(ctx);
   compile_rules(ctx);
   proceed_post_compil(ctx);

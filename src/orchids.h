@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Thu Apr  5 08:23:24 2007
+ ** @date Last update: Thu Apr  5 16:00:43 2007
  **/
 
 /*
@@ -946,10 +946,8 @@ struct mod_entry_s
  **/
 struct orchids_s
 {
-  /* currently in use */
   struct timeval start_time;
   char *config_file;
-  /* struct input_module_s *mod_list; */ /* XXX: NOT USED */
   mod_entry_t mods[MAX_MODULES];
   int loaded_modules;
   struct polled_input_s *poll_handler_list;
@@ -972,8 +970,6 @@ struct orchids_s
   unsigned long rule_instances;
   unsigned long state_instances;
   unsigned long threads;
-  /* struct compiled_rule_s *compiled_rule_list; */
-  /* XXX create an OVM context? or keep it merged in global orchids context ?*/
   lifostack_t *ovm_stack;
   issdl_function_t *vm_func_tbl;
   int vm_func_tbl_sz;
@@ -981,9 +977,6 @@ struct orchids_s
   char *off_line_input_file;
   int daemon;
 
-/*   queue_t *cur; */
-/*   queue_t *new; */
-/*   queue_t *retrig; */
   wait_thread_t  *current_tail;
   wait_thread_t  *cur_retrig_qh;
   wait_thread_t  *cur_retrig_qt;
@@ -1007,7 +1000,7 @@ struct orchids_s
   char *idmef_analyzer_loc;
   char *idmef_sensor_hostname;
 
-  /* HTML Output Config (dir/css/mode/etc...) */
+  /* HTML Output Config (dir/css/mode/etc...) XXX: move to module */
   char *html_output_dir;
 
   /* Event feedback address */
@@ -1044,6 +1037,7 @@ struct orchids_s
   struct timeval cur_loop_time;
 
   char *modules_dir;
+  char *lockfile;
 };
 
 
@@ -1249,7 +1243,7 @@ struct field_s
 /* orchids_api.c */
 
 void
-orchids_lock(void);
+orchids_lock(const char *lockfile);
 
 /**
  ** Create a new Orchids application context, and initialize it with

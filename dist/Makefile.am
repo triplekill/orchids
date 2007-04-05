@@ -11,5 +11,4 @@ orchidsconf_DATA = orchids.conf orchids-rules.conf
             -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
             -e 's#@@LIBDIR@@#$(libdir)#g' \
             -e 's#@@RUNUSER@@#$(ORCHIDS_RUNTIME_USER)#g' \
-           $(srcdir)/$< \
-           > $@
+           $<  >  $@

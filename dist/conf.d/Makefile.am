@@ -33,5 +33,5 @@ orchidsconfd_DATA =         \
             -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
             -e 's#@@LIBDIR@@#$(libdir)#g' \
             -e 's#@@RUNUSER@@#$(ORCHIDS_RUNTIME_USER)#g' \
-           $(srcdir)/$< \
+           $< \
            > $@

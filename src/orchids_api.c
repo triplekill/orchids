@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Fri Mar 30 10:05:42 2007
+ ** @date Last update: Thu Apr  5 16:00:20 2007
  **/
 
 /*
@@ -74,13 +74,13 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len)
 }
 
 void
-orchids_lock(void)
+orchids_lock(const char *lockfile)
 {
   int fd;
   pid_t pid;
   int ret;
 
-  fd = Xopen(ORCHIDS_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  fd = Xopen(lockfile, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
 
   pid = lock_test(fd, F_WRLCK, 0, SEEK_SET, 0);
   if (pid) {
@@ -117,6 +117,7 @@ new_orchids_context(void)
   ctx->last_ruleinst_act = ctx->start_time;
   ctx->last_evt_act = ctx->start_time;
   ctx->cur_loop_time = ctx->start_time;
+  ctx->lockfile = DEFAULT_ORCHIDS_LOCKFILE;
 
   /* initialise a rule compiler context -- XXX: This is not thread safe !
    * but we don't usualyly want to parse file in parallel */
