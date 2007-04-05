@@ -1,0 +1,10 @@
+#
+# textfile input module config
+#
+#<module textfile>
+#  ReOpenSafetyChecks = true
+#  ReOpenIntegrityChecks = crc32
+#  PollPeriod 15
+#  AddInputFile /var/log/messages
+#  ProceedAll 1
+#</module>

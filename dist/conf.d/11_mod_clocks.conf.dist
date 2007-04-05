@@ -1,0 +1,27 @@
+#
+# Clock imprecisions modules
+#
+
+<module clocks>
+
+  <clock host-kernel>
+    Precision       0.0000001
+    Synchronization 0.01
+  </clock>
+
+  <clock host-syslog>
+    Precision       1.0
+    Synchronization 0.01
+  </clock>
+
+  <clock switch0-timep>
+    Precision       1.0
+    Synchronization 2.0
+  </clock>
+
+  <clock wifi0-syslog-ntpdate>
+    Precision 1.0
+    Synchronization 0.5
+  </clock>
+
+</module>

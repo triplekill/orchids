@@ -1,0 +1,4 @@
+# rawsnare module
+<module rawsnare>
+  AddUdpSource 6262
+</module>

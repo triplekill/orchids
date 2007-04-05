@@ -1,0 +1,4 @@
+# remote admin module
+<module remoteadm>
+  ListenPort 4242
+</module>

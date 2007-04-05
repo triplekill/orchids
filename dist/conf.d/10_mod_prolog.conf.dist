@@ -1,0 +1,7 @@
+#
+# SWI Prolog engine
+#
+
+<module prolog>
+  Consult orchids.pl
+</module>

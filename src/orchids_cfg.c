@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Mar 30 10:23:53 2007
+ ** @date Last update: Thu Apr  5 09:41:13 2007
  **/
 
 /*
@@ -19,8 +19,6 @@
 # include "config.h"
 #endif
 
-
-/* XXX: Ugly conf tree builder !... Have to rewrite it !... */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,6 +31,7 @@
 
 #include <sys/time.h> /* gettimeofday() */
 
+#include <glob.h> /* glob() */
 
 #include <errno.h>
 
@@ -65,12 +64,19 @@ extern input_module_t mod_autohtml;
 extern input_module_t mod_sockunix;
 #endif
 
-static config_directive_t *
-build_config_section(FILE *fp, config_directive_t *parent);
-static void build_config_tree(orchids_t *ctx);
-static void fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section,
-                                 int depth);
+static int
+build_config_tree(const char *config_filepath, config_directive_t **root);
 static void proceed_config_tree(orchids_t *ctx);
+static int
+build_config_tree_sub(FILE *fp,
+                      config_directive_t **sect_root,
+                      config_directive_t *parent,
+                      const char *file,
+                      int *lineno);
+static int
+split_line(char *line, char **directive, char **argument);
+static void
+cfg_get_next_token(const char *text, size_t *offset, size_t *length);
 static void
 config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
@@ -89,7 +95,7 @@ proceed_pre_config(orchids_t *ctx)
   DebugLog(DF_CORE, DS_NOTICE, "*** beginning ORCHIDS configuration ***\n");
 
   if (ctx->off_line_mode == MODE_ONLINE) {
-    build_config_tree(ctx);
+    build_config_tree(ctx->config_file, &ctx->cfg_tree);
     proceed_config_tree(ctx);
   } else {
 #if 0
@@ -134,175 +140,299 @@ proceed_pre_config(orchids_t *ctx)
            (diff_time.tv_sec * 1000) + (diff_time.tv_usec) / 1000);
 }
 
-static void
-build_config_tree(orchids_t *ctx)
+static int
+build_config_tree(const char *config_filepath, config_directive_t **root)
 {
   FILE *fp;
-  int i;
-  char cfg_file_path[PATH_MAX];
-  char line[2048];
-  char op[64];
-  char param[2014];
-  config_directive_t *new_dir = NULL;
-  config_directive_t *last_dir = NULL;
+  int ret;
+  int line;
 
-  Xrealpath(ctx->config_file, cfg_file_path);
+  fp = Xfopen(config_filepath, "r");
+  line = 0;
+  ret = build_config_tree_sub(fp, root, NULL, config_filepath, &line);
 
-  DebugLog(DF_CORE, DS_NOTICE,
-           "builing config tree from cfg file [%s]\n", cfg_file_path);
-
-  fp = Xfopen(cfg_file_path, "r");
-  while (!feof(fp))
-    {
-      line[0] = '\0';
-      Xfgets(line, 2048, fp);
-      op[0] = param[0] = '\0';
-      i = sscanf(line, "%64s %2014[^\n]", op, param);
-
-      /* skip blanks */
-      if ((op[0] == '#') || (op[0] == '\0'))
-        continue;
-
-      /* handle section */
-      if (op[0] == '<')
-        {
-          if (op[1] != '/')
-            {
-              DebugLog(DF_CORE, DS_TRACE, "Begin Section %s\n", op);
-              new_dir = Xzmalloc(sizeof (config_directive_t));
-              if (op[strlen(op)-1] == '>')
-                {
-                  op[ strlen(op) - 1 ] = '\0';
-                  new_dir->directive = strdup(op);
-                }
-              else
-                new_dir->directive = strdup(op);
-              new_dir->args = strdup(param);
-              /* Read section resursively */
-              new_dir->first_child = build_config_section(fp, new_dir);
-              /* Add directive */
-              if (last_dir) /* add to current list */
-                last_dir->next = new_dir;
-              else /* special case for first element */
-                ctx->cfg_tree = new_dir;
-              last_dir = new_dir;
-              continue ;
-            }
-          else
-            {
-              DebugLog(DF_CORE, DS_FATAL, "Closing section in globals ?.\n");
-              exit(EXIT_FAILURE);
-            }
-        }
-      
-      DebugLog(DF_CORE, DS_DEBUG, "Directive '%s' Parameter '%s'\n", op, param);
-      new_dir = Xzmalloc(sizeof (config_directive_t));
-      new_dir->directive = strdup(op);
-      new_dir->args = strdup(param);
-      /* Add directive */
-      if (last_dir) /* add to current list */
-        last_dir->next = new_dir;
-      else /* special case for first element */
-        ctx->cfg_tree = new_dir;
-      last_dir = new_dir;
-    }
-
-  Xfclose(fp);
+  return (ret);
 }
 
 static config_directive_t *
-build_config_section(FILE *fp, config_directive_t *parent)
+get_last_dir(config_directive_t *list)
 {
-  config_directive_t *new_dir;
-  config_directive_t *section_root;
-  config_directive_t *last_dir; /* current directive */
+  if (list == NULL)
+    return (NULL);
+
+  for ( ; list->next ; list = list->next )
+    ;
+
+  return (list);
+}
+
+static int
+proceed_includes(char *pattern, config_directive_t **root, config_directive_t **last)
+{
+  int ret;
   int i;
-  char line[2048];
-  char op[64];
-  char param[2014];
+  glob_t globbuf;
+  config_directive_t *new_root;
 
-  last_dir = new_dir = section_root = NULL;
+  DebugLog(DF_CORE, DS_DEBUG, "Include config file pattern '%s'\n", pattern);
 
-  while (!feof(fp))
-    {
-      line[0] = '\0';
-      Xfgets(line, 2048, fp);
-      op[0] = param[0] = '\0';
-      i = sscanf(line, "%64s %2014[^\n]", op, param);
+  ret = glob(pattern, 0, NULL, &globbuf);
+  if (ret) {
+    if (ret == GLOB_NOMATCH)
+      fprintf(stderr,
+              "WARNING: Pattern returned no match.\n");
+    else
+      fprintf(stderr,
+              "WARNING: glob() error.\n");
+  }
 
-      /* skip comment and blank lines */
-      if ((op[0] == '#') || (op[0] == '\0'))
-        continue;
+  for (i = 0; i < globbuf.gl_pathc; i++) {
+    DebugLog(DF_CORE, DS_DEBUG, "Include config file '%s'\n", globbuf.gl_pathv[i]);
+    new_root = NULL;
+    ret = build_config_tree(globbuf.gl_pathv[i], &new_root);
+    if (ret)
+      return (ret);
+    if (new_root == NULL)
+      continue ;
+    if (*last)
+      (*last)->next = new_root;
+    else
+      (*root) = new_root;
+    *last = get_last_dir(new_root);
+  }
 
-      /* handle section */
-      if (op[0] == '<')
-        {
-          if (op[1] != '/')
-            {
-              DebugLog(DF_CORE, DS_TRACE, "Begin Section %s\n", op);
-              new_dir = Xzmalloc(sizeof (config_directive_t));
-              if (op[strlen(op)-1] == '>')
-                {
-                  op[ strlen(op) - 1 ] = '\0';
-                  new_dir->directive = strdup(op);
-                }
-              else
-                new_dir->directive = strdup(op);
-              new_dir->args = strdup(param);
-              /* Read section resursively */
-              new_dir->first_child = build_config_section(fp, new_dir);
-              new_dir->parent = parent;
-              /* Add directive */
-              if (last_dir) /* add to current list */
-                last_dir->next = new_dir;
-              else /* special case for first element */
-                section_root = new_dir;
-              last_dir = new_dir;
-              continue ;
-            }
-          else /* handle closing section this time... */
-            {
-              /* check if we are closing right section */
-              if (!strncmp((op + 2), parent->directive + 1, strlen(op) - 3))
-                {
-                  /* XXX - check if section was empty before returning */
-                  return (section_root);
-                }
-              else
-                {
-                  DebugLog(DF_CORE, DS_FATAL, "Bad closing... [%s] -> [%s]\n",
-                           parent->directive, op);
-                  exit(EXIT_FAILURE);
-                }
-            }
+  return (RETURN_SUCCESS);
+}
+
+
+static int
+build_config_tree_sub(FILE *fp,
+                      config_directive_t **sect_root,
+                      config_directive_t *parent,
+                      const char *file,
+                      int *lineno)
+{
+  char line[LINE_MAX];
+  char *directive;
+  char *arguments;
+  config_directive_t *new_dir = NULL;
+  config_directive_t *last_dir = NULL;
+  int skip;
+  int ret;
+
+  while (!feof(fp)) {
+    line[0] = '\0';
+    Xfgets(line, LINE_MAX, fp);
+    (*lineno)++;
+
+    skip = split_line(line, &directive, &arguments);
+
+    /* skip blanks */
+    if (skip)
+      continue;
+
+    /* handle section */
+    if (directive[0] == '<') {
+      if (directive[1] != '/') {
+        /* open a section */
+        new_dir = Xzmalloc(sizeof (config_directive_t));
+        if (directive[ strlen(directive) - 1 ] == '>') {
+          directive[ strlen(directive) - 1 ] = '\0';
+          new_dir->directive = strdup(directive);
         }
+        else {
+          /* XXX warn if a section is empty ? */
+          new_dir->directive = strdup(directive);
+        }
+        if (arguments)
+          new_dir->args = strdup(arguments);
+        new_dir->parent = parent;
+        new_dir->file = file;
+        new_dir->line = *lineno;
 
-      DebugLog(DF_CORE, DS_TRACE, "Directive '%s' Parameter '%s'\n", op, param);
+        /* Add the directive to the section */
+        if (last_dir) /* add to current list */
+          last_dir->next = new_dir;
+        else /* special case for first element */
+          *sect_root = new_dir;
+        last_dir = new_dir;
+
+        /* Read section resursively */
+        ret = build_config_tree_sub(fp,
+                                    &new_dir->first_child,
+                                    new_dir,
+                                    file,
+                                    lineno);
+
+        if (ret)
+          return (ret);
+
+        continue ;
+      }
+      else if (    parent
+               && !strncmp((directive + 2),
+                           parent->directive + 1,
+                           strlen(directive) - 3)) {
+        /* close a section */
+        return (RETURN_SUCCESS);
+      }
+      else {
+        return (ERR_CFG_SECT);
+      }
+    }
+
+    if ( !strcmp("Include", directive) ) {
+      proceed_includes(arguments, sect_root, &last_dir);
+    }
+    else {
       new_dir = Xzmalloc(sizeof (config_directive_t));
-      new_dir->directive = strdup(op);
-      new_dir->args = strdup(param);
-      /* Add directive */
+      new_dir->directive = strdup(directive);
+      if (arguments)
+        new_dir->args = strdup(arguments);
+      new_dir->file = file;
+      new_dir->line = *lineno;
+
       if (last_dir) /* add to current list */
         last_dir->next = new_dir;
       else /* special case for first element */
-        section_root = new_dir;
+        *sect_root = new_dir;
       last_dir = new_dir;
     }
+  }
 
-  /* XXX - keep this ???*/
-  DebugLog(DF_CORE, DS_FATAL, "Error... Missing closing section before EOF...\n");
-  exit(EXIT_FAILURE);
+  Xfclose(fp);
 
-  return (NULL);
+  if (parent)
+    return (ERR_CFG_PEOF);
+
+  return (RETURN_SUCCESS);
 }
 
-void
-fprintf_cfg_tree(FILE *fp, config_directive_t *root)
+static void
+strip_trailing_garbage(char *string)
 {
-  fprintf(fp, "---[ configuration tree ]---\n");
-  fprintf_cfg_tree_sub(fp, root, 0);
-  fprintf(fp, "---[ end of configuration tree ]---\n\n");
+  char *last_effective;
+  int escaping;
+  int in_quote;
+  int c;
+
+  in_quote = 0;
+  escaping = FALSE;
+
+  for ( last_effective = string; *string && *last_effective; string++ ) {
+
+    c = *string;
+
+    if (escaping) {
+      escaping = FALSE;
+      last_effective = string;
+      continue ;
+    }
+
+    switch (c) {
+
+    case '#':
+      if ( !escaping && !in_quote) {
+        *(last_effective+1) = '\0';
+        return ;
+      }
+      last_effective = string;
+      break ;
+
+    case '\n':
+      *(last_effective+1) = '\0';
+      return ;
+
+    case '\t':
+    case ' ':
+      break ;
+
+    case '\\':
+      last_effective = string;
+      escaping = TRUE;
+      break ;
+
+    case '\'':
+      last_effective = string;
+      if (in_quote == '\'')
+        in_quote = 0;
+      else if (in_quote == 0)
+        in_quote = '\'';
+      break;
+
+    case '"':
+      last_effective = string;
+      if (in_quote == '"')
+        in_quote = 0;
+      else if (in_quote == 0)
+        in_quote = '\"';
+      break;
+
+    default:
+      last_effective = string;
+      break;
+    }
+  }
 }
+
+
+static int
+split_line(char *line, char **directive, char **argument)
+{
+  size_t offset;
+  size_t length;
+  int c;
+  char *ptr;
+
+  cfg_get_next_token(line, &offset, &length);
+
+  ptr = line + offset;
+  c = *ptr;
+  if (c == '#' || c == '\n' || c == '\0')
+    return (CONFIG_IGNORE_LINE);
+
+  *directive = ptr;
+  ptr += length;
+
+  offset = strspn(ptr, " \t\n");
+
+  *ptr = '\0';
+  ptr += offset;
+
+  c = *ptr;
+  if (c == '#' || c == '\n' || c == '\0') {
+    *argument = NULL;
+  }
+  else {
+    *argument = ptr;
+    strip_trailing_garbage(ptr);
+  }
+
+  return (RETURN_SUCCESS);
+}
+
+
+static void
+cfg_get_next_token(const char *text, size_t *offset, size_t *length)
+{
+  int i;
+  int c;
+  const char *token;
+
+  i = strspn(text, " \t\n");
+  token = &text[i];
+
+  c = *token;
+  *offset = i;
+  if (c == '\0' || c == '\n') {
+    *length = 0;
+    return ;
+  }
+
+  i = strcspn(token, " \t\n");
+  *length = i;
+}
+
 
 static void
 fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth)
@@ -326,6 +456,14 @@ fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth)
         fprintf(fp, "[%s] [%s]\n", section->directive, section->args);
     }
   fprintf(fp, "\n");
+}
+
+void
+fprintf_cfg_tree(FILE *fp, config_directive_t *root)
+{
+  fprintf(fp, "---[ configuration tree ]---\n");
+  fprintf_cfg_tree_sub(fp, root, 0);
+  fprintf(fp, "---[ end of configuration tree ]---\n\n");
 }
 
 static void

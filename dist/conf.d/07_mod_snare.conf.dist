@@ -1,0 +1,5 @@
+# snare module
+<module snare>
+  AddUdpSource 6161
+  AddTextfileSource /var/log/snare.log
+</module>

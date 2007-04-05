@@ -1,0 +1,7 @@
+# syslog input module
+<module syslog>
+  AddTextfileSource /var/log/messages
+  AddUdpSource 10514
+  AddUdpSource 514
+  AddUnixSocketSource /dev/log
+</module>

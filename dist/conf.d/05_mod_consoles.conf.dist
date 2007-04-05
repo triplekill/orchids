@@ -1,0 +1,7 @@
+# UDP consoles
+<module consoles>
+  AddConsole alert   localhost 42000
+  AddConsole warning localhost 42001
+  AddConsole info    localhost 42002
+  AddConsole msg     localhost 42003
+</module>

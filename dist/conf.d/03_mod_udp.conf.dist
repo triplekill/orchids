@@ -1,0 +1,9 @@
+# udpsyslog input module
+<module udp>
+  AddListenPort 10514
+  AddListenPort 6161
+  AddListenPort 6262
+  AddListenPort 6363
+  AddListenPort 514
+  AddListenPort 162
+</module>

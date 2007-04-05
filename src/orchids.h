@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Mar 30 11:07:19 2007
+ ** @date Last update: Thu Apr  5 08:23:24 2007
  **/
 
 /*
@@ -58,6 +58,14 @@ extern unsigned long dmalloc_orchids;
 #ifndef FALSE
 #define FALSE 0
 #endif
+
+#define RETURN_SUCCESS 0
+
+/* should go to orchids_cfg.h */
+#define ERR_CFG_PEOF 1
+#define ERR_CFG_SECT 2
+#define CONFIG_IGNORE_LINE 1
+
 
 typedef int bool_t;
 
@@ -125,7 +133,8 @@ struct config_directive_s
   config_directive_t *next;
   config_directive_t *first_child;
   config_directive_t *parent;
-  int                 line_num;
+  const char         *file;
+  int                 line;
 };
 
 /**

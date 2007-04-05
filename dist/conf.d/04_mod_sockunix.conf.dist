@@ -1,0 +1,4 @@
+# sockunix module
+#<module sockunix>
+#  AddUnixSocket /dev/log
+#</module>
