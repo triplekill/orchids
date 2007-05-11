@@ -8,7 +8,7 @@
  ** @ingroup modules
  ** 
  ** @date  Started on: Mon Dec 01 00:57:32 2003
- ** @date Last update: Wed Nov 30 12:50:31 2005
+ ** @date Last update: Fri May 11 09:59:14 2007
  **/
 
 /*
@@ -36,7 +36,6 @@
 /* typedef int (*mod_htmloutput_t)(orchids_t *ctx, mod_entry_t *mod, FILE *menufp); */
 
 
-typedef struct timeval timeval_t;
 #ifdef USE_DOUBLE
 typedef double timefloat_t;
 typedef double prob_t;

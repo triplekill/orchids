@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Thu Apr  5 16:00:43 2007
+ ** @date Last update: Fri May 11 09:58:39 2007
  **/
 
 /*
@@ -66,9 +66,6 @@ extern unsigned long dmalloc_orchids;
 #define ERR_CFG_SECT 2
 #define CONFIG_IGNORE_LINE 1
 
-
-typedef int bool_t;
-
 #define NO_CACHE 0
 #define USE_CACHE 1
 #define CACHE_HIT ((void *)-1)
@@ -122,7 +119,10 @@ typedef int bool_t;
 /**   @var config_directive_s::parent
  **     A pointer to the parent directive container.
  **/
-/**   @var config_directive_s::line_num
+/**   @var config_directive_s::file
+ **     A pointer to the file name containing the directive.
+ **/
+/**   @var config_directive_s::line
  **     Line number where directive appear in configuration file
  **/
 typedef struct config_directive_s config_directive_t;
@@ -134,7 +134,7 @@ struct config_directive_s
   config_directive_t *first_child;
   config_directive_t *parent;
   const char         *file;
-  int                 line;
+  uint32_t            line;
 };
 
 /**
@@ -154,7 +154,7 @@ struct config_directive_s
 typedef struct event_s event_t;
 struct event_s
 {
-  int        field_id;
+  int32_t    field_id;
   ovm_var_t *value;
   event_t   *next;
 };
@@ -182,7 +182,7 @@ struct active_event_s
   event_t        *event;
   active_event_t *next;
   active_event_t *prev;
-  signed int             refs;
+  int32_t         refs;
 };
 
 typedef struct orchids_s orchids_t;
@@ -214,7 +214,7 @@ typedef int (*rtaction_cb_t)(orchids_t *ctx, rtaction_t *e);
  **     The list elements.
  **/
 struct rtaction_s {
-  struct timeval date;
+  timeval_t date;
   rtaction_cb_t cb;
   void *data;
   DLIST_ENTRY(rtaction_t) evtlist;
@@ -246,11 +246,11 @@ struct rtaction_s {
 typedef struct field_record_s field_record_t;
 struct field_record_s
 {
-  int         active;
+  int32_t     active;
   char       *name;
-  int         type;
+  int32_t     type;
   char       *desc;
-  int         id;
+  int32_t     id;
   ovm_var_t  *val;
 };
 
@@ -297,6 +297,11 @@ typedef unsigned long bytecode_t;
 
 typedef struct wait_thread_s wait_thread_t;
 
+typedef struct input_module_s input_module_t;
+typedef struct polled_input_s polled_input_t;
+typedef struct realtime_input_s realtime_input_t;
+typedef struct rule_compiler_s rule_compiler_t;
+
 /**
  ** @struct transition_s
  **   Transition structure.
@@ -323,11 +328,11 @@ struct transition_s
 {
   state_t *dest;
   /* int state_id; */ /* XXX: NOT USED */
-  int required_fields_nb;
-  int *required_fields;
+  int32_t  required_fields_nb;
+  int32_t *required_fields;
   bytecode_t *eval_code;
-  int id;
-  int global_id;
+  int32_t id;
+  int32_t global_id;
 };
 
 
@@ -362,13 +367,13 @@ struct transition_s
 struct state_s
 {
   char         *name;
-  int           line;
+  int32_t       line;
   bytecode_t   *action;
-  int           trans_nb;
+  int32_t       trans_nb;
   transition_t *trans;
   rule_t       *rule;
-  unsigned long flags;
-  int           id;
+  uint32_t      flags;
+  int32_t       id;
 };
 
 /**
@@ -424,29 +429,29 @@ struct rule_s
 {
   char             *filename;
   time_t	    file_mtime;
-  int               lineno;
+  int32_t           lineno;
   char             *name;
-  int               state_nb;
+  int32_t           state_nb;
   state_t          *state;
-  int               trans_nb;
+  int32_t           trans_nb;
   ovm_var_t       **static_env;
-  int               static_env_sz;
-  int               dynamic_env_sz;
+  int32_t           static_env_sz;
+  int32_t           dynamic_env_sz;
   char            **var_name;
-  int              *start_conds;
+  int32_t          *start_conds;
   size_t            start_conds_sz;
   rule_t           *next;
-  int               instances;
-  int               id;
+  int32_t           instances;
+  int32_t           id;
 
   state_instance_t *init;
   wait_thread_t    *ith;
   wait_thread_t    *itt;
-  int               nb_init_threads;
+  int32_t           nb_init_threads;
 
   objhash_t        *sync_lock;
-  int              *sync_vars;
-  int               sync_vars_sz;
+  int32_t          *sync_vars;
+  int32_t           sync_vars_sz;
 
   /* XXX add rule stats here ??? */
 };
@@ -502,16 +507,16 @@ struct rule_instance_s
   size_t            rigid_env_sz;
   state_instance_t *first_state;
   rule_instance_t  *next;
-  int               state_instances;
+  int32_t           state_instances;
   time_t            creation_date;
-  struct timeval    new_creation_date;
-  struct timeval    new_last_act;
+  timeval_t         new_creation_date;
+  timeval_t         new_last_act;
   wait_thread_t    *queue_head;
   wait_thread_t    *queue_tail;
   state_instance_t *state_list;
-  int               max_depth;
-  int               threads;
-  unsigned long     flags;
+  int32_t           max_depth;
+  int32_t           threads;
+  uint32_t          flags;
   /* List of state instance that have synchronisation locks */
   sync_lock_list_t *sync_lock_list;
 };
@@ -564,15 +569,15 @@ struct state_instance_s
   state_instance_t *next_sibling;
   state_instance_t *parent;
   active_event_t   *event;
-  int               event_level;
-  unsigned long     flags;
+  int32_t           event_level;
+  uint32_t          flags;
   state_t          *state;
   rule_instance_t  *rule_instance;
   ovm_var_t       **inherit_env;
   ovm_var_t       **current_env;
   state_instance_t *global_next;
   state_instance_t *retrig_next;
-  int               depth;
+  int32_t           depth;
   wait_thread_t    *thread_list;
   state_instance_t *next_report_elmt;
 };
@@ -693,22 +698,21 @@ struct rulefile_s
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
-typedef struct rule_compiler_s rule_compiler_t;
 struct rule_compiler_s
 {
   char             *currfile;        
-  int               rules;
+  int32_t           rules;
   strhash_t        *functions_hash;
   strhash_t        *fields_hash;
   strhash_t        *rulenames_hash;
   strhash_t        *statenames_hash;
   strhash_t        *rule_env;
   ovm_var_t       **statics;
-  int               statics_nb;
-  int               statics_sz;
+  int32_t           statics_nb;
+  int32_t           statics_sz;
   char            **dyn_var_name;
-  int               dyn_var_name_nb;
-  int               dyn_var_name_sz;
+  int32_t           dyn_var_name_nb;
+  int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
 };
@@ -745,9 +749,9 @@ typedef struct issdl_function_s issdl_function_t;
 struct issdl_function_s
 {
   ovm_func_t func;
-  int        id;
+  int32_t    id;
   char      *name;
-  int        args_nb;
+  int32_t    args_nb;
   char      *desc;
 };
 
@@ -801,16 +805,16 @@ struct conditional_dissector_record_s {
  **/
 struct mod_entry_s
 {
-  int                    num_fields;
-  int                    first_field_pos;
+  int32_t                num_fields;
+  int32_t                first_field_pos;
   void                  *config;
   hash_t                *sub_dissectors;
   dissect_t              dissect;
   mod_entry_t           *dissect_mod;
   void                  *data;
-  struct input_module_s *mod;
+  input_module_t        *mod;
   unsigned long          posts;
-  int                    mod_id;
+  int32_t                mod_id;
 };
 
 
@@ -946,36 +950,36 @@ struct mod_entry_s
  **/
 struct orchids_s
 {
-  struct timeval start_time;
-  char *config_file;
-  mod_entry_t mods[MAX_MODULES];
-  int loaded_modules;
-  struct polled_input_s *poll_handler_list;
-  time_t last_poll;
-  struct realtime_input_s *realtime_handler_list;
-  int maxfd;
-  fd_set fds;
+  timeval_t    start_time;
+  char        *config_file;
+  mod_entry_t  mods[MAX_MODULES];
+  int32_t      loaded_modules;
+  polled_input_t     *poll_handler_list;
+  time_t              last_poll;
+  realtime_input_t   *realtime_handler_list;
+  int                 maxfd;
+  fd_set_t            fds;
   config_directive_t *cfg_tree;
-  int num_fields;
-  field_record_t *global_fields;
-  unsigned long events;
-  struct rule_compiler_s *rule_compiler;
-  struct timeval poll_period;
-  rulefile_t *rulefile_list;
-  rulefile_t *last_rulefile;
-  rule_instance_t *first_rule_instance;
-  rule_instance_t *last_rule_instance;
-  state_instance_t *retrig_list;
-  unsigned long active_events;
-  unsigned long rule_instances;
-  unsigned long state_instances;
-  unsigned long threads;
-  lifostack_t *ovm_stack;
-  issdl_function_t *vm_func_tbl;
-  int vm_func_tbl_sz;
-  int off_line_mode;
-  char *off_line_input_file;
-  int daemon;
+  int32_t             num_fields;
+  field_record_t     *global_fields;
+  uint32_t            events;
+  rule_compiler_t    *rule_compiler;
+  timeval_t           poll_period;
+  rulefile_t         *rulefile_list;
+  rulefile_t         *last_rulefile;
+  rule_instance_t    *first_rule_instance;
+  rule_instance_t    *last_rule_instance;
+  state_instance_t   *retrig_list;
+  uint32_t            active_events;
+  uint32_t            rule_instances;
+  uint32_t            state_instances;
+  uint32_t            threads;
+  lifostack_t        *ovm_stack;
+  issdl_function_t   *vm_func_tbl;
+  int32_t             vm_func_tbl_sz;
+  int32_t             off_line_mode;
+  char               *off_line_input_file;
+  bool_t              daemon;
 
   wait_thread_t  *current_tail;
   wait_thread_t  *cur_retrig_qh;
@@ -989,10 +993,10 @@ struct orchids_s
   active_event_t *active_event_tail;
   active_event_t *active_event_cur;
 
-  struct timeval  preconfig_time;
-  struct timeval  postconfig_time;
-  struct timeval  compil_time;
-  struct timeval  postcompil_time;
+  timeval_t  preconfig_time;
+  timeval_t  postconfig_time;
+  timeval_t  compil_time;
+  timeval_t  postcompil_time;
 
   /* IDMEF parameters */
   char *idmef_dtd;
@@ -1015,7 +1019,7 @@ struct orchids_s
   /* Runtime User */
   char *runtime_user;
 
-  struct rusage ru;
+  rusage_t ru;
 
   char *report_dir;
   char *report_prefix;
@@ -1023,18 +1027,18 @@ struct orchids_s
 
   pid_t pid;
 
-  unsigned long reports;
+  uint32_t reports;
 
-  struct timeval last_evt_act; /* last time when an event is kept */
-  struct timeval last_mod_act; /* last time when a mod was ins or rem */
-  struct timeval last_rule_act; /* last time when a rule was ins or rem */
-  struct timeval last_ruleinst_act; /* last time when a report was created */
+  timeval_t last_evt_act; /* last time when an event is kept */
+  timeval_t last_mod_act; /* last time when a mod was ins or rem */
+  timeval_t last_rule_act; /* last time when a rule was ins or rem */
+  timeval_t last_ruleinst_act; /* last time when a report was created */
 
   DLIST_HEAD(evtlist, rtaction_t) rtactionlist;
 
   char *preproc_cmd;
 
-  struct timeval cur_loop_time;
+  timeval_t cur_loop_time;
 
   char *modules_dir;
   char *lockfile;
@@ -1122,15 +1126,14 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
 /**   @var input_module_s::post_config
  **     Post-configuration function.
  **/
-typedef struct input_module_s input_module_t;
 struct input_module_s
 {
-  unsigned long          magic;
-  unsigned long          version;
+  uint32_t               magic;
+  uint32_t               version;
   char                  *name;
   char                  *license;
   char                 **dependencies;
-  struct mod_cfg_cmd_s  *cfg_cmds;
+  mod_cfg_cmd_t         *cfg_cmds;
   pre_config_t           pre_config;
   post_config_t          post_config;
   post_compil_t          post_compil;
@@ -1163,14 +1166,13 @@ typedef int (*realtime_callback_t)(orchids_t *ctx, mod_entry_t *mod, int fd, voi
 /**   @var realtime_input_s::fd
  **     file/socket descriptor used for realtime input.
  **/
-typedef struct realtime_input_s realtime_input_t;
 struct realtime_input_s
 {
   realtime_input_t    *next;
   void                *data;
   realtime_callback_t  cb;
   int                  fd;
-  int                  mod_id;
+  int32_t              mod_id;
 };
 
 
@@ -1197,10 +1199,9 @@ typedef int (*poll_callback_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
 /**   @var polled_input_s::cb
  **     Module callback supposed to poll data. (and post events).
  **/
-typedef struct polled_input_s polled_input_t;
 struct polled_input_s
 {
-  struct polled_input_s *next;
+  polled_input_t        *next;
   time_t                 last_call;
   void                  *data;
   poll_callback_t        cb;
@@ -1223,9 +1224,9 @@ struct polled_input_s
 typedef struct field_s field_t;
 struct field_s
 {
-  char *name;
-  int type;
-  char *desc;
+  char    *name;
+  int32_t  type;
+  char    *desc;
 };
 
 

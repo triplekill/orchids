@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Thu Apr  5 16:00:30 2007
+ ** @date Last update: Fri May 11 10:00:04 2007
  **/
 
 /*
@@ -544,12 +544,12 @@ generate_html_orchids_stats(orchids_t *ctx)
   fprintf(fp, "  <tr> <td class=\"e1\"> loaded modules </td> <td class=\"v1\"> %i </td> </tr>\n", ctx->loaded_modules);
   fprintf(fp, "  <tr> <td class=\"e0\"> current poll period </td> <td class=\"v0\"> %li </td> </tr>\n", ctx->poll_period.tv_sec);
   fprintf(fp, "  <tr> <td class=\"e1\"> registed fields </td> <td class=\"v1\"> %i </td> </tr>\n", ctx->num_fields);
-  fprintf(fp, "  <tr> <td class=\"e0\"> injected events </td> <td class=\"v0\"> %lu </td> </tr>\n", ctx->events);
-  fprintf(fp, "  <tr> <td class=\"e1\"> active events </td> <td class=\"v1\"> %lu </td> </tr>\n", ctx->active_events);
-  fprintf(fp, "  <tr> <td class=\"e0\"> rule instances </td> <td class=\"v0\"> %lu </td> </tr>\n", ctx->rule_instances);
-  fprintf(fp, "  <tr> <td class=\"e1\"> state instances </td> <td class=\"v1\"> %lu </td> </tr>\n", ctx->state_instances);
-  fprintf(fp, "  <tr> <td class=\"e0\"> active threads </td> <td class=\"v0\"> %lu </td> </tr>\n", ctx->threads);
-  fprintf(fp, "  <tr> <td class=\"e1\"> reports </td> <td class=\"v1\"> %lu </td> </tr>\n", ctx->reports);
+  fprintf(fp, "  <tr> <td class=\"e0\"> injected events </td> <td class=\"v0\"> %u </td> </tr>\n", ctx->events);
+  fprintf(fp, "  <tr> <td class=\"e1\"> active events </td> <td class=\"v1\"> %u </td> </tr>\n", ctx->active_events);
+  fprintf(fp, "  <tr> <td class=\"e0\"> rule instances </td> <td class=\"v0\"> %u </td> </tr>\n", ctx->rule_instances);
+  fprintf(fp, "  <tr> <td class=\"e1\"> state instances </td> <td class=\"v1\"> %u </td> </tr>\n", ctx->state_instances);
+  fprintf(fp, "  <tr> <td class=\"e0\"> active threads </td> <td class=\"v0\"> %u </td> </tr>\n", ctx->threads);
+  fprintf(fp, "  <tr> <td class=\"e1\"> reports </td> <td class=\"v1\"> %u </td> </tr>\n", ctx->reports);
   fprintf(fp, "  <tr> <td class=\"e0\"> ovm stack size </td> <td class=\"v0\"> %u </td> </tr>\n", ctx->ovm_stack->size);
   fprintf(fp, "  <tr> <td class=\"e1\"> registered functions </td> <td class=\"v1\"> %u </td> </tr>\n", ctx->vm_func_tbl_sz);
 

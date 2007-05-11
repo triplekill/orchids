@@ -8,7 +8,7 @@
  ** @ingroup core
  ** 
  ** @date  Started on: Fri Nov 28 15:32:53 2003
- ** @date Last update: Fri Mar 30 11:07:04 2007
+ ** @date Last update: Fri May 11 09:56:10 2007
  **/
 
 /*
@@ -18,26 +18,33 @@
 #ifndef ORCHIDS_TYPES
 #define ORCHIDS_TYPES
 
-/* XXX: remove this with automake/autoconf */
-#define HAVE_STDINT
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+/* standard types unification */
+typedef struct timeval timeval_t;
+typedef fd_set fd_set_t;
+typedef struct rusage rusage_t;
+
+/* custom types */
+typedef int bool_t;
 
 #ifndef HAVE_STDINT
-typedef signed   char  int8_t;
+typedef   signed char  int8_t;
 typedef unsigned char uint8_t;
 
-typedef signed   short  int16_t;
-typedef unsigned long uint16_t;
+typedef   signed short  int16_t;
+typedef unsigned short uint16_t;
 
-typedef signed   long  int32_t;
-typedef unsigned long uint32_t;
+typedef   signed int  int32_t;
+typedef unsigned int uint32_t;
+
+typedef   signed long long  int64_t;
+typedef unsigned long long uint64_t;
+
 #endif /* HAVE_STDINT */
 
-
-
-/* #ifdef HAVE_LONGLONG */
-/* typedef signed   long long  int64_t; */
-/* typedef unsigned long long uint64_t; */
-/* #endif /\* HAVE_LONGLONG *\/ */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
