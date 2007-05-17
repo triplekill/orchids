@@ -32,6 +32,10 @@ if USE_SWIPROLOG
 pkglib_LTLIBRARIES += mod_prolog.la
 endif
 
+if HAVE_LIBPCAP
+pkglib_LTLIBRARIES += mod_wifi.la
+endif
+
 #  mod_stats.la
 #  mod_snmp.la
 #  mod_template.la
@@ -70,6 +74,13 @@ $(srcdir)/netfilter.yy.c: $(srcdir)/netfilter.l
 
 mod_period_la_SOURCES = mod_period.c
 mod_period_la_LDFLAGS = -module -avoid-version
+
+if HAVE_LIBPCAP
+mod_wifi_la_SOURCES = mod_wifi.c mod_wifi.h compat.h
+mod_wifi_la_LDFLAGS = -module -avoid-version
+mod_wifi_la_LIBADD = $(PCAPLIB)
+mod_wifi_la_CFLAGS = $(PCAPINC)
+endif
 
 if USE_SWIPROLOG
 mod_prolog_la_SOURCES = mod_prolog.c
@@ -148,6 +159,7 @@ mod_win32evt_la_LDFLAGS = -module -avoid-version
 
 mod_htmlstate_la_SOURCES = mod_htmlstate.c html_output.c file_cache.c
 mod_htmlstate_la_LDFLAGS = -module -avoid-version
+
 
 
 # End-of-file

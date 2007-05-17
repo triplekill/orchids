@@ -185,6 +185,7 @@ fi
 dnl Activate Debug log library
 AC_DEFINE([ENABLE_DEBUGLOG], 1, [Set to 1 if DEBUG is requested])
 
+AC_CHECK_LIBPCAP
 AC_CHECK_GNUPLOT
 AC_CHECK_GRAPHVIZ_DOT
 AC_CHECK_EPSTOPDF

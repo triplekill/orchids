@@ -302,10 +302,14 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
      if test -f $withval/pcap.h; then
         PCAPINC="-I$withval"
         PCAPLIB="-L$withval -lpcap"
+        AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
+        AM_CONDITIONAL(HAVE_LIBPCAP, true)
         AC_MSG_RESULT($withval)
      elif test -f $withval/include/pcap.h; then
         PCAPINC="-I$withval/include"
         PCAPLIB="-L$withval/lib -lpcap"
+        AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
+        AM_CONDITIONAL(HAVE_LIBPCAP, true)
         AC_MSG_RESULT($withval)
      else
         AC_MSG_RESULT(no)
@@ -316,16 +320,24 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
 [ if test -f /usr/include/pcap/pcap.h; then
      PCAPINC="-I/usr/include/pcap"
      PCAPLIB="-lpcap"
+     AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
+     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     AC_MSG_RESULT(yes)
   elif test -f /usr/include/pcap.h; then
      PCAPLIB="-lpcap"
+     AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
+     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     AC_MSG_RESULT(yes)
   elif test -f /usr/local/include/pcap.h; then
      PCAPINC="-I/usr/local/include"
      PCAPLIB="-lpcap"
+     AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
+     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     AC_MSG_RESULT(yes)
   else
+     AM_CONDITIONAL(HAVE_LIBPCAP, false)
      AC_MSG_RESULT(no)
-     AC_MSG_ERROR([libpcap not found.])
-  fi
-  AC_MSG_RESULT(yes) ]
+  fi ]
 )
 ])
 
