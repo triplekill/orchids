@@ -161,6 +161,7 @@ AS_HELP_STRING([--enable-htmloutput], [enable HTML Output (default is on)]),
 esac],
 [orchids_htmloutput=true]
 )
+AM_CONDITIONAL(ENABLE_HTMLOUTPUT, test x$orchids_htmloutput = xtrue)
 if test "$orchids_htmloutput" = "true" ; then
    AC_DEFINE([ENABLE_HTMLOUTPUT], 1, [Set to 1 if HTMLOUTPUT is requested])
 fi
