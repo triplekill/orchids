@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Thu Apr  5 16:00:20 2007
+ ** @date Last update: Thu May 17 16:59:36 2007
  **/
 
 /*
@@ -501,13 +501,13 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
   fprintf(fp, "current poll period : %li\n", ctx->poll_period.tv_sec);
   fprintf(fp, "    registed fields : %i\n", ctx->num_fields);
-  fprintf(fp, "    injected events : %lu\n", ctx->events);
-  fprintf(fp, "      active events : %lu\n", ctx->active_events);
-  fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);
-  fprintf(fp, "    state instances : %lu\n", ctx->state_instances);
-  fprintf(fp, "     active threads : %lu\n", ctx->threads);
+  fprintf(fp, "    injected events : %u\n", ctx->events);
+  fprintf(fp, "      active events : %u\n", ctx->active_events);
+  fprintf(fp, "     rule instances : %u\n", ctx->rule_instances);
+  fprintf(fp, "    state instances : %u\n", ctx->state_instances);
+  fprintf(fp, "     active threads : %u\n", ctx->threads);
   fprintf(fp, "     ovm stack size : %u\n", ctx->ovm_stack->size);
-  fprintf(fp, "            reports : %lu\n", ctx->reports);
+  fprintf(fp, "            reports : %u\n", ctx->reports);
   fprintf(fp, "--------------------+-------------------------------------------------------\n");
 }
 
