@@ -26,6 +26,7 @@ LoadModule consoles
 LoadModule prolog
 LoadModule clocks
 LoadModule period
+LoadModule wifi
 
 # Deprecated: Polled inputs now use real-time scheduler
 # PollPeriod is now set in module configuration.

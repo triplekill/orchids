@@ -12,7 +12,8 @@ EXTRA_DIST =                  \
   09_mod_netfilter.conf.dist  \
   10_mod_prolog.conf.dist     \
   11_mod_clocks.conf.dist     \
-  12_mod_generic.conf.dist
+  12_mod_generic.conf.dist    \
+  13-mod_wifi.conf.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
@@ -26,7 +27,8 @@ orchidsconfd_DATA =         \
   09_mod_netfilter.conf     \
   10_mod_prolog.conf        \
   11_mod_clocks.conf        \
-  12_mod_generic.conf
+  12_mod_generic.conf       \
+  13_mod_wifi.conf
 
 %.conf: $(srcdir)/%.conf.dist
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
