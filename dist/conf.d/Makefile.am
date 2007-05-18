@@ -13,7 +13,7 @@ EXTRA_DIST =                  \
   10_mod_prolog.conf.dist     \
   11_mod_clocks.conf.dist     \
   12_mod_generic.conf.dist    \
-  13-mod_wifi.conf.dist
+  13_mod_wifi.conf.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
