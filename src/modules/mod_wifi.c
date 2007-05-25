@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Thu Jun 22 00:00:00 2006
- ** @date Last update: Fri Oct 06 15:01:32 2006
+ ** @date Last update: Fri May 25 14:32:33 2007
  **/
 
 
@@ -75,7 +75,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
 
   attr = (ovm_var_t **) av;
 
-  if(datalink_type == DLT_PRISM_HEADER) {
+  if (datalink_type == DLT_PRISM_HEADER) {
     prism2_header = (prism2_header_t) pkt;
     mac_header = (ieee80211_header_t) (pkt + 144);
 
@@ -95,8 +95,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
   dir = mac_header->fc[1] & DIR_MASK;
 
 
-  switch(type)
-  {
+  switch (type) {
     /******************** Dans le cas d'une trame de gestion */
     case TYPE_MGT:
 
@@ -403,7 +402,6 @@ wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
 
   memset(attr, 0, sizeof(attr));
 
-  pcap_setnonblock(cap, 1, NULL);
   if ( pcap_dispatch(cap, 1, wifi_pcap_callback, (u_char*) attr) == -1 )
   {
     DebugLog(DF_MOD, DS_ERROR, "pcap_dispatch error: %s\n", pcap_geterr(cap));
@@ -469,11 +467,11 @@ add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     return;
   }
 
+  pcap_setnonblock(capd, 1, NULL);
   fd = pcap_fileno(capd);
   datalink_type = pcap_datalink(capd);
 
   add_input_descriptor(ctx, mod, wifi_callback, fd, capd);
-
 }
 
 static mod_cfg_cmd_t wifi_dir[] = 
