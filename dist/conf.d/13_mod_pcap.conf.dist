@@ -1,0 +1,4 @@
+<module pcap>
+# Uncomment the following line to activate pcap frame capture
+# AddDevice eth0
+</module>
