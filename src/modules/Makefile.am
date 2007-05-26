@@ -36,6 +36,7 @@ pkglib_LTLIBRARIES += mod_prolog.la
 endif
 
 if HAVE_LIBPCAP
+pkglib_LTLIBRARIES += mod_pcap.la
 pkglib_LTLIBRARIES += mod_wifi.la
 endif
 
@@ -79,6 +80,11 @@ mod_period_la_SOURCES = mod_period.c
 mod_period_la_LDFLAGS = -module -avoid-version
 
 if HAVE_LIBPCAP
+mod_pcap_la_SOURCES = mod_pcap.c
+mod_pcap_la_LDFLAGS = -module -avoid-version
+mod_pcap_la_LIBADD = $(PCAPLIB)
+mod_pcap_la_CFLAGS = $(PCAPINC)
+
 mod_wifi_la_SOURCES = mod_wifi.c mod_wifi.h compat.h
 mod_wifi_la_LDFLAGS = -module -avoid-version
 mod_wifi_la_LIBADD = $(PCAPLIB)
