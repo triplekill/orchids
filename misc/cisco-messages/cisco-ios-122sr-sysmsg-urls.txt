@@ -1,0 +1,8 @@
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr01.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr02.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr03.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr04.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr05.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr06.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr07.htm
+http://www.cisco.com/univercd/cc/td/doc/product/software/ios122sr/122srsms/sm2sr08.htm
