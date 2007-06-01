@@ -34,7 +34,9 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %attr(755,root,root) %{prefix}/etc/init.d/orchids
 %attr(755,root,root) %{prefix}/usr/bin/orchids
 %config %{prefix}/etc/orchids/orchids.conf
+%config %{prefix}/etc/orchids/orchids-rules.conf
 %config %{prefix}/etc/orchids/rules/*
+%config %{prefix}/etc/orchids/conf.d/*
 %{prefix}/usr/lib/orchids/*
 %attr(-,nobody,nobody)%{prefix}/var/orchids/*
 %doc AUTHORS ChangeLog COPYING* NEWS README
