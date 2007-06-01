@@ -1,0 +1,84 @@
+#define MAX_COUNTER 5
+#define DELAY       10
+#define WAITIME     15
+
+/* 
+ * 
+ * 
+ */
+
+rule deauth_flood synchronize($addr_src, $addr_dst) {
+
+
+  state init {
+
+    $addr_src = .wifi.sa ;
+    $addr_dst = .wifi.da ;
+
+    if ( .wifi.subtype == "deauth" )
+      goto start;
+
+  } /* end init */
+
+
+  state start {
+
+    $counter = 1 ;
+    $start_time = .wifi.time ;
+    $end_time = .wifi.time + DELAY ;
+    
+    if ( .wifi.subtype == "deauth" )
+      goto deauth_loop;
+
+  } /* end start */
+
+
+  state deauth_loop {
+
+    $counter = $counter + 1;
+
+    if (    .wifi.subtype == "deauth"
+         && $addr_src == .wifi.sa
+         && $addr_dst == .wifi.da
+         && .wifi.time < $end_time
+         && $counter < MAX_COUNTER )
+      goto deauth_loop;
+
+    if (    .wifi.subtype == "deauth"
+         && $addr_src == .wifi.sa
+         && $addr_dst == .wifi.da 
+         && .wifi.time < $end_time
+         && $counter >= MAX_COUNTER )
+      goto alert;
+
+    if (    .wifi.subtype == "deauth"
+         && $addr_src == .wifi.sa
+         && $addr_dst == .wifi.da
+         && .wifi.time >= $end_time )
+      goto the_end;
+
+  } /* end deauth_loop */
+
+
+  state alert {
+
+    cut("start");
+    $end_time = .wifi.time + WAITIME ;
+
+    $msg = "deauthentication flood [" + str_from_int( $counter ) + " pkts] src:"
+          + .wifi.sa + " dst:" + .wifi.da ;
+
+    print ( $msg );
+
+    if ( .wifi.time >= $end_time )
+      goto the_end;
+
+  } /* end alert */
+
+
+  state the_end {
+
+  } /* end the_end */
+
+
+} /* end rule deauth_flood */
