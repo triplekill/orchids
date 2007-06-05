@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Thu Jun 22 00:00:00 2006
- ** @date Last update: Fri May 25 14:32:33 2007
+ ** @date Last update: Tue Jun  5 08:23:49 2007
  **/
 
 
@@ -55,9 +55,17 @@ typedef struct ieee80211_header_s* ieee80211_header_t;
 typedef struct prism2_header_s* prism2_header_t;
 
 
-#define GETADDR(addr, bufstr) \
-  sprintf(bufstr, "%.2x:%.2x:%.2x:%.2x:%.2x:%.2x", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-
+#define ADDR_STR_SZ  17 /* 6 bytes of 2 nibbles plus 5 ':' */
+#define GETADDR(addr, ovmvar)                                           \
+  do {                                                                  \
+    char buf_mac[ ADDR_STR_SZ + 1 ];                                    \
+    (ovmvar) = ovm_str_new( ADDR_STR_SZ );                              \
+    sprintf(buf_mac,                                                    \
+            "%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",                            \
+            (addr)[0], (addr)[1], (addr)[2],                            \
+            (addr[3]), (addr[4]), (addr)[5]);                           \
+    memcpy(STR(ovmvar), buf_mac, ADDR_STR_SZ);                          \
+  } while (0)
 
 
 void
@@ -66,10 +74,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
   ieee80211_header_t mac_header;
   prism2_header_t prism2_header;
   u_int8_t dir, type, subtype;
-  char buf_mac[7] = "";
-
   ovm_var_t **attr;
-
 
   DebugLog(DF_MOD, DS_TRACE, "wifi_pcap_callback()\n");
 
@@ -81,19 +86,18 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
 
     attr[F_RSSI] = ovm_int_new();
     INT(attr[F_RSSI]) = (&(prism2_header->rssi))->data;
-  } else
-      return;
+  } else {
+      return ;
+  }
 
   /* fixation du champ .wifi.time */
   attr[F_TIME] = ovm_timeval_new();
   attr[F_TIME]->flags |= TYPE_MONO;
   gettimeofday( &(TIMEVAL(attr[F_TIME])) , NULL);
 
-
   type = mac_header->fc[0] & 0x0c;
   subtype = mac_header->fc[0] & SUBTYPE_MASK;
   dir = mac_header->fc[1] & DIR_MASK;
-
 
   switch (type) {
     /******************** Dans le cas d'une trame de gestion */
@@ -111,15 +115,9 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
          addr2 = SA
          addr3 = BSSID */
 
-      attr[F_DA] = ovm_str_new(sizeof(buf_mac));
-      GETADDR(mac_header->addr1, STR(attr[F_DA]));
-
-      attr[F_SA] = ovm_str_new(sizeof(buf_mac));
-      GETADDR(mac_header->addr2, STR(attr[F_SA]));
-
-      attr[F_BSSID] = ovm_str_new(sizeof(buf_mac));
-      GETADDR(mac_header->addr3, STR(attr[F_BSSID]));
-
+      GETADDR(mac_header->addr1, attr[F_DA]);
+      GETADDR(mac_header->addr2, attr[F_SA]);
+      GETADDR(mac_header->addr3, attr[F_BSSID]);
 
       switch(subtype)
       {
@@ -167,7 +165,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_mgmt_subtype_0x%.2x\n", subtype);
           attr[F_SUBTYPE] = ovm_str_new(strlen("unknown_mgmt_subtype"));
           memcpy(STR(attr[F_SUBTYPE]), "unknown_mgmt_subtype", STRLEN(attr[F_SUBTYPE]));
-      };  /* end switch(subtype) */
+      }  /* end switch(subtype) */
 
       break;
 
@@ -184,11 +182,8 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           attr[F_SUBTYPE] = ovm_str_new(strlen("rts"));
           memcpy(STR(attr[F_SUBTYPE]), "rts", STRLEN(attr[F_SUBTYPE]));
 
-          attr[F_RA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_RA]));
-
-          attr[F_TA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr2, STR(attr[F_TA]));
+          GETADDR(mac_header->addr1, attr[F_RA]);
+          GETADDR(mac_header->addr2, attr[F_TA]);
 
           break;
 
@@ -196,8 +191,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           attr[F_SUBTYPE] = ovm_str_new(strlen("cts"));
           memcpy(STR(attr[F_SUBTYPE]), "cts", STRLEN(attr[F_SUBTYPE]));
 
-          attr[F_RA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_RA]));
+          GETADDR(mac_header->addr1, attr[F_RA]);
 
           break;
 
@@ -205,8 +199,7 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           attr[F_SUBTYPE] = ovm_str_new(strlen("ack"));
           memcpy(STR(attr[F_SUBTYPE]), "ack", STRLEN(attr[F_SUBTYPE]));
 
-          attr[F_RA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_RA]));
+          GETADDR(mac_header->addr1, attr[F_RA]);
 
           break;
 
@@ -269,13 +262,10 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           attr[F_SUBTYPE] = ovm_str_new(strlen("unknown_data_subtype"));
           memcpy(STR(attr[F_SUBTYPE]), "unknown_data_subtype", STRLEN(attr[F_SUBTYPE]));
 
-      }; /* end switch(subtype) */
-
-
+      } /* end switch(subtype) */
 
       switch(dir)
       {
-
         case DIR_NODS:
 
           attr[F_DIR] = ovm_str_new(strlen("nods"));
@@ -288,17 +278,11 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
              addr2 = SA
              addr3 = BSSID */
 
-          attr[F_DA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_DA]));
-
-          attr[F_SA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr2, STR(attr[F_SA]));
-
-          attr[F_BSSID] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr3, STR(attr[F_BSSID]));
+          GETADDR(mac_header->addr1, attr[F_DA]);
+          GETADDR(mac_header->addr2, attr[F_SA]);
+          GETADDR(mac_header->addr3, attr[F_BSSID]);
 
           break;
-
 
 
         case DIR_TODS:
@@ -313,14 +297,9 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
              addr2 = SA
              addr3 = DA */
 
-          attr[F_BSSID] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_BSSID]));
-
-          attr[F_SA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr2, STR(attr[F_SA]));
-
-          attr[F_DA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr3, STR(attr[F_DA]));
+          GETADDR(mac_header->addr1, attr[F_BSSID]);
+          GETADDR(mac_header->addr2, attr[F_SA]);
+          GETADDR(mac_header->addr3, attr[F_DA]);
 
           break;
 
@@ -337,14 +316,9 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
              addr2 = BSSID
              addr3 = SA */
 
-          attr[F_DA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_DA]));
-
-          attr[F_BSSID] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr2, STR(attr[F_BSSID]));
-
-          attr[F_SA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr3, STR(attr[F_SA]));
+          GETADDR(mac_header->addr1, attr[F_DA]);
+          GETADDR(mac_header->addr2, attr[F_BSSID]);
+          GETADDR(mac_header->addr3, attr[F_SA]);
 
           break;
 
@@ -363,29 +337,22 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
              addr3 = DA
              addr4 = SA */
 
-          attr[F_RA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr1, STR(attr[F_RA]));
-
-          attr[F_TA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr2, STR(attr[F_TA]));
-
-          attr[F_DA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr3, STR(attr[F_DA]));
-
-          attr[F_SA] = ovm_str_new(sizeof(buf_mac));
-          GETADDR(mac_header->addr4, STR(attr[F_SA]));
+          GETADDR(mac_header->addr1, attr[F_RA]);
+          GETADDR(mac_header->addr2, attr[F_TA]);
+          GETADDR(mac_header->addr3, attr[F_DA]);
+          GETADDR(mac_header->addr4, attr[F_SA]);
 
           break;
 
         default: DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_direction_0x%.2x\n", dir);
 
-      }; /* end switch(dir) */
+      } /* end switch(dir) */
 
       break;
 
     default: DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_type_0x%.2x\n", type);
 
-  }; /* end switch(type) */
+  } /* end switch(type) */
 
 }
 
@@ -411,6 +378,9 @@ wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
   event = NULL;
 
   add_fields_to_event(ctx, mod, &event, attr, IEEE80211_FIELDS);
+
+  if (event == NULL)
+    return (-1);
 
   post_event(ctx, mod, event);
 
