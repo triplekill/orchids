@@ -14,7 +14,8 @@ EXTRA_DIST =                  \
   11_mod_clocks.conf.dist     \
   12_mod_generic.conf.dist    \
   13_mod_pcap.conf.dist       \
-  14_mod_wifi.conf.dist
+  14_mod_wifi.conf.dist       \
+  15_mod_sharedvars.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
@@ -30,7 +31,8 @@ orchidsconfd_DATA =         \
   11_mod_clocks.conf        \
   12_mod_generic.conf       \
   13_mod_pcap.conf          \
-  14_mod_wifi.conf
+  14_mod_wifi.conf          \
+  15_mod_sharedvars.conf
 
 %.conf: $(srcdir)/%.conf.dist
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
