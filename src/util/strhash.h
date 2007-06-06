@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Mon Mar 31 12:26:30 2003
- ** @date Last update: Thu Mar 29 14:46:08 2007
+ ** @date Last update: Wed Jun  6 12:27:21 2007
  **/
 
 /*
@@ -47,6 +47,11 @@ void *strhash_to_array(strhash_t *hash);
 void strhash_resize(strhash_t *hash, size_t newsize);
 void strhash_add(strhash_t *hash, void *data, char *key);
 void *strhash_get(strhash_t *hash, char *key);
+void *strhash_check_and_add(strhash_t *hash, void *data, char *key);
+void *strhash_update(strhash_t *hash, void *new_data, char *key);
+void *strhash_update_or_add(strhash_t *hash, void *new_data, char *key);
+void *strhash_del(strhash_t *hash, char *key);
+strhash_t *strhash_clone(strhash_t *hash, void *(clone)(void *elmt));
 int strhash_walk(strhash_t *hash, int (func)(void *elmt, void *data), void *data);
 int strhash_collide_count(strhash_t *hash);
 
