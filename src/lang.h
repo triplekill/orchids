@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Fri Mar 30 10:31:20 2007
+ ** @date Last update: Thu Jun  7 17:31:52 2007
  **/
 
 /*
@@ -32,7 +32,7 @@
 #define T_FNCT        1
 #define T_INT         2
 #define T_BSTR        3
-#define T_VBINSTR     4
+#define T_VBSTR       4
 #define T_STR         5
 #define T_VSTR        6
 #define T_ARRAY       7

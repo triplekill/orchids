@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Nov 29 18:38:06 2005
+ ** @date Last update: Thu Jun  7 17:38:59 2007
  **/
 
 /*
@@ -494,8 +494,8 @@ static field_t win32evt_fields[] = {
   { "win32evt.event_id",   T_INT,     "Event identifier"         },
   { "win32evt.event_type", T_INT,     "Event type"               },
   { "win32evt.event_cat",  T_INT,     "Event category"           },
-  { "win32evt.user_sid",   T_VBINSTR, "User security identifier" },
-  { "win32evt.data",       T_VBINSTR, "Event data"               },
+  { "win32evt.user_sid",   T_VBSTR,   "User security identifier" },
+  { "win32evt.data",       T_VBSTR,   "Event data"               },
 };
 
 static void *

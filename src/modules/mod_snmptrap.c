@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Wed Nov 30 19:01:25 2005
+ ** @date Last update: Thu Jun  7 17:38:40 2007
  **/
 
 /*
@@ -188,7 +188,7 @@ static field_t snmptrap_fields[] = {
   { "snmptrap.community",    T_STR, "Community name" },
   { "snmptrap.pdu_type",     T_VSTR, "Protocol Data Unit type" },
   { "snmptrap.object_id",    T_SNMPOID, "Object identifier" },
-  { "snmptrap.value",        T_VBINSTR, "Object value" },
+  { "snmptrap.value",        T_VBSTR, "Object value" },
 
   /* Version 1 Specific */
   { "snmptrap.enterprise",   T_SNMPOID, "Identifies the trap source" },

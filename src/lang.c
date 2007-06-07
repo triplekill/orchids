@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Mar 30 09:42:27 2007
+ ** @date Last update: Thu Jun  7 17:35:23 2007
  **/
 
 /*
@@ -211,7 +211,7 @@ static struct issdl_type_s issdl_types_g[] = {
   { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Function reference" },
   { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_mul, int_div, int_mod, int_clone, "Integer numbers (32-bits signed int)" },
   { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, "Binary string, allocated, (unsigned char *)" },
-  { "vbstr",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Virtual binary string, not allocated, only pointer/offset reference" },
+  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, "Virtual binary string, not allocated, only pointer/offset reference" },
   { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, "Character string, allocated, (char *)" },
   { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, "Virtual string, not allocated, only pointer/offset reference" },
   { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Array" },
@@ -639,7 +639,66 @@ ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *str)
 ** store references on allocatated Binary string.
 */
 
-/* XXX: T_VBINSTR -- ToDo */
+ovm_var_t *
+ovm_vbstr_new(void)
+{
+  ovm_vbstr_t *vbstr;
+
+  vbstr = Xzmalloc(sizeof (ovm_vbstr_t));
+  vbstr->type = T_VBSTR;
+
+  return ( OVM_VAR(bstr) );
+}
+
+static ovm_var_t *
+vbstr_clone(ovm_var_t *var)
+{
+  ovm_var_t *res;
+
+  if (var->type != T_VBSTR)
+    return (NULL);
+
+  res = ovm_vbstr_new( VBSTRLEN(var) );
+  VBSTR(res) = VBSTR(var);
+  VBSTRLEN(res) = VBSTRLEN(var);
+  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+
+  return (res);
+}
+
+
+static void *
+vbstr_get_data(ovm_var_t *vbstr)
+{
+  return ( VBSTR(vbstr) );
+}
+
+static size_t
+vbstr_get_data_len(ovm_var_t *vbstr)
+{
+  return ( VBSTRLEN(vbstr) );
+}
+
+void
+ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str)
+{
+  int i;
+
+  if (str->type != T_VBSTR) {
+    fprintf(fp, "Wrong object type.\n");
+    return ;
+  }
+
+  fprintf(fp, "vbinstr[%i] : \"", str->len);
+  for (i = 0; i < str->len; i++) {
+    if (isprint(str->str[i]))
+      fprintf(fp, "%c", str->str[i]);
+    else
+      fprintf(fp, ".");
+  }
+  fprintf(fp, "\"\n");
+}
+
 
 
 /*
@@ -1963,6 +2022,17 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
             fprintf(fp, ".");
         }
       fprintf(fp, "\"\n");
+      break;
+
+    case T_VBSTR:
+      fprintf(fp, "vbstr[%i]: \"", VBSTRLEN(val));
+      for (i = 0; i < VBSTRLEN(val); i++) {
+        if (isprint(VBSTR(val)[i]))
+          fputc(BSTR(val)[i], fp);
+        else
+          fputc('.', fp);
+      }
+      fputs("\"\n", fp);
       break;
 
     case T_STR:
