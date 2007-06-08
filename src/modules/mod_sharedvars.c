@@ -9,7 +9,7 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Wed Jun  6 13:02:24 2007
+ ** @date Last update: Fri Jun  8 16:24:07 2007
  **/
 
 /*
@@ -83,9 +83,14 @@ issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
 
   value = strhash_del(mod_sharedvars_cfg_g->vars_hash, key);
 
-  /* XXX: test if NULL ? */
-
-  stack_push(ctx->ovm_stack, value);
+  if (value) {
+    Xfree(value);
+  }
+  else {
+    DebugLog(DF_ENG, DS_ERROR,
+             "Try to delete an non-existent variable '%s'\n",
+             key);
+  }
 
   Xfree(key);
 }
