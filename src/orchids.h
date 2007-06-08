@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Jun  8 15:38:36 2007
+ ** @date Last update: Fri Jun  8 16:09:56 2007
  **/
 
 /*
@@ -1234,6 +1234,15 @@ struct field_s
 };
 
 
+
+/**
+ ** @typedef mod_func_t
+ **   Function prototype for optional inter-module function calls.
+ **/
+typedef int (*mod_func_t)(orchids_t *ctx, mod_entry_t *mod, void *params);
+
+
+
 /*
 ** DOT DISPLAY flags.
 */
@@ -1513,7 +1522,7 @@ remove_module(orchids_t *ctx, char *name);
  **              was not found.
  **/
 input_module_t *
-find_module(orchids_t *ctx, char *name);
+find_module(orchids_t *ctx, const char *name);
 
 /**
  ** Find a module id given its name.
@@ -1524,7 +1533,7 @@ find_module(orchids_t *ctx, char *name);
  ** @return      The identifier number.
  **/
 int
-find_module_id(orchids_t *ctx, char *name);
+find_module_id(orchids_t *ctx, const char *name);
 
 /**
  ** Find a module entry given its name.
@@ -1535,7 +1544,25 @@ find_module_id(orchids_t *ctx, char *name);
  ** @return      The module entry.
  **/
 mod_entry_t *
-find_module_entry(orchids_t *ctx, char *name);
+find_module_entry(orchids_t *ctx, const char *name);
+
+
+/**
+ ** Try to call a module function, if the module is loaded and if the
+ ** function is found.
+ **
+ ** @param ctx      Orchids context.
+ ** @param modname  Module name to find.
+ ** @param funcname Function name to find.
+ ** @param funcparams Arbitrary parameters passed to the called function.
+ **
+ ** @return      An error code.
+ **/
+int
+call_mod_func(orchids_t *ctx,
+              const char *modname,
+              const char *funcname,
+              void *funcparams);
 
 
 /**

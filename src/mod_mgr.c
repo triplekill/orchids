@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Fri Jun  8 15:51:15 2007
+ ** @date Last update: Fri Jun  8 16:04:21 2007
  **/
 
 /*
@@ -140,7 +140,7 @@ remove_module(orchids_t *ctx, char *name)
 }
 
 input_module_t *
-find_module(orchids_t *ctx, char *name)
+find_module(orchids_t *ctx, const char *name)
 {
   mod_entry_t *m;
   int nm;
@@ -157,7 +157,7 @@ find_module(orchids_t *ctx, char *name)
 }
 
 int
-find_module_id(orchids_t *ctx, char *name)
+find_module_id(orchids_t *ctx, const char *name)
 {
   mod_entry_t *m;
   int nm;
@@ -175,7 +175,7 @@ find_module_id(orchids_t *ctx, char *name)
 
 
 mod_entry_t *
-find_module_entry(orchids_t *ctx, char *name)
+find_module_entry(orchids_t *ctx, const char *name)
 {
   mod_entry_t *m;
   int nm;
@@ -191,6 +191,37 @@ find_module_entry(orchids_t *ctx, char *name)
   return (NULL);
 }
 
+
+int
+call_mod_func(orchids_t *ctx,
+              const char *modname,
+              const char *funcname,
+              void *funcparams)
+{
+  char full_func_name[1024];
+  mod_entry_t *m;
+  mod_func_t   f;
+  int ret;
+
+  m = find_module_entry(ctx, modname);
+  if (m == NULL) {
+    return (-1); /* module not loaded */
+  }
+
+  snprintf(full_func_name, sizeof (full_func_name),
+           "mod_%s_%s",
+           modname, funcname);
+  f = dlsym(m->dlhandle, full_func_name);
+  if (f == NULL) {
+    DebugLog(DF_CORE, DS_FATAL, "error: dlsym(%s): %s\n",
+             full_func_name, dlerror());
+    return (-2); /* module loaded, but function not found */
+  }
+
+  ret = f(ctx, m, funcparams);
+
+  return (ret);
+}
 
 
 /**
