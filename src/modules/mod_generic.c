@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:08:11 2003
- ** @date Last update: Tue Nov 29 11:12:25 2005
+ ** @date Last update: Fri Jun  8 15:39:12 2007
  **/
 
 /*
@@ -262,7 +262,7 @@ generic_postconfig(orchids_t *ctx, mod_entry_t *mod)
     }
 
     /* add modules */
-    vmod->mod_id = add_module(ctx, &vmod->mod_entry);
+    vmod->mod_id = add_module(ctx, &vmod->mod_entry, NULL);
 
     /* register fields */
     register_fields(ctx, &ctx->mods[vmod->mod_id], vmod->field_array, vmod->fields);

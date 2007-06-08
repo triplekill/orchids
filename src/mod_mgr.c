@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Fri Mar 30 09:44:29 2007
+ ** @date Last update: Fri Jun  8 15:37:36 2007
  **/
 
 /*
@@ -26,24 +26,24 @@
 
 #include "orchids.h"
 
+/* input_module_t * */
+/* load_add_module(orchids_t *ctx, const char *name) */
+/* { */
+/*   input_module_t *input_mod; */
+
+/*   input_mod = load_shared_module(ctx, name); */
+/*   if (input_mod == NULL) { */
+/*     DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", name); */
+/*     return (NULL); */
+/*   } */
+
+/*   add_module(ctx, input_mod); */
+
+/*   return (input_mod); */
+/* } */
+
 input_module_t *
-load_add_module(orchids_t *ctx, const char *name)
-{
-  input_module_t *input_mod;
-
-  input_mod = load_shared_module(ctx, name);
-  if (input_mod == NULL) {
-    DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", name);
-    return (NULL);
-  }
-
-  add_module(ctx, input_mod);
-
-  return (input_mod);
-}
-
-input_module_t *
-load_shared_module(orchids_t *ctx, const char *name)
+load_add_shared_module(orchids_t *ctx, const char *name)
 {
   char mod_fname[4096];
   void *mod_handle;
@@ -66,11 +66,13 @@ load_shared_module(orchids_t *ctx, const char *name)
 
   DebugLog(DF_CORE, DS_NOTICE, "module [%s] successfully loaded: symbol mod_%s found at %x\n", name, name, mod);
 
+  add_module(ctx, mod, mod_handle);
+
   return (mod);
 }
 
 int
-add_module(orchids_t *ctx, input_module_t *mod)
+add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
 {
   int mod_id;
   void *mod_cfg;
@@ -113,6 +115,7 @@ add_module(orchids_t *ctx, input_module_t *mod)
   mod_id = ctx->loaded_modules;
   ctx->mods[mod_id].mod_id = mod_id;
   ctx->mods[mod_id].mod = mod;
+  ctx->mods[mod_id].dlhandle = dlhandle;
   /* dyn realloc mod array ? remove mod limit ? */
 
   /* 4 - Proceed to initialisation */

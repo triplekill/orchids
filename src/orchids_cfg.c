@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Thu Apr  5 15:56:53 2007
+ ** @date Last update: Fri Jun  8 15:38:04 2007
  **/
 
 /*
@@ -103,9 +103,9 @@ proceed_pre_config(orchids_t *ctx)
     switch (ctx->off_line_mode) {
 
     case MODE_SYSLOG:
-      mod_textfile = load_add_module(ctx, "textfile");
-      load_add_module(ctx, "udp");
-      mod_syslog = load_add_module(ctx, "syslog");
+      mod_textfile = load_add_shared_module(ctx, "textfile");
+      load_add_shared_module(ctx, "udp");
+      mod_syslog = load_add_shared_module(ctx, "syslog");
 
       dir.args = "1";
       dir_handler = dir_handler_lookup(ctx, mod_textfile, "ProceedAll");
@@ -120,9 +120,9 @@ proceed_pre_config(orchids_t *ctx)
       break;
 
     case MODE_SNARE:
-      load_add_module(ctx, "textfile");
-      load_add_module(ctx, "udp");
-      load_add_module(ctx, "snare");
+      load_add_shared_module(ctx, "textfile");
+      load_add_shared_module(ctx, "udp");
+      load_add_shared_module(ctx, "snare");
       break;
 
     default:
@@ -581,13 +581,11 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   input_module_t *input_mod;
 
-  input_mod = load_shared_module(ctx, dir->args);
+  input_mod = load_add_shared_module(ctx, dir->args);
   if (input_mod == NULL) {
     DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", dir->args);
     return ;
   }
-
-  add_module(ctx, input_mod);
 }
 
 /* XXX move this to mod_htmlstate */

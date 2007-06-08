@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri May 11 09:58:39 2007
+ ** @date Last update: Fri Jun  8 15:38:36 2007
  **/
 
 /*
@@ -803,6 +803,9 @@ struct conditional_dissector_record_s {
 /**   @var mod_entry_s::mod_id
  **     Module identifier.
  **/
+/**   @var mod_entry_s::dlhandle
+ **     The handle returned by dlopen().
+ **/
 struct mod_entry_s
 {
   int32_t                num_fields;
@@ -815,6 +818,7 @@ struct mod_entry_s
   input_module_t        *mod;
   unsigned long          posts;
   int32_t                mod_id;
+  void                  *dlhandle;
 };
 
 
@@ -1457,11 +1461,12 @@ fprintf_state_env(FILE *fp, const state_instance_t *state);
  **
  ** @param ctx  Orchids application context.
  ** @param mod  The information structure of the module to register.
+ ** @param dlhandle  The handle returned by dlopen() or NULL if not dynamic.
  **
  ** @return mod_id if module was succefully added, or -1 if an error occurred.
  **/
 int
-add_module(orchids_t *ctx, input_module_t *mod);
+add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
 
 /**
  ** Load and register a Dynamic Shared Object (DSO) module.
@@ -1473,7 +1478,7 @@ add_module(orchids_t *ctx, input_module_t *mod);
  **   NULL if an erro occurs.
  **/
 input_module_t *
-load_shared_module(orchids_t *ctx, const char *name);
+load_add_shared_module(orchids_t *ctx, const char *name);
 
 /**
  ** Load, register and add a Dynamic Shared Object (DSO) module.
@@ -1484,8 +1489,8 @@ load_shared_module(orchids_t *ctx, const char *name);
  ** @return A pointer to the information structure of the module, or
  **   NULL if an erro occurs.
  **/
-input_module_t *
-load_add_module(orchids_t *ctx, const char *name);
+/* input_module_t * */
+/* load_add_module(orchids_t *ctx, const char *name); */
 
 /**
  ** Remove a module.
