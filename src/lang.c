@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Thu Jun  7 17:35:23 2007
+ ** @date Last update: Fri Jun  8 15:46:54 2007
  **/
 
 /*
@@ -55,6 +55,13 @@ static void *
 bytestr_get_data(ovm_var_t *str);
 static size_t
 bytestr_get_data_len(ovm_var_t *str);
+
+static void *
+vbstr_get_data(ovm_var_t *str);
+static size_t
+vbstr_get_data_len(ovm_var_t *str);
+static ovm_var_t *
+vbstr_clone(ovm_var_t *var);
 
 static void *
 string_get_data(ovm_var_t *str);
@@ -647,7 +654,7 @@ ovm_vbstr_new(void)
   vbstr = Xzmalloc(sizeof (ovm_vbstr_t));
   vbstr->type = T_VBSTR;
 
-  return ( OVM_VAR(bstr) );
+  return ( OVM_VAR(vbstr) );
 }
 
 static ovm_var_t *
@@ -658,7 +665,7 @@ vbstr_clone(ovm_var_t *var)
   if (var->type != T_VBSTR)
     return (NULL);
 
-  res = ovm_vbstr_new( VBSTRLEN(var) );
+  res = ovm_vbstr_new();
   VBSTR(res) = VBSTR(var);
   VBSTRLEN(res) = VBSTRLEN(var);
   FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
