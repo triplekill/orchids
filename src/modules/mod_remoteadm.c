@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Tue Nov 29 10:53:00 2005
+ ** @date Last update: Tue Jun 12 12:35:07 2007
  **/
 
 /*
@@ -316,7 +316,7 @@ radm_cmd_dumpinst(FILE *fp, orchids_t *ctx, char *args)
       show_prompt(fp);
       return ;
     }
-    fprintf_rule_instance_dot(fp, r, DOT_SHOWONLYONCE|DOT_RETRIGLIST, ctx->new_qh);
+    fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh);
     show_prompt(fp);
   } else {
     fprintf(fp, "invalid rule instance identifier '%s'.\n", args);

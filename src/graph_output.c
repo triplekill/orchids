@@ -8,7 +8,7 @@
  ** @ingroup output
  **
  ** @date  Started on: Fri May 23 12:18:40 2003
- ** @date Last update: Fri Mar 30 09:19:22 2007
+ ** @date Last update: Tue Jun 12 12:33:45 2007
  **/
 
 /*
@@ -67,19 +67,13 @@ fprintf_rule_dot(FILE *fp, rule_t *rule)
  * @param fp Output stream.
  * @param state State instance to display.
  * @param options Option flag for output.
- * option DOT_SHOWONLYONCE: draw 'ONLYONCE' state in grey.
  **/
 static void
 fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options)
 {
-  /* XXX UGLY HACK: USE state pointer to identify state instance */
-
-  if ((options & DOT_SHOWONLYONCE) && (state->flags & SF_ONLYONCE))
-    fprintf(fp, "  \"%s.%p\" [ label=\"%s\", style=filled, fillcolor=\"#E0E0E0\" ]\n",
-            state->state->name, (void *) state, state->state->name);
-  else
-    fprintf(fp, "  \"%s.%p\" [ label=\"%s\" ]\n",
-            state->state->name, (void *) state, state->state->name);
+  /* Small hack: Use state pointer to identify state instance */
+  fprintf(fp, "  \"%s.%p\" [ label=\"%s\" ]\n",
+          state->state->name, (void *) state, state->state->name);
 
   /* if we are a child, display transition */
   if (state->parent) {
@@ -103,7 +97,6 @@ fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options)
  * @param options Options flags for output.
  * @param tq Current thread queue.
  * option #DOT_RETRIGLIST: draw retrig list (in dotted links).
- * option #DOT_SHOWONLYONCE: draw 'ONLYONCE' state in grey.
  **/
 void
 fprintf_rule_instance_dot(FILE *fp, rule_instance_t *rule, int options, wait_thread_t *tq)

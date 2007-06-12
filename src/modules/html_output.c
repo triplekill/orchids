@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Fri May 11 10:00:04 2007
+ ** @date Last update: Tue Jun 12 12:41:03 2007
  **/
 
 /*
@@ -857,7 +857,7 @@ generate_html_rule_instances(orchids_t *ctx)
     fp = fopen_cached(absolute_filepath);
     if (fp != CACHE_HIT && fp != NULL) {
     DebugLog(DF_CORE, DS_INFO, "dot file (%s).\n", absolute_filepath);
-    fprintf_rule_instance_dot(fp, r, DOT_SHOWONLYONCE|DOT_RETRIGLIST, ctx->new_qh);
+    fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh);
     Xfclose(fp);
 
     /* convert in various formats (eps/pdf/jpeg) */

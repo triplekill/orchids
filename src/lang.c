@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Jun  8 15:46:54 2007
+ ** @date Last update: Tue Jun 12 12:43:56 2007
  **/
 
 /*
@@ -2188,7 +2188,7 @@ issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumppathtree()\n");
   fprintf_rule_instance_dot(stdout, state->rule_instance,
-                            DOT_SHOWONLYONCE|DOT_RETRIGLIST, ctx->new_qh);
+                            DOT_RETRIGLIST, ctx->new_qh);
 }
 
 static void

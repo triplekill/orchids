@@ -9,7 +9,7 @@
  ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:02 2003
- ** @date Last update: Fri Mar 30 09:32:50 2007
+ ** @date Last update: Tue Jun 12 12:34:24 2007
  **/
 
 /*
@@ -66,7 +66,7 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 
 %token RULE STATE INIT IF GOTO IF WAITFOR /* special keywords */
 %token O_BRACE C_BRACE O_PARENT C_PARENT EQ /* ponctuation */
-%token SEMICOLUMN COMMA ONLY_ONCE SYNCHRONIZE
+%token SEMICOLUMN COMMA SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_TIMEVAL KW_COUNTER KW_REGEX
 %token <sym> SYMNAME INIT
 %token <string> FIELD VARIABLE /* raw data types */
@@ -170,8 +170,6 @@ state:
 state_options:
   /* empty */
     { $$ = SF_NOFLAGS; }
-| ONLY_ONCE
-    { $$ |= SF_ONLYONCE; }
 ;
 
 

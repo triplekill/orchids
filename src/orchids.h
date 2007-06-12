@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Jun  8 16:09:56 2007
+ ** @date Last update: Tue Jun 12 12:36:17 2007
  **/
 
 /*
@@ -264,10 +264,7 @@ struct field_record_s
 ** data structure for automata representation **
 *---------------------------------------------*/
 
-/** State flag ONLY_ONCE : a state that will not be retrigered after one
- of his transition is traversed */
 #define SF_NOFLAGS  0x00000000
-#define SF_ONLYONCE 0x00000001
 #define SF_PRUNED   0x00000002
 #define SF_PATHMARK 0xF0000000
 
@@ -1248,7 +1245,6 @@ typedef int (*mod_func_t)(orchids_t *ctx, mod_entry_t *mod, void *params);
 */
 
 #define DOT_RETRIGLIST   1
-#define DOT_SHOWONLYONCE 2
 
 /*----------------------------------------------------------------------------*
 ** functions                                                                 **

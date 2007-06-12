@@ -9,7 +9,7 @@
  ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:38 2003
- ** @date Last update: Fri Mar 30 09:19:57 2007
+;; @date Last update: Tue Jun 12 12:34:46 2007
  **/
 
 /*
@@ -77,7 +77,6 @@ static size_t qstr_sz_g;
  /* reserved keywords and operators */
 "rule"     { return (RULE);     }
 "state"    { return (STATE);    }
-"onlyonce" { return (ONLY_ONCE); }
 "synchronize" { return (SYNCHRONIZE); }
 "init" {
   issdllval.sym.file = issdlcurrentfile_g;
