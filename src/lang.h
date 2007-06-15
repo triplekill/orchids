@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Thu Jun  7 17:31:52 2007
+ ** @date Last update: Fri Jun 15 10:03:27 2007
  **/
 
 /*
@@ -763,6 +763,11 @@ ovm_bstr_new(size_t size);
 void
 ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *bstr);
 
+ovm_var_t *
+ovm_vbstr_new(void);
+
+void
+ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
 
 ovm_var_t *
 ovm_uint_new(void);
