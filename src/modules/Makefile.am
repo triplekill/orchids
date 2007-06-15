@@ -38,6 +38,7 @@ endif
 
 if HAVE_LIBPCAP
 pkglib_LTLIBRARIES += mod_pcap.la
+pkglib_LTLIBRARIES += mod_prism2.la
 pkglib_LTLIBRARIES += mod_wifi.la
 endif
 
@@ -85,6 +86,11 @@ mod_pcap_la_SOURCES = mod_pcap.c
 mod_pcap_la_LDFLAGS = -module -avoid-version
 mod_pcap_la_LIBADD = $(PCAPLIB)
 mod_pcap_la_CFLAGS = $(PCAPINC)
+
+mod_prism2_la_SOURCES = mod_prism2.c mod_prism2.h
+mod_prism2_la_LDFLAGS = -module -avoid-version
+mod_prism2_la_LIBADD = $(PCAPLIB)
+mod_prism2_la_CFLAGS = $(PCAPINC)
 
 mod_wifi_la_SOURCES = mod_wifi.c mod_wifi.h compat.h
 mod_wifi_la_LDFLAGS = -module -avoid-version
