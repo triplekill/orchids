@@ -26,7 +26,8 @@ pkglib_LTLIBRARIES = \
   mod_udp.la \
   mod_win32evt.la \
   mod_period.la \
-  mod_sharedvars.la
+  mod_sharedvars.la \
+  mod_timeout.la
 
 if ENABLE_HTMLOUTPUT
 pkglib_LTLIBRARIES += mod_htmlstate.la
@@ -180,6 +181,9 @@ endif
 
 mod_sharedvars_la_SOURCES = mod_sharedvars.c
 mod_sharedvars_la_LDFLAGS = -module -avoid-version
+
+mod_timeout_la_SOURCES = mod_timeout.c
+mod_timeout_la_LDFLAGS = -module -avoid-version
 
 
 # End-of-file
