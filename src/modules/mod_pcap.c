@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri May 25 14:29:20 2007
- ** @date Last update: Sat May 26 00:05:27 2007
+ ** @date Last update: Fri Jun 15 10:31:18 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -196,6 +196,10 @@ add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 
   newif->datalink = pcap_datalink(newif->pcap);
+
+  DebugLog(DF_MOD, DS_INFO,
+           "Device %s have fd=%i and datalink=%i\n",
+           dir->args, newif->fd, newif->datalink);
 
   add_input_descriptor(ctx, mod, modpcap_callback, newif->fd, newif);
 }
