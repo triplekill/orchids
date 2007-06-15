@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Tue Jun 12 12:43:56 2007
+ ** @date Last update: Fri Jun 15 10:40:15 2007
  **/
 
 /*
@@ -2019,6 +2019,10 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       fprintf(fp, "int: %li\n", INT(val));
       break;
 
+    case T_UINT:
+      fprintf(fp, "uint: %lu\n", UINT(val));
+      break;
+
     case T_BSTR:
       fprintf(fp, "bstr[%i]: \"", BSTRLEN(val));
       for (i = 0; i < BSTRLEN(val); i++)
@@ -2035,7 +2039,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       fprintf(fp, "vbstr[%i]: \"", VBSTRLEN(val));
       for (i = 0; i < VBSTRLEN(val); i++) {
         if (isprint(VBSTR(val)[i]))
-          fputc(BSTR(val)[i], fp);
+          fputc(VBSTR(val)[i], fp);
         else
           fputc('.', fp);
       }
