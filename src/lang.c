@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Jun 15 10:40:15 2007
+ ** @date Last update: Fri Jun 15 12:25:21 2007
  **/
 
 /*
@@ -67,11 +67,15 @@ static void *
 string_get_data(ovm_var_t *str);
 static size_t
 string_get_data_len(ovm_var_t *str);
+static ovm_var_t *
+string_clone(ovm_var_t *var);
 
 static void *
 vstring_get_data(ovm_var_t *str);
 static size_t
 vstring_get_data_len(ovm_var_t *str);
+static ovm_var_t *
+vstr_clone(ovm_var_t *var);
 
 static void *
 counter_get_data(ovm_var_t *i);
@@ -219,8 +223,8 @@ static struct issdl_type_s issdl_types_g[] = {
   { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_mul, int_div, int_mod, int_clone, "Integer numbers (32-bits signed int)" },
   { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, "Binary string, allocated, (unsigned char *)" },
   { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, "Virtual binary string, not allocated, only pointer/offset reference" },
-  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, "Character string, allocated, (char *)" },
-  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, "Virtual string, not allocated, only pointer/offset reference" },
+  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, string_clone, "Character string, allocated, (char *)" },
+  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, vstr_clone, "Virtual string, not allocated, only pointer/offset reference" },
   { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Array" },
   { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Hash table" },
   { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, ctime_mul, ctime_div, ctime_mod, ctime_clone, "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
@@ -740,6 +744,21 @@ string_get_data_len(ovm_var_t *str)
 }
 
 static ovm_var_t *
+string_clone(ovm_var_t *var)
+{
+  ovm_var_t *res;
+
+  if (var->type != T_STR)
+    return (NULL);
+
+  res = ovm_str_new( STRLEN(var) );
+  memcpy( STR(res), STR(var), STRLEN(var));
+  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+
+  return (res);
+}
+
+static ovm_var_t *
 str_add(ovm_var_t *var1, ovm_var_t *var2)
 {
   ovm_var_t *res;
@@ -826,6 +845,22 @@ static size_t
 vstring_get_data_len(ovm_var_t *str)
 {
   return (((ovm_vstr_t *)str)->len);
+}
+
+static ovm_var_t *
+vstr_clone(ovm_var_t *var)
+{
+  ovm_var_t *res;
+
+  if (var->type != T_VSTR)
+    return (NULL);
+
+  res = ovm_vstr_new();
+  VSTR(res) = VSTR(var);
+  VSTRLEN(res) = VSTRLEN(var);
+  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+
+  return (res);
 }
 
 static ovm_var_t *
@@ -2729,19 +2764,6 @@ issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
   state->event_level = INT(level);
 }
 
-static void
-issdl_timeout(orchids_t *ctx, state_instance_t *state)
-{
-  /* find state */
-  /*   if state doesn't exist, return an error */
-  /* create a thread to state */
-  /* register a realtime action passing created thread */
-
-  /* cutting the real-time timeout */
-  /*   if cutting a rtt */
-  /*     look for its attached rtaction, by walking through the list */
-  /*     remove rtaction or thread link TBD */
-}
 
 /* compute the number of different bit of two variable of
 the same type and size. */
@@ -2946,12 +2968,11 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_pastval, 17, "pastval", 2, "Past value of a variable" },
   { issdl_sendmail, 18, "sendmail", 4, "Send a mail" },
   { issdl_sendmail_report, 19, "sendmail_report", 4, "Send a report by mail" },
-  { issdl_timeout, 20, "timeout", 2, "Real-time timeout" },
-  { issdl_bindist, 21, "bitdist", 2, "Number of different bits" },
-  { issdl_bytedist, 22, "bytedist", 2, "Number of different bytes" },
-  { issdl_vstr_from_regex, 23, "vstr_from_regex", 1, "Return the source virtual string of a compiled regex" },
-  { issdl_str_from_regex, 24, "str_from_regex", 1, "Return the source string of a compiled regex" },
-  { issdl_regex_from_str, 25, "regex_from_str", 1, "Compile a regex from a string" },
+  { issdl_bindist, 20, "bitdist", 2, "Number of different bits" },
+  { issdl_bytedist, 21, "bytedist", 2, "Number of different bytes" },
+  { issdl_vstr_from_regex, 22, "vstr_from_regex", 1, "Return the source virtual string of a compiled regex" },
+  { issdl_str_from_regex, 23, "str_from_regex", 1, "Return the source string of a compiled regex" },
+  { issdl_regex_from_str, 24, "regex_from_str", 1, "Compile a regex from a string" },
   { NULL, 0, NULL, 0, NULL }
 };
 
