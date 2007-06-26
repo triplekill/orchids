@@ -9,7 +9,7 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Dec  6 15:36:14 2005
+ ** @date Last update: Tue Jun 26 21:03:37 2007
  **/
 
 /*
@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "orchids.h"
 
@@ -32,6 +33,57 @@ struct period_config_s
 {
   strhash_t *contexts;
 };
+
+static int
+qsort_strcmp(const void *a, const void *b)
+{
+  return ( strcmp(*(char **)a, *(char **)b) );
+}
+
+static int
+period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
+{
+  FILE *fp;
+  int i;
+  strhash_elmt_t *helmt;
+  size_t ctx_array_sz;
+  char **ctx_array;
+
+  fprintf(menufp,
+	  "<a href=\"orchids-period.html\" "
+          "target=\"main\">Periods</a><br/>\n");
+
+  fp = create_html_file(ctx, "orchids-period.html", NO_CACHE);
+  fprintf_html_header(fp, "Orchids frequencies / phases tables");
+
+  fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
+
+  ctx_array = NULL;
+  ctx_array_sz = 0;
+  for (i = 0; i < ctx->temporal->size; i++) {
+    for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next) {
+      ctx_array_sz++;
+      ctx_array = Xrealloc(ctx_array, ctx_array_sz * sizeof (char *));
+      ctx_array[ ctx_array_sz - 1 ] = helmt->key;
+    }
+  }
+  qsort(ctx_array, ctx_array_sz, sizeof (char *), qsort_strcmp);
+
+  fprintf(fp, "%i context%s<br/><br/><br/>\n",
+          ctx_array_sz, ctx_array_sz > 1 ? "s" : "");
+
+  for (i = 0; i < ctx_array_sz; i++)
+    fprintf(fp, "%i: %s<br/>\n", i, ctx_array[i]);
+
+  if (ctx_array_sz > 0)
+    Xfree(ctx_array);
+
+  fprintf_html_trailer(fp);
+  Xfclose(fp);
+
+  return (0);
+}
+
 
 static void
 issdl_temporal(orchids_t *ctx, state_instance_t *state)
@@ -80,6 +132,8 @@ period_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx, issdl_temporal,
                          "temporal", 1, "update a temporal context");
+
+  html_output_add_menu_entry(ctx, mod, period_htmloutput);
 
   /* return config structure, for module manager */
   return (cfg);

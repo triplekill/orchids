@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Tue Jun 12 12:41:03 2007
+ ** @date Last update: Tue Jun 26 20:59:54 2007
  **/
 
 /*
@@ -1228,49 +1228,6 @@ generate_html_report_list(orchids_t *ctx)
   generate_htmlfile_hardlink(ctx, file, "orchids-reports.html");
 }
 
-static int
-qsort_strcmp(const void *a, const void *b)
-{
-  return ( strcmp(*(char **)a, *(char **)b) );
-}
-
-static void
-generate_html_freqphase(orchids_t *ctx)
-{
-  FILE *fp;
-  int i;
-  strhash_elmt_t *helmt;
-  size_t ctx_array_sz;
-  char **ctx_array;
-
-  fp = create_html_file(ctx, "orchids-freqphase.html", NO_CACHE);
-  fprintf_html_header(fp, "Orchids frequencies / phases tables");
-
-  fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
-
-  ctx_array = NULL;
-  ctx_array_sz = 0;
-  for (i = 0; i < ctx->temporal->size; i++) {
-    for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next) {
-      ctx_array_sz++;
-      ctx_array = Xrealloc(ctx_array, ctx_array_sz * sizeof (char *));
-      ctx_array[ ctx_array_sz - 1 ] = helmt->key;
-    }
-  }
-  qsort(ctx_array, ctx_array_sz, sizeof (char *), qsort_strcmp);
-
-  fprintf(fp, "%i context%s<br/><br/><br/>\n",
-          ctx_array_sz, ctx_array_sz > 1 ? "s" : "");
-
-  for (i = 0; i < ctx_array_sz; i++)
-    fprintf(fp, "%i: %s<br/>\n", i, ctx_array[i]);
-
-  if (ctx_array_sz > 0)
-    Xfree(ctx_array);
-
-  fprintf_html_trailer(fp);
-  Xfclose(fp);
-}
 
 static void
 generate_html_config(orchids_t *ctx);
@@ -1441,9 +1398,6 @@ generate_html_menu_timestamps(orchids_t *ctx)
       m->output(ctx, m->mod, fp);
   }
 
-/* "<a href=\"orchids-freqphase.html\" target=\"main\">Freq/Phase</a><br/>" */
-/* "<a href=\"orchids-prolog-db.html\" target=\"main\">Prolog DB</a><br/><br/>" */
-
   fprintf(fp, "<hr/>\n");
   fprintf(fp, "<a href=\"index-help.html\" target=\"main\">Help</a><br/>\n");
   fprintf(fp, "<a href=\"index-about.html\" target=\"main\">About</a><br/>\n");
@@ -1482,9 +1436,6 @@ generate_html_menu(orchids_t *ctx)
   fprintf(fp,
           "<a href=\"orchids-stats.html\" "
           "target=\"main\">Statistics</a><br/>\n");
-  fprintf(fp,
-          "<a href=\"orchids-freqphase.html\" "
-          "target=\"main\">Freq/Phase</a><br/>\n");
   fprintf(fp,
           "<a href=\"orchids-datatypes.html\" "
           "target=\"main\">Data Types</a><br/>\n");
@@ -1558,7 +1509,6 @@ do_html_output(orchids_t *ctx)
   generate_html_thread_queue(ctx);
   generate_html_events(ctx);
   generate_html_report_list(ctx);
-  generate_html_freqphase(ctx);
   generate_html_config(ctx);
 
   generate_html_menu(ctx);
