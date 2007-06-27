@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Tue Jun 12 12:35:07 2007
+ ** @date Last update: Wed Jun 27 21:49:39 2007
  **/
 
 /*
@@ -230,7 +230,8 @@ static void
 radm_cmd_htmloutput(FILE *fp, orchids_t *ctx, char *args)
 {
   fprintf(fp, "Generating HTML output...\n");
-  html_output(ctx);
+  call_mod_func(ctx, "htmlstate", "do_update", NULL);
+  /* XXX: test return */
   show_prompt(fp);
 }
 

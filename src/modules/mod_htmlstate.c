@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Thu Mar 29 15:49:57 2007
+ ** @date Last update: Wed Jun 27 21:46:29 2007
  **/
 
 /*
@@ -67,6 +67,14 @@ static mod_cfg_cmd_t htmlstate_dir[] =
   { "EnableCache", enable_cache, "Enable file cache" },
   { NULL, NULL }
 };
+
+int
+mod_htmlstate_do_update(orchids_t *ctx, mod_entry_t *mod, void *params)
+{
+  html_ouput(ctx);
+
+  return (0);
+}
 
 input_module_t mod_htmlstate = {
   MOD_MAGIC,
