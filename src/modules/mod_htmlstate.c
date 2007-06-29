@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Wed Jun 27 21:46:29 2007
+ ** @date Last update: Fri Jun 29 11:42:47 2007
  **/
 
 /*
@@ -71,7 +71,7 @@ static mod_cfg_cmd_t htmlstate_dir[] =
 int
 mod_htmlstate_do_update(orchids_t *ctx, mod_entry_t *mod, void *params)
 {
-  html_ouput(ctx);
+  html_output(ctx);
 
   return (0);
 }
