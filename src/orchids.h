@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Tue Jun 12 12:36:17 2007
+ ** @date Last update: Wed Jun 27 22:10:28 2007
  **/
 
 /*
@@ -1860,7 +1860,7 @@ void
 fprintf_rule_dot(FILE *fp, rule_t *rule);
 
 void
-fprintf_rule_instance_dot(FILE *fp, rule_instance_t *rule, int options, wait_thread_t *tq);
+fprintf_rule_instance_dot(FILE *fp, rule_instance_t *rule, int options, wait_thread_t *tq, int limit);
 
 /* lang.h XXX ?!... */
 issdl_function_t *

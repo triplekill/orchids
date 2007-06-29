@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Tue Jan 14 14:00:41 2003
- ** @date Last update: Thu Apr  5 15:55:00 2007
+ ** @date Last update: Fri Jun 29 14:14:36 2007
  **/
 
 
@@ -75,8 +75,6 @@
 
 #define DEFAULT_ORCHIDS_LOCKFILE    LOCALSTATEDIR "/run/orchids/orchids.lock"
 #define DEFAULT_OUTPUTHTML_LOCKFILE LOCALSTATEDIR "/run/orchids/orchids-outputhtml.lock"
-
-#define HTML_AUTOREFRESH "20"
 
 #define ORCHIDS_TMPDIR "/tmp"
 #define ORCHIDS_SENDMAIL_TEMPFILE \

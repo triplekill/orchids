@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Fri Jun 29 11:42:47 2007
+ ** @date Last update: Fri Jun 29 13:44:18 2007
  **/
 
 /*
@@ -27,11 +27,24 @@
 
 input_module_t mod_htmlstate;
 
+#define HTMLSTATE_DEFAULT_REFRESH_DELAY 10
+
 typedef struct htmlstatecfg_s htmlstatecfg_t;
 struct htmlstatecfg_s
 {
   int enable_cache;
   int fork;
+
+  int auto_refresh_delay;
+  int page_generation_delay;
+  int cache_cleanup_delay;
+  int rule_media; /* flags for graphs */
+  int rule_limit;
+  int rule_state_limit;
+  int rule_instance_limit;
+  int rule_instence_state_limit;
+  int thread_limit;
+  int event_limit;
 };
 
 static void *
@@ -45,7 +58,7 @@ htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
   mod_cfg = Xzmalloc(sizeof (htmlstatecfg_t));
   /* default initialisation here */
 
-  html_output_preconfig(ctx); /* XXX: Move this in a module */
+  html_output_preconfig(ctx);
 
   return (mod_cfg);
 }
@@ -59,12 +72,25 @@ htmlstate_postconfig(orchids_t *ctx, mod_entry_t *mod)
 static void
 enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  ((htmlstatecfg_t *)mod->config)->enable_cache = 1;
+  htmlstatecfg_t *cfg;
+
+  cfg = (htmlstatecfg_t *)mod->config;
+  cfg->enable_cache = 1;
+}
+
+static void
+add_cache_params(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  htmlstatecfg_t *cfg;
+
+  cfg = (htmlstatecfg_t *)mod->config;
+  /* XXX */
 }
 
 static mod_cfg_cmd_t htmlstate_dir[] = 
 {
   { "EnableCache", enable_cache, "Enable file cache" },
+  { "<cache", add_cache_params, "Add cache parameters" },
   { NULL, NULL }
 };
 

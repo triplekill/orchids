@@ -8,12 +8,14 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Tue Jun 26 20:59:54 2007
+ ** @date Last update: Fri Jun 29 14:14:58 2007
  **/
 
 /*
  * See end of file for LICENSE and COPYRIGHT informations.
  */
+
+#define HTML_AUTOREFRESH 20
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -38,6 +40,38 @@
 #endif /* linux */
 
 #include "orchids.h"
+
+#define HTMLSTATE_LNK_DOT         (1 << 0)
+#define HTMLSTATE_LNK_EPS         (1 << 1)
+#define HTMLSTATE_LNK_JPG_THUMB   (1 << 2)
+#define HTMLSTATE_LNK_JPG_FULL    (1 << 3)
+#define HTMLSTATE_LNK_PDF         (1 << 4)
+
+#define HTMLSTATE_NEED_DOT(flag)      \
+  (flag & (  HTMLSTATE_LNK_DOT        \
+           | HTMLSTATE_LNK_EPS        \
+           | HTMLSTATE_LNK_JPG_THUMB  \
+           | HTMLSTATE_LNK_JPG_FULL   \
+           | HTMLSTATE_LNK_PDF))
+
+#define HTMLSTATE_NEED_EPS_FULL(flag) \
+  (flag & (  HTMLSTATE_LNK_EPS        \
+           | HTMLSTATE_LNK_JPG_FULL   \
+           | HTMLSTATE_LNK_PDF))
+
+#define HTMLSTATE_NEED_EPS_THUMB(flag) \
+  (flag & (HTMLSTATE_LNK_JPG_THUMB)
+
+#define HTMLSTATE_NEED_JPG_FULL(flag) \
+  (flag & ( HTMLSTATE_LNK_JPG_FULL ))
+
+#define HTMLSTATE_NEED_JPG_THUMB(flag) \
+  (flag & ( HTMLSTATE_LNK_JPG_THUMB ))
+
+#define HTMLSTATE_NEED_PDF_FULL(flag) \
+  (flag & ( HTMLSTATE_LNK_PDF_FULL ))
+
+#define HTMLSTATE_STATE_LIMIT 50
 
 static void do_html_output(orchids_t *ctx);
 static void convert_filename(char *file);
@@ -204,7 +238,7 @@ cached_html_file(orchids_t *ctx, char *file)
 }
 
 void
-fprintf_html_header(FILE *fp, char *title)
+fprintf_html_header(FILE *fp, char *title /*, int refresh_delay */)
 {
   fprintf(fp, "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n");
   fprintf(fp, "<html>\n");
@@ -217,7 +251,8 @@ fprintf_html_header(FILE *fp, char *title)
 #else /* USE_HTTP_11 */
   fprintf(fp, "  <meta http-equiv=\"cache-control\" content=\"no-cache\">\n");
 #endif /* USE_HTTP_11 */
-  fprintf(fp, "  <meta http-equiv=\"refresh\" content=\"" HTML_AUTOREFRESH "\">\n");
+  /* if (refresh_delay)*/
+  fprintf(fp, "  <meta http-equiv=\"refresh\" content=\"%i\">\n", HTML_AUTOREFRESH /* refresh_delay */);
   fprintf(fp, "</head>\n");
   fprintf(fp, "<body>\n");
 }
@@ -665,11 +700,11 @@ generate_html_rules(orchids_t *ctx)
     strncpy(rulefile, r->filename, sizeof (rulefile));
     convert_filename(rulefile);
     snprintf(basefile, PATH_MAX,
-	     "orchids-rule-%s-%s-%08lx",
-	     r->name, rulefile, r->file_mtime);
+             "orchids-rule-%s-%s-%08lx",
+             r->name, rulefile, r->file_mtime);
     snprintf(base_name, PATH_MAX,
-	     "%s/rules/%s",
-	     absolute_dir, basefile);
+             "%s/rules/%s",
+             absolute_dir, basefile);
     snprintf(absolute_filepath, PATH_MAX, "%s.dot", base_name);
     fp = fopen_cached(absolute_filepath);
 
@@ -850,39 +885,39 @@ generate_html_rule_instances(orchids_t *ctx)
     Timer_to_NTP(&r->new_creation_date, ntpch, ntpcl);
     Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
     snprintf(basefile, PATH_MAX,
-	     "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
-	     r->rule->name, ntpch, ntpcl, ntpah, ntpal);
+             "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
+             r->rule->name, ntpch, ntpcl, ntpah, ntpal);
     snprintf(base_name, PATH_MAX, "%s/rule-insts/%s", absolute_dir, basefile);
     snprintf(absolute_filepath, PATH_MAX, "%s.dot", base_name);
     fp = fopen_cached(absolute_filepath);
     if (fp != CACHE_HIT && fp != NULL) {
-    DebugLog(DF_CORE, DS_INFO, "dot file (%s).\n", absolute_filepath);
-    fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh);
-    Xfclose(fp);
+      DebugLog(DF_CORE, DS_INFO, "dot file (%s).\n", absolute_filepath);
+      fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh, HTMLSTATE_STATE_LIMIT);
+      Xfclose(fp);
 
-    /* convert in various formats (eps/pdf/jpeg) */
-    snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_DOT " -Tps -Grankdir=LR -Gnodesep=0.05 -Granksep=0.05 \"%s\" -o \"%s.eps\"", absolute_filepath, base_name);
-    DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-    system(cmdline);
+      /* convert in various formats (eps/pdf/jpeg) */
+      snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_DOT " -Tps -Grankdir=LR -Gnodesep=0.05 -Granksep=0.05 \"%s\" -o \"%s.eps\"", absolute_filepath, base_name);
+      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      system(cmdline);
 
-    /* smaller eps, for thumbs (for better image quality) */
-    snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_DOT " -Tps -Grankdir=LR -Gnodesep=0.05 -Granksep=0.05 -Gsize=8,8 \"%s\" -o \"%s.thumb.eps\"", absolute_filepath, base_name);
-    DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-    system(cmdline);
+      /* smaller eps, for thumbs (for better image quality) */
+      snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_DOT " -Tps -Grankdir=LR -Gnodesep=0.05 -Granksep=0.05 -Gsize=8,8 \"%s\" -o \"%s.thumb.eps\"", absolute_filepath, base_name);
+      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      system(cmdline);
 
 #ifndef ORCHIDS_DEMO
-    snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
-    DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-    system(cmdline);
+      snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
+      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      system(cmdline);
 #endif
 
-    snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_CONVERT " \"%s.eps\" \"%s.jpg\"", base_name, base_name);
-    DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-    system(cmdline);
+      snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_CONVERT " \"%s.eps\" \"%s.jpg\"", base_name, base_name);
+      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      system(cmdline);
 
-    snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_CONVERT " \"%s.thumb.eps\" \"%s.thumb.jpg\"", base_name, base_name);
-    DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-    system(cmdline);
+      snprintf(cmdline, sizeof(cmdline), COMMAND_PREFIX PATH_TO_CONVERT " \"%s.thumb.eps\" \"%s.thumb.jpg\"", base_name, base_name);
+      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      system(cmdline);
     }
 
     /* create html entry */

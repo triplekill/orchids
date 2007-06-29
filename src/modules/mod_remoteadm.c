@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Wed Jun 27 21:49:39 2007
+ ** @date Last update: Wed Jun 27 22:11:45 2007
  **/
 
 /*
@@ -64,6 +64,8 @@
 input_module_t mod_remoteadm;
 
 #define DEFAULT_RADM_PORT 4242
+
+#define RADM_STATE_LIMIT 50
 
 typedef struct radmcfg_s radmcfg_t;
 struct radmcfg_s
@@ -317,7 +319,7 @@ radm_cmd_dumpinst(FILE *fp, orchids_t *ctx, char *args)
       show_prompt(fp);
       return ;
     }
-    fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh);
+    fprintf_rule_instance_dot(fp, r, DOT_RETRIGLIST, ctx->new_qh, RADM_STATE_LIMIT);
     show_prompt(fp);
   } else {
     fprintf(fp, "invalid rule instance identifier '%s'.\n", args);

@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Jun 15 12:25:21 2007
+ ** @date Last update: Wed Jun 27 22:15:52 2007
  **/
 
 /*
@@ -2227,7 +2227,8 @@ issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumppathtree()\n");
   fprintf_rule_instance_dot(stdout, state->rule_instance,
-                            DOT_RETRIGLIST, ctx->new_qh);
+                            DOT_RETRIGLIST, ctx->new_qh, 100);
+  /* XXX: hardcoded limit */
 }
 
 static void
