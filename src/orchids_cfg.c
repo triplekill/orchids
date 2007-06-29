@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Jun 29 11:31:35 2007
+ ** @date Last update: Fri Jun 29 13:01:13 2007
  **/
 
 /*
@@ -200,6 +200,8 @@ proceed_includes(char *pattern, config_directive_t **root, config_directive_t **
       (*root) = new_root;
     *last = get_last_dir(new_root);
   }
+
+  /* globfree(&globbuf); */
 
   return (RETURN_SUCCESS);
 }
