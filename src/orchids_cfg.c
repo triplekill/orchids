@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Jun 29 13:01:13 2007
+ ** @date Last update: Fri Jun 29 13:07:40 2007
  **/
 
 /*
@@ -502,6 +502,49 @@ add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 static void
+add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  rulefile_t *rulefile;
+  int ret;
+  int i;
+  glob_t globbuf;
+
+  DebugLog(DF_CORE, DS_INFO, "adding rule files '%s'\n", dir->args);
+
+  ret = glob(dir->args, 0, NULL, &globbuf);
+  if (ret) {
+    if (ret == GLOB_NOMATCH) {
+      DebugLog(DF_CORE, DS_INFO,
+               "Pattern returned no match.\n");
+    }
+    else {
+      DebugLog(DF_CORE, DS_ERROR,
+               "glob() error..\n");
+    }
+  }
+
+  for (i = 0; i < globbuf.gl_pathc; i++) {
+    DebugLog(DF_CORE, DS_DEBUG, "Adding rule file '%s'\n", globbuf.gl_pathv[i]);
+
+    rulefile = Xmalloc(sizeof (rulefile_t));
+    rulefile->name = globbuf.gl_pathv[i];
+    rulefile->next = NULL;
+
+    /* if it is the first rulefile... */
+    if (ctx->rulefile_list == NULL) {
+      ctx->rulefile_list = rulefile;
+      ctx->last_rulefile = rulefile;
+    } else {
+      ctx->last_rulefile->next = rulefile;
+      ctx->last_rulefile = rulefile;
+    }
+  }
+
+  /* globfree(&globbuf); */
+}
+
+
+static void
 module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   char mod_name[MODNAME_MAX];
@@ -763,6 +806,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "LoadModule" , config_load_module, "Load a shared object module"},
   { "<module"   , module_config  , "Configuration section for a module" },
   { "AddRuleFile", add_rule_file , "Add a rule file" },
+  { "AddRuleFiles", add_rule_files , "Add a rule files with a pattern" },
   { "HTMLOutputDir", set_html_output_dir , "Set the HTML output directory" },
   { "IDMEFdtd", set_idmef_dtd, "Set the IDMEF dtd"},
   { "IDMEFAnalyzerId", set_idmef_analyzer_id, "Set the IDMEF analyzer identifier"},
