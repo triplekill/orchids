@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Jun  8 15:38:04 2007
+ ** @date Last update: Fri Jun 29 11:31:35 2007
  **/
 
 /*
@@ -27,9 +27,9 @@
 
 #include <sys/types.h> /* for stat() */
 #include <sys/stat.h>
-#include <unistd.h>
-
+#include <sys/resource.h>
 #include <sys/time.h> /* gettimeofday() */
+#include <unistd.h>
 
 #include <glob.h> /* glob() */
 
@@ -710,6 +710,47 @@ set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ctx->lockfile = dir->args;
 }
 
+static void
+set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  int ret;
+  int l;
+  struct rlimit rl;
+
+  DebugLog(DF_CORE, DS_INFO, "setting max memory limit '%s'\n", dir->args);
+
+  l = atoi(dir->args);
+
+  ret = getrlimit(RLIMIT_AS, &rl);
+  if (ret) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "getrlimit(): error %i: %s\n",
+             errno, strerror(errno));
+    return ;
+  }
+
+  DebugLog(DF_CORE, DS_INFO, "current memory limit is %i %i\n",
+           rl.rlim_cur, rl.rlim_max);
+
+  if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < l) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "can't set memory limit: hard limit already set to %i "
+             "(requesting %i)\n",
+             rl.rlim_max, l);
+    return ;
+  }
+
+  rl.rlim_cur = l;
+  rl.rlim_max = l;
+  ret = setrlimit(RLIMIT_AS, &rl);
+  if (ret) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "setrlimit(): error %i: %s\n",
+             errno, strerror(errno));
+    return ;
+  }
+}
+
 
 static mod_cfg_cmd_t config_dir_g[] = 
 {
@@ -732,6 +773,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "SetPreprocessorCmd", set_preproc_cmd, "Set the preprocessor command" },
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
   { "SetLockFile", set_lock_file, "Set the lock file name" },
+  { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
   { NULL, NULL, NULL }
 };
 

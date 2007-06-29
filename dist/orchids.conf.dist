@@ -7,6 +7,9 @@
 # ORCHIDS Configuration file
 #
 
+# For starting, 128 MB should be enough
+MaxMemorySize 134217728
+
 SetModuleDir @@LIBDIR@@/orchids
 
 # ORCHIDS Global parameters
