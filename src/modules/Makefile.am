@@ -27,7 +27,8 @@ pkglib_LTLIBRARIES = \
   mod_win32evt.la \
   mod_period.la \
   mod_sharedvars.la \
-  mod_timeout.la
+  mod_timeout.la \
+  mod_ruletrace.la
 
 if ENABLE_HTMLOUTPUT
 pkglib_LTLIBRARIES += mod_htmlstate.la
@@ -184,6 +185,9 @@ mod_sharedvars_la_LDFLAGS = -module -avoid-version
 
 mod_timeout_la_SOURCES = mod_timeout.c
 mod_timeout_la_LDFLAGS = -module -avoid-version
+
+mod_ruletrace_la_SOURCES = mod_ruletrace.c
+mod_ruletrace_la_LDFLAGS = -module -avoid-version
 
 
 # End-of-file

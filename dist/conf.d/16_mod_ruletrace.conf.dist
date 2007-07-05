@@ -1,0 +1,6 @@
+<module ruletrace>
+  OutputDirectory    @@VARDIR@@/orchids/ruletrace
+  FilePrefix         ruletrace-
+  RuleLimit          1000
+  StateLimit         1000
+</module>
