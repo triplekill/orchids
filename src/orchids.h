@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Wed Jun 27 22:10:28 2007
+ ** @date Last update: Thu Jul  5 13:27:34 2007
  **/
 
 /*
@@ -819,6 +819,25 @@ struct mod_entry_s
 };
 
 
+/**
+ ** @typedef hook_cb_t
+ **   Hook callback function type.
+ **/
+typedef int (*hook_cb_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
+
+
+/**
+ ** @struct rtaction_s
+ **   Real time action structure, element used in the
+ **   wait queue orchids_s::rtactionlist.
+ **/
+typedef struct hook_list_elmt_s hook_list_elmt_t;
+struct hook_list_elmt_s {
+  hook_cb_t cb;
+  mod_entry_t *mod;
+  void *data;
+  SLIST_ENTRY(hook_list_elmt_t) hooklist;
+};
 
 
 /**
@@ -1043,6 +1062,8 @@ struct orchids_s
 
   char *modules_dir;
   char *lockfile;
+
+  SLIST_HEAD(postevthooklist, hook_list_elmt_t) post_evt_hook_list;
 };
 
 

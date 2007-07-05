@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Thu May 17 16:59:36 2007
+ ** @date Last update: Thu Jul  5 13:32:03 2007
  **/
 
 /*
@@ -283,6 +283,34 @@ register_conditional_dissector(orchids_t *ctx,
 }
 
 void
+register_post_inject_hook(orchids_t *ctx,
+                          mod_entry_t *mod,
+                          hook_cb_t cb,
+                          void *data)
+{
+  hook_list_elmt_t *e;
+
+  DebugLog(DF_CORE, DS_INFO, "register post event injection hook...\n");
+
+  e = Xzmalloc( sizeof (hook_list_elmt_t) );
+  e->cb = cb;
+  e->mod = mod;
+  e->data = data;
+
+  SLIST_INSERT_HEAD(&ctx->post_evt_hook_list, e, hooklist);
+}
+
+void
+execute_post_inject_hooks(orchids_t *ctx)
+{
+  hook_list_elmt_t *e;
+
+  SLIST_FOREACH(e, &ctx->post_evt_hook_list, hooklist) {
+    e->cb(ctx, e->mod, e->data);
+  }
+}
+
+void
 register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
 {
   int i;
@@ -427,6 +455,8 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
     DebugLog(DF_CORE, DS_TRACE, "--> Injection into analysis engine -->\n");
     inject_event(ctx, event);
   }
+
+  execute_post_inject_hooks(ctx);
 }
 
 #ifndef ORCHIDS_DEMO
