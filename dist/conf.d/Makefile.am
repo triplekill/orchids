@@ -15,7 +15,7 @@ EXTRA_DIST =                  \
   12_mod_generic.conf.dist    \
   13_mod_pcap.conf.dist       \
   14_mod_wifi.conf.dist       \
-  15_mod_sharedvars.dist
+  15_mod_sharedvars.conf.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
