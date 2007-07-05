@@ -32,6 +32,7 @@ LoadModule period
 LoadModule pcap
 LoadModule wifi
 LoadModule timeout
+LoadModule sharedvars
 
 # Deprecated: Polled inputs now use real-time scheduler
 # PollPeriod is now set in module configuration.
