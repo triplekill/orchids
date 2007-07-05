@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Mar 30 09:17:11 2007
+ ** @date Last update: Thu Jul  5 12:53:45 2007
  **/
 
 /*
@@ -462,7 +462,7 @@ inject_event(orchids_t *ctx, event_t *event)
 
     /* thread ripper (and rule instance if apply) */
     if ( THREAD_IS_KILLED(t) ) {
-      gettimeofday(&ctx->last_ruleinst_act, NULL);
+      ctx->last_ruleinst_act = ctx->cur_loop_time;
       DebugLog(DF_ENG, DS_DEBUG, "Rip and overide killed thread (%p)\n", t);
       t->state_instance->rule_instance->threads--;
       ctx->threads--;
@@ -499,7 +499,7 @@ inject_event(orchids_t *ctx, event_t *event)
       t->pass++;
       passed_threads++;
 
-      gettimeofday(&ctx->last_ruleinst_act, NULL);
+      ctx->last_ruleinst_act = ctx->cur_loop_time;
       t->state_instance->rule_instance->new_last_act = ctx->last_ruleinst_act;
 
       if ( THREAD_IS_ONLYONCE(t) ) {
@@ -645,7 +645,7 @@ inject_event(orchids_t *ctx, event_t *event)
     Xfree(active_event);
   }
   else {
-    gettimeofday(&ctx->last_evt_act, NULL);
+    ctx->last_evt_act = ctx->cur_loop_time;
     DebugLog(DF_ENG, DS_DEBUG,
              "Keep new event: active_event->refs = %i (linking) %i\n",
              active_event->refs, passed_threads);
@@ -829,7 +829,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
 
       /* unreferenced active events are freed in inject_event() */
       if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
-        gettimeofday(&ctx->last_evt_act, NULL);
+        ctx->last_evt_act = ctx->cur_loop_time;
         DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
         free_event(si->event->event);
         si->event->event = NULL;
