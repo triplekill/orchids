@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Thu Jul  5 12:53:45 2007
+ ** @date Last update: Thu Jul  5 14:53:49 2007
  **/
 
 /*
@@ -667,6 +667,7 @@ inject_event(orchids_t *ctx, event_t *event)
     dmalloc_log_changed(dmalloc_orchids, 1, 1, 1);
 #endif
 
+    execute_post_inject_hooks(ctx);
 }
 
 

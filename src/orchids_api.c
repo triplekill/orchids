@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Thu Jul  5 13:32:03 2007
+ ** @date Last update: Thu Jul  5 14:54:13 2007
  **/
 
 /*
@@ -38,6 +38,7 @@
 
 #include "orchids.h"
 #include "orchids_defaults.h"
+
 
 int
 lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len)
@@ -455,8 +456,6 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
     DebugLog(DF_CORE, DS_TRACE, "--> Injection into analysis engine -->\n");
     inject_event(ctx, event);
   }
-
-  execute_post_inject_hooks(ctx);
 }
 
 #ifndef ORCHIDS_DEMO

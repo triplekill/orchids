@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Thu Jul  5 13:27:34 2007
+ ** @date Last update: Thu Jul  5 14:54:44 2007
  **/
 
 /*
@@ -1366,6 +1366,22 @@ register_dissector(orchids_t *ctx,
                    char *parent_modname,
                    dissect_t dissect,
                    void *data);
+
+/**
+ ** Register a new callback in the post-inject-event hook.
+ **/
+void
+register_post_inject_hook(orchids_t *ctx,
+                          mod_entry_t *mod,
+                          hook_cb_t cb,
+                          void *data);
+
+/**
+ ** Execute all registered callbacks in the post-inject-event hook.
+ **/
+void
+execute_post_inject_hooks(orchids_t *ctx);
+
 
 /**
  ** Print the Orchids application statistics to a stdio stream.
