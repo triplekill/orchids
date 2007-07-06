@@ -1,6 +1,10 @@
+#
+# Configuration for the wifi module
+#
+
 <module wifi>
 
-# Uncomment the following line to activate wifi frame capture
-# AddDevice wlan0
+  # Uncomment the following line to activate wifi frame capture
+  # AddDevice wlan0
 
 </module>

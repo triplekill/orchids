@@ -1,7 +1,17 @@
-# UDP consoles
+#
+# Configuration for UDP consoles
+#
+
 <module consoles>
+
+  # Define consoles
+  # 1st param is the console name
+  # 2nd param is the hostname
+  # 3rd parameter is the udp port
+
   AddConsole alert   localhost 42000
   AddConsole warning localhost 42001
   AddConsole info    localhost 42002
   AddConsole msg     localhost 42003
+
 </module>

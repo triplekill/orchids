@@ -1,4 +1,12 @@
-# sockunix module
+#
+# Configuration file for the sockunix module
+#
+
 #<module sockunix>
+#
+#  # Adds a PF_UNIX (local) DGRAM Socket to listen realtime message.
+#  # Defining a socket to /dev/log receive messages directly from the syslog socket.
+#  # Note that enabling this will bypass the real syskig.
 #  AddUnixSocket /dev/log
+#
 #</module>

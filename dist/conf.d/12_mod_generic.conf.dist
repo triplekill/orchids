@@ -1,4 +1,7 @@
-# generic module
+#
+# Configuration for the generic programmable module
+#
+
 <module generic>
 
   <hook syslog "sshd">

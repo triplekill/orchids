@@ -1,3 +1,10 @@
+#
+# Configuration file for the sharedvars module.
+#
+
 <module sharedvars>
+
+  # This is the size of the hash, in number of entries.
   HashSize 262144
+
 </module>

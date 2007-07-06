@@ -1,4 +1,10 @@
-# remote admin module
+#
+# Configuration for the remote admin module
+#
+
 <module remoteadm>
+
+  # This is the tcp port to listen incoming connection.
   ListenPort 4242
+
 </module>

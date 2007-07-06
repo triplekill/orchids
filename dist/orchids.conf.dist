@@ -7,12 +7,22 @@
 # ORCHIDS Configuration file
 #
 
+# Set a virtual memory limit.  This avoid memory explosion
+# when testing/writing new rules.
 # For starting, 128 MB should be enough
+
 MaxMemorySize 134217728
+
+
+# Set the module directory.  This is the place where
+# module binary files will be loaded.
 
 SetModuleDir @@LIBDIR@@/orchids
 
-# ORCHIDS Global parameters
+
+# Module section.
+# This is the place where modules are loaded.
+
 LoadModule htmlstate
 LoadModule remoteadm
 LoadModule textfile
@@ -35,30 +45,43 @@ LoadModule timeout
 LoadModule sharedvars
 LoadModule ruletrace
 
-# Deprecated: Polled inputs now use real-time scheduler
-# PollPeriod is now set in module configuration.
-# PollPeriod 15
+# Define the preprocessor command for rule files.
 
 SetPreprocessorCmd cpp
 
-Include @@ETCDIR@@/orchids/orchids-rules.conf
+
+# This directive is deprecated and should be moved
+# in the htmlstate module section.
+# This is the place where html pages will be generated.
 
 HTMLOutputDir @@VARDIR@@/orchids/htmlstate
+
+
+# These directives are deprecated and should be moved in
+# a specific idmef module.
 
 IDMEFdtd              @@VARDIR@@/orchids/xml/idmef-message.dtd
 IDMEFAnalyzerId       orchids-idmef
 IDMEFAnalyzerLocation orchids-analyzer
 IDMEFSensorHostname   orchids-sensor
 
+# This is the runtime user id in which Orchids will drop root provoleges.
+
 RuntimeUser @@RUNUSER@@
+
+
+# Configure reports generation paremeters.
 
 ReportDir     @@VARDIR@@/orchids/reports
 ReportPrefix  report-
 ReportExt     .rpt
 
 
-#
-# Include other configurations files...
-#
+# Include module specific configurations files...
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
+
+
+# Include the rule rule definition file.
+
+Include @@ETCDIR@@/orchids/orchids-rules.conf

@@ -1,5 +1,19 @@
-# netfilter module
+#
+# Configuration file for the Net-Filter module
+#
+
 <module netfilter>
-  AddUdpSource 6363
+
+  # The module can hook the mod_udp module
+  # for parsing raw netfilter logs recieved by UDP
+  # AddUdpSource 6363
+
+  # The module can also unconditionnaly hook modules.
+  # In this case, this is a wrapper module, dissected
+  # via the generic module.  The reason of this mechanism is
+  # that netfilter logs are reported via syslog as kernel message.
+  # To differenciate these messages from other kernel message, a prefix
+  # is added with the command iptables --log-prefix "fw:" in each log rule.
   AddHook nfhub
+
 </module>

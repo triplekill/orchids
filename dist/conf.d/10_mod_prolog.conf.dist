@@ -3,5 +3,8 @@
 #
 
 <module prolog>
+
+  # Add prolog file acting as the Orchids Prolog library
   Consult orchids.pl
+
 </module>

@@ -1,10 +1,15 @@
 #
-# textfile input module config
-#
+# Configuration file for textfile input module
+
 #<module textfile>
-#  ReOpenSafetyChecks = true
-#  ReOpenIntegrityChecks = crc32
+#
+#  # Set the polling period, for checking for new data.
 #  PollPeriod 15
+#
+#  # Text files to read data from.
 #  AddInputFile /var/log/messages
+#
+#  # The default behaviour is to proceed all data in files, at startup.
 #  ProceedAll 1
+#
 #</module>

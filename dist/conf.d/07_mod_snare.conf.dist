@@ -1,5 +1,13 @@
-# snare module
+#
+# Configuration for the snare module.
+#
+
 <module snare>
+
+  # This is the port number where snare text log files are recieved.
   AddUdpSource 6161
+
+  # The snare module can also read text log files via the mod_textfile.
   AddTextfileSource /var/log/snare.log
+
 </module>
