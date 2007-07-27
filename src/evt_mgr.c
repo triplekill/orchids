@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
- ** @date Last update: Fri Mar 30 09:18:25 2007
+ ** @date Last update: Fri Jul 27 15:44:34 2007
  **/
 
 /*
@@ -28,17 +28,12 @@
 
 #include "orchids.h"
 
-#ifdef ENABLE_ACTMON
-static void monitor_activity(void);
-# define Monitor_Activity() monitor_activity()
-#else
-# define Monitor_Activity()
-#endif /* ACTMON */
+#include "evt_mgr.h"
+#include "evt_mgr_priv.h"
 
 #ifdef DMALLOC
 unsigned long dmalloc_orchids;
 #endif
-
 
 
 rtaction_t *
@@ -56,6 +51,7 @@ register_rtcallback(orchids_t *ctx, rtaction_cb_t cb, void *data, time_t delay)
 
   return (event);
 }
+
 
 void
 register_rtaction(orchids_t *ctx, rtaction_t *e)

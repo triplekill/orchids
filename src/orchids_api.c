@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Thu Jul  5 14:54:13 2007
+ ** @date Last update: Fri Jul 27 15:50:09 2007
  **/
 
 /*
@@ -39,6 +39,7 @@
 #include "orchids.h"
 #include "orchids_defaults.h"
 
+#include "engine.h"
 
 int
 lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len)

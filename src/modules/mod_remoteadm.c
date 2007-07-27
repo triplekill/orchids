@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Wed Jun 27 22:11:45 2007
+ ** @date Last update: Fri Jul 27 16:48:55 2007
  **/
 
 /*
@@ -31,6 +31,9 @@
 #include <netdb.h>
 
 #include "orchids.h"
+
+#include "engine.h"
+#include "graph_output.h"
 
 #define RADM_BANNER \
 " _    _____   __         ___         _    _    _\n" \

@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Thu Apr  5 16:10:40 2007
+ ** @date Last update: Fri Jul 27 15:49:57 2007
  **/
 
 /*
@@ -36,13 +36,11 @@
 
 #include "orchids.h"
 
-static void parse_cmdline(orchids_t *ctx, int argc, char **argv);
-static void orchids_usage(char *prg);
-/* static void register_builtin_modules(orchids_t *ctx); */
+#include "main_priv.h"
 
-void sig_chld(int signo);
+#include "evt_mgr.h"
 
-void
+static void
 sig_chld(int signo)
 {
   while ( waitpid(-1, NULL, WNOHANG) > 0 )
@@ -226,7 +224,7 @@ orchids_usage(char *prg)
 }
 
 
-void
+static void
 daemonize(const char *stdout_file, const char *stderr_file)
 {
   pid_t pid;

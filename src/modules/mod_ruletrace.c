@@ -7,14 +7,12 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Thu Jul  5 16:22:10 2007
+ ** @date Last update: Fri Jul 27 16:49:20 2007
  **/
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
-
-#include "orchids.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,8 +22,11 @@
 #include <string.h>
 #include <errno.h>
 
+#include "orchids.h"
+
 #include "safelib.h"
 #include "strhash.h"
+#include "graph_output.h"
 
 /*
   File naming scheme:

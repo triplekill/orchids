@@ -2,13 +2,15 @@ SUBDIRS = modules
 bin_PROGRAMS = orchids
 orchids_SOURCES = \
         orchids.h orchids_defaults.h orchids_types.h \
-        main.c mod_mgr.c orchids_api.c evt_mgr.c \
-	engine.c \
+        main.c main_priv.h \
+        oevt_mgr.c evt_mgr.h evt_mgr_priv.h \
+        mod_mgr.c orchids_api.c \
+	engine.c engine.h engine_priv.h \
         rule_compiler.c rule_compiler.h \
 	orchids_cfg.c \
-        lang.c lang.h \
+        lang.c lang.h lang_priv.h \
         ovm.c ovm.h ovm_private.h \
-        graph_output.c \
+        graph_output.c graph_output.h graph_output_priv.h \
 	issdl.yy.c issdl.tab.c issdl.tab.h \
  \
 	util/array.c               util/array.h           \

@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri Jun 15 10:53:53 2007
- ** @date Last update: Fri Jun 15 13:01:43 2007
+ ** @date Last update: Fri Jul 27 15:49:11 2007
  **/
 
 /*
@@ -24,6 +24,8 @@
 #include <string.h>
 
 #include "orchids.h"
+
+#include "evt_mgr.h"
 
 input_module_t mod_timeout;
 

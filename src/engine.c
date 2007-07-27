@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Thu Jul  5 14:53:49 2007
+ ** @date Last update: Fri Jul 27 15:27:47 2007
  **/
 
 /*
@@ -31,25 +31,12 @@
 #include "orchids.h"
 #include "lang.h"
 
+#include "engine.h"
+#include "engine_priv.h"
+
 /* WARNING -- Field list in event_t, and field ids in int array must
    be sorted in decreasing order */
 
-static void
-free_rule_instance(orchids_t *ctx,
-                   rule_instance_t *rule_instance);
-
-static state_instance_t *
-create_state_instance(orchids_t *ctx,
-                      state_t *state,
-                      const state_instance_t *parent);
-
-static state_instance_t *
-create_init_state_instance(orchids_t *ctx,
-                           const rule_t *rule);
-
-static void
-mark_dead_rule(orchids_t *ctx,
-               rule_instance_t *rule);
 
 /* need to sort threads by rule instance */
 static void
@@ -125,7 +112,7 @@ rip_dead_rule(orchids_t *ctx, rule_instance_t *rule)
  * @param ctx  Orchids context.
  * @param state  Current state instance.
  **/
-int
+static int
 sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
 {
   int i;

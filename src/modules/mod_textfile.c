@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Tue Nov 29 10:55:13 2005
+ ** @date Last update: Fri Jul 27 15:48:50 2007
  **/
 
 /*
@@ -28,6 +28,8 @@
 #include <limits.h>
 
 #include "orchids.h"
+
+#include "evt_mgr.h"
 
 #define TF_FIELDS  3
 #define F_LINE_NUM 0

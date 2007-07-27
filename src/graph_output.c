@@ -8,7 +8,7 @@
  ** @ingroup output
  **
  ** @date  Started on: Fri May 23 12:18:40 2003
- ** @date Last update: Wed Jun 27 22:10:16 2007
+ ** @date Last update: Fri Jul 27 15:58:21 2007
  **/
 
 /*
@@ -24,21 +24,10 @@
 
 #include "orchids.h"
 
-static void fprintf_state_instance_dot(FILE *fp,
-                                       state_instance_t *state,
-                                       int options,
-                                       int limit);
-static void fprintf_state_instance_dot_sub(FILE *fp,
-                                       state_instance_t *state,
-                                       int options,
-                                       int *limit);
+#include "graph_output.h"
+#include "graph_output_priv.h"
 
-/**
- * Display a rule definition in the GraphViz dot format.
- *
- * @param fp Output stream.
- * @param rule Rule to display.
- **/
+
 void
 fprintf_rule_dot(FILE *fp, rule_t *rule)
 {
@@ -66,13 +55,7 @@ fprintf_rule_dot(FILE *fp, rule_t *rule)
   fprintf(fp, "}\n");
 }
 
-/**
- * Recursive function for displaying rule instance path tree.
- *
- * @param fp Output stream.
- * @param state State instance to display.
- * @param options Option flag for output.
- **/
+
 static void
 fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options, int limit)
 {
@@ -80,14 +63,6 @@ fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options, int l
 }
 
 
-/**
- * Recursive function for displaying rule instance path tree.
- *
- * @param fp Output stream.
- * @param state State instance to display.
- * @param options Option flag for output.
- * @param limit A pointer to the maximum number of printed states.
- **/
 static void
 fprintf_state_instance_dot_sub(FILE *fp, state_instance_t *state, int options, int *limit)
 {
@@ -114,15 +89,7 @@ fprintf_state_instance_dot_sub(FILE *fp, state_instance_t *state, int options, i
     fprintf_state_instance_dot_sub(fp, state->next_sibling, options, limit);
 }
 
-/**
- * Display a rule instance path tree in the GraphViz dot format.
- *
- * @param fp Output stream.
- * @param rule Rule instance to display.
- * @param options Options flags for output.
- * @param tq Current thread queue.
- * option #DOT_RETRIGLIST: draw retrig list (in dotted links).
- **/
+
 void
 fprintf_rule_instance_dot(FILE *fp,
                           rule_instance_t *rule,
@@ -158,6 +125,7 @@ fprintf_rule_instance_dot(FILE *fp,
 
   fprintf(fp, "}\n");
 }
+
 
 /*
 ** default config header

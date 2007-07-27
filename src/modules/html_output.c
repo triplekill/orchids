@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Fri Jun 29 14:14:58 2007
+ ** @date Last update: Fri Jul 27 16:49:44 2007
  **/
 
 /*
@@ -40,6 +40,9 @@
 #endif /* linux */
 
 #include "orchids.h"
+
+#include "evt_mgr.h"
+#include "graph_output.h"
 
 #define HTMLSTATE_LNK_DOT         (1 << 0)
 #define HTMLSTATE_LNK_EPS         (1 << 1)

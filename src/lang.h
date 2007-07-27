@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Fri Jun 15 10:03:27 2007
+ ** @date Last update: Fri Jul 27 16:47:31 2007
  **/
 
 /*
@@ -24,8 +24,9 @@
 
 #include <regex.h>
 
-
 #include "hash.h"
+
+#include "orchids.h"
 
 /* Minimal natives types */
 #define T_NULL        0
@@ -120,6 +121,10 @@
 #define    SNMPOID(var)  (((ovm_snmpoid_t *)(var))->objoid)
 #define      FLOAT(var)    (((ovm_float_t *)(var))->val)
 #define     DOUBLE(var)   (((ovm_double_t *)(var))->val)
+
+
+
+
 
 
 /**
@@ -791,6 +796,10 @@ ovm_snmpoid_new(size_t len);
 
 char *
 ovm_strdup(ovm_var_t *str);
+
+/* --- */
+
+
 
 
 #endif /* LANG_H */

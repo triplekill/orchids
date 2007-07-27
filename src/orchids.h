@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Thu Jul  5 14:54:44 2007
+ ** @date Last update: Fri Jul 27 16:48:10 2007
  **/
 
 /*
@@ -1619,31 +1619,6 @@ fprintf_loaded_modules(orchids_t *ctx, FILE *fp);
 dir_handler_t
 dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir);
 
-/* evt_mgr.c */
-
-/**
- ** Runtime main loop.
- **
- ** @param ctx Orchids context.
- **/
-void
-event_dispatcher_main_loop(orchids_t *ctx);
-
-/**
- ** Register a real-time action.  This scheduled action will be
- ** multiplexed to the real-time event flow.
- **
- ** @param ctx Orchids context.
- ** @param e   Real-time action to register.
- **/
-void
-register_rtaction(orchids_t *ctx, rtaction_t *e);
-
-rtaction_t *
-create_register_rtaction(orchids_t *ctx, rtaction_cb_t cb, time_t delay);
-rtaction_t *
-register_rtcallback(orchids_t *ctx, rtaction_cb_t cb, void *data, time_t delay);
-
 
 
 /* ochids_cfg.c */
@@ -1727,76 +1702,6 @@ get_next_int(const char *istr, long *i, size_t n);
 size_t
 get_next_token(const char *pos, int c, size_t n);
 
-/* engine.c */
-
-/**
- ** Inject an event into the analysis engine.
- ** This is the entry point of the correlator.
- **
- ** @param ctx    Orchids application context.
- ** @param event  The event to inject.
- **/
-void
-inject_event(orchids_t *ctx, event_t *event);
-
-/* int fieldncmp(event_t *event, int *ref, size_t s); */
-/* int refissubset(event_t *event, int *ref, size_t s); */
-/* int refissubsetptr(event_t *event, int *ref); */
-
-int
-sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state);
-
-
-/**
- ** Display all active rule instances on a stream.
- ** Displayed informations are :
- ** rule instance identifier (rid), 
- ** rule name, 
- ** number of actives states, 
- ** max depth of the path tree (dpt) 
- ** and the creation date.
- **
- ** @param fp Output stream.
- ** @param ctx Orchids context.
- **/
-void
-fprintf_rule_instances(FILE *fp, const orchids_t *ctx);
-
-/**
- ** Display a waiting thread queue.
- ** Displayed information are:
- **   the thread identifier (thid),
- **   the rule name,
- **   the state name,
- **   the rule identifier (rid),
- **   the source state and the destination state identifiers (sid->did),
- **   the transition identifier,
- **   the transition counter value,
- **   the bump flag.
- **
- ** @param fp   The output stream.
- ** @param ctx  Orchids application context.
- ** @param q    The waiting thread queue to display.
- **/
-void
-fprintf_thread_queue2(FILE *fp, orchids_t *ctx, queue_t *q);
-
-void
-fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *t);
-
-/**
- ** Display the list of active events.
- ** An event is active when it has passed a transition, at least.
- ** An active event record (active_event_s) may have passed more than
- ** one transition, so we count the number of references. When a rule instance
- ** is free'd, the reference counter is updated, and if it null, we can
- ** destroy the saved event too.
- **
- ** @param fp   The output stream.
- ** @param ctx  Orchids application context.
- **/
-void
-fprintf_active_events(FILE *fp, orchids_t *ctx);
 
 /* rule_compiler.c */
 
@@ -1892,27 +1797,6 @@ fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode);
 void
 fprintf_bytecode_dump(FILE *fp, bytecode_t *code);
 
-/* graph_output.c */
-void
-fprintf_rule_dot(FILE *fp, rule_t *rule);
-
-void
-fprintf_rule_instance_dot(FILE *fp, rule_instance_t *rule, int options, wait_thread_t *tq, int limit);
-
-/* lang.h XXX ?!... */
-issdl_function_t *
-get_issdl_functions(void);
-void
-register_lang_function(orchids_t *ctx,
-                       ovm_func_t func,
-                       const char *name,
-                       int arity,
-                       const char *desc);
-void
-fprintf_issdl_functions(FILE *fp, orchids_t *ctx);
-void
-register_core_functions(orchids_t *ctx);
-
 
 void
 html_output(orchids_t *ctx);
@@ -1987,13 +1871,6 @@ int
 cached_file(const char *path);
 
 
-/*
- * main.c
- */
-void
-daemonize(const char *stdout_file, const char *stderr_file);
-
-
 
 
 
@@ -2019,6 +1896,25 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len);
 #define Un_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLK, F_UNLCK, offset, whence, len)
 
+
+/* lang.h */
+/* XXX: separate structure and prototype definitions and
+   move this in lang files */
+issdl_function_t *
+get_issdl_functions(void);
+
+void
+register_lang_function(orchids_t *ctx,
+                       ovm_func_t func,
+                       const char *name,
+                       int arity,
+                       const char *desc);
+
+void
+fprintf_issdl_functions(FILE *fp, orchids_t *ctx);
+
+void
+register_core_functions(orchids_t *ctx);
 
 
 
