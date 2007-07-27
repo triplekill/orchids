@@ -80,8 +80,9 @@ $(srcdir)/netfilter.tab.c $(srcdir)/netfilter.tab.h: $(srcdir)/netfilter.y
 $(srcdir)/netfilter.yy.c: $(srcdir)/netfilter.l
 	$(LEX) -f -Pnetfilter -o$(srcdir)/netfilter.yy.c $(srcdir)/netfilter.l
 
-mod_period_la_SOURCES = mod_period.c
+mod_period_la_SOURCES = mod_period.c period.c period.h
 mod_period_la_LDFLAGS = -module -avoid-version
+mod_period_la_LIBADD = -lm
 
 if HAVE_LIBPCAP
 mod_pcap_la_SOURCES = mod_pcap.c
