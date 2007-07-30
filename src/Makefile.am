@@ -3,7 +3,7 @@ bin_PROGRAMS = orchids
 orchids_SOURCES = \
         orchids.h orchids_defaults.h orchids_types.h \
         main.c main_priv.h \
-        oevt_mgr.c evt_mgr.h evt_mgr_priv.h \
+        evt_mgr.c evt_mgr.h evt_mgr_priv.h \
         mod_mgr.c orchids_api.c \
 	engine.c engine.h engine_priv.h \
         rule_compiler.c rule_compiler.h \
