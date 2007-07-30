@@ -29,19 +29,6 @@ orchids_SOURCES = \
         util/objhash.c             util/objhash.h         \
         util/timer.h
 
-#  \
-# 	modules/mod_autohtml.c   modules/mod_cisco.c      \
-# 	modules/mod_consoles.c   modules/mod_textfile.c   \
-# 	modules/mod_generic.c    modules/mod_udp.c        \
-# 	modules/mod_netfilter.c  modules/mod_win32evt.c   \
-# 	modules/mod_rawsnare.c   modules/mod_remoteadm.c  \
-# 	modules/mod_snare.c      modules/mod_snmp.c       \
-# 	modules/mod_snmptrap.c   modules/rawsnare.h       \
-# 	modules/mod_sockunix.c   modules/mod_sunbsm.c     \
-# 	modules/mod_syslog.c \
-# 	modules/snare.yy.c modules/snare.tab.c modules/snare.tab.h \
-# 	modules/netfilter.yy.c modules/netfilter.tab.c modules/netfilter.tab.h
-
 orchids_LDADD = -ldl
 orchids_LDFLAGS = -export-dynamic
 AM_CFLAGS= -I$(srcdir)/util
@@ -50,27 +37,9 @@ EXTRA_DIST = issdl.l issdl.y
 
 BUILT_SOURCES = \
 	issdl.yy.c issdl.tab.c issdl.tab.h
-# 	modules/snare.yy.c modules/snare.tab.c modules/snare.tab.h \
-# 	modules/netfilter.yy.c modules/netfilter.tab.c modules/netfilter.tab.h
 
 $(srcdir)/issdl.tab.c $(srcdir)/issdl.tab.h: $(srcdir)/issdl.y
 	$(YACC) -p issdl -d -b issdl -o $(srcdir)/issdl.tab.c $(srcdir)/issdl.y
 
 $(srcdir)/issdl.yy.c: $(srcdir)/issdl.l issdl.tab.h
 	$(LEX) -f -Pissdl -o$(srcdir)/issdl.yy.c $(srcdir)/issdl.l
-
-# $(srcdir)/modules/netfilter.tab.c $(srcdir)/modules/netfilter.tab.h: $(srcdir)/modules/netfilter.y
-# 	if test ! -d "modules" ; then mkdir modules ; fi
-# 	$(YACC) -p netfilter -d -b netfilter -o $(srcdir)/modules/netfilter.tab.c $(srcdir)/modules/netfilter.y
-
-# $(srcdir)/modules/netfilter.yy.c: $(srcdir)/modules/netfilter.l
-# 	if test ! -d "modules" ; then mkdir modules ; fi
-# 	$(LEX) -f -Pnetfilter -o$(srcdir)/modules/netfilter.yy.c $(srcdir)/modules/netfilter.l
-
-# $(srcdir)/modules/snare.tab.c $(srcdir)/modules/snare.tab.h: $(srcdir)/modules/snare.y
-# 	if test ! -d "modules" ; then mkdir modules ; fi
-# 	$(YACC) -p snare -d -b snare -o $(srcdir)/modules/snare.tab.c $(srcdir)/modules/snare.y
-
-# $(srcdir)/modules/snare.yy.c: $(srcdir)/modules/snare.l
-# 	if test ! -d "modules" ; then mkdir modules ; fi
-# 	$(LEX) -f -Psnare -o$(srcdir)/modules/snare.yy.c $(srcdir)/modules/snare.l
