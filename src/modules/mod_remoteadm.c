@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Fri Jul 27 16:48:55 2007
+ ** @date Last update: Mon Jul 30 23:52:09 2007
  **/
 
 /*
@@ -34,6 +34,7 @@
 
 #include "engine.h"
 #include "graph_output.h"
+#include "mod_mgr.h"
 
 #define RADM_BANNER \
 " _    _____   __         ___         _    _    _\n" \

@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Fri Jun  8 16:04:21 2007
+ ** @date Last update: Mon Jul 30 23:38:30 2007
  **/
 
 /*
@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>
+
+#include "mod_mgr.h"
 
 #include "orchids.h"
 

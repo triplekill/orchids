@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:08:11 2003
- ** @date Last update: Fri Jun  8 15:39:12 2007
+ ** @date Last update: Mon Jul 30 23:43:02 2007
  **/
 
 /*
@@ -29,6 +29,7 @@
 
 #include "orchids.h"
 
+#include "mod_mgr.h"
 #include "dlist.h"
 
 input_module_t mod_generic;

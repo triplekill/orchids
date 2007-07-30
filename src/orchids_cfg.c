@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Jun 29 13:07:40 2007
+ ** @date Last update: Mon Jul 30 23:53:01 2007
  **/
 
 /*
@@ -37,6 +37,7 @@
 
 
 #include "safelib.h"
+#include "mod_mgr.h"
 
 #include "orchids.h"
 

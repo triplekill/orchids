@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Jul 27 16:48:10 2007
+ ** @date Last update: Mon Jul 30 23:41:46 2007
  **/
 
 /*
@@ -1494,131 +1494,6 @@ fprintf_fields(FILE *fp, const orchids_t *ctx);
  **/
 void
 fprintf_state_env(FILE *fp, const state_instance_t *state);
-
-
-/* module_manager.c */
-
-/**
- ** Add an input module.
- **
- ** @param ctx  Orchids application context.
- ** @param mod  The information structure of the module to register.
- ** @param dlhandle  The handle returned by dlopen() or NULL if not dynamic.
- **
- ** @return mod_id if module was succefully added, or -1 if an error occurred.
- **/
-int
-add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
-
-/**
- ** Load and register a Dynamic Shared Object (DSO) module.
- **
- ** @param ctx   Orchids application context.
- ** @param name  The module name to load.
- **
- ** @return A pointer to the information structure of the module, or
- **   NULL if an erro occurs.
- **/
-input_module_t *
-load_add_shared_module(orchids_t *ctx, const char *name);
-
-/**
- ** Load, register and add a Dynamic Shared Object (DSO) module.
- **
- ** @param ctx   Orchids application context.
- ** @param name  The module name to load.
- **
- ** @return A pointer to the information structure of the module, or
- **   NULL if an erro occurs.
- **/
-/* input_module_t * */
-/* load_add_module(orchids_t *ctx, const char *name); */
-
-/**
- ** Remove a module.
- **
- ** @param ctx  Orchids application context.
- ** @param name The module name to remove.
- **
- ** @return 0 if module was succefully removed, or -1 if an error occurred.
- **/
-int
-remove_module(orchids_t *ctx, char *name);
-
-/**
- ** Find a module given its name.
- **
- ** @param ctx   Orchids context.
- ** @param name  Module name to find.
- **
- ** @return      A pointer to a input_module_s structure, or NULL if the module
- **              was not found.
- **/
-input_module_t *
-find_module(orchids_t *ctx, const char *name);
-
-/**
- ** Find a module id given its name.
- **
- ** @param ctx   Orchids context.
- ** @param name  Module name to find.
- **
- ** @return      The identifier number.
- **/
-int
-find_module_id(orchids_t *ctx, const char *name);
-
-/**
- ** Find a module entry given its name.
- **
- ** @param ctx   Orchids context.
- ** @param name  Module name to find.
- **
- ** @return      The module entry.
- **/
-mod_entry_t *
-find_module_entry(orchids_t *ctx, const char *name);
-
-
-/**
- ** Try to call a module function, if the module is loaded and if the
- ** function is found.
- **
- ** @param ctx      Orchids context.
- ** @param modname  Module name to find.
- ** @param funcname Function name to find.
- ** @param funcparams Arbitrary parameters passed to the called function.
- **
- ** @return      An error code.
- **/
-int
-call_mod_func(orchids_t *ctx,
-              const char *modname,
-              const char *funcname,
-              void *funcparams);
-
-
-/**
- ** Display loaded modules on a stream.
- **
- ** @param ctx  Orchids application context.
- ** @param fp   The output stream.
- **/
-void
-fprintf_loaded_modules(orchids_t *ctx, FILE *fp);
-
-/**
- ** Look for a directive handler, given its name.
- ** 
- ** @param ctx  Orchids application context.
- ** @param mod  Input module information structure.
- ** @param dir  The directive name to resolve.
- **
- ** @return A function pointer of the resolved directive handler.
- **/
-dir_handler_t
-dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir);
-
 
 
 /* ochids_cfg.c */
