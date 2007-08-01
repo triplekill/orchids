@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb 14 18:36:36 2003
- ** @date Last update: Tue Nov 29 11:12:58 2005
+ ** @date Last update: Tue Jul 31 23:35:36 2007
  **/
 
 /*
@@ -29,6 +29,8 @@
 #include <arpa/inet.h>
 
 #include "orchids.h"
+#include "orchids_api.h"
+
 #include "rawsnare.h"
 
 #define RAWSNARE_FIELDS 35

@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Tue Nov 29 11:12:02 2005
+ ** @date Last update: Tue Jul 31 23:33:33 2007
  **/
 
 /*
@@ -28,6 +28,8 @@
 #include <limits.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 input_module_t mod_autohtml;
 

@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Nov 29 11:12:08 2005
+ ** @date Last update: Tue Jul 31 23:33:50 2007
  **/
 
 /*
@@ -23,6 +23,8 @@
 #include <stdio.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 input_module_t mod_cisco;
 

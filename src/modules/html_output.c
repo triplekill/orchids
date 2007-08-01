@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Fri Jul 27 16:49:44 2007
+ ** @date Last update: Tue Jul 31 23:39:32 2007
  **/
 
 /*
@@ -43,6 +43,7 @@
 
 #include "evt_mgr.h"
 #include "graph_output.h"
+#include "orchids_api.h"
 
 #define HTMLSTATE_LNK_DOT         (1 << 0)
 #define HTMLSTATE_LNK_EPS         (1 << 1)
@@ -1511,8 +1512,6 @@ generate_html_menu(orchids_t *ctx)
 
   Xfclose(fp);
 }
-
-
 
 
 static void

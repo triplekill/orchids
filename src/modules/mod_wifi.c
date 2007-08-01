@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Thu Jun 22 00:00:00 2006
- ** @date Last update: Tue Jun  5 08:23:49 2007
+ ** @date Last update: Tue Jul 31 23:40:29 2007
  **/
 
 
@@ -28,10 +28,14 @@
 #include <arpa/inet.h>
 
 #include <pcap.h>
+
+#include "orchids.h"
+
+#include "orchids_api.h"
+
 #include "compat.h"
 #include "mod_wifi.h"
 
-#include "orchids.h"
 
 #define IEEE80211_FIELDS 13
 #define F_TYPE            0

@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 16:56:40 2003
- ** @date Last update: Tue Nov 29 11:13:19 2005
+ ** @date Last update: Tue Jul 31 23:36:37 2007
  **/
 
 /*
@@ -33,6 +33,8 @@
 #include <errno.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 #define SOCKUNIX_FIELDS 4
 #define F_EVENT    0

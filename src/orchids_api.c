@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Fri Jul 27 15:50:09 2007
+ ** @date Last update: Tue Jul 31 23:46:34 2007
  **/
 
 /*
@@ -40,6 +40,9 @@
 #include "orchids_defaults.h"
 
 #include "engine.h"
+#include "mod_mgr.h"
+
+#include "orchids_api.h"
 
 int
 lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len)
@@ -53,6 +56,7 @@ lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len)
 
   return ( fcntl(fd, cmd, &lock) );
 }
+
 
 pid_t
 lock_test(int fd, int type, off_t offset, int whence, off_t len)
@@ -75,6 +79,7 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len)
   return (lock.l_pid);
 }
 
+
 void
 orchids_lock(const char *lockfile)
 {
@@ -86,14 +91,17 @@ orchids_lock(const char *lockfile)
 
   pid = lock_test(fd, F_WRLCK, 0, SEEK_SET, 0);
   if (pid) {
-    fprintf(stderr, "An Orchids process (pid=%i) already running... Exiting\n", pid);
+    fprintf(stderr,
+            "An Orchids process (pid=%i) already running... Exiting\n",
+            pid);
     exit(EXIT_FAILURE);
   }
 
   ret = Write_lock(fd, 0, SEEK_SET, 0);
   if (ret) {
     if (errno == EACCES || errno == EAGAIN) {
-      fprintf(stderr, "Another Orchids process already running (race condition).\n");
+      fprintf(stderr,
+              "Another Orchids process already running (race condition).\n");
       perror("fcntl()");
       exit(EXIT_FAILURE);
     }
@@ -103,6 +111,7 @@ orchids_lock(const char *lockfile)
     }
   }
 }
+
 
 orchids_t *
 new_orchids_context(void)
@@ -144,6 +153,7 @@ new_orchids_context(void)
   return (ctx);
 }
 
+
 void
 add_polled_input_callback(orchids_t *ctx,
                           mod_entry_t *mod,
@@ -159,6 +169,7 @@ add_polled_input_callback(orchids_t *ctx,
   pi->next = ctx->poll_handler_list;
   ctx->poll_handler_list = pi;
 }
+
 
 void
 del_input_descriptor(orchids_t *ctx, int fd)
@@ -180,6 +191,7 @@ del_input_descriptor(orchids_t *ctx, int fd)
     prev = rti;
   }
 }
+
 
 void
 add_input_descriptor(orchids_t *ctx, 
@@ -207,6 +219,7 @@ add_input_descriptor(orchids_t *ctx,
     ctx->maxfd = fd;
   FD_SET(fd, &ctx->fds);
 }
+
 
 void
 register_dissector(orchids_t *ctx,
@@ -241,6 +254,7 @@ register_dissector(orchids_t *ctx,
   parent_mod->dissect_mod = mod;
   parent_mod->data = data;
 }
+
 
 void
 register_conditional_dissector(orchids_t *ctx,
@@ -284,6 +298,7 @@ register_conditional_dissector(orchids_t *ctx,
   hash_add(parent_mod->sub_dissectors, cond_dissect, key, keylen);
 }
 
+
 void
 register_post_inject_hook(orchids_t *ctx,
                           mod_entry_t *mod,
@@ -302,6 +317,7 @@ register_post_inject_hook(orchids_t *ctx,
   SLIST_INSERT_HEAD(&ctx->post_evt_hook_list, e, hooklist);
 }
 
+
 void
 execute_post_inject_hooks(orchids_t *ctx)
 {
@@ -311,6 +327,7 @@ execute_post_inject_hooks(orchids_t *ctx)
     e->cb(ctx, e->mod, e->data);
   }
 }
+
 
 void
 register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
@@ -323,10 +340,15 @@ register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
 
   /* 1 - Allocate some memory in global field list */
   /* Is it the first allocation ?? */
-  if (ctx->global_fields == NULL)
-    ctx->global_fields = Xmalloc(sz * sizeof(field_record_t));
-  else
-    ctx->global_fields = Xrealloc(ctx->global_fields, (ctx->num_fields + sz) * sizeof (field_record_t));
+  if (ctx->global_fields == NULL) {
+    ctx->global_fields =
+      Xmalloc(sz * sizeof(field_record_t));
+  }
+  else {
+    ctx->global_fields =
+      Xrealloc(ctx->global_fields,
+               (ctx->num_fields + sz) * sizeof (field_record_t));
+  }
 
   /* 2 - index of first module field in global array
   ** (need an offset, because ptr should be relocated by realloc() ) */
@@ -345,6 +367,7 @@ register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
   ctx->num_fields += sz;
 }
 
+
 void
 free_fields(ovm_var_t **tbl_event, size_t s)
 {
@@ -354,6 +377,7 @@ free_fields(ovm_var_t **tbl_event, size_t s)
     if ((tbl_event[i] != NULL) && (tbl_event[i] != F_NOT_NEEDED))
       Xfree(tbl_event[i]);
 }
+
 
 void
 add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
@@ -389,15 +413,25 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
 {
   fprintf(fp, "-------------------------[ event id: %p ]------------------\n",
 	  (void *) event);
-  fprintf(fp, " fid |         attribute        |         value\n");
-  fprintf(fp, "-----+--------------------------+---------------------------------\n");
+  fprintf(fp,
+          " fid |"
+          "         attribute        |"
+          "         value\n");
+  fprintf(fp,
+          "-----+"
+          "--------------------------+"
+          "---------------------------------\n");
   for ( ; event; event = event->next) {
     fprintf(fp, "%4i | %-24s | ",
             event->field_id, ctx->global_fields[ event->field_id ].name);
     fprintf_issdl_val(fp, event->value);
   }
-  fprintf(fp, "-----+--------------------------+---------------------------------\n");
+  fprintf(fp,
+          "-----+"
+          "--------------------------+"
+          "---------------------------------\n");
 }
+
 
 void
 free_event(event_t *event)
@@ -411,6 +445,7 @@ free_event(event_t *event)
     event = e;
   }
 }
+
 
 void
 post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
@@ -442,7 +477,10 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
                             issdl_get_data_len(event->next->value));
     if (cond_dissect) {
       DebugLog(DF_CORE, DS_DEBUG, "call found conditional subdissector.\n");
-      ret = cond_dissect->dissect(ctx, cond_dissect->mod, event, cond_dissect->data);
+      ret = cond_dissect->dissect(ctx,
+                                  cond_dissect->mod,
+                                  event,
+                                  cond_dissect->data);
       /* Free and optionally inject event if sub-dissector fail */
       if (ret) {
         DebugLog(DF_CORE, DS_WARN, "dissection failed.\n");
@@ -477,13 +515,21 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   gettimeofday(&curr_time, NULL);
   getrusage(RUSAGE_SELF, &ru);
 
-  fprintf(fp, "-----------------------------[ orchids statistics ]-------------------------\n");
-  fprintf(fp, "           property |  value\n");
-  fprintf(fp, "--------------------+-------------------------------------------------------\n");
+  fprintf(fp,
+          "-----------------------------[ "
+          "orchids statistics"
+          " ]-------------------------\n");
+  fprintf(fp,
+          "           property |"
+          "  value\n");
+  fprintf(fp,
+          "--------------------+"
+          "-------------------------------------------------------\n");
   Xuname(&un);
   fprintf(fp, "             System : %s %s %s %s\n",
           un.sysname, un.nodename, un.release, un.machine);
-  snprintf_uptime(uptime_buf, sizeof (uptime_buf), curr_time.tv_sec - ctx->start_time.tv_sec);
+  snprintf_uptime(uptime_buf, sizeof (uptime_buf),
+                  curr_time.tv_sec - ctx->start_time.tv_sec);
   fprintf(fp, "        Real uptime : %lis (%s)\n",
           curr_time.tv_sec - ctx->start_time.tv_sec,
           uptime_buf);
@@ -521,10 +567,15 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 
 
 #ifdef linux
-  fprintf(fp, "- - - - - - - - - - + - - - - -[ linux specific ]- - - - - - - - - - - - - -\n");
+  fprintf(fp,
+          "- - - - - - - - - - + - - - - -[ "
+          "linux specific"
+          " ]- - - - - - - - - - - - - -\n");
   get_linux_process_info(&pinfo, getpid());
   fprintf_linux_process_summary(fp, &pinfo);
-  fprintf(fp, "- - - - - - - - - - + - - - - - - - - - - - - - - - - - - - - - - - - - - - \n");
+  fprintf(fp,
+          "- - - - - - - - - - +"
+          " - - - - - - - - - - - - - - - - - - - - - - - - - - - \n");
 #endif /* linux */
 
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
@@ -538,7 +589,9 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "     active threads : %u\n", ctx->threads);
   fprintf(fp, "     ovm stack size : %u\n", ctx->ovm_stack->size);
   fprintf(fp, "            reports : %u\n", ctx->reports);
-  fprintf(fp, "--------------------+-------------------------------------------------------\n");
+  fprintf(fp,
+          "--------------------+"
+          "-------------------------------------------------------\n");
 }
 
 #else /* #ifndef ORCHIDS_DEMO */
@@ -560,13 +613,21 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   getrusage(RUSAGE_SELF, &ru);
 
   fprintf(fp, "\n");
-  fprintf(fp, "-----------------------------[ orchids statistics ]-------------------------\n");
-  fprintf(fp, "           property |  value\n");
-  fprintf(fp, "--------------------+-------------------------------------------------------\n");
+  fprintf(fp,
+          "-----------------------------[ "
+          "orchids statistics"
+          " ]-------------------------\n");
+  fprintf(fp,
+          "           property |"
+          "  value\n");
+  fprintf(fp,
+          "--------------------+"
+          "-------------------------------------------------------\n");
   Xuname(&un);
   fprintf(fp, "             System : %s %s %s %s\n",
           un.sysname, un.nodename, un.release, un.machine);
-  snprintf_uptime(uptime_buf, sizeof (uptime_buf), curr_time.tv_sec - ctx->start_time.tv_sec);
+  snprintf_uptime(uptime_buf, sizeof (uptime_buf),
+                  curr_time.tv_sec - ctx->start_time.tv_sec);
   fprintf(fp, "        Real uptime : %lis (%s)\n",
           curr_time.tv_sec - ctx->start_time.tv_sec,
           uptime_buf);
@@ -604,7 +665,10 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 
 
 #ifdef linux
-  fprintf(fp, "- - - - - - - - - - + - - - - -[ linux specific ]- - - - - - - - - - - - - -\n");
+  fprintf(fp,
+          "- - - - - - - - - - + - - - - -[ "
+          "linux specific"
+          " ]- - - - - - - - - - - - - -\n");
   get_linux_process_info(&pinfo, getpid());
   fprintf_linux_process_summary(fp, &pinfo);
   fprintf(fp, "- - - - - - - - - - + - - - - - - - - - - - - - - - - - - - - - - - - - - - \n");
@@ -619,7 +683,9 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "    state instances : %lu\n", ctx->state_instances);
   fprintf(fp, "     active threads : %lu\n", ctx->threads);
   fprintf(fp, "            reports : %lu\n", ctx->reports);
-  fprintf(fp, "--------------------+-------------------------------------------------------\n");
+  fprintf(fp,
+          "--------------------+"
+          "-------------------------------------------------------\n");
 }
 
 #endif /* ORCHIDS_DEMO */
@@ -634,6 +700,7 @@ fprintf_hexdump(FILE *fp, const void *data, size_t n)
   fprintf(stdout, "\n");
 }
 
+
 void
 fprintf_fields(FILE *fp, const orchids_t *ctx)
 {
@@ -642,37 +709,42 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
   int field;
   int gfid;
 
-  fprintf(fp, "---------------------------[ registered fields ]-----------------------\n");
+  fprintf(fp,
+          "---------------------------[ "
+          "registered fields"
+          " ]-----------------------\n");
   fprintf(fp, "gfid|mfid|      field name      | type     | description\n");
   gfid = 0;
-  for (mod = 0; mod < ctx->loaded_modules; ++mod)
-    {
-      fprintf(fp, "----+----+------------[ module %-16s ]-------------------------\n", ctx->mods[mod].mod->name);
-      if (ctx->mods[mod].num_fields)
-	{
-	  for (field = 0; field < ctx->mods[mod].num_fields; ++field)
-	    {
-	      base = ctx->mods[mod].first_field_pos;
-	      fprintf(fp, "%3i | %2i | %-20s | %-8s | %-32s\n",
-		      gfid, field, ctx->global_fields[base + field].name,
-		      str_issdltype(ctx->global_fields[base + field].type),
-		      ctx->global_fields[base + field].desc);
-	      ++gfid;
-	    }
-	}
-      else
-	{
-	  fprintf(fp, " No field.\n");
-	}
+  for (mod = 0; mod < ctx->loaded_modules; mod++) {
+    fprintf(fp,
+            "----+----+------------[ "
+            "module %-16s "
+            "]-------------------------\n",
+            ctx->mods[mod].mod->name);
+    if (ctx->mods[mod].num_fields) {
+      for (field = 0; field < ctx->mods[mod].num_fields; ++field) {
+        base = ctx->mods[mod].first_field_pos;
+        fprintf(fp, "%3i | %2i | %-20s | %-8s | %-32s\n",
+                gfid,
+                field,
+                ctx->global_fields[base + field].name,
+                str_issdltype(ctx->global_fields[base + field].type),
+                ctx->global_fields[base + field].desc);
+        gfid++;
+      }
     }
-  fprintf(fp, "-----+--------------------------+------------------+-------------------\n");
+    else {
+      fprintf(fp, " No field.\n");
+    }
+  }
+  fprintf(fp,
+          "-----+"
+          "--------------------------+"
+          "------------------+"
+          "-------------------\n");
 }
 
-/**
- * Display a state environment.
- * @param fp Output stream.
- * @param state The state instance.
- **/
+
 void
 fprintf_state_env(FILE *fp, const state_instance_t *state)
 {

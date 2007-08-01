@@ -1,6 +1,6 @@
 /**
- ** @file ovm_private.h
- ** Orchids Virtual Machine internal definitions.
+ ** @file ovm_priv.h
+ ** Private definitions for ovm.c.
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** 
@@ -8,7 +8,7 @@
  ** @ingroup ovm
  ** 
  ** @date  Started on: Thu Dec  4 12:06:04 2003
- ** @date Last update: Fri Mar 30 10:25:48 2007
+ ** @date Last update: Tue Jul 31 23:50:32 2007
  **/
 
 /*

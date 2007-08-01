@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Thu Jun  7 17:38:59 2007
+ ** @date Last update: Tue Jul 31 23:38:47 2007
  **/
 
 /*
@@ -28,6 +28,8 @@
 #include <string.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 /*
 typedef unsigned long DWORD;

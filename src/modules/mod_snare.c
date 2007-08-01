@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Thu Feb 13 13:03:07 2003
- ** @date Last update: Tue Nov 29 11:13:05 2005
+ ** @date Last update: Tue Jul 31 23:36:05 2007
  **/
 
 /*
@@ -27,6 +27,8 @@
 /* #include "snare.h" */
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 extern void snareparse_set_str(char *str, size_t s);
 extern void snareparse_set_attrs(ovm_var_t **attr_fields);

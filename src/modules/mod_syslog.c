@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:21:55 2003
- ** @date Last update: Tue Dec  6 17:16:00 2005
+ ** @date Last update: Tue Jul 31 23:37:07 2007
  **/
 
 /*
@@ -25,6 +25,8 @@
 #include <string.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 input_module_t mod_syslog;
 

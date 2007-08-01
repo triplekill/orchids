@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:08:11 2003
- ** @date Last update: Mon Jul 30 23:43:02 2007
+ ** @date Last update: Tue Jul 31 23:34:22 2007
  **/
 
 /*
@@ -29,6 +29,7 @@
 
 #include "orchids.h"
 
+#include "orchids_api.h"
 #include "mod_mgr.h"
 #include "dlist.h"
 

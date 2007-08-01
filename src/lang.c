@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Jul 27 16:50:05 2007
+ ** @date Last update: Tue Jul 31 23:42:40 2007
  **/
 
 /*
@@ -38,6 +38,7 @@
 #include "dlist.h"
 #include "timer.h"
 #include "graph_output.h"
+#include "orchids_api.h"
 
 #include "lang.h"
 #include "lang_priv.h"

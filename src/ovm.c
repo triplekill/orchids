@@ -8,7 +8,7 @@
  ** @ingroup ovm
  **
  ** @date  Started on: Wed Mar 12 12:14:53 2003
- ** @date Last update: Fri Mar 30 10:25:34 2007
+ ** @date Last update: Tue Jul 31 23:50:07 2007
  **/
 
 /*
@@ -27,8 +27,7 @@
 #include "stack.h"
 
 #include "ovm.h"
-
-#include "ovm_private.h"
+#include "ovm_priv.h"
 
 
 int

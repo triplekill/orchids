@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Fri Jul 27 16:49:20 2007
+ ** @date Last update: Tue Jul 31 23:39:16 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -27,6 +27,7 @@
 #include "safelib.h"
 #include "strhash.h"
 #include "graph_output.h"
+#include "orchids_api.h"
 
 /*
   File naming scheme:

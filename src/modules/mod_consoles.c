@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Tue Nov 29 11:12:20 2005
+ ** @date Last update: Tue Jul 31 23:34:06 2007
  **/
 
 /*
@@ -31,6 +31,8 @@
 #include <netdb.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 input_module_t mod_consoles;
 

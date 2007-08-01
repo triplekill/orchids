@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Jul 27 15:27:47 2007
+ ** @date Last update: Tue Jul 31 23:41:57 2007
  **/
 
 /*
@@ -30,6 +30,7 @@
 
 #include "orchids.h"
 #include "lang.h"
+#include "orchids_api.h"
 
 #include "engine.h"
 #include "engine_priv.h"

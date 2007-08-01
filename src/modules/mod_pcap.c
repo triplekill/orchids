@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri May 25 14:29:20 2007
- ** @date Last update: Fri Jun 15 10:31:18 2007
+ ** @date Last update: Tue Jul 31 23:39:44 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -26,6 +26,8 @@
 #include <pcap.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 #define PCAP_FIELDS       6
 #define F_TIME            0

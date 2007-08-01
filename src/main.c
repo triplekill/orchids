@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Fri Jul 27 15:49:57 2007
+ ** @date Last update: Tue Jul 31 23:41:05 2007
  **/
 
 /*
@@ -32,13 +32,14 @@
 #include <pwd.h>
 #include <sys/types.h> /* for stat() */
 
-#include "hash.h"
-
 #include "orchids.h"
+
+#include "hash.h"
+#include "evt_mgr.h"
+#include "orchids_api.h"
 
 #include "main_priv.h"
 
-#include "evt_mgr.h"
 
 static void
 sig_chld(int signo)
@@ -46,6 +47,7 @@ sig_chld(int signo)
   while ( waitpid(-1, NULL, WNOHANG) > 0 )
     ;
 }
+
 
 static void
 change_run_id(char *username)

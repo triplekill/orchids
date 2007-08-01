@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Thu Jun  7 17:38:40 2007
+ ** @date Last update: Tue Jul 31 23:36:22 2007
  **/
 
 /*
@@ -38,6 +38,8 @@
 #include <net-snmp/net-snmp-includes.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 input_module_t mod_snmptrap;
 

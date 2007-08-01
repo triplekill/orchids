@@ -8,7 +8,7 @@
  ** @ingroup modules
  ** 
  ** @date  Started on: Wed Nov  5 16:18:07 2003
- ** @date Last update: Tue Nov 29 11:12:30 2005
+ ** @date Last update: Tue Jul 31 23:35:21 2007
  **/
 
 /*
@@ -23,6 +23,8 @@
 #include <string.h>
 
 #include "orchids.h"
+
+#include "orchids_api.h"
 
 static char *nf_hook_g = NULL;
 
