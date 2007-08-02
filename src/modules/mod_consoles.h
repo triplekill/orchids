@@ -1,73 +1,66 @@
 /**
- ** @file mod_autohtml.c
- ** Automatic regeneration of HTML internal state of Orchids.
+ ** @file mod_consoles.h
+ ** Definitions for mod_consoles.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
  **
- ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Thu Aug  2 23:31:16 2007
+ ** @date  Started on: Mon Jan 27 17:32:49 2003
+ ** @date Last update: Thu Aug  2 23:54:39 2007
  **/
 
 /*
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+#ifndef MOD_CONSOLES_H
+#define MOD_CONSOLES_H
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-#include <limits.h>
-
-#include "orchids.h"
-
-#include "orchids_api.h"
-
-#include "mod_autohtml.h"
-
-input_module_t mod_autohtml;
-
-static int
-autohtml_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
-{
-  DebugLog(DF_MOD, DS_TRACE, "autohtml_callback();\n");
-
-  html_output(ctx);
-
-  return (0);
-}
-
-static void *
-autohtml_preconfig(orchids_t *ctx, mod_entry_t *mod)
-{
-  DebugLog(DF_MOD, DS_INFO, "load() autohtml@%p\n", (void *) &mod_autohtml);
-
-  add_polled_input_callback(ctx, mod, autohtml_callback, NULL);
-
-  return (NULL);
-}
-
-input_module_t mod_autohtml = {
-  MOD_MAGIC,
-  ORCHIDS_VERSION,
-  "autohtml",
-  "CeCILL2",
-  NULL,
-  NULL,
-  autohtml_preconfig,
-  NULL,
-  NULL
+typedef struct console_s console_t;
+struct console_s {
+  char *name;
+  char *host;
+  int   port;
+  FILE *fp;
 };
 
+typedef struct conscfg_s conscfg_t;
+struct conscfg_s
+{
+  strhash_t *consoles;
+};
 
+static void
+issdl_console_msg(orchids_t *ctx, state_instance_t *state);
+
+
+static void
+issdl_console_evt(orchids_t *ctx, state_instance_t *state);
+
+
+static void *
+cons_preconfig(orchids_t *ctx, mod_entry_t *mod);
+
+
+static FILE *
+create_udp_socket(const char *host, const int port);
+
+
+static void
+output_console_msg(char *console, char *msg);
+
+
+static void
+output_console_evt(orchids_t *ctx, char *console, state_instance_t *state);
+
+
+static void
+add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+#endif /* MOD_CONSOLES_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
@@ -104,5 +97,6 @@ input_module_t mod_autohtml = {
 ** The fact that you are presently reading this means that you have had
 ** knowledge of the CeCILL license and that you accept its terms.
 */
+
 
 /* End-of-file */

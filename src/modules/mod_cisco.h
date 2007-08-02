@@ -1,73 +1,47 @@
 /**
- ** @file mod_autohtml.c
- ** Automatic regeneration of HTML internal state of Orchids.
+ ** @file mod_cisco.h
+ ** Definitions for mod_cisco.h.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
  **
- ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Thu Aug  2 23:31:16 2007
+ ** @date  Started on: Fri Feb  7 11:07:42 2003
+ ** @date Last update: Thu Aug  2 23:38:21 2007
  **/
 
 /*
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
+#ifndef MOD_CISCO_H
+#define MOD_CISCO_H
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-#include <limits.h>
-
-#include "orchids.h"
-
-#include "orchids_api.h"
-
-#include "mod_autohtml.h"
-
-input_module_t mod_autohtml;
+#define CISCO_FIELDS 9
+#define F_MSGTYPE    0
+#define F_ACL        1
+#define F_ACTION     2
+#define F_PROTO      3
+#define F_SIP        4
+#define F_DIP        5
+#define F_SPT        6
+#define F_DPT        7
+#define F_PACKETS    8
 
 static int
-autohtml_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
-{
-  DebugLog(DF_MOD, DS_TRACE, "autohtml_callback();\n");
-
-  html_output(ctx);
-
-  return (0);
-}
+cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data);
 
 static void *
-autohtml_preconfig(orchids_t *ctx, mod_entry_t *mod)
-{
-  DebugLog(DF_MOD, DS_INFO, "load() autohtml@%p\n", (void *) &mod_autohtml);
+cisco_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
-  add_polled_input_callback(ctx, mod, autohtml_callback, NULL);
+static void
+cisco_postconfig(orchids_t *ctx, mod_entry_t *mod);
 
-  return (NULL);
-}
+static void
+cisco_postcompil(orchids_t *ctx, mod_entry_t *mod);
 
-input_module_t mod_autohtml = {
-  MOD_MAGIC,
-  ORCHIDS_VERSION,
-  "autohtml",
-  "CeCILL2",
-  NULL,
-  NULL,
-  autohtml_preconfig,
-  NULL,
-  NULL
-};
-
-
+#endif /* MOD_CISCO_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification

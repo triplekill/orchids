@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Tue Jul 31 23:34:06 2007
+ ** @date Last update: Thu Aug  2 23:54:22 2007
  **/
 
 /*
@@ -34,30 +34,12 @@
 
 #include "orchids_api.h"
 
+#include "mod_consoles.h"
+
 input_module_t mod_consoles;
 
-typedef struct console_s console_t;
-struct console_s {
-  char *name;
-  char *host;
-  int   port;
-  FILE *fp;
-};
-
-typedef struct conscfg_s conscfg_t;
-struct conscfg_s
-{
-  strhash_t *consoles;
-};
-
-static void issdl_console_msg(orchids_t *ctx, state_instance_t *state);
-static void issdl_console_evt(orchids_t *ctx, state_instance_t *state);
-static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod);
-static FILE *create_udp_socket(const char *host, const int port);
-static void output_console_msg(char *console, char *msg);
-static void output_console_evt(orchids_t *ctx, char *console, state_instance_t *state);
-
 static conscfg_t *conscfg_g;
+
 
 static void
 issdl_console_msg(orchids_t *ctx, state_instance_t *state)
@@ -84,6 +66,7 @@ issdl_console_msg(orchids_t *ctx, state_instance_t *state)
 
   output_console_msg(c, s);
 }
+
 
 static void
 issdl_console_evt(orchids_t *ctx, state_instance_t *state)
@@ -152,6 +135,7 @@ create_udp_socket(const char *host, const int port)
   return (sp);
 }
 
+
 static void
 add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -184,6 +168,7 @@ add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   strhash_add(((conscfg_t *)mod->config)->consoles, con, con->name);
 }
 
+
 static void
 output_console_msg(char *console, char *msg)
 {
@@ -201,6 +186,7 @@ output_console_msg(char *console, char *msg)
   fprintf(con->fp, "%s\n", msg);
   fflush(con->fp);
 }
+
 
 static void
 output_console_evt(orchids_t *ctx, char *console, state_instance_t *state)

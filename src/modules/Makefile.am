@@ -50,10 +50,13 @@ endif
 #  mod_test2.la
 #  mod_test.la
 
-mod_autohtml_la_SOURCES = mod_autohtml.c
+mod_autohtml_la_SOURCES = mod_autohtml.c mod_autohtml.h
 mod_autohtml_la_LDFLAGS = -module -avoid-version
 
-mod_cisco_la_SOURCES = mod_cisco.c cisco.tab.c cisco.tab.h cisco.yy.c
+mod_cisco_la_SOURCES =     \
+  mod_cisco.c mod_cisco.h  \
+  cisco.tab.c cisco.tab.h  \
+  cisco.yy.c
 mod_cisco_la_LDFLAGS = -module -avoid-version
 
 $(srcdir)/cisco.tab.c $(srcdir)/cisco.tab.h: $(srcdir)/cisco.y
@@ -62,13 +65,13 @@ $(srcdir)/cisco.tab.c $(srcdir)/cisco.tab.h: $(srcdir)/cisco.y
 $(srcdir)/cisco.yy.c: $(srcdir)/cisco.l
 	$(LEX) -f -Pcisco -o$(srcdir)/cisco.yy.c $(srcdir)/cisco.l
 
-mod_clocks_la_SOURCES = mod_clocks.c
+mod_clocks_la_SOURCES = mod_clocks.c mod_clocks.h
 mod_clocks_la_LDFLAGS = -module -avoid-version
 
-mod_consoles_la_SOURCES = mod_consoles.c
+mod_consoles_la_SOURCES = mod_consoles.c mod_console.h
 mod_consoles_la_LDFLAGS = -module -avoid-version
 
-mod_generic_la_SOURCES = mod_generic.c
+mod_generic_la_SOURCES = mod_generic.c mod_generic.h
 mod_generic_la_LDFLAGS = -module -avoid-version
 
 mod_netfilter_la_SOURCES = mod_netfilter.c netfilter.tab.c netfilter.tab.h netfilter.yy.c

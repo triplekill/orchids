@@ -1,6 +1,6 @@
 /**
- ** @file mod_autohtml.c
- ** Automatic regeneration of HTML internal state of Orchids.
+ ** @file mod_autohtml.h
+ ** Definitions for mod_autohtml.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
@@ -8,66 +8,21 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Thu Aug  2 23:31:16 2007
+ ** @date Last update: Thu Aug  2 23:38:46 2007
  **/
 
 /*
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-#include <limits.h>
-
-#include "orchids.h"
-
-#include "orchids_api.h"
-
-#include "mod_autohtml.h"
-
-input_module_t mod_autohtml;
+#ifndef MOD_AUTOHTML_H
+#define MOD_AUTOHTML_H
 
 static int
-autohtml_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
-{
-  DebugLog(DF_MOD, DS_TRACE, "autohtml_callback();\n");
-
-  html_output(ctx);
-
-  return (0);
-}
+autohtml_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy);
 
 static void *
-autohtml_preconfig(orchids_t *ctx, mod_entry_t *mod)
-{
-  DebugLog(DF_MOD, DS_INFO, "load() autohtml@%p\n", (void *) &mod_autohtml);
-
-  add_polled_input_callback(ctx, mod, autohtml_callback, NULL);
-
-  return (NULL);
-}
-
-input_module_t mod_autohtml = {
-  MOD_MAGIC,
-  ORCHIDS_VERSION,
-  "autohtml",
-  "CeCILL2",
-  NULL,
-  NULL,
-  autohtml_preconfig,
-  NULL,
-  NULL
-};
-
-
+autohtml_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
@@ -105,4 +60,5 @@ input_module_t mod_autohtml = {
 ** knowledge of the CeCILL license and that you accept its terms.
 */
 
-/* End-of-file */
+
+#endif /* MOD_AUTOHTML_H */
