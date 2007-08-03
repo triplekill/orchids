@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Fri Aug  3 12:34:25 2007
+ ** @date Last update: Fri Aug  3 12:55:13 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -29,38 +29,13 @@
 #include "graph_output.h"
 #include "orchids_api.h"
 
+#include "mod_ruletrace.h"
+
 /*
   File naming scheme:
   $OUTPUT_DIR/$D1/$D2/$D3/$D4-$NTPTSH-$NTPTSL/$FILEPREFIX$NTPTSH-$NTPTSL-$RNAME.dot
  */
 
-typedef struct ruletrace_ctx_s ruletrace_ctx_t;
-struct ruletrace_ctx_s
-{
-  char *output_dir;
-  char *file_prefix;
-  int rule_limit;
-  int state_limit;
-
-  pid_t ruletracepid;
-  int created_pid_dir;
-};
-
-#define MOD_RULETRACE_DEFAULT_PREFIX      "ruletrace-"
-#define MOD_RULETRACE_DEFAULT_RULE_LIMIT  1000
-
-static void
-ruletrace_output_rule_instances(orchids_t *ctx,
-                                ruletrace_ctx_t *ruletracectx,
-                                event_t *event);
-static FILE *
-ruletrace_fopen_dot_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx, rule_instance_t *rule);
-static void
-ruletrace_output_rule_inst(orchids_t *ctx,
-                           ruletrace_ctx_t *ruletracectx,
-                           rule_instance_t *rule);
-static void
-ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx);
 
 static int
 ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
@@ -76,6 +51,7 @@ ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
   return (0);
 }
 
+
 static void
 ruletrace_output_rule_instances(orchids_t *ctx,
                                 ruletrace_ctx_t *ruletracectx,
@@ -89,8 +65,9 @@ ruletrace_output_rule_instances(orchids_t *ctx,
   rilim = ruletracectx->rule_limit;
   for (r = ctx->first_rule_instance; r && i < rilim; r = r->next) {
     if (timercmp(&r->new_last_act, &ctx->cur_loop_time, ==)) {
-      if (i == 0)
+      if (i == 0) {
         ruletrace_output_create_dirs(ctx, ruletracectx);
+      }
       ruletrace_output_rule_inst(ctx, ruletracectx, r);
       i++;
     }
@@ -103,6 +80,7 @@ ruletrace_output_rule_instances(orchids_t *ctx,
     }
   }
 }
+
 
 static void
 ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
@@ -169,7 +147,9 @@ ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
 
 
 static FILE *
-ruletrace_fopen_dot_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx, rule_instance_t *rule)
+ruletrace_fopen_dot_file(orchids_t *ctx,
+                         ruletrace_ctx_t *ruletracectx,
+                         rule_instance_t *rule)
 {
   FILE *fp;
   uint32_t evtid;
@@ -211,10 +191,11 @@ ruletrace_fopen_dot_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx, rule_ins
   return (fp);
 }
 
+
 static void
 ruletrace_output_rule_inst(orchids_t *ctx,
-                      ruletrace_ctx_t *ruletracectx,
-                      rule_instance_t *rule)
+                           ruletrace_ctx_t *ruletracectx,
+                           rule_instance_t *rule)
 {
   FILE *fp;
 
@@ -228,6 +209,7 @@ ruletrace_output_rule_inst(orchids_t *ctx,
 
   fclose(fp);
 }
+
 
 static void *
 ruletrace_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -262,6 +244,7 @@ ruletrace_postconfig(orchids_t *ctx, mod_entry_t *mod)
   register_post_inject_hook(ctx, mod, ruletrace_hook, NULL);
 }
 
+
 static void
 set_output_directory(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -273,6 +256,7 @@ set_output_directory(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ruletracectx->output_dir = dir->args;
 }
+
 
 static void
 set_file_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -286,6 +270,7 @@ set_file_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ruletracectx->file_prefix = dir->args;
 }
 
+
 static void
 set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -297,6 +282,7 @@ set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ruletracectx->rule_limit = atoi(dir->args);
 }
+
 
 static void
 set_state_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)

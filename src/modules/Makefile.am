@@ -192,7 +192,7 @@ mod_sharedvars_la_LDFLAGS = -module -avoid-version
 mod_timeout_la_SOURCES = mod_timeout.c
 mod_timeout_la_LDFLAGS = -module -avoid-version
 
-mod_ruletrace_la_SOURCES = mod_ruletrace.c
+mod_ruletrace_la_SOURCES = mod_ruletrace.c mod_ruletrace.h
 mod_ruletrace_la_LDFLAGS = -module -avoid-version
 
 
