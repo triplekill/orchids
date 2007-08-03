@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Aug  3 12:34:04 2007
+ ** @date Last update: Fri Aug  3 12:47:13 2007
  **/
 
 /*
@@ -62,7 +62,8 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 
   for (t = ctx->current_tail; t; t = t->next) {
     if ((t->state_instance->rule_instance == rule)) {
-      DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (current_tail)\n", t);
+      DebugLog(DF_ENG, DS_TRACE,
+               "Marking thread %p as KILLED (current_tail)\n", t);
       KILL_THREAD(ctx, t);
     }
   }
@@ -195,7 +196,8 @@ simulate_state_and_create_threads(orchids_t        *ctx,
           state->rule_instance->sync_lock_list = lock_elmt;
         }
         else {
-          DebugLog(DF_ENG, DS_INFO, "No lock found.  Don't create in ONLY_ONCE\n");
+          DebugLog(DF_ENG, DS_INFO,
+                   "No lock found.  Don't create in ONLY_ONCE\n");
         }
       }
     }
@@ -211,8 +213,11 @@ simulate_state_and_create_threads(orchids_t        *ctx,
       if (state->state->trans[t].eval_code)
         vmret = ovm_exec(ctx, state, state->state->trans[t].eval_code);
       if (vmret == 0) {
-        DPRINTF( ("e-trans passed (to %s)\n", state->state->trans[t].dest->name) );
-        new_state = create_state_instance(ctx, state->state->trans[t].dest, state);
+        DPRINTF( ("e-trans passed (to %s)\n",
+                  state->state->trans[t].dest->name) );
+        new_state = create_state_instance(ctx,
+                                          state->state->trans[t].dest,
+                                          state);
 
         /* link new_state instance in the tree */
         new_state->next_sibling = state->first_child;
@@ -224,7 +229,10 @@ simulate_state_and_create_threads(orchids_t        *ctx,
         state->rule_instance->state_list = new_state;
 
         /* and recursively call simul() */
-        simul_ret = simulate_state_and_create_threads(ctx, new_state, event, only_once);
+        simul_ret = simulate_state_and_create_threads(ctx,
+                                                      new_state,
+                                                      event,
+                                                      only_once);
         if (simul_ret < 0)
           return (-created_threads + simul_ret);
         created_threads += simul_ret;
@@ -356,25 +364,21 @@ static int
 backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
 {
 #if 1
-  /* if destination state is fully blocking AND doesn't bind field value to a free variable,
-   * this is THE shortest run.  Next threads will be redundant. */
+  /* if destination state is fully blocking AND doesn't bind field value 
+   * to a free variable, this is THE shortest run.
+   * Next threads will be redundant. */
   if (thread->trans->dest->trans_nb > 0 &&
       !(thread->trans->dest->flags & BYTECODE_HAVE_PUSHFIELD))
     return (TRUE);
   /* XXX: Destination MUST NOT be a cut-point.
-     Destination cuts should be resolved at compilation-time instead of runtime ? */
+     Destination cuts should be resolved at compilation-time
+     instead of runtime ? */
 #endif
 
   return (FALSE);
 }
 
-/**
- * Analysis engine entry point.
- * (Jean's algo -> one-evt and evt-loop)
- * @param ctx orchids context.
- * @param event A reference to the event to be injected in the analysis engine.
- * @callgraph
- **/
+
 void
 inject_event(orchids_t *ctx, event_t *event)
 {
@@ -494,7 +498,8 @@ inject_event(orchids_t *ctx, event_t *event)
         DebugLog(DF_ENG, DS_DEBUG,
                  "Initial thread passed. Create rule instance.\n");
         t->state_instance->rule_instance->creation_date = time(NULL);
-	t->state_instance->rule_instance->new_creation_date = ctx->last_ruleinst_act;
+	t->state_instance->rule_instance->new_creation_date =
+          ctx->last_ruleinst_act;
         t->state_instance->rule_instance->rule->instances++;
         t->state_instance->rule_instance->flags |= RULE_INUSE;
         ctx->rule_instances++;
@@ -540,7 +545,8 @@ inject_event(orchids_t *ctx, event_t *event)
 
       if (t->flags & THREAD_BUMP) {
         DebugLog(DF_ENG, DS_DEBUG,
-                 "initial thread bump (commit q'_{new} = q_{new} @ q_{retrig})\n");
+                 "initial thread bump "
+                 "(commit q'_{new} = q_{new} @ q_{retrig})\n");
         if (ctx->retrig_qt)
           ctx->retrig_qt->flags |= THREAD_BUMP;
         if (ctx->new_qh) {
@@ -630,7 +636,9 @@ inject_event(orchids_t *ctx, event_t *event)
   /* free unreferenced event here (the the current event didn't passed any
      transition, Xfree() it) */
   if (active_event->refs == 0) {
-    DebugLog(DF_ENG, DS_DEBUG, "free unreferenced event (%p/%p)\n", active_event, active_event->event);
+    DebugLog(DF_ENG, DS_DEBUG,
+             "free unreferenced event (%p/%p)\n",
+             active_event, active_event->event);
     free_event(active_event->event);
     Xfree(active_event);
   }
@@ -654,7 +662,7 @@ inject_event(orchids_t *ctx, event_t *event)
            "simulate_state_and_create_threads() = %i\n", ret);
 
 #ifdef DMALLOC
-    dmalloc_log_changed(dmalloc_orchids, 1, 1, 1);
+  dmalloc_log_changed(dmalloc_orchids, 1, 1, 1);
 #endif
 }
 
@@ -868,17 +876,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
   Xfree(rule_instance);
 }
 
-/**
- * Display all active rule instances. Displayed informations are :
- * rule instance identifier (rid), 
- * rule name, 
- * number of actives states, 
- * max depth of the path tree (dpt) 
- * and the creation date.
- *
- * @param fp Output stream.
- * @param ctx Orchids context.
- **/
+
 void
 fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
 {
@@ -886,34 +884,37 @@ fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
   rule_instance_t *r;
   int i;
 
-  if (ctx->first_rule_instance == NULL)
-    {
-      fprintf(fp, "no rule instance.\n");
-      return ;
-    }
+  if (ctx->first_rule_instance == NULL) {
+    fprintf(fp, "no rule instance.\n");
+    return ;
+  }
 
-  fprintf(fp, "-------------------------------[ rule instances ]------------------------------\n");
+  fprintf(fp,
+          "-------------------------------[ "
+          "rule instances"
+          " ]------------------------------\n");
   fprintf(fp, " rid | rule name   | state |thrds| dpt | creation date\n");
-  fprintf(fp, "-----+-------------+-------+-----+-----+---------------------------------------\n");
-  for (r = ctx->first_rule_instance, i = 0; r; r = r->next, ++i)
-    {
-      if (r->creation_date > 0) {
-        strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-                 localtime(&r->creation_date));
-      }
-      else {
-        strcpy(asc_time, "initial instance");
-      }
-      fprintf(fp, " %3i |%12.12s |%6i |%4i | %3i | %li (%.32s)\n",
-              i, r->rule->name, r->state_instances, r->threads,
-              r->max_depth, r->creation_date, asc_time);
+  fprintf(fp,
+          "-----+-------------+-------+-----+"
+          "-----+---------------------------------------\n");
+  for (r = ctx->first_rule_instance, i = 0; r; r = r->next, ++i) {
+    if (r->creation_date > 0) {
+      strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
+               localtime(&r->creation_date));
     }
-  fprintf(fp, "-----+-------------+-------+-----+-----+---------------------------------------\n");
+    else {
+      strcpy(asc_time, "initial instance");
+    }
+    fprintf(fp, " %3i |%12.12s |%6i |%4i | %3i | %li (%.32s)\n",
+            i, r->rule->name, r->state_instances, r->threads,
+            r->max_depth, r->creation_date, asc_time);
+  }
+  fprintf(fp,
+          "-----+-------------+-------+-----+"
+          "-----+---------------------------------------\n");
 }
 
-/*
- * Display a thread queue.
- **/
+
 void
 fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
 {
@@ -925,20 +926,28 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
           "thread wait queue"
           " ]----------------------------\n");
   fprintf(fp,
-          " thid "
-          "|   rule name  "
-          "|      state names     "
-          "| rid | sid->did |tran| cnt | bmp\n");
+          " thid |"
+          "   rule name  |"
+          "      state names     |"
+          " rid | sid->did |tran| cnt | bmp\n");
   fprintf(fp,
-          "------"
-          "+--------------"
-          "+----------------------"
-          "+-----+----------+----+-----+----\n");
+          "------+"
+          "--------------+"
+          "----------------------+"
+          "-----+----------+----+-----+----\n");
 
   k = 0;
   for (i = 0; thread; thread = thread->next, i++) {
     if (!(thread->flags & THREAD_KILLED)) {
-      fprintf(fp, "%5u | %12.12s | %8.8s -> %-8.8s | %3i | %2i -> %-2i | %2i | %3i |%s\n",
+      fprintf(fp,
+              "%5u | "
+              "%12.12s | "
+              "%8.8s -> %-8.8s | "
+              "%3i | "
+              "%2i -> %-2i | "
+              "%2i | "
+              "%3i | "
+              "%s\n",
               i,
               thread->state_instance->state->rule->name,
               thread->state_instance->state->name,
@@ -952,7 +961,15 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
     }
     else {
       k++;
-      fprintf(fp, "%5u*| %12.12s | %8.8s -> %-8.8s | %3i | %2i -> %-2i | %2i | %3i |%s\n",
+      fprintf(fp,
+              "%5u*| "
+              "%12.12s | "
+              "%8.8s -> %-8.8s | "
+              "%3i | "
+              "%2i -> %-2i | "
+              "%2i | "
+              "%3i |"
+              "%s\n",
               i,
               thread->state_instance->state->rule->name,
               thread->state_instance->state->name,
@@ -967,7 +984,11 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
     }
   }
   fprintf(fp, "(*) %u killed threads\n", k);
-  fprintf(fp, "------+--------------+----------------------+-----+----------+----+-----+----\n");
+  fprintf(fp,
+          "------+"
+          "--------------+"
+          "----------------------+"
+          "-----+----------+----+-----+----\n");
 }
 
 /**

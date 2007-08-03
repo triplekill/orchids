@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Jul 27 15:30:32 2007
+ ** @date Last update: Fri Aug  3 12:42:20 2007
  **/
 
 /*
@@ -24,6 +24,8 @@
 /**
  ** Inject an event into the analysis engine.
  ** This is the entry point of the correlator.
+ ** This function correspond to the judgments one-evt and evt-loop in the
+ ** Jean's paper ("Un Algorithme pour l'Analyse de Logs").
  **
  ** @param ctx    Orchids application context.
  ** @param event  The event to inject.
