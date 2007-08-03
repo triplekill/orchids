@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Aug  3 13:57:22 2007
+ ** @date Last update: Fri Aug  3 14:22:22 2007
  **/
 
 /*
@@ -1873,8 +1873,8 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
   fputc(' ', fp);
 
   /* display data */
-  switch (val->type)
-    {
+  switch (val->type) {
+
     case T_NULL:
       fprintf(fp, "null (%i)\n", ERRNO(val));
       break;
@@ -1889,14 +1889,13 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
 
     case T_BSTR:
       fprintf(fp, "bstr[%i]: \"", BSTRLEN(val));
-      for (i = 0; i < BSTRLEN(val); i++)
-        {
-          if (isprint(BSTR(val)[i]))
-            fprintf(fp, "%c", BSTR(val)[i]);
-          else
-            fprintf(fp, ".");
-        }
-      fprintf(fp, "\"\n");
+      for (i = 0; i < BSTRLEN(val); i++) {
+        if (isprint(BSTR(val)[i]))
+          fputc(BSTR(val)[i], fp);
+        else
+          fputc('.', fp);
+      }
+      fputs("\"\n", fp);
       break;
 
     case T_VBSTR:
@@ -1908,19 +1907,19 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
           fputc('.', fp);
       }
       fputs("\"\n", fp);
-      break;
+    break;
 
     case T_STR:
       fprintf(fp, "str[%i]: \"", STRLEN(val));
       for (i = 0; i < STRLEN(val); i++)
-        fprintf(fp, "%c", STR(val)[i]);
-      fprintf(fp, "\"\n");
+        fputc(STR(val)[i], fp);
+      fputs("\"\n", fp);
       break;
 
     case T_VSTR:
       fprintf(fp, "vstr[%i]: \"", VSTRLEN(val));
       for (i = 0; i < VSTRLEN(val); i++)
-        fprintf(fp, "%c", VSTR(val)[i]);
+        fputc(VSTR(val)[i], fp);
       fprintf(fp, "\"\n");
       break;
       
@@ -1938,21 +1937,20 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       else {
         hptr = NULL;
       }
-      if (hptr == NULL)
-        {
-          fprintf(fp, "\n");
-          return ;
-        }
-      else if (hptr->h_name != NULL)
+      if (hptr == NULL) {
+        fputc('\n', fp);
+        return ;
+      }
+      else if (hptr->h_name != NULL) {
         fprintf(fp, " (name=%s", hptr->h_name);
-      else
-        {
-          fprintf(fp, "\n");
-          return ;
-        }
+      }
+      else {
+        fputc('\n', fp);
+        return ;
+      }
       for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
         fprintf(fp, " alias=%s", *pptr);
-      fprintf(fp, ")\n");
+      fputs(")\n", fp);
       break;
 
     case T_TIMEVAL:
@@ -1990,7 +1988,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       for (i=0; i < SNMPOIDLEN(val); i++) {
         fprintf(fp, "%lu.", (SNMPOID(val))[i]);
       }
-      fprintf(fp, "\n");
+      fputc('\n', fp);
       break;
 
     default:
