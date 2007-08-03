@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Fri Jul 27 16:47:31 2007
+ ** @date Last update: Fri Aug  3 13:57:53 2007
  **/
 
 /*
@@ -694,6 +694,9 @@ issdl_get_data_len(ovm_var_t *val);
 
 void
 fprintf_issdl_val(FILE *fp, ovm_var_t *val);
+
+void
+set_ip_resolution(int value);
 
 void
 ovm_null_fprintf(FILE *fp, ovm_null_t *val);

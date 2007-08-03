@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Mon Jul 30 23:53:01 2007
+ ** @date Last update: Fri Aug  3 14:06:22 2007
  **/
 
 /*
@@ -38,6 +38,7 @@
 
 #include "safelib.h"
 #include "mod_mgr.h"
+#include "lang.h"
 
 #include "orchids.h"
 
@@ -797,6 +798,23 @@ set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 }
 
+static void
+set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting ResolveIP to '%s'\n", dir->args);
+
+  if (    !strcasecmp("on",      dir->args)
+       || !strcasecmp("1",       dir->args)
+       || !strcasecmp("yes",     dir->args)
+       || !strcasecmp("true",    dir->args)
+       || !strcasecmp("enabled", dir->args) ) {
+    set_ip_resolution(TRUE);
+  }
+  else {
+    set_ip_resolution(FALSE);
+  }
+}
+
 
 static mod_cfg_cmd_t config_dir_g[] = 
 {
@@ -821,6 +839,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
   { "SetLockFile", set_lock_file, "Set the lock file name" },
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
+  { "ResolveIP", set_resolve_ip, "Enable/Disable DNS name resolution" },
   { NULL, NULL, NULL }
 };
 

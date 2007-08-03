@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Tue Jul 31 23:42:40 2007
+ ** @date Last update: Fri Aug  3 13:57:22 2007
  **/
 
 /*
@@ -67,6 +67,8 @@ static struct issdl_type_s issdl_types_g[] = {
   { "double",  0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "IEEE 64-bit floating point number (double)" },
   { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
+
+static int resolve_ipv4_g = 0;
 
 char *
 str_issdltype(int type)
@@ -1929,8 +1931,13 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
 
     case T_IPV4:
       fprintf(fp, "ipv4: %s", inet_ntoa(IPV4(val)));
-      hptr = gethostbyaddr((char *) &IPV4(val),
-                           sizeof (struct in_addr), AF_INET);
+      if (resolve_ipv4_g) {
+        hptr = gethostbyaddr((char *) &IPV4(val),
+                             sizeof (struct in_addr), AF_INET);
+      }
+      else {
+        hptr = NULL;
+      }
       if (hptr == NULL)
         {
           fprintf(fp, "\n");
@@ -2857,6 +2864,13 @@ fprintf_issdl_functions(FILE *fp, orchids_t *ctx)
   for (f = issdl_function_g; f->name; f++) {
     fprintf(fp, "%20s() | %s\n", f->name, f->desc);
   }
+}
+
+
+void
+set_ip_resolution(int value)
+{
+  resolve_ipv4_g = value ? TRUE : FALSE;
 }
 
 
