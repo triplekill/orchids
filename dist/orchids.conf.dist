@@ -77,6 +77,11 @@ ReportPrefix  report-
 ReportExt     .rpt
 
 
+# Disable Network name resolution by default
+
+ResolveIP  no
+
+
 # Include module specific configurations files...
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
