@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Fri Aug  3 12:55:13 2007
+ ** @date Last update: Fri Aug  3 13:09:30 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -32,8 +32,11 @@
 #include "mod_ruletrace.h"
 
 /*
-  File naming scheme:
+  File naming scheme for .dot files for rule instances:
   $OUTPUT_DIR/$D1/$D2/$D3/$D4-$NTPTSH-$NTPTSL/$FILEPREFIX$NTPTSH-$NTPTSL-$RNAME.dot
+
+  File naming scheme for event files:
+  $OUTPUT_DIR/$D1/$D2/$D3/$D4-$NTPTSH-$NTPTSL/event
  */
 
 
@@ -67,6 +70,7 @@ ruletrace_output_rule_instances(orchids_t *ctx,
     if (timercmp(&r->new_last_act, &ctx->cur_loop_time, ==)) {
       if (i == 0) {
         ruletrace_output_create_dirs(ctx, ruletracectx);
+        ruletrace_output_event(ctx, ruletracectx, event);
       }
       ruletrace_output_rule_inst(ctx, ruletracectx, r);
       i++;
@@ -143,6 +147,60 @@ ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
   mkdir(pathname, 0777);
 
   DebugLog(DF_MOD, DS_INFO, "Created directory: '%s'\n", pathname);
+}
+
+
+static void
+ruletrace_output_event(orchids_t *ctx,
+                       ruletrace_ctx_t *ruletracectx,
+                       event_t *event)
+{
+  FILE *fp;
+
+  fp = ruletrace_fopen_event_file(ctx, ruletracectx);
+  if (fp == NULL)
+    return ;
+
+  fprintf_event(fp, ctx, event);
+
+  fclose(fp);
+}
+
+
+static FILE *
+ruletrace_fopen_event_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
+{
+  FILE *fp;
+  uint32_t evtid;
+  int d1, d2, d3, d4;
+  char pathname[PATH_MAX];
+  uint32_t ntp1h, ntp1l;
+
+  evtid = ctx->events;
+  d4 = evtid & 0xFF;
+  evtid >>= 8;
+  d3 = evtid & 0xFF;
+  evtid >>= 8;
+  d2 = evtid & 0xFF;
+  evtid >>= 8;
+  d1 = evtid & 0xFF;
+  Timer_to_NTP(&ctx->cur_loop_time, ntp1h, ntp1l);
+
+  snprintf(pathname, sizeof (pathname),
+           "%s/%05i/%02x/%02x/%02x/%02x-%08x-%08x/event",
+           ruletracectx->output_dir,
+           ruletracectx->ruletracepid,
+           d1, d2, d3, d4,
+           ntp1h, ntp1l);
+
+  fp = fopen(pathname, "w");
+  if (fp == NULL) {
+    DebugLog(DF_MOD, DS_INFO,
+             "Error while opening %s: errno %i: %s\n",
+             pathname, errno, strerror(errno));
+  }
+
+  return (fp);
 }
 
 

@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Fri Aug  3 12:52:43 2007
+ ** @date Last update: Fri Aug  3 13:09:11 2007
  **/
 
 #ifndef MOD_RULETRACE_H
@@ -49,6 +49,16 @@ ruletrace_output_rule_inst(orchids_t *ctx,
                            rule_instance_t *rule);
 static void
 ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx);
+
+
+static void
+ruletrace_output_event(orchids_t *ctx,
+                       ruletrace_ctx_t *ruletracectx,
+                       event_t *event);
+
+
+static FILE *
+ruletrace_fopen_event_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx);
 
 
 static int
