@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Tue Jul 31 23:31:41 2007
+ ** @date Last update: Fri Aug  3 12:27:55 2007
  **/
 
 /*
@@ -823,7 +823,10 @@ struct mod_entry_s
  ** @typedef hook_cb_t
  **   Hook callback function type.
  **/
-typedef int (*hook_cb_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
+typedef int (*hook_cb_t)(orchids_t *ctx,
+                         mod_entry_t *mod,
+                         void *data,
+                         event_t *e);
 
 
 /**

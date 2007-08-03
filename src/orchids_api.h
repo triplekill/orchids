@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Tue Jul 31 23:43:10 2007
+ ** @date Last update: Fri Aug  3 12:28:50 2007
  **/
 
 /*
@@ -151,7 +151,7 @@ register_post_inject_hook(orchids_t *ctx,
  ** Execute all registered callbacks in the post-inject-event hook.
  **/
 void
-execute_post_inject_hooks(orchids_t *ctx);
+execute_post_inject_hooks(orchids_t *ctx, event_t *event);
 
 
 /**

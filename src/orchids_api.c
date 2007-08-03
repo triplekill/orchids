@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Tue Jul 31 23:46:34 2007
+ ** @date Last update: Fri Aug  3 12:27:13 2007
  **/
 
 /*
@@ -319,12 +319,12 @@ register_post_inject_hook(orchids_t *ctx,
 
 
 void
-execute_post_inject_hooks(orchids_t *ctx)
+execute_post_inject_hooks(orchids_t *ctx, event_t *event)
 {
   hook_list_elmt_t *e;
 
   SLIST_FOREACH(e, &ctx->post_evt_hook_list, hooklist) {
-    e->cb(ctx, e->mod, e->data);
+    e->cb(ctx, e->mod, e->data, event);
   }
 }
 

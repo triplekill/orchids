@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Tue Jul 31 23:39:16 2007
+ ** @date Last update: Fri Aug  3 12:34:25 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -50,18 +50,20 @@ struct ruletrace_ctx_s
 #define MOD_RULETRACE_DEFAULT_RULE_LIMIT  1000
 
 static void
-ruletrace_output_rule_instances(orchids_t *ctx, ruletrace_ctx_t *ruletracectx);
+ruletrace_output_rule_instances(orchids_t *ctx,
+                                ruletrace_ctx_t *ruletracectx,
+                                event_t *event);
 static FILE *
 ruletrace_fopen_dot_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx, rule_instance_t *rule);
 static void
 ruletrace_output_rule_inst(orchids_t *ctx,
-                      ruletrace_ctx_t *ruletracectx,
-                      rule_instance_t *rule);
+                           ruletrace_ctx_t *ruletracectx,
+                           rule_instance_t *rule);
 static void
 ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx);
 
 static int
-ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data)
+ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -69,13 +71,15 @@ ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data)
 
   ruletracectx = (ruletrace_ctx_t *)mod->config;
 
-  ruletrace_output_rule_instances(ctx, ruletracectx);
+  ruletrace_output_rule_instances(ctx, ruletracectx, event);
 
   return (0);
 }
 
 static void
-ruletrace_output_rule_instances(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
+ruletrace_output_rule_instances(orchids_t *ctx,
+                                ruletrace_ctx_t *ruletracectx,
+                                event_t *event)
 {
   rule_instance_t *r;
   int rilim;

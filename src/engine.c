@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Tue Jul 31 23:41:57 2007
+ ** @date Last update: Fri Aug  3 12:34:04 2007
  **/
 
 /*
@@ -625,6 +625,8 @@ inject_event(orchids_t *ctx, event_t *event)
 
   }
 
+  execute_post_inject_hooks(ctx, active_event->event);
+
   /* free unreferenced event here (the the current event didn't passed any
      transition, Xfree() it) */
   if (active_event->refs == 0) {
@@ -654,10 +656,7 @@ inject_event(orchids_t *ctx, event_t *event)
 #ifdef DMALLOC
     dmalloc_log_changed(dmalloc_orchids, 1, 1, 1);
 #endif
-
-    execute_post_inject_hooks(ctx);
 }
-
 
 
 /**
