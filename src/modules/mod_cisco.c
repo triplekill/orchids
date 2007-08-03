@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Thu Aug  2 23:37:52 2007
+ ** @date Last update: Fri Aug  3 09:13:10 2007
  **/
 
 /*
@@ -96,7 +96,7 @@ input_module_t mod_cisco = {
   "cisco",                  /* module name */
   "CeCILL2",                /* module license */
   NULL,                     /* module dependencies */
-  cisco_config_commands,    /* module configuration commands,
+  NULL,                     /* module configuration commands,
                                for core config parser */
   cisco_preconfig,          /* called just after module registration */
   cisco_postconfig,         /* called after all mods preconfig,

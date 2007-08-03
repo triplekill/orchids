@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Fri Jun 29 13:44:18 2007
+ ** @date Last update: Fri Aug  3 10:16:20 2007
  **/
 
 /*
@@ -25,27 +25,9 @@
 
 #include "orchids.h"
 
+#include "mod_htmlstate.h"
+
 input_module_t mod_htmlstate;
-
-#define HTMLSTATE_DEFAULT_REFRESH_DELAY 10
-
-typedef struct htmlstatecfg_s htmlstatecfg_t;
-struct htmlstatecfg_s
-{
-  int enable_cache;
-  int fork;
-
-  int auto_refresh_delay;
-  int page_generation_delay;
-  int cache_cleanup_delay;
-  int rule_media; /* flags for graphs */
-  int rule_limit;
-  int rule_state_limit;
-  int rule_instance_limit;
-  int rule_instence_state_limit;
-  int thread_limit;
-  int event_limit;
-};
 
 static void *
 htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)

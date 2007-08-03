@@ -180,7 +180,9 @@ mod_win32evt_la_SOURCES = mod_win32evt.c
 mod_win32evt_la_LDFLAGS = -module -avoid-version
 
 if ENABLE_HTMLOUTPUT
-mod_htmlstate_la_SOURCES = mod_htmlstate.c html_output.c file_cache.c
+mod_htmlstate_la_SOURCES = \
+  mod_htmlstate.c mod_htmlstate.h \
+  html_output.c file_cache.c
 mod_htmlstate_la_LDFLAGS = -module -avoid-version
 endif
 
