@@ -9,7 +9,7 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Fri Jul 27 14:58:55 2007
+ ** @date Last update: Sat Sep  8 18:49:45 2007
  **/
 
 /*
@@ -28,21 +28,9 @@
 
 #include "period.h"
 
+#include "mod_period.h"
+
 input_module_t mod_period;
-
-typedef struct modperiod_ctx_s modperiod_ctx_t;
-struct modperiod_ctx_s
-{
-  char *name;
-  periodctx_t *periodctx;
-  phasectx_t *phasectx;
-};
-
-typedef struct period_config_s period_config_t;
-struct period_config_s
-{
-  strhash_t *contexts;
-};
 
 static int
 qsort_strcmp(const void *a, const void *b)

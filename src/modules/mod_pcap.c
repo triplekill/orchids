@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri May 25 14:29:20 2007
- ** @date Last update: Tue Jul 31 23:39:44 2007
+ ** @date Last update: Sat Sep  8 18:43:11 2007
  **/
 
 #ifdef HAVE_CONFIG_H
@@ -29,40 +29,7 @@
 
 #include "orchids_api.h"
 
-#define PCAP_FIELDS       6
-#define F_TIME            0
-#define F_LEN             1
-#define F_CAPLEN          2
-#define F_INTERFACE       3
-#define F_DATALINK        4
-#define F_PACKET          5
-
-#define MODPCAP_DEFAULT_SNAPLEN 65535
-#define MODPCAP_DEFAULT_PROMISC 1
-
-#define MODPCAP_READ_TIMEOUT 0
-
-typedef struct pcap_pkthdr pcap_pkthdr_t;
-
-typedef struct mod_pcap_if_s mod_pcap_if_t;
-typedef struct pcap_cb_data_s pcap_cb_data_t;
-
-struct pcap_cb_data_s
-{
-  orchids_t      *ctx;
-  mod_entry_t    *mod;
-  mod_pcap_if_t  *pcapif;
-};
-
-struct mod_pcap_if_s
-{
-  char   *name;
-  int     promisc;
-  int     snaplen;
-  pcap_t *pcap;
-  int     fd;
-  int     datalink;
-};
+#include "mod_pcap.h"
 
 input_module_t mod_pcap;
 

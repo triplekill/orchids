@@ -1,6 +1,6 @@
 /**
- ** @file mod_period.c
- ** Module for frequencies en phase analysis.
+ ** @file mod_sharedvars.c
+ ** Add the ability to use global shared variables between rule instances.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
@@ -9,12 +9,13 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Fri Jun  8 16:24:07 2007
+ ** @date Last update: Sat Sep  8 19:22:20 2007
  **/
 
 /*
  * See end of file for LICENSE and COPYRIGHT informations.
  */
+
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -27,16 +28,10 @@
 
 #include "strhash.h"
 
-#define DEFAULT_SHAREDVARS_HASH_SZ 262144
+#include "mod_sharedvars.h"
+
 
 input_module_t mod_sharedvars;
-
-typedef struct sharedvars_config_s sharedvars_config_t;
-struct sharedvars_config_s
-{
-  int hash_size;
-  strhash_t *vars_hash;
-};
 
 static sharedvars_config_t *mod_sharedvars_cfg_g = NULL;
 
@@ -159,6 +154,7 @@ sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (cfg);
 }
 
+
 static void
 sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -168,22 +164,13 @@ sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
   cfg->vars_hash = new_strhash( cfg->hash_size );
 }
 
+
 static void
 sharedvars_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ rule compilation. */
 }
 
-#if 0
-static void
-set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  int someoption;
-
-  someoption = atoi(dir->args);
-  DebugLog(DF_MOD, DS_INFO, "setting some_option to %i\n", someoption);
-}
-#endif
 
 static void
 set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -195,11 +182,11 @@ set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static mod_cfg_cmd_t sharedvars_config_commands[] = 
-{
+static mod_cfg_cmd_t sharedvars_config_commands[] = {
   { "HashSize", set_hash_size, "Set the size of the hash" },
   { NULL, NULL, NULL }
 };
+
 
 input_module_t mod_sharedvars = {
   MOD_MAGIC,                /* Magic number */
@@ -214,7 +201,6 @@ input_module_t mod_sharedvars = {
                                and after all module configuration*/
   sharedvars_postcompil
 };
-
 
 
 /*

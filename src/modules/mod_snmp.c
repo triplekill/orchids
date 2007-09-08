@@ -1,6 +1,6 @@
 /**
  ** @file mod_snmp.c
- ** A snmp for new modules.
+ ** A snmp module.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Nov 29 11:13:09 2005
+ ** @date Last update: Sat Sep  8 19:41:28 2007
  **/
 
 /*
@@ -24,27 +24,11 @@
 
 #include "orchids.h"
 
+#include "mod_snmp.h"
+
+
 input_module_t mod_snmp;
 
-#define DEFAULT_FLAG 123
-#define DEFAULT_OPTION 456
-
-#define SNMP_FIELDS   8
-#define F_VERSION     0
-#define F_COMMUNITY   1
-#define F_PDUTYPE     2
-#define F_REQUESTID   3
-#define F_ERRORSTATUS 4
-#define F_ERRORINDEX  5
-#define F_OBJECTID    6
-#define F_VALUE       7
-
-typedef struct snmp_config_s snmp_config_t;
-struct snmp_config_s
-{
-  int some_flag;
-  int some_option;
-};
 
 static int
 snmp_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
@@ -59,6 +43,7 @@ snmp_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
   return (0);
 }
 
+
 static field_t snmp_fields[] = {
   { "snmp.version",      T_VSTR, "Protocol version" },
   { "snmp.community",    T_VSTR, "Community name" },
@@ -69,6 +54,7 @@ static field_t snmp_fields[] = {
   { "snmp.object_id",    T_SNMPOID, "Object identifier" },
   { "snmp.value",        T_VBINSTR, "Object value" },
 };
+
 
 static void *
 snmp_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -100,12 +86,14 @@ snmp_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (cfg);
 }
 
+
 static void
 snmp_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ module configuration.
   ** (register configurable callbacks for examples) */
 }
+
 
 static void
 snmp_postcompil(orchids_t *ctx, mod_entry_t *mod)
@@ -114,38 +102,16 @@ snmp_postcompil(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static void
-set_some_flag(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  int someflag;
-
-  someflag = atoi(dir->args);
-  DebugLog(DF_MOD, DS_INFO, "setting some_flag to %i\n", someflag);
-
-  ((snmp_config_t *)mod->config)->some_flag = someflag;
-}
-
-static void
-set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  int someoption;
-
-  someoption = atoi(dir->args);
-  DebugLog(DF_MOD, DS_INFO, "setting some_option to %i\n", someoption);
-
-  ((snmp_config_t *)mod->config)->some_option = someoption;
-}
-
 static mod_cfg_cmd_t snmp_config_commands[] = 
 {
-  { "SomeFlag", set_some_flag, "Set some_flag value" },
-  { "SomeOption", set_some_option, "Set some_option value" },
   { NULL, NULL, NULL }
 };
+
 
 static char *snmp_dependencies[] = {
   NULL
 };
+
 
 input_module_t mod_snmp = {
   MOD_MAGIC,                /* Magic number */

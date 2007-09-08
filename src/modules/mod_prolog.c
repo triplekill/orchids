@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Fri Dec  2 14:20:58 2005
+ ** @date Last update: Sat Sep  8 18:54:51 2007
  **/
 
 /*
@@ -42,20 +42,11 @@ plld -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DHAVE_SWIPROLOG \
 
 #include "orchids.h"
 
-typedef struct prolog_cfg_s prolog_cfg_t;
-struct prolog_cfg_s {
-  struct timeval last_db_update;
-};
+#include "mod_prolog.h"
+
 
 input_module_t mod_prolog;
 
-static int pl_init(char *name, char *bootfile);
-static int pl_execute(const char *goal);
-static char *pl_execute_var(const char *goal_str, const char *var_name);
-static int set_prolog_io(const char *in, const char *out, const char *err);
-/* static int pl_dump_dyndb(const char *file); */
-static int pl_consult(const char *file);
-static int prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
 
 static int
 pl_init(char *name, char *bootfile)
@@ -87,6 +78,7 @@ pl_init(char *name, char *bootfile)
   return (TRUE);
 }
 
+
 static int
 pl_execute(const char *goal)
 {
@@ -106,6 +98,7 @@ pl_execute(const char *goal)
 
   return (retval);
 }
+
 
 static char *
 pl_execute_var(const char *goal_str, const char *var_name)
@@ -202,6 +195,7 @@ set_prolog_io(const char *in, const char *out, const char *err)
   return (ret);
 }
 
+
 #if 0
 int
 pl_dump_dyndb(const char *file)
@@ -224,6 +218,7 @@ pl_dump_dyndb(const char *file)
   return (ret);
 }
 #endif
+
 
 static int
 pl_consult(const char *file)

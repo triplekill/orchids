@@ -83,12 +83,12 @@ $(srcdir)/netfilter.tab.c $(srcdir)/netfilter.tab.h: $(srcdir)/netfilter.y
 $(srcdir)/netfilter.yy.c: $(srcdir)/netfilter.l
 	$(LEX) -f -Pnetfilter -o$(srcdir)/netfilter.yy.c $(srcdir)/netfilter.l
 
-mod_period_la_SOURCES = mod_period.c period.c period.h
+mod_period_la_SOURCES = mod_period.c mod_period.h period.c period.h
 mod_period_la_LDFLAGS = -module -avoid-version
 mod_period_la_LIBADD = -lm
 
 if HAVE_LIBPCAP
-mod_pcap_la_SOURCES = mod_pcap.c
+mod_pcap_la_SOURCES = mod_pcap.c mod_pcap.h
 mod_pcap_la_LDFLAGS = -module -avoid-version
 mod_pcap_la_LIBADD = $(PCAPLIB)
 mod_pcap_la_CFLAGS = $(PCAPINC)
@@ -105,7 +105,7 @@ mod_wifi_la_CFLAGS = $(PCAPINC)
 endif
 
 if USE_SWIPROLOG
-mod_prolog_la_SOURCES = mod_prolog.c
+mod_prolog_la_SOURCES = mod_prolog.c mod_prolog.h
 mod_prolog_la_LDFLAGS = -module -avoid-version $(SWIPL_LDFLAGS)
 mod_prolog_la_LIBADD = $(SWIPL_LDADD)
 mod_prolog_la_CFLAGS = $(SWIPL_CFLAGS)
@@ -123,13 +123,13 @@ mod_prolog.prc:
 -t "consult([]),qsave_program('mod_prolog.prc',[toplevel=prolog])"
 endif
 
-mod_rawsnare_la_SOURCES = mod_rawsnare.c rawsnare.h
+mod_rawsnare_la_SOURCES = mod_rawsnare.c mod_rawsnare.h rawsnare.h
 mod_rawsnare_la_LDFLAGS = -module -avoid-version
 
-mod_remoteadm_la_SOURCES = mod_remoteadm.c
+mod_remoteadm_la_SOURCES = mod_remoteadm.c mod_remoteadm.h
 mod_remoteadm_la_LDFLAGS = -module -avoid-version
 
-mod_snare_la_SOURCES = mod_snare.c snare.tab.c snare.tab.h snare.yy.c
+mod_snare_la_SOURCES = mod_snare.c mod_snare.h snare.tab.c snare.tab.h snare.yy.c
 mod_snare_la_LDFLAGS = -module -avoid-version
 
 $(srcdir)/snare.tab.c $(srcdir)/snare.tab.h: $(srcdir)/snare.y
@@ -139,7 +139,7 @@ $(srcdir)/snare.yy.c: $(srcdir)/snare.l
 	$(LEX) -f -Psnare -o$(srcdir)/snare.yy.c $(srcdir)/snare.l
 
 
-# mod_snmp_la_SOURCES = mod_snmp.c
+# mod_snmp_la_SOURCES = mod_snmp.c mod_snmp.h
 # mod_snmp_la_LDFLAGS = -module -avoid-version
 
 if USE_NETSNMP
@@ -186,7 +186,7 @@ mod_htmlstate_la_SOURCES = \
 mod_htmlstate_la_LDFLAGS = -module -avoid-version
 endif
 
-mod_sharedvars_la_SOURCES = mod_sharedvars.c
+mod_sharedvars_la_SOURCES = mod_sharedvars.c mod_sharedvars.h
 mod_sharedvars_la_LDFLAGS = -module -avoid-version
 
 mod_timeout_la_SOURCES = mod_timeout.c

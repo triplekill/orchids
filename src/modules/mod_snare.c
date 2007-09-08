@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Thu Feb 13 13:03:07 2003
- ** @date Last update: Tue Jul 31 23:36:05 2007
+ ** @date Last update: Sat Sep  8 19:30:48 2007
  **/
 
 /*
@@ -30,47 +30,11 @@
 
 #include "orchids_api.h"
 
-extern void snareparse_set_str(char *str, size_t s);
-extern void snareparse_set_attrs(ovm_var_t **attr_fields);
-extern int snareparse(void);
-extern void snareparse_set_attrs(ovm_var_t **attr_fields);
-extern void snareparse_reset(void);
+#include "mod_snare.h"
 
-#define SNARE_FIELDS 32
-#define F_TIME      0
-#define F_CLASS     1
-#define F_SYSCALL   2
-#define F_RUID      3
-#define F_RGID      4
-#define F_EUID      5
-#define F_EGID      6
-#define F_PID       7
-#define F_PROCNAME  8
-#define F_RETCODE   9
-#define F_WORKDIR   10
-#define F_PATH      11
-#define F_MODE      12
-#define F_CREATEMODE 13
-#define F_CMDLINE   14
-#define F_SRCPATH   15
-#define F_DSTPATH   16
-#define F_SOCKCALL  17
-#define F_DSTIP     18
-#define F_DSTPORT   19
-#define F_SRCIP     20
-#define F_SRCPORT   21
-#define F_OWNERUID  22
-#define F_OWNERGID  23
-#define F_TARGETID  24
-#define F_TARGETRID 25
-#define F_TARGETSID 26
-#define F_MODNAME   27
-#define F_SEQUENCE  28
-#define F_DEVMAJ    29
-#define F_DEVMIN    30
-#define F_OFFSET    31
 
 input_module_t mod_snare;
+
 
 static int
 snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
@@ -152,6 +116,7 @@ snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
+
 static void
 add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -167,6 +132,7 @@ add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
                                  snare_dissect, NULL);
 }
 
+
 static void
 add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -177,18 +143,20 @@ add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
                                  snare_dissect, NULL);
 }
 
-static mod_cfg_cmd_t snare_cfgcmds[] = 
-{
+
+static mod_cfg_cmd_t snare_cfgcmds[] = {
   { "AddTextfileSource", add_textfile_source, "Add text source file" },
   { "AddUdpSource", add_udp_source, "Add udp port source" },
   { NULL, NULL }
 };
+
 
 static char *snare_deps[] = {
   "udp",
   "textfile",
   NULL
 };
+
 
 input_module_t mod_snare = {
   MOD_MAGIC,
@@ -201,9 +169,6 @@ input_module_t mod_snare = {
   NULL,
   NULL
 };
-
-
-
 
 
 #if 0
@@ -232,7 +197,6 @@ main(int argc, char *argv[])
 }
 
 #endif /* 0 */
-
 
 
 /*

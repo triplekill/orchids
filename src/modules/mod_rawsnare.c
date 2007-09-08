@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb 14 18:36:36 2003
- ** @date Last update: Tue Jul 31 23:35:36 2007
+ ** @date Last update: Sat Sep  8 19:09:52 2007
  **/
 
 /*
@@ -33,49 +33,18 @@
 
 #include "rawsnare.h"
 
-#define RAWSNARE_FIELDS 35
-#define F_TIME      0
-#define F_CLASS     1
-#define F_SYSCALL   2
-#define F_RUID      3
-#define F_RGID      4
-#define F_EUID      5
-#define F_EGID      6
-#define F_PID       7
-#define F_PPID      8
-#define F_PROCNAME  9
-#define F_RETCODE   10
-#define F_WORKDIR   11
-#define F_PATH      12
-#define F_MODE      13
-#define F_CREATEMODE 14
-#define F_CMDLINE   15
-#define F_SRCPATH   16
-#define F_DSTPATH   17
-#define F_SOCKCALL  18
-#define F_DSTIP     19
-#define F_DSTPORT   20
-#define F_SRCIP     21
-#define F_SRCPORT   22
-#define F_OWNERUID  23
-#define F_OWNERGID  24
-#define F_TARGETID  25
-#define F_TARGETRID 26
-#define F_TARGETSID 27
-#define F_MODNAME   28
-#define F_PTRACEREQ 29
-#define F_PTRACEPID 30
-#define F_PTRACEADDR 31
-#define F_PTRACEDATA 32
-#define F_KILLPID 33
-#define F_KILLSIG 34
+#include "mod_rawsnare.h"
 
 input_module_t mod_rawsnare;
+
 static char *linux24_syscall_name_g[256];
+
 static char *linux24_socketcall_name_g[19];
+
 static char *linux24_ptrace_reqname_g[26];
 
 static char *linux24_signal_g[32];
+
 
 static int
 read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
@@ -114,6 +83,7 @@ read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
   return (0);
 }
 
+
 static int
 read_pc(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -136,6 +106,7 @@ read_pc(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 
   return (0);
 }
+
 
 static int
 read_exec(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
@@ -171,6 +142,7 @@ read_exec(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 
   return (0);
 }
+
 
 static int
 read_net(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
@@ -216,6 +188,7 @@ read_net(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
   return (0);
 }
 
+
 static int
 read_pt(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -256,6 +229,7 @@ read_pt(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 
   return (0);
 }
+
 
 static int
 read_kill(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
@@ -302,6 +276,7 @@ read_admin(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 }
 #endif
 
+
 static int
 read_ch(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -339,6 +314,7 @@ read_ch(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
   return (0);
 }
 
+
 static int
 read_cp(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -374,6 +350,7 @@ read_cp(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
   return (0);
 }
 
+
 static int
 read_su(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -406,6 +383,7 @@ read_su(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
   return (0);
 }
 
+
 static int
 read_ad(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -432,6 +410,7 @@ read_ad(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 
   return (0);
 }
+
 
 static
 int (*read_class[])(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr) = {
@@ -464,13 +443,14 @@ rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 
   attr[F_CLASS] = ovm_int_new();
   INT(attr[F_CLASS]) = snare_hdr->event_class;
-/*   attr[F_SYSCALL] = ovm_int_new(); */
-/*   INT(attr[F_SYSCALL]) = snare_hdr->event_id; */
-  /* XXX -- Text for demo !!! */
-  if (snare_hdr->event_id < 243) {
-  attr[F_SYSCALL] = ovm_vstr_new();
-  VSTR(attr[F_SYSCALL]) = linux24_syscall_name_g[ snare_hdr->event_id ];
-  VSTRLEN(attr[F_SYSCALL]) = strlen(linux24_syscall_name_g[snare_hdr->event_id]);
+  if (snare_hdr->event_id < LIN24_SYSCALL_MAX) {
+    /* XXX -- Text for demo !!! */
+    /* attr[F_SYSCALL] = ovm_int_new(); */
+    /* INT(attr[F_SYSCALL]) = snare_hdr->event_id; */
+    attr[F_SYSCALL] = ovm_vstr_new();
+    VSTR(attr[F_SYSCALL]) = linux24_syscall_name_g[ snare_hdr->event_id ];
+    VSTRLEN(attr[F_SYSCALL]) =
+      strlen(linux24_syscall_name_g[snare_hdr->event_id]);
   }
   attr[F_TIME] = ovm_timeval_new();
   attr[F_TIME]->flags |= TYPE_MONO;
@@ -556,6 +536,7 @@ rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   return (NULL);
 }
+
 
 static void
 add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
