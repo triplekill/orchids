@@ -9,7 +9,7 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Sat Sep  8 18:49:45 2007
+ ** @date Last update: Fri Sep 14 19:04:54 2007
  **/
 
 /*
@@ -26,6 +26,7 @@
 
 #include "orchids.h"
 
+#include "file_cache.h"
 #include "period.h"
 
 #include "mod_period.h"

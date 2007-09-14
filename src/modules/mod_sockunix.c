@@ -9,7 +9,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 16:56:40 2003
- ** @date Last update: Tue Jul 31 23:36:37 2007
+ ** @date Last update: Fri Sep 14 18:15:55 2007
  **/
 
 /*
@@ -36,34 +36,10 @@
 
 #include "orchids_api.h"
 
-#define SOCKUNIX_FIELDS 4
-#define F_EVENT    0
-#define F_TIME     1
-#define F_SOCKET   2
-#define F_MSG      3
+#include "mod_sockunix.h"
 
 input_module_t mod_sockunix;
 
-#if 0
-static int
-create_udp_socket(int udp_port)
-{
-  int fd, on = 1;
-  struct sockaddr_in sin;
-
-  fd = Xsocket(AF_INET, SOCK_DGRAM, 0);
-
-  memset(&sin, 0, sizeof(sin));
-  sin.sin_family = AF_INET;
-  sin.sin_port = htons(udp_port);
-
-  Xsetsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-
-  Xbind(fd, (struct sockaddr *) &sin, sizeof(sin));
-
-  return (fd);
-}
-#endif
 
 static int
 create_sockunix_socket(const char *path)
@@ -118,12 +94,6 @@ sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   attr[F_TIME] = ovm_timeval_new();
   attr[F_TIME]->flags |= TYPE_MONO;
   gettimeofday( &(TIMEVAL(attr[F_TIME])) , NULL);
-
-/*   attr[F_SRC_ADDR] = ovm_ipv4_new(); */
-/*   IPV4(attr[F_SRC_ADDR]) = from.sin_addr; */
-
-/*   attr[F_DST_PORT] = ovm_int_new(); */
-/*   INT(attr[F_DST_PORT]) = (int) data; */
 
   attr[F_EVENT] = ovm_int_new();
   attr[F_EVENT]->flags |= TYPE_MONO;

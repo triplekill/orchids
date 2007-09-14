@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Fri Aug  3 10:14:36 2007
+ ** @date Last update: Fri Sep 14 18:59:39 2007
  **/
 
 /*
@@ -44,6 +44,7 @@
 #include "evt_mgr.h"
 #include "graph_output.h"
 #include "orchids_api.h"
+#include "file_cache.h"
 
 #include "html_output.h"
 

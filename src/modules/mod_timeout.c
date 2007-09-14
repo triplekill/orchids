@@ -1,13 +1,13 @@
 /**
  ** @file mod_timeout.c
- ** 
+ ** A module for implementing active real-time timeouts.
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** 
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri Jun 15 10:53:53 2007
- ** @date Last update: Tue Jul 31 23:39:01 2007
+ ** @date Last update: Fri Sep 14 18:34:47 2007
  **/
 
 /*
@@ -28,20 +28,15 @@
 #include "evt_mgr.h"
 #include "orchids_api.h"
 
-input_module_t mod_timeout;
+#include "mod_timeout.h"
 
-#define TIMEOUT_FIELDS  7
-#define F_DATE          0
-#define F_REGDATE       1
-#define F_NAME          2
-#define F_RULE          3
-#define F_RULEINST      4
-#define F_STATE         5
-#define F_STATEINST     6
+
+input_module_t mod_timeout;
 
 /* XXX: small hack to retrieve the mod entry
    in language function and/or rtcallback */
 static mod_entry_t *mod_entry_g = NULL;
+
 
 static field_t timeout_fields[] = {
   { "timeout.date",        T_TIMEVAL,  "Date when the timeout triggered"   },
@@ -52,6 +47,7 @@ static field_t timeout_fields[] = {
   { "timeout.state",       T_VSTR,     "Name of the registration state" },
   { "timeout.state_inst",  T_INT,      "Instance ID of the registration state instance" },
 };
+
 
 static int
 timeout_rtcallback(orchids_t *ctx, rtaction_t *e)
@@ -74,6 +70,7 @@ timeout_rtcallback(orchids_t *ctx, rtaction_t *e)
 
   return (0);
 }
+
 
 static void
 issdl_timeout(orchids_t *ctx, state_instance_t *state)
@@ -119,6 +116,7 @@ issdl_timeout(orchids_t *ctx, state_instance_t *state)
 
   /* XXX: FREE IF NEEDED parameters */
 }
+
 
 static void *
 timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)

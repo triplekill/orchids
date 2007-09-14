@@ -68,7 +68,7 @@ $(srcdir)/cisco.yy.c: $(srcdir)/cisco.l
 mod_clocks_la_SOURCES = mod_clocks.c mod_clocks.h
 mod_clocks_la_LDFLAGS = -module -avoid-version
 
-mod_consoles_la_SOURCES = mod_consoles.c mod_console.h
+mod_consoles_la_SOURCES = mod_consoles.c mod_consoles.h
 mod_consoles_la_LDFLAGS = -module -avoid-version
 
 mod_generic_la_SOURCES = mod_generic.c mod_generic.h
@@ -143,13 +143,13 @@ $(srcdir)/snare.yy.c: $(srcdir)/snare.l
 # mod_snmp_la_LDFLAGS = -module -avoid-version
 
 if USE_NETSNMP
-mod_snmptrap_la_SOURCES = mod_snmptrap.c
+mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
 mod_snmptrap_la_CFLAGS = $(NETSNMP_CFLAGS)
 mod_snmptrap_la_LDFLAGS = -module -avoid-version
 mod_snmptrap_la_LIBADD = $(NETSNMP_LDFLAGS)
 endif
 
-mod_sockunix_la_SOURCES = mod_sockunix.c
+mod_sockunix_la_SOURCES = mod_sockunix.c mod_sockunix.h
 mod_sockunix_la_LDFLAGS = -module -avoid-version
 
 # mod_stats_la_SOURCES = mod_stats.c
@@ -158,7 +158,7 @@ mod_sockunix_la_LDFLAGS = -module -avoid-version
 mod_sunbsm_la_SOURCES = mod_sunbsm.c
 mod_sunbsm_la_LDFLAGS = -module -avoid-version
 
-mod_syslog_la_SOURCES = mod_syslog.c
+mod_syslog_la_SOURCES = mod_syslog.c mod_syslog.h
 mod_syslog_la_LDFLAGS = -module -avoid-version
 
 # mod_template_la_SOURCES = mod_template.c
@@ -170,26 +170,26 @@ mod_syslog_la_LDFLAGS = -module -avoid-version
 # mod_test_la_SOURCES = mod_test.c
 # mod_test_la_LDFLAGS = -module -avoid-version
 
-mod_textfile_la_SOURCES = mod_textfile.c
+mod_textfile_la_SOURCES = mod_textfile.c mod_textfile.h
 mod_textfile_la_LDFLAGS = -module -avoid-version
 
-mod_udp_la_SOURCES = mod_udp.c
+mod_udp_la_SOURCES = mod_udp.c mod_udp.h
 mod_udp_la_LDFLAGS = -module -avoid-version
 
-mod_win32evt_la_SOURCES = mod_win32evt.c
+mod_win32evt_la_SOURCES = mod_win32evt.c mod_win32evt.h
 mod_win32evt_la_LDFLAGS = -module -avoid-version
 
 if ENABLE_HTMLOUTPUT
 mod_htmlstate_la_SOURCES = \
   mod_htmlstate.c mod_htmlstate.h \
-  html_output.c file_cache.c
+  html_output.c html_output.h \
+  file_cache.c file_cache.h file_cache_priv.h
 mod_htmlstate_la_LDFLAGS = -module -avoid-version
 endif
-
 mod_sharedvars_la_SOURCES = mod_sharedvars.c mod_sharedvars.h
 mod_sharedvars_la_LDFLAGS = -module -avoid-version
 
-mod_timeout_la_SOURCES = mod_timeout.c
+mod_timeout_la_SOURCES = mod_timeout.c mod_timeout.h
 mod_timeout_la_LDFLAGS = -module -avoid-version
 
 mod_ruletrace_la_SOURCES = mod_ruletrace.c mod_ruletrace.h

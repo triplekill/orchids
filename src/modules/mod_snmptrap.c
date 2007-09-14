@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Jul 31 23:36:22 2007
+ ** @date Last update: Fri Sep 14 18:45:36 2007
  **/
 
 /*
@@ -41,33 +41,10 @@
 
 #include "orchids_api.h"
 
+#include "mod_snmptrap.h"
+
 input_module_t mod_snmptrap;
 
-#define SNMPTRAP_FIELDS   15
-#define F_SEQ 0
-#define F_BIND 1
-#define F_VERSION     2
-#define F_COMMUNITY   3
-#define F_PDUTYPE     4
-#define F_OBJECTID    5
-#define F_VALUE       6
-
-#define F_ENTERPRISE 7
-#define F_AGENT_ADDR 8
-#define F_TRAPTYPE 9
-#define F_SPECIFIC_TRAPTYPE 10
-#define F_TIMESTAMP 11
-
-#define F_REQUESTID   12
-#define F_ERRORSTATUS 13
-#define F_ERRORINDEX  14
-
-typedef struct snmptrap_config_s snmptrap_config_t;
-struct snmptrap_config_s
-{
-  int some_flag;
-  int some_option;
-};
 
 /* static long seq_g = 0; */
 
@@ -280,8 +257,7 @@ add_mib_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 }
 
-static mod_cfg_cmd_t snmptrap_config_commands[] = 
-{
+static mod_cfg_cmd_t snmptrap_config_commands[] = {
   { "AddMibDir", add_mib_dir, "Add a MIB directory" },
   { "AddMib", add_mib, "Add a MIB module" },
   { "AddMibFile", add_mib_file, "Add a MIB file" },

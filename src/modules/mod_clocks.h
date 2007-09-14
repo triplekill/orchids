@@ -8,7 +8,7 @@
  ** @ingroup modules
  ** 
  ** @date  Started on: Mon Dec 01 00:57:32 2003
- ** @date Last update: Thu Aug  2 23:48:08 2007
+ ** @date Last update: Fri Sep 14 19:06:17 2007
  **/
 
 /*
@@ -30,8 +30,8 @@ typedef float prob_t;
 
 typedef unsigned long sequence_t;
 
-typedef struct clock_s clock_t;
-struct clock_s {
+typedef struct myclock_s myclock_t;
+struct myclock_s {
   char *name;
   timefloat_t prec;
   timefloat_t sync;
@@ -39,7 +39,7 @@ struct clock_s {
 
 typedef struct clocktime_s clocktime_t;
 struct clocktime_s {
-  clock_t *clock;
+  myclock_t *clock;
   sequence_t seq;
   timefloat_t time;
 };

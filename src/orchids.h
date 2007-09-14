@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Aug  3 12:27:55 2007
+ ** @date Last update: Fri Sep 14 19:01:15 2007
  **/
 
 /*
@@ -65,10 +65,6 @@ extern unsigned long dmalloc_orchids;
 #define ERR_CFG_PEOF 1
 #define ERR_CFG_SECT 2
 #define CONFIG_IGNORE_LINE 1
-
-#define NO_CACHE 0
-#define USE_CACHE 1
-#define CACHE_HIT ((void *)-1)
 
 /* orchids module magic number ('ORCH' in an int) */
 #define MOD_MAGIC 0x4F524348 /* (0x4843524F w/ byteswaping) */
@@ -1505,25 +1501,6 @@ int
 snprintf_uptime(char *str, size_t size, time_t uptime);
 int
 snprintf_uptime_short(char *str, size_t size, time_t uptime);
-
-
-/*
- * file_cache.c
- */
-void
-cache_gc(char *dir,
-	 char *prefix,
-	 int file_limit,
-	 size_t size_limit,
-	 time_t time_limit);
-
-FILE *
-fopen_cached(const char *path);
-
-int
-cached_file(const char *path);
-
-
 
 
 

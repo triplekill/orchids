@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
- ** @date Last update: Tue Jul 31 23:37:43 2007
+ ** @date Last update: Fri Sep 14 18:31:15 2007
  **/
 
 /*
@@ -32,53 +32,10 @@
 #include "evt_mgr.h"
 #include "orchids_api.h"
 
-#define TF_FIELDS  3
-#define F_LINE_NUM 0
-#define F_FILE     1
-#define F_LINE     2
+#include "mod_textfile.h"
 
-/*
-** module flags:
-** the two LSBs identify integrity check method
-** the third bit control file safety checks
-*/
-#define TXTFILE_CHK_NONE    0x00
-#define TXTFILE_CHK_CRC32   0x01
-#define TXTFILE_CHK_MD5     0x02
-#define TXTFILE_CHK_SHA1    0x03
-#define TXTFILE_SAFE_REOPEN 0x04
-
-#define HASH_SIZE 32
-
-#define DEFAULT_MODTEXT_POLL_PERIOD 10
-#define INITIAL_MODTEXT_POLL_DEFAY  10
-
-typedef struct textfile_s textfile_t;
-struct textfile_s
-{
-  struct textfile_s *next;
-  char *filename;
-  FILE *fd;
-  struct stat file_stat;
-  unsigned int line;
-  unsigned char hash[HASH_SIZE];
-};
-
-typedef struct textfile_config_s textfile_config_t;
-struct textfile_config_s
-{
-  int flags;
-  int proceed_all_data;
-  int poll_period;
-  struct textfile_s *file_list;
-};
 
 input_module_t mod_textfile;
-
-static void
-add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-static int
-rtaction_read_files(orchids_t *ctx, rtaction_t *e);
 
 
 static void
@@ -107,6 +64,7 @@ textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf)
 
   post_event(ctx, mod, event);
 }
+
 
 static int
 textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
@@ -164,6 +122,7 @@ static field_t tf_fields[] = {
   { "textfile.line",     T_STR,  "a line of a given textfile" }
 };
 
+
 static void *
 textfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -178,6 +137,7 @@ textfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   return (mod_cfg);
 }
+
 
 static void
 textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -198,6 +158,7 @@ textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 			INITIAL_MODTEXT_POLL_DEFAY);
   }
 }
+
 
 static void
 textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
@@ -226,6 +187,7 @@ textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
     }
   }
 }
+
 
 static void
 add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -259,6 +221,7 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   cfg->file_list = f;
 }
 
+
 static void
 set_proceed_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -270,6 +233,7 @@ set_proceed_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   if (flag)
     ((textfile_config_t *)mod->config)->proceed_all_data = 1;
 }
+
 
 static void
 set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -285,6 +249,7 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ((textfile_config_t *)mod->config)->poll_period = value;
 }
+
 
 static int
 rtaction_read_files(orchids_t *ctx, rtaction_t *e)
@@ -308,7 +273,6 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
 }
 
 
-
 static mod_cfg_cmd_t textfile_dir[] = 
 {
   { "AddInputFile", add_input_file, "Add a file as input source" },
@@ -316,6 +280,7 @@ static mod_cfg_cmd_t textfile_dir[] =
   { "SetPollPeriod", set_poll_period, "Set poll period in second for files" },
   { NULL, NULL }
 };
+
 
 input_module_t mod_textfile = {
   MOD_MAGIC,

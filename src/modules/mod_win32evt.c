@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Tue Jul 31 23:38:47 2007
+ ** @date Last update: Fri Sep 14 18:43:50 2007
  **/
 
 /*
@@ -31,102 +31,12 @@
 
 #include "orchids_api.h"
 
-/*
-typedef unsigned long DWORD;
-typedef unsigned short WORD;
-*/
-
-#define MSEVT_RESERVED 0x654C664C
-
-#define MSEVT_MAGIC1 0x11111111UL
-#define MSEVT_MAGIC2 0x22222222UL
-#define MSEVT_MAGIC3 0x33333333UL
-#define MSEVT_MAGIC4 0x44444444UL
-
-#define WIN32EVT_FIELDS 7
-#define F_RECNUM        0
-#define F_GENTIME       1
-#define F_WRITIME       2
-#define F_EVENTID       3
-#define F_EVENTTYPE     4
-#define F_EVENTCAT      5
-#define F_USERSID       6
-#define F_DATA          7
-
-typedef struct event_log_header_s
-{
-  unsigned long length; /* length of header record == 48 */
-  unsigned long reserved; /* magic number == MSEVT_RESERVER */
-  unsigned long val0; /* ??? usually == 1 */
-  unsigned long val1; /* ??? usually == 1 */
-  unsigned long first_record_offset; /* offset of the first event record */
-  unsigned long trailer_record_offset; /* offset of the trailer record */
-  unsigned long number_of_records; /* number of records (events + 1 for header)*/
-  unsigned long val5; /* ??? usually == 1 */
-  unsigned long used_file_size; /* file size */
-  unsigned long pending_events; /* event writed on file (at the trailer_record_offset) */
-  unsigned long time_limit;
-  unsigned long length_end;
-} event_log_header_t;
-
-typedef struct event_log_trailer_s
-{
-  unsigned long length;
-  unsigned long magic1;
-  unsigned long magic2;
-  unsigned long magic3;
-  unsigned long magic4;
-  unsigned long first_record_new_offset;
-  unsigned long trailer_record_new_offset;
-  unsigned long new_number_of_records;
-  unsigned long val4;
-  unsigned long length_end;
-} event_log_trailer_t;
-
-#define EVENT_HEADER_SIZE 56
-
-typedef struct event_log_record_s
-{
-  unsigned long length;
-  unsigned long reserved;
-  unsigned long record_number;
-  unsigned long time_generated;
-  unsigned long time_written;
-  unsigned long event_id;
-  unsigned short event_type;
-  unsigned short num_strings;
-  unsigned short event_category;
-  unsigned short reserved_flags;
-  unsigned long closing_record_number;
-  unsigned long string_offset;
-  unsigned long user_sid_length;
-  unsigned long user_sid_offset;
-  unsigned long data_length;
-  unsigned long data_offset;
-
-  unsigned char extra_data[0]; /* NOT ISO C89 ! */
-
-/*   wchar_t source_name[]; */
-/*   wchar_t computername[]; */
-/*   unsigned char user_sid[]; */
-/*   wchar_t strings[]; */
-/*   unsigned char data[]; */
-/*   char pad[]; */
-/*   unsigned int pad_len; */
-/*   unsigned long length_end; */
-
-} event_log_record_t;
-
+#include "mod_win32evt.h"
 
 input_module_t mod_win32evt;
 
-typedef struct win32evt_config_s win32evt_config_t;
-struct win32evt_config_s
-{
-  void *files;
-};
 
-void
+static void
 fprintf_event_log_header(FILE *fp, event_log_header_t *hdr)
 {
   fprintf(fp, "---------------[ log header ]-------------\n");
@@ -154,7 +64,8 @@ fprintf_event_log_header(FILE *fp, event_log_header_t *hdr)
           hdr->length_end, hdr->length_end);
 }
 
-void
+
+static void
 fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer)
 {
   fprintf(fp, "---------------[ log trailer ]-------------\n");
@@ -179,6 +90,8 @@ fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer)
   fprintf(fp, "               length_end: 0x%08lx (%lu)\n",
           trailer->length_end, trailer->length_end);
 }
+
+
 
 void
 fprintf_event_log_record(FILE *fp, event_log_record_t *event)
@@ -291,7 +204,8 @@ fprintf_event_log_record(FILE *fp, event_log_record_t *event)
   fprintf(fp, "\n");
 }
 
-int
+
+static int
 get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 {
   int sz;
@@ -328,7 +242,7 @@ get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 }
 
 
-event_log_record_t *
+static event_log_record_t *
 get_next_event_log_record(FILE *fp)
 {
   event_log_record_t header;
@@ -339,7 +253,8 @@ get_next_event_log_record(FILE *fp)
   return (NULL);
 }
 
-void
+
+static void
 read_record(const char *file)
 {
   FILE *fp;
@@ -474,6 +389,7 @@ read_record(const char *file)
   fprintf_event_log_trailer(stdout, &trailer);
 }
 
+
 #if WIN32EVT
 static int
 win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
@@ -500,6 +416,7 @@ static field_t win32evt_fields[] = {
   { "win32evt.data",       T_VBSTR,   "Event data"               },
 };
 
+
 static void *
 win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -517,6 +434,7 @@ win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (cfg);
 }
 
+
 static void
 win32evt_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -524,16 +442,18 @@ win32evt_postconfig(orchids_t *ctx, mod_entry_t *mod)
   ** (register configurable callbacks for examples) */
 }
 
+
 static void
 win32evt_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ rule compilation. */
 }
 
-static mod_cfg_cmd_t win32evt_config_commands[] = 
-{
+
+static mod_cfg_cmd_t win32evt_config_commands[] = {
   { NULL, NULL, NULL }
 };
+
 
 input_module_t mod_win32evt = {
   MOD_MAGIC,                /* Magic number */

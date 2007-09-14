@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:48:03 2004
- ** @date Last update: Fri Mar 30 10:31:52 2007
+ ** @date Last update: Fri Sep 14 18:54:05 2007
  **/
 
 /*
@@ -40,14 +40,19 @@
 
 #include "orchids.h"
 
+#include "file_cache.h"
+#include "file_cache_priv.h"
+
 static char *cache_gc_prefix_g = NULL;
 static char *cache_gc_dir_g = NULL;
+
 
 static int
 cache_gc_select(const struct dirent *d)
 {
   return (!strncmp(cache_gc_prefix_g, d->d_name, strlen(cache_gc_prefix_g)));
 }
+
 
 static int
 cache_gc_compar(const void *a, const void *b)
@@ -66,6 +71,7 @@ cache_gc_compar(const void *a, const void *b)
 
   return (stat_b.st_mtime - stat_a.st_mtime);
 }
+
 
 void
 cache_gc(char *dir,
@@ -108,6 +114,7 @@ cache_gc(char *dir,
   }
 }
 
+
 FILE *
 fopen_cached(const char *path)
 {
@@ -140,6 +147,7 @@ fopen_cached(const char *path)
 
   return (CACHE_HIT);
 }
+
 
 int
 cached_file(const char *path)

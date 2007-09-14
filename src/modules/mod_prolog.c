@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Sat Sep  8 18:54:51 2007
+ ** @date Last update: Fri Sep 14 19:05:34 2007
  **/
 
 /*
@@ -41,6 +41,7 @@ plld -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DHAVE_SWIPROLOG \
 #include <SWI-Prolog.h>
 
 #include "orchids.h"
+#include "file_cache.h"
 
 #include "mod_prolog.h"
 

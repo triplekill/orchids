@@ -8,7 +8,7 @@
  ** @ingroup modules
  ** 
  ** @date  Started on: Mon Dec 01 00:57:32 2003
- ** @date Last update: Thu Aug  2 23:51:17 2007
+ ** @date Last update: Fri Sep 14 19:08:29 2007
  **/
 
 /*
@@ -30,6 +30,7 @@
 
 #include "safelib.h"
 #include "strhash.h"
+#include "file_cache.h"
 
 #include "mod_clocks.h"
 
@@ -56,9 +57,9 @@ clock_add_float(clockctx_t *ctx,
                 timefloat_t prec,
                 timefloat_t sync)
 {
-  clock_t *clock;
+  myclock_t *clock;
 
-  clock = Xzmalloc(sizeof (clock_t));
+  clock = Xzmalloc(sizeof (myclock_t));
   clock->name = name;
   clock->prec = prec;
   clock->sync = sync;
@@ -190,7 +191,7 @@ make_clocktime(clockctx_t *ctx,
                sequence_t seq,
                char *clock_name)
 {
-  clock_t *clock;
+  myclock_t *clock;
 
   clock = strhash_get(ctx->clocks, clock_name);
   if (clock == NULL)
@@ -210,7 +211,7 @@ make_clocktime_float(clockctx_t *ctx,
                      sequence_t seq,
                      char *clock_name)
 {
-  clock_t *clock;
+  myclock_t *clock;
 
   clock = strhash_get(ctx->clocks, clock_name);
   if (clock == NULL)
@@ -295,7 +296,7 @@ add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 static int
 qsort_clockcmp(const void *a, const void *b)
 {
-  return ( strcmp(((clock_t*)a)->name, ((clock_t *)b)->name) );
+  return ( strcmp(((myclock_t*)a)->name, ((myclock_t *)b)->name) );
 }
 
 
@@ -308,7 +309,7 @@ clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 /*  strhash_t *clocks; */
 /*   int nb_clocks; */
   size_t ctx_array_sz;
-  clock_t **ctx_array;
+  myclock_t **ctx_array;
   clockctx_t *modcfg;
 
   modcfg = mod->config;
@@ -325,7 +326,7 @@ clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 
   ctx_array = strhash_to_array(modcfg->clocks);
   ctx_array_sz = modcfg->clocks->elmts;
-  qsort(ctx_array, ctx_array_sz, sizeof (clock_t *), qsort_clockcmp);
+  qsort(ctx_array, ctx_array_sz, sizeof (myclock_t *), qsort_clockcmp);
 
   for (i = 0; i < ctx_array_sz; i++) {
     fprintf(fp,
@@ -506,7 +507,7 @@ parse_config(clockctx_t *ctx, char *file)
 }
 
 
-#endif
+#endif /* 0 */
 
 
 /*

@@ -2,14 +2,13 @@
  ** @file mod_udp.c
  ** Listen to events on udp sockets.
  **
- **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 16:56:40 2003
- ** @date Last update: Tue Jul 31 23:38:35 2007
+ ** @date Last update: Fri Sep 14 18:36:50 2007
  **/
 
 /*
@@ -34,16 +33,10 @@
 
 #include "orchids_api.h"
 
-#define UDP_FIELDS 7
-#define F_EVENT    0
-#define F_TIME     1
-#define F_SRC_ADDR 2
-#define F_SRC_PORT 3
-#define F_DST_ADDR 4
-#define F_DST_PORT 5
-#define F_MSG      6
+#include "mod_udp.h"
 
 input_module_t mod_udp;
+
 
 static int
 create_udp_socket(int udp_port)
@@ -63,6 +56,7 @@ create_udp_socket(int udp_port)
 
   return (fd);
 }
+
 
 static int
 udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
@@ -110,6 +104,7 @@ udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   return (0);
 }
 
+
 static field_t udp_fields[] = {
   { "udp.event",    T_INT,      "event number"        },
   { "udp.time",     T_TIMEVAL,  "reception time"      },
@@ -120,6 +115,7 @@ static field_t udp_fields[] = {
   { "udp.msg",      T_BSTR,     "message"             }
 };
 
+
 static void *
 udp_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -129,6 +125,7 @@ udp_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   return (NULL);
 }
+
 
 static void
 add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -148,11 +145,12 @@ add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   add_input_descriptor(ctx, mod, udp_callback, sd, (void *)port);
 }
 
-static mod_cfg_cmd_t udp_dir[] = 
-{
+
+static mod_cfg_cmd_t udp_dir[] = {
   { "AddListenPort", add_listen_port, "Add a listen port for udp input" },
   { NULL, NULL }
 };
+
 
 input_module_t mod_udp = {
   MOD_MAGIC,

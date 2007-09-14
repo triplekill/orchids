@@ -8,7 +8,7 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:21:55 2003
- ** @date Last update: Tue Jul 31 23:37:07 2007
+ ** @date Last update: Fri Sep 14 18:46:13 2007
  **/
 
 /*
@@ -28,19 +28,9 @@
 
 #include "orchids_api.h"
 
+#include "mod_syslog.h"
+
 input_module_t mod_syslog;
-
-#define SYSLOG_FIELDS 8
-#define F_FACILITY 0
-#define F_SEVERITY 1
-#define F_TIME 2
-#define F_HOST 3
-#define F_REPEAT 4
-#define F_PID 5
-#define F_PROG 6
-#define F_MSG 7
-
-struct tm *syslog_getdate(const char *date);
 
 /*
 ** priority = facility * 8 + severity
@@ -87,7 +77,6 @@ static char *syslog_facility_g[] = {
 };
 
 
-/* XXX: put this two function in a orchids-stdlib ?? */
 static int
 dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
@@ -247,17 +236,8 @@ dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
   /* remaining string is the syslog message */
   attr[F_MSG] = ovm_vstr_new();
   token_size = my_strspn(txt_line, "\r\n", txt_len);
-  /* VSTRLEN(attr[F_MSG]) = txt_len - 1; */
   VSTRLEN(attr[F_MSG]) = token_size;
   VSTR(attr[F_MSG]) = txt_line;
-
-/*   add_value_to_event(&event, "syslog.facility", (ovm_var_t *)facility); */
-/*   add_value_to_event(&event, "syslog.severity", (ovm_var_t *)severity); */
-/*   add_value_to_event(&event, "syslog.date", (ovm_var_t *) date); */
-/*   add_value_to_event(&event, "syslog.host", (ovm_var_t *) host); */
-/*   add_value_to_event(&event, "syslog.pid", (ovm_var_t *) pid); */
-/*   add_value_to_event(&event, "syslog.prog", (ovm_var_t *) src_prog); */
-/*   add_value_to_event(&event, "syslog.msg", (ovm_var_t *) msg); */
 
   add_fields_to_event(ctx, mod, &event, attr, SYSLOG_FIELDS);
 
@@ -277,6 +257,7 @@ field_t syslog_fields[] = {
   { "syslog.msg",      T_VSTR,  "the message"                    }
 };
 
+
 static void *
 syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -286,6 +267,7 @@ syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   return (NULL);
 }
+
 
 static void
 add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -303,6 +285,7 @@ add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
                                  dissect_syslog, NULL);
 }
 
+
 static void
 add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -312,6 +295,7 @@ add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
                                  (void *)dir->args, strlen(dir->args),
                                  dissect_syslog, NULL);
 }
+
 
 static void
 add_sockunix_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -324,19 +308,20 @@ add_sockunix_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static mod_cfg_cmd_t syslog_cfgcmds[] = 
-{
+static mod_cfg_cmd_t syslog_cfgcmds[] = {
   { "AddTextfileSource", add_textfile_source, "Add text source file" },
   { "AddUdpSource", add_udp_source, "Add udp port source" },
   { "AddUnixSocketSource", add_sockunix_source, "Add a unix socket source"},
   { NULL, NULL, NULL }
 };
 
+
 static char *syslog_deps[] = {
   "udp",
   "textfile",
   NULL
 };
+
 
 input_module_t mod_syslog = {
   MOD_MAGIC,
@@ -355,19 +340,6 @@ input_module_t mod_syslog = {
 ** date convertion
 */
 
-#define JAN 0
-#define FEB 1
-#define MAR 2
-#define AVR 3
-#define MAY 4
-#define JUN 5
-#define JUL 6
-#define AUG 7
-#define SEP 8
-#define OCT 9
-#define NOV 10
-#define DEC 11
-
 struct tm *
 syslog_getdate(const char *date)
 {
@@ -375,65 +347,61 @@ syslog_getdate(const char *date)
   int day;
 
   /* XXX hard coded year */
-  t.tm_year = 103;
+  t.tm_year = 107;
 
-  switch (date[0])
-    {
+  switch (date[0]) {
     case 'A': /* Aug, Avr */
-      switch (date[1])
-        {
+      switch (date[1]) {
         case 'u':
-          t.tm_mon = AUG;
+          t.tm_mon = MOD_SYSLOG_AUG;
           break;
         case 'v':
-          t.tm_mon = AVR;
+          t.tm_mon = MOD_SYSLOG_AVR;
           break;
-        }
+      }
       break;
 
     case 'D': /* Dec */
-      t.tm_mon = DEC;
+      t.tm_mon = MOD_SYSLOG_DEC;
       break;
 
     case 'F': /* Feb */
-      t.tm_mon = FEB;
+      t.tm_mon = MOD_SYSLOG_FEB;
       break;
 
     case 'J': /* Jan, Jul, Jun */
-      if (date[1] == 'a')
-        {
-          t.tm_mon = JAN;
-        }
-      else if (date[1] == 'u' && date[2] == 'l')
-        {
-          t.tm_mon = JUL;
-        }
-      else if (date[1] == 'u' && date[2] == 'n')
-          t.tm_mon = JUN;
+      if (date[1] == 'a') {
+        t.tm_mon = MOD_SYSLOG_JAN;
+      }
+      else if (date[1] == 'u' && date[2] == 'l') {
+        t.tm_mon = MOD_SYSLOG_JUL;
+      }
+      else if (date[1] == 'u' && date[2] == 'n') {
+        t.tm_mon = MOD_SYSLOG_JUN;
+      }
       break;
 
     case 'M': /* Mar, May */
-      switch (date[2])
-        {
-        case 'r':
-          t.tm_mon = MAR;
-          break;
-        case 'y':
-          t.tm_mon = MAY;
-          break;
-        }
+      switch (date[2]) {
+      case 'r':
+        t.tm_mon = MOD_SYSLOG_MAR;
+        break;
+      case 'y':
+        t.tm_mon = MOD_SYSLOG_MAY;
+        break;
+      }
       break;
 
     case 'N': /* Nov */
-          t.tm_mon = NOV;
+      t.tm_mon = MOD_SYSLOG_NOV;
       break;
 
     case 'O': /* Oct */
-          t.tm_mon = OCT;
+      t.tm_mon = MOD_SYSLOG_OCT;
       break;
 
     case 'S': /* Sep */
-          t.tm_mon = SEP;
+      t.tm_mon = MOD_SYSLOG_SEP;
       break;
 
     default:
@@ -441,10 +409,12 @@ syslog_getdate(const char *date)
       break;
     }
 
-  if (date[4] != ' ')
+  if (date[4] != ' ') {
     day = (date[4] - '0') * 10;
-  else
+  }
+  else {
     day = 0;
+  }
   day += date[5] - '0';
   t.tm_mday = day;
 
@@ -454,7 +424,6 @@ syslog_getdate(const char *date)
 
   return (&t);
 }
-
 
 
 /*
