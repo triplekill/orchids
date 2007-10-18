@@ -38,9 +38,10 @@ vim-minimal
 sudo
 rsync
 wget
-man
+#man
 tcpdump
 cpufreq-utils
+memtest86+
 
 # dev tools
 #gcc
@@ -55,12 +56,14 @@ cpufreq-utils
 # Xorg
 xorg-x11-xinit
 xorg-x11-server-Xorg
+xorg-x11-server-utils
 xorg-x11-drv-*
 -xorg-x11-drv-*-devel
 system-config-display
 gdm
 #xorg-x11-xdm
-fluxbox
+WindowMaker
+#fluxbox
 xterm
 
 # tools for demo
@@ -69,6 +72,7 @@ httpd
 firefox
 gkrellm
 rsh
+xpdf
 
 # Orchids dependencies
 pl
@@ -118,32 +122,19 @@ if [ -b /dev/live ]; then
    mount -o ro /dev/live /mnt/live
 fi
 
-# configure X
-exists system-config-display --noui --reconfig --set-depth=24
+# configure X, allowing user to override xdriver
+for o in \`cat /proc/cmdline\` ; do
+    case \$o in
+    xdriver=*)
+        xdriver="--set-driver=\${o#xdriver=}"
+        ;;
+    esac
+done
+
+exists system-config-display --noui --reconfig --set-depth=24 \$xdriver
 
 # unmute sound card
 exists alsaunmute 0 2> /dev/null
-
-# add fedora user with no passwd
-useradd -c "Fedora Live" fedora
-passwd -d fedora > /dev/null
-# disable screensaver locking
-gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
-# set up timed auto-login for after 60 seconds
-sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=fedora\nTimedLoginDelay=60/' /etc/gdm/custom.conf
-if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
-    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
-    chown fedora:fedora /home/fedora/.face
-    # TODO: would be nice to get e-d-s to pick this one up too... but how?
-fi
-
-# Set default session
-cat > ~fedora/.dmrc << END_OF_DMRC
-[Desktop]
-Session=fluxbox
-END_OF_DMRC
-chown fedora:fedora ~fedora/.dmrc
-chmod 644 ~fedora/.dmrc
 
 # turn off firstboot for livecd boots
 #echo "RUN_FIRSTBOOT=NO" > /etc/sysconfig/firstboot
@@ -162,9 +153,32 @@ chmod 644 ~fedora/.dmrc
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
 END_OF_SCRIPT
+
 chmod 755 /etc/rc.d/init.d/fedora-live
 /sbin/restorecon /etc/rc.d/init.d/fedora-live
 /sbin/chkconfig --add fedora-live
+
+# add fedora user with no passwd
+useradd -c "Fedora Live" fedora
+passwd -d fedora > /dev/null
+# disable screensaver locking
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
+# set up timed auto-login for after 60 seconds
+sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=fedora\nTimedLoginDelay=60/' /etc/gdm/custom.conf
+if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
+    cp /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png /home/fedora/.face
+    chown fedora:fedora /home/fedora/.face
+    # TODO: would be nice to get e-d-s to pick this one up too... but how?
+fi
+
+# Set default session
+cat > ~fedora/.dmrc << END_OF_DMRC
+[Desktop]
+Session=WindowMaker
+END_OF_DMRC
+chown fedora:fedora ~fedora/.dmrc
+chmod 644 ~fedora/.dmrc
+
 
 # save a little bit of space at least...
 rm -f /boot/initrd*
