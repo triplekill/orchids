@@ -71,6 +71,8 @@ qemu
 httpd
 firefox
 gkrellm
+gkrellm-freq
+gkrellm-wifi
 rsh
 xpdf
 
