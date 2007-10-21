@@ -15,6 +15,8 @@ repo --name=everything-update --baseurl=file:///var/local/fedora-mirror/updates/
 xconfig --startxonboot
 services --enabled=httpd --disabled=network,sshd,ConsoleKit,avahi-daemon,mcstrans
 firstboot --disable
+network --hostname=orchids --device=eth0 --onboot=no --bootproto=dhcp --noipv6
+
 
 %packages
 
