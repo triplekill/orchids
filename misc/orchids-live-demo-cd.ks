@@ -72,6 +72,7 @@ xterm
 # tools for demo
 qemu
 httpd
+# use galeon instead firefox, for saving some space ?
 firefox
 gkrellm
 gkrellm-freq
