@@ -190,10 +190,12 @@ chmod 644 ~fedora/.dmrc
 # save a little bit of space at least...
 rm -f /boot/initrd*
 #find /usr/share/man/ -mindepth 1 -maxdepth 1 -not -name "man*" | xargs rm -rf
+rpm -ql cracklib-dicts | xargs rm -rf
 rm -rf /usr/share/man/*
 rm -rf /usr/share/doc/*
 rm -rf /usr/share/locale/*
 rm -rf /usr/share/info/*
 rm -rf /usr/share/icons/*
+rm -rf /usr/share/gnome/help/*
 
 %end
