@@ -40,6 +40,7 @@ rsync
 wget
 #man
 tcpdump
+cpuspeed
 cpufreq-utils
 memtest86+
 
