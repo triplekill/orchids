@@ -27,7 +27,7 @@ repo --name=local --baseurl=file:///var/local/repos/local/
 xconfig --startxonboot
 services --enabled=network,httpd --disabled=sshd,ConsoleKit,avahi-daemon,mcstrans
 firstboot --disable
-network --hostname=orchids --device=eth0 --onboot=no --bootproto=dhcp --noipv6
+network --hostname=orchids.localdomain --device=eth0 --onboot=no --bootproto=dhcp --noipv6
 
 
 %packages
