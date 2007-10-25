@@ -83,6 +83,7 @@ xterm
 
 # tools for demo
 livecd-custom
+orchids-home-demo
 qemu
 httpd
 firefox
