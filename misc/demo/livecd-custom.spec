@@ -108,6 +108,15 @@ rm -rf $RPM_BUILD_ROOT
 /sbin/chkconfig --add fedora-live
 /sbin/chkconfig --add kudzu-live
 
+# Add virtual machine in the /etc/hosts file
+if [ ! grep -zF "# For QEmu Virtual Machine" /etc/hosts ] ; then
+cat << EOF >> /etc/hosts
+# For QEmu Virtual Machine
+10.0.0.1        host
+10.0.0.100      orchidsvm
+EOF
+fi
+
 %files
 %defattr(-,root,root,-)
 %doc
