@@ -38,6 +38,9 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/passwd -d orchids
 exit 0
 
+%post
+sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=orchids\nTimedLoginDelay=60/' /etc/gdm/custom.conf
+
 %files
 %defattr(-,orchids,orchids)
 /home/orchids
