@@ -25,7 +25,7 @@ repo --name=everything-update --baseurl=file:///var/local/repos/updates/7/i386/
 repo --name=local --baseurl=file:///var/local/repos/local/
 
 xconfig --startxonboot
-services --enabled=httpd --disabled=network,sshd,ConsoleKit,avahi-daemon,mcstrans
+services --enabled=network,httpd --disabled=sshd,ConsoleKit,avahi-daemon,mcstrans
 firstboot --disable
 network --hostname=orchids --device=eth0 --onboot=no --bootproto=dhcp --noipv6
 
