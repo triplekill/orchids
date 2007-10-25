@@ -17,6 +17,9 @@ Requires: gdm
 # chown orchids:orchids ~orchids/.dmrc
 # chmod 644 ~orchids/.dmrc
 
+# Don't forget to include in the tarball
+# the ~orchids/.face png image for gdm
+
 %description
 Files of the home directory of the demo user account orchids.
 
