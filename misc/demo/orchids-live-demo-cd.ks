@@ -19,6 +19,11 @@ firewall --disabled
 repo --name=everything-base --baseurl=file:///var/local/repos/releases/7/Everything/i386/os/
 repo --name=everything-update --baseurl=file:///var/local/repos/updates/7/i386/
 
+# Local repository for custom packages
+# made by dropping RPMs in the directory /var/local/repos/local/
+# then by running "createrepo -dv /var/local/repos/local/"
+repo --name=local --baseurl=file:///var/local/repos/local/
+
 xconfig --startxonboot
 services --enabled=httpd --disabled=network,sshd,ConsoleKit,avahi-daemon,mcstrans
 firstboot --disable
