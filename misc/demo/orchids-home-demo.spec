@@ -8,6 +8,15 @@ Source0: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: gdm
 
+# on FC7, default session is set in .dmrc file.
+# Be sure to have the following file in the tarball.
+# $ cat > ~orchids/.dmrc << END_OF_DMRC
+# [Desktop]
+# Session=WindowMaker
+# END_OF_DMRC
+# chown orchids:orchids ~orchids/.dmrc
+# chmod 644 ~orchids/.dmrc
+
 %description
 Files of the home directory of the demo user account orchids.
 

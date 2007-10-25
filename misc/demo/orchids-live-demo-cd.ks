@@ -176,15 +176,6 @@ if [ -e /usr/share/icons/hicolor/96x96/apps/fedora-logo-icon.png ] ; then
     # TODO: would be nice to get e-d-s to pick this one up too... but how?
 fi
 
-# Set default session
-cat > ~fedora/.dmrc << END_OF_DMRC
-[Desktop]
-Session=WindowMaker
-END_OF_DMRC
-chown fedora:fedora ~fedora/.dmrc
-chmod 644 ~fedora/.dmrc
-
-
 # save a little bit of space at least...
 rm -f /boot/initrd*
 #find /usr/share/man/ -mindepth 1 -maxdepth 1 -not -name "man*" | xargs rm -rf
