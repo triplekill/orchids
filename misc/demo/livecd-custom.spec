@@ -117,6 +117,15 @@ cat << EOF >> /etc/hosts
 EOF
 fi
 
+# Add qemu and orchids for user orchids in sudo
+if [ ! grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ] ; then
+cat << EOF >> /etc/sudoers
+
+# Sudo Config for Orchids Demo
+orchids ALL = NOPASSWD: /home/orchids/orchids/bin/orchids
+orchids ALL = NOPASSWD: /usr/bin/qemu
+EOF
+
 %files
 %defattr(-,root,root,-)
 %doc
