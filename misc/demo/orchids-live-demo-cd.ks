@@ -44,7 +44,6 @@ wget
 tcpdump
 cpuspeed
 cpufreq-utils
-memtest86+
 dhclient
 
 # dev tools
