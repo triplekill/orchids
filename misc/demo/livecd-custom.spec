@@ -88,6 +88,18 @@ END_OF_SCRIPT
 
 chmod 755 $RPM_BUILD_ROOT/etc/rc.d/init.d/kudzu-live
 
+mkdir -p $RPM_BUILD_ROOT/etc/httpd/conf.d/
+
+cat > $RPM_BUILD_ROOT/etc/httpd/conf.d/orchids.conf << END_OF_CONFIG
+Alias /orchids/ "/home/orchids/orchids/var/orchids/htmlstate/"
+
+<Directory "/home/orchids/orchids/var/orchids/htmlstate">
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+</Directory>
+END_OF_CONFIG
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -101,5 +113,6 @@ rm -rf $RPM_BUILD_ROOT
 %doc
 /etc/rc.d/init.d/fedora-live
 /etc/rc.d/init.d/kudzu-live
+/etc/httpd/conf.d/orchids.conf
 
 %changelog
