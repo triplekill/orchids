@@ -65,15 +65,41 @@ END_OF_SCRIPT
 chmod 755 $RPM_BUILD_ROOT/etc/rc.d/init.d/fedora-live
 
 
+cat > $RPM_BUILD_ROOT/etc/rc.d/init.d/kudzu-live << END_OF_SCRIPT
+#!/bin/bash
+#
+# live: Init script for live image
+#
+# chkconfig: 345 06 99
+# description: Init script for live image.
+
+. /etc/init.d/functions
+
+if ! strstr "\`cat /proc/cmdline\`" liveimg || [ "\$1" != "start" ] ; then
+    exit 0
+fi
+
+# disable all configured interface on boot.
+find /etc/sysconfig/network-scripts/ \\
+  -name "ifcfg-*" -not -name "ifcfg-lo" | while read f ; do
+  sed -i 's/ONBOOT=yes/ONBOOT=no/' \$f
+done
+END_OF_SCRIPT
+
+chmod 755 $RPM_BUILD_ROOT/etc/rc.d/init.d/kudzu-live
+
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
 /sbin/chkconfig --add fedora-live
+/sbin/chkconfig --add kudzu-live
 
 %files
 %defattr(-,root,root,-)
 %doc
 /etc/rc.d/init.d/fedora-live
+/etc/rc.d/init.d/kudzu-live
 
 %changelog
