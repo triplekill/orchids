@@ -85,6 +85,11 @@ xterm
 livecd-custom
 orchids-home-demo
 qemu
+# kqemu is not part of Fedora but can be found at ATRpms
+# download from http://atrpms.net/dist/f7/kqemu/ and put right files
+# into the local RPM repository for custom packages.
+kqemu
+kqemu-kmdl-*
 httpd
 firefox
 gkrellm
