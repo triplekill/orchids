@@ -8,10 +8,17 @@ timezone US/Eastern
 auth --useshadow --enablemd5
 selinux --disabled
 firewall --disabled
+
+# Uncomment if we want to use online repositories
 # repo --name=everything-base --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/releases/7/Everything/i386/os/
 # repo --name=everything-update --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/updates/7/i386/
+
+# local version made by rsync'ing
+# rsync://mirrors.kernel.org/fedora/releases/7/Everything/i386/os/
+# rsync://mirrors.kernel.org/fedora/updates/7/i386/
 repo --name=everything-base --baseurl=file:///var/local/repos/releases/7/Everything/i386/os/
 repo --name=everything-update --baseurl=file:///var/local/repos/updates/7/i386/
+
 xconfig --startxonboot
 services --enabled=httpd --disabled=network,sshd,ConsoleKit,avahi-daemon,mcstrans
 firstboot --disable
