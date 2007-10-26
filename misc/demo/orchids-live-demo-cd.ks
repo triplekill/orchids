@@ -118,9 +118,6 @@ libpcap
 
 
 %post
-# FIXME: it'd be better to get this installed from a package
-# disable screensaver locking
-gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
 
 # save a little bit of space at least...
 rm -f /boot/initrd*

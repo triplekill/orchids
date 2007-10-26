@@ -126,6 +126,10 @@ orchids ALL = NOPASSWD: /home/orchids/orchids/bin/orchids
 orchids ALL = NOPASSWD: /usr/bin/qemu
 EOF
 
+# disable screensaver locking
+gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
+
+
 %files
 %defattr(-,root,root,-)
 %doc
