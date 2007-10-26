@@ -119,9 +119,6 @@ libpcap
 
 %post
 # FIXME: it'd be better to get this installed from a package
-# add fedora user with no passwd
-useradd -c "Fedora Live" fedora
-passwd -d fedora > /dev/null
 # disable screensaver locking
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
 
