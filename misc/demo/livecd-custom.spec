@@ -6,6 +6,7 @@ License: GPL
 Group: Orchids Demo
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+Requires: sudo GConf2
 
 %description
 
