@@ -60,6 +60,17 @@ exists alsaunmute 0 2> /dev/null
 
 # Stopgap fix for RH #217966; should be fixed in HAL instead
 touch /media/.hal-mtab
+
+# Add virtual machine in the /etc/hosts file
+if grep -zF "# For QEmu Virtual Machine" /etc/hosts ; then
+cat << EOF >> /etc/hosts
+
+# For QEmu Virtual Machine
+10.0.0.1        host
+10.0.0.100      orchidsvm
+EOF
+fi
+
 END_OF_SCRIPT
 
 chmod 755 $RPM_BUILD_ROOT/etc/rc.d/init.d/fedora-live
@@ -107,16 +118,6 @@ rm -rf $RPM_BUILD_ROOT
 %post
 /sbin/chkconfig --add fedora-live
 /sbin/chkconfig --add kudzu-live
-
-# Add virtual machine in the /etc/hosts file
-if grep -zF "# For QEmu Virtual Machine" /etc/hosts ; then
-cat << EOF >> /etc/hosts
-
-# For QEmu Virtual Machine
-10.0.0.1        host
-10.0.0.100      orchidsvm
-EOF
-fi
 
 # Add qemu and orchids for user orchids in sudo
 if grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ; then
