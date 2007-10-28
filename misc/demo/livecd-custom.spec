@@ -109,7 +109,7 @@ rm -rf $RPM_BUILD_ROOT
 /sbin/chkconfig --add kudzu-live
 
 # Add virtual machine in the /etc/hosts file
-if [ grep -zF "# For QEmu Virtual Machine" /etc/hosts ] ; then
+if grep -zF "# For QEmu Virtual Machine" /etc/hosts ; then
 cat << EOF >> /etc/hosts
 
 # For QEmu Virtual Machine
@@ -119,7 +119,7 @@ EOF
 fi
 
 # Add qemu and orchids for user orchids in sudo
-if [ grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ] ; then
+if grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ; then
 cat << EOF >> /etc/sudoers
 
 # Sudo Config for Orchids Demo
