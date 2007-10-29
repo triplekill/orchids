@@ -120,6 +120,9 @@ libpcap
 
 %post
 
+# create an empty /etc/resolv.conf to avoid warning messages.
+touch /etc/resolv.conf
+
 # save a little bit of space at least...
 rm -f /boot/initrd*
 #find /usr/share/man/ -mindepth 1 -maxdepth 1 -not -name "man*" | xargs rm -rf
