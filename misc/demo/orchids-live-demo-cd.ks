@@ -57,6 +57,7 @@ tcpdump
 cpuspeed
 cpufreq-utils
 dhclient
+acpid
 
 # dev tools
 #gcc
