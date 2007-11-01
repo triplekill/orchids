@@ -120,16 +120,6 @@ rm -rf $RPM_BUILD_ROOT
 /sbin/chkconfig --add fedora-live
 /sbin/chkconfig --add kudzu-live
 
-# Add qemu and orchids for user orchids in sudo
-if ! grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ; then
-cat << EOF >> /etc/sudoers
-
-# Sudo Config for Orchids Demo
-orchids ALL = NOPASSWD: /home/orchids/orchids/bin/orchids
-orchids ALL = NOPASSWD: /usr/bin/qemu
-EOF
-fi
-
 # disable screensaver locking
 gconftool-2 --direct --config-source=xml:readwrite:/etc/gconf/gconf.xml.defaults -s -t bool /apps/gnome-screensaver/lock_enabled false >/dev/null
 

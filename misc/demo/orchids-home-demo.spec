@@ -44,6 +44,17 @@ exit 0
 %post
 sed -i -e 's/\[daemon\]/[daemon]\nTimedLoginEnable=true\nTimedLogin=orchids\nTimedLoginDelay=60/' /etc/gdm/custom.conf
 
+# Add qemu and orchids for user orchids in sudo
+if ! grep -zF "# Sudo Config for Orchids Demo" /etc/sudoers ; then
+cat << EOF >> /etc/sudoers
+
+# Sudo Config for Orchids Demo
+orchids ALL = NOPASSWD: /home/orchids/orchids/bin/orchids
+orchids ALL = NOPASSWD: /usr/bin/qemu
+EOF
+fi
+
+
 %files
 %defattr(-,orchids,orchids)
 /home/orchids
