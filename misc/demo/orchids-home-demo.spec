@@ -51,6 +51,8 @@ cat << EOF >> /etc/sudoers
 # Sudo Config for Orchids Demo
 orchids ALL = NOPASSWD: /home/orchids/orchids/bin/orchids
 orchids ALL = NOPASSWD: /usr/bin/qemu
+orchids ALL = NOPASSWD: /usr/bin/cpufreq-set
+orchids ALL = NOPASSWD: /sbin/service
 EOF
 fi
 
