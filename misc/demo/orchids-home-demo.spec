@@ -6,7 +6,7 @@ Release: 1
 License: GPL
 Source0: %{name}-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
-Requires: gdm
+Requires: sudo gdm
 
 # on FC7, default session is set in .dmrc file.
 # Be sure to have the following file in the tarball.
