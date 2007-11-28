@@ -1,6 +1,6 @@
 # Based on livecd-fedora-desktop.ks of livecd-tools-009
 # Build iso image, as root, with the command:
-# livecd-creator --config=orchids-live-demo-cd.ks
+# livecd-creator --config=orchids-demo-cd.ks
 
 lang en_US.UTF-8
 keyboard us
@@ -10,14 +10,14 @@ selinux --disabled
 firewall --disabled
 
 # Uncomment if we want to use online repositories
-# repo --name=everything-base --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/releases/7/Everything/i386/os/
-# repo --name=everything-update --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/updates/7/i386/
+# repo --name=everything-base --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/releases/8/Everything/i386/os/
+# repo --name=everything-update --baseurl=http://download.fedora.redhat.com/pub/fedora/linux/updates/8/i386/
 
 # local version made by rsync'ing
-# rsync://mirrors.kernel.org/fedora/releases/7/Everything/i386/os/
-# rsync://mirrors.kernel.org/fedora/updates/7/i386/
-repo --name=everything-base --baseurl=file:///var/local/repos/releases/7/Everything/i386/os/
-repo --name=everything-update --baseurl=file:///var/local/repos/updates/7/i386/
+# rsync://mirrors.kernel.org/fedora/releases/8/Everything/i386/os/
+# rsync://mirrors.kernel.org/fedora/updates/8/i386/
+repo --name=everything-base --baseurl=file:///var/local/repos/releases/8/Everything/i386/os/
+repo --name=everything-update --baseurl=file:///var/local/repos/updates/8/i386/
 
 # Local repository for custom packages
 # made by dropping RPMs in the directory /var/local/repos/local/
@@ -87,7 +87,7 @@ livecd-custom
 orchids-home-demo
 qemu
 # kqemu is not part of Fedora but can be found at ATRpms
-# download from http://atrpms.net/dist/f7/kqemu/ and put right files
+# download from http://atrpms.net/dist/f8/kqemu/ and put right files
 # into the local RPM repository for custom packages.
 kqemu
 kqemu-kmdl-*
