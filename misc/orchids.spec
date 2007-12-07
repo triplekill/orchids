@@ -28,6 +28,7 @@ Module mod_autohtml.
 %package mod_cisco
 Summary: Module mod_cisco
 Group: System Environment/Daemons
+BuildRequires: flex bison
 
 %description mod_cisco
 Module mod_cisco.
@@ -60,6 +61,7 @@ Module mod_generic.
 %package mod_htmlstate
 Summary: Module mod_htmlstate
 Group: System Environment/Daemons
+Requires: graphviz ghostscript ImageMagick gnuplot
 
 %description mod_htmlstate
 Module mod_htmlstate.
@@ -68,6 +70,7 @@ Module mod_htmlstate.
 %package mod_netfilter
 Summary: Module mod_netfilter
 Group: System Environment/Daemons
+BuildRequires: flex bison
 
 %description mod_netfilter
 Module mod_netfilter.
@@ -76,6 +79,8 @@ Module mod_netfilter.
 %package mod_pcap
 Summary: Module mod_pcap
 Group: System Environment/Daemons
+BuildRequires: libpcap
+Requires: libpcap
 
 %description mod_pcap
 Module mod_pcap.
@@ -92,6 +97,7 @@ Module mod_period.
 %package mod_prism2
 Summary: Module mod_prism2
 Group: System Environment/Daemons
+Requires: orchids-mod_pcap
 
 %description mod_prism2
 Module mod_prism2.
@@ -100,6 +106,8 @@ Module mod_prism2.
 %package mod_prolog
 Summary: Module mod_prolog
 Group: System Environment/Daemons
+BuildRequires: pl
+Requires: pl
 
 %description mod_prolog
 Module mod_prolog.
@@ -108,6 +116,7 @@ Module mod_prolog.
 %package mod_rawsnare
 Summary: Module mod_rawsnare
 Group: System Environment/Daemons
+Requires: orchids-mod_udp
 
 %description mod_rawsnare
 Module mod_rawsnare.
@@ -140,6 +149,7 @@ Module mod_sharedvars.
 %package mod_snare
 Summary: Module mod_snare
 Group: System Environment/Daemons
+BuildRequires: flex bison
 
 %description mod_snare
 Module mod_snare.
@@ -156,6 +166,8 @@ Module mod_snare.
 %package mod_snmptrap
 Summary: Module mod_snmptrap
 Group: System Environment/Daemons
+BuildRequires: net-snmp-devel
+Requires: net-snmp orchids-mod_udp
 
 %description mod_snmptrap
 Module mod_snmptrap.
