@@ -408,5 +408,20 @@ fi
 %postun
 /sbin/service %{name} condrestart &>/dev/null || :
 
+
 %changelog
 
+* Sun Dec  9 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Imported change log into this spec file.
+
+* Fri Dec  7 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Added package dependencies and build dependencies.
+
+* Wed Dec  5 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Split modules into sub-packages.
+
+* Fri Jun  1 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Added split config files.
+
+* Wed Feb 28 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Initial spec file.
