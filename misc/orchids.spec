@@ -13,6 +13,8 @@ Group: System Environment/Daemons
 Source: orchids-%{version}.tar.gz
 BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 
+Requires: cpp
+
 %description
 A real-time intrusion detection system.
 
@@ -410,6 +412,9 @@ fi
 
 
 %changelog
+
+* Sun Dec 16 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Added cpp dependency for the main package.
 
 * Sun Dec  9 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
 - Imported change log into this spec file.
