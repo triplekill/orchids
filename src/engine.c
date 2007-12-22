@@ -8,7 +8,7 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Aug  3 12:47:13 2007
+ ** @date Last update: Sat Dec 22 22:05:54 2007
  **/
 
 /*
@@ -70,9 +70,7 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 
   for (t = ctx->new_qh; t; t = t->next) {
     if ((t->state_instance->rule_instance == rule) && !THREAD_IS_KILLED(t)) {
-#ifndef ORCHIDS_DEMO
-      printf("maybe forgotten thread ? (new)\n");
-#endif /* ORCHIDS_DEMO */
+      DebugLog(DF_ENG, DS_TRACE, "Forgotten thread ? (in new queue)\n");
     }
   }
 
