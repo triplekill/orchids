@@ -99,6 +99,10 @@ gkrellm-wifi
 rsh
 xpdf
 
+# Orchids and its modules
+orchids
+orchids-mod_*
+
 # Orchids dependencies
 pl
 net-snmp
