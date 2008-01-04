@@ -249,15 +249,15 @@ daemonize(const char *stdout_file, const char *stderr_file)
     /* setvbuf(stdout, (char *)NULL, _IOLBF, 0); */
   }
 
-  if(getppid() != 1) {
+  if (getppid() != 1) {
     pid = fork();
 
-    if(pid > 0) /* parent */
-      exit(0);
+    if (pid > 0) /* parent */
+      exit(EXIT_SUCCESS);
 
-    if(pid < 0) {
+    if (pid < 0) {
       perror("fork");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     setsid();
   }
