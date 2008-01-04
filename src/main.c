@@ -264,12 +264,16 @@ daemonize(const char *stdout_file, const char *stderr_file)
   }
 
   close(STDOUT_FILENO);
-  stdout_fd = open(stdout_file, O_CREAT | O_RDWR);
+  stdout_fd = open(stdout_file,
+                   O_CREAT | O_RDWR,
+                   S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   dup2(stdout_fd, STDOUT_FILENO);
   close(stdout_fd);
 
   close(STDERR_FILENO);
-  stderr_fd = open(stderr_file, O_CREAT | O_RDWR);
+  stderr_fd = open(stderr_file,
+                   O_CREAT | O_RDWR,
+                   S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   dup2(stderr_fd, STDERR_FILENO);
   close(stderr_fd);
 }
