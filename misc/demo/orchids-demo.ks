@@ -83,6 +83,7 @@ WindowMaker
 xterm
 
 # tools for demo
+evtgen
 livecd-custom
 orchids-home-demo
 qemu
