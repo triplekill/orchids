@@ -232,7 +232,7 @@ daemonize(const char *stdout_file, const char *stderr_file)
   pid_t pid;
   int stdout_fd;
   int stderr_fd;
-  char *devnull_str = "/dev/null";
+  const char *devnull_str = "/dev/null";
 
   if (stdout_file == NULL)
     stdout_file = devnull_str;
@@ -240,7 +240,8 @@ daemonize(const char *stdout_file, const char *stderr_file)
   if (stderr_file == NULL)
     stderr_file = devnull_str;
 
-  if ( !strcmp(stdout_file,stderr_file) && strcmp("/dev/null", stdout_file)) {
+  if ( !strcmp(stdout_file, stderr_file) &&
+        strcmp("/dev/null", stdout_file)) {
     fprintf(stderr,
             "WARNING, log may be corrupted if buffered I/O are used.\n");
     /* XXX: activate line buffer ?? */
