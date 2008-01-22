@@ -58,6 +58,7 @@ cpuspeed
 cpufreq-utils
 dhclient
 acpid
+usbutils
 
 # dev tools
 #gcc
@@ -115,7 +116,8 @@ ImageMagick
 libpcap
 #gnuplot
 
-# installer
+# installer (+14 MB on final iso if added)
+# Don't forget to disable firstboot service if anaconda is installed.
 #anaconda
 #anaconda-runtime
 
