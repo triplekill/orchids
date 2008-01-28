@@ -24,15 +24,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h> /* for PATH_MAX */
-
 #include <sys/types.h> /* for stat() */
 #include <sys/stat.h>
 #include <sys/resource.h>
-#include <sys/time.h> /* gettimeofday() */
+#include <sys/time.h>
 #include <unistd.h>
-
 #include <glob.h> /* glob() */
-
 #include <errno.h>
 
 
@@ -815,6 +812,32 @@ set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 }
 
+static void
+set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  int nice_value;
+  int ret;
+
+  DebugLog(DF_CORE, DS_INFO, "setting nice priority to '%s'\n", dir->args);
+
+  nice_value = atoi(dir->args);
+  if (nice_value < -20 || nice_value > 19) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "Ignored invalid Nice priority value %i "
+             "(-20 <= priority <= 19)\n",
+             dir->args);
+    return ;
+  }
+
+  ret = setpriority(PRIO_PROCESS, 0, nice_value);
+  if (ret != 0) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "setpriority(prio=%i): error %i: %s\n",
+             nice_value, errno, strerror(errno));
+    return ;
+  }
+}
+
 
 static mod_cfg_cmd_t config_dir_g[] = 
 {
@@ -840,6 +863,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "SetLockFile", set_lock_file, "Set the lock file name" },
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
   { "ResolveIP", set_resolve_ip, "Enable/Disable DNS name resolution" },
+  { "Nice", set_nice, "Set the process priority"},
   { NULL, NULL, NULL }
 };
 

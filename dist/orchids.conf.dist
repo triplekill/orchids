@@ -82,6 +82,9 @@ ReportExt     .rpt
 ResolveIP  no
 
 
+# Remove this comment to set the process priority
+# Nice -10
+
 # Include module specific configurations files...
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
