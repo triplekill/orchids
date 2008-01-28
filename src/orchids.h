@@ -44,6 +44,7 @@
 #include "queue.h"
 #include "debuglog.h"
 #include "timer.h"
+#include "slist.h"
 #include "dlist.h"
 
 #ifdef DMALLOC

@@ -31,7 +31,7 @@
 
 #include "orchids_api.h"
 #include "mod_mgr.h"
-#include "dlist.h"
+#include "stailq.h"
 
 #include "mod_generic.h"
 

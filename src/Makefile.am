@@ -6,27 +6,29 @@ orchids_SOURCES = \
         evt_mgr.c evt_mgr.h evt_mgr_priv.h                \
         mod_mgr.c mod_mgr.h                               \
         orchids_api.c orchids_api.h                       \
-	engine.c engine.h engine_priv.h                   \
+        engine.c engine.h engine_priv.h                   \
         rule_compiler.c rule_compiler.h                   \
-	orchids_cfg.c                                     \
+        orchids_cfg.c                                     \
         lang.c lang.h lang_priv.h                         \
         ovm.c ovm.h ovm_priv.h                            \
         graph_output.c graph_output.h graph_output_priv.h \
-	issdl.yy.c issdl.tab.c issdl.tab.h                \
+        issdl.yy.c issdl.tab.c issdl.tab.h                \
  \
-	util/array.c               util/array.h           \
-	util/bsdqueue.h            util/queue.c           \
-	util/crc32.c               util/queue.h           \
-	util/debuglog.c            util/debuglog.h        \
-	                           util/safelib.c         \
-	util/dlist.h               util/safelib.h         \
-	util/hash.c                util/stack.c           \
-	util/hash.h                util/stack.h           \
-	util/linux_process_info.c  util/strhash.c         \
-	util/linux_process_info.h  util/strhash.h         \
-	util/list.c                util/string_util.c     \
-	util/list.h                util/tree.c            \
-	util/misc.c                util/tree.h            \
+        util/array.c               util/array.h           \
+                                   util/queue.c           \
+        util/crc32.c               util/queue.h           \
+        util/debuglog.c            util/debuglog.h        \
+        util/safelib.c             util/safelib.h         \
+        util/offsetof.h                                   \
+        util/slist.h               util/dlist.h           \
+        util/stailq.h              util/dtailq.h          \
+        util/hash.c                util/stack.c           \
+        util/hash.h                util/stack.h           \
+        util/linux_process_info.c  util/strhash.c         \
+        util/linux_process_info.h  util/strhash.h         \
+        util/list.c                util/string_util.c     \
+        util/list.h                util/tree.c            \
+        util/misc.c                util/tree.h            \
         util/objhash.c             util/objhash.h         \
         util/timer.h
 

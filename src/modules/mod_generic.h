@@ -18,6 +18,8 @@
 #ifndef MOD_GENERIC_H
 #define MOD_GENERIC_H
 
+#include "stailq.h"
+
 typedef struct generic_field_s generic_field_t;
 struct generic_field_s
 {
