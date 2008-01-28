@@ -13,7 +13,7 @@ Group: System Environment/Daemons
 Source: orchids-%{version}.tar.gz
 BuildRoot: /var/tmp/%{name}-%{version}-%{release}-root
 
-Requires: cpp
+Requires: cpp /usr/sbin/sendmail
 
 %description
 A real-time intrusion detection system.
