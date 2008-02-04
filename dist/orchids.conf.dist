@@ -45,10 +45,14 @@ LoadModule timeout
 LoadModule sharedvars
 LoadModule ruletrace
 
-# Define the preprocessor command for rule files.
+# Define preprocessor command for each rule file suffix.
 
-SetPreprocessorCmd cpp
+AddPreprocessorCmd .cpp.rule  cpp
+AddPreprocessorCmd  .m4.rule  m4
 
+# The default preprocessor is normally the "cat" command
+# It is set here to cpp for convenience
+SetDefaultPreprocessorCmd     cpp
 
 # This directive is deprecated and should be moved
 # in the htmlstate module section.

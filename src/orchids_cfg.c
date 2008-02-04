@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Fri Aug  3 14:06:22 2007
+ ** @date Last update: Mon Feb  4 15:00:25 2008
  **/
 
 /*
@@ -730,11 +730,38 @@ set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
 
 static void
-set_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting pre-processor command to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "setting default pre-processor command to '%s'\n", dir->args);
 
-  ctx->preproc_cmd = dir->args;
+  ctx->default_preproc_cmd = dir->args;
+}
+
+
+static void
+add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  char suffix[256];
+  char cmd[4096];
+  int ret;
+  preproc_cmd_t *preproc;
+
+  ret = sscanf(dir->args, "%256s %4096[^\n]", suffix, cmd);
+  if (ret != 2) {
+    DebugLog(DF_CORE, DS_ERROR,
+             "AddPreprocessorCmd: Bad argument format (suffix preproccmd)\n");
+    return ;
+  }
+
+  DebugLog(DF_CORE, DS_INFO,
+           "Adding the pre-processor command '%s' for file suffix '%s'\n",
+           cmd, suffix);
+
+  preproc = Xzmalloc(sizeof (preproc_cmd_t));
+  preproc->suffix = strdup(suffix);
+  preproc->cmd = strdup(cmd);
+
+  SLIST_INSERT_HEAD(&ctx->preproclist, preproc, preproclist);
 }
 
 
@@ -858,7 +885,8 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "ReportDir", set_report_output_dir, "Set the outpout directory" },
   { "ReportPrefix", set_report_prefix, "Set the report prefix" },
   { "ReportExt", set_report_ext, "Set the report extension" },
-  { "SetPreprocessorCmd", set_preproc_cmd, "Set the preprocessor command" },
+  { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
+  { "AddPreprocessorCmd", add_preproc_cmd, "Add a preprocessor command for a file suffix" },
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
   { "SetLockFile", set_lock_file, "Set the lock file name" },
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },

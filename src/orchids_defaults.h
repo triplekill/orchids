@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Tue Jan 14 14:00:41 2003
- ** @date Last update: Fri Jun 29 14:14:36 2007
+ ** @date Last update: Mon Feb  4 14:27:31 2008
  **/
 
 
@@ -67,7 +67,7 @@
 # define PATH_TO_CPP "cpp"
 #endif /* PATH_TO_CPP */
 
-#define DEFAULT_PREPROC_CMD PATH_TO_CPP
+#define DEFAULT_PREPROC_CMD "cat"
 
 #ifndef PATH_TO_SENDMAIL
 # define PATH_TO_SENDMAIL "/usr/sbin/sendmail"

@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Fri Aug  3 12:27:13 2007
+ ** @date Last update: Mon Feb  4 14:26:23 2008
  **/
 
 /*
@@ -121,7 +121,7 @@ new_orchids_context(void)
   ctx = Xzmalloc(sizeof (orchids_t));
 
   /* do default initialisation here */
-  ctx->preproc_cmd = DEFAULT_PREPROC_CMD;
+  ctx->default_preproc_cmd = DEFAULT_PREPROC_CMD;
   ctx->config_file = DEFAULT_CONFIG_FILE;
   ctx->poll_period.tv_sec = DEFAULT_IN_PERIOD;
   gettimeofday(&ctx->start_time, NULL);

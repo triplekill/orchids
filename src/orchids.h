@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Fri Sep 14 19:01:15 2007
+ ** @date Last update: Mon Feb  4 14:24:29 2008
  **/
 
 /*
@@ -841,6 +841,17 @@ struct hook_list_elmt_s {
 
 
 /**
+ ** @struct preproc_cmd_s
+ **   Preprocessor command bounded to a file suffix.
+ **/
+typedef struct preproc_cmd_s preproc_cmd_t;
+struct preproc_cmd_s {
+  SLIST_ENTRY(preproc_cmd_t)  preproclist;
+  char *suffix;
+  char *cmd;
+};
+
+/**
  ** @struct orchids_s
  **   Main program context structure.
  **   Contain all needed data for global operation.
@@ -1056,7 +1067,10 @@ struct orchids_s
 
   DLIST_HEAD(evtlist, rtaction_t) rtactionlist;
 
-  char *preproc_cmd;
+#ifdef ENABLE_PREPROC
+  char *default_preproc_cmd;
+  SLIST_HEAD(preproclist, preproc_cmd_t) preproclist;
+#endif /* ENABLE_PREPROC */
 
   timeval_t cur_loop_time;
 

@@ -8,7 +8,7 @@
  ** @ingroup compiler
  **
  ** @date  Started on: Sat Feb 22 17:57:07 2003
- ** @date Last update: Fri Mar 30 10:20:06 2007
+ ** @date Last update: Mon Feb  4 15:04:06 2008
  **/
 
 /*
@@ -161,6 +161,31 @@ compile_rules(orchids_t *ctx)
   /* precomp_rule_init_threads(ctx); */
 }
 
+
+#ifdef ENABLE_PREPROC
+static char *
+get_preproc_cmd(orchids_t *ctx, const char *filename)
+{
+  preproc_cmd_t *c;
+  size_t filename_len;
+  size_t suffix_len;
+
+  filename_len = strlen(filename);
+
+  SLIST_FOREACH(c, &ctx->preproclist, preproclist) {
+    suffix_len = strlen(c->suffix);
+    if (suffix_len > filename_len)
+      continue ;
+
+    if (!strcmp(c->suffix, filename + filename_len - suffix_len))
+      return (c->cmd);
+  }
+
+  return (ctx->default_preproc_cmd);
+}
+#endif /* ENABLE_PREPROC */
+
+
 /**
  * Lex/yacc parser entry point.
  * @param ctx Orchids context.
@@ -171,6 +196,7 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
 {
   int ret;
 #ifdef ENABLE_PREPROC
+  const char *ppcmd;
   char cmd[4096];
 #endif /* ENABLE_PREPROC */
 
@@ -181,8 +207,10 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
   issdlcurrentfile_g = strdup(rulefile);
   issdllineno_g = 1;
 #ifdef ENABLE_PREPROC
-    snprintf(cmd, sizeof (cmd), "%s %s", ctx->preproc_cmd, rulefile);
-    issdlin = Xpopen(cmd, "r");
+  ppcmd = get_preproc_cmd(ctx, rulefile);
+  DebugLog(DF_OLC, DS_NOTICE, "Using the preproc cmd '%s'.\n", ppcmd);
+  snprintf(cmd, sizeof (cmd), "%s %s", ppcmd, rulefile);
+  issdlin = Xpopen(cmd, "r");
 #else
     issdlin = Xfopen(rulefile, "r");
 #endif /* ENABLE_PREPROC */
