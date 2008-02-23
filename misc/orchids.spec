@@ -22,6 +22,7 @@ A real-time intrusion detection system.
 %package mod_autohtml
 Summary: Module mod_autohtml
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_autohtml
 Module mod_autohtml.
@@ -30,6 +31,7 @@ Module mod_autohtml.
 %package mod_cisco
 Summary: Module mod_cisco
 Group: System Environment/Daemons
+Requires: orchids
 BuildRequires: flex bison
 
 %description mod_cisco
@@ -39,6 +41,7 @@ Module mod_cisco.
 %package mod_clocks
 Summary: Module mod_clocks
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_clocks
 Module mod_clocks.
@@ -47,6 +50,7 @@ Module mod_clocks.
 %package mod_consoles
 Summary: Module mod_consoles
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_consoles
 Module mod_consoles.
@@ -55,6 +59,7 @@ Module mod_consoles.
 %package mod_generic
 Summary: Module mod_generic
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_generic
 Module mod_generic.
@@ -63,7 +68,7 @@ Module mod_generic.
 %package mod_htmlstate
 Summary: Module mod_htmlstate
 Group: System Environment/Daemons
-Requires: graphviz ghostscript ImageMagick gnuplot
+Requires: orchids graphviz ghostscript ImageMagick gnuplot
 
 %description mod_htmlstate
 Module mod_htmlstate.
@@ -73,6 +78,7 @@ Module mod_htmlstate.
 Summary: Module mod_netfilter
 Group: System Environment/Daemons
 BuildRequires: flex bison
+Requires: orchids
 
 %description mod_netfilter
 Module mod_netfilter.
@@ -82,7 +88,7 @@ Module mod_netfilter.
 Summary: Module mod_pcap
 Group: System Environment/Daemons
 BuildRequires: libpcap
-Requires: libpcap
+Requires: orchids libpcap
 
 %description mod_pcap
 Module mod_pcap.
@@ -91,6 +97,7 @@ Module mod_pcap.
 %package mod_period
 Summary: Module mod_period
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_period
 Module mod_period.
@@ -99,7 +106,7 @@ Module mod_period.
 %package mod_prism2
 Summary: Module mod_prism2
 Group: System Environment/Daemons
-Requires: orchids-mod_pcap
+Requires: orchids orchids-mod_pcap
 
 %description mod_prism2
 Module mod_prism2.
@@ -109,7 +116,7 @@ Module mod_prism2.
 Summary: Module mod_prolog
 Group: System Environment/Daemons
 BuildRequires: pl
-Requires: pl
+Requires: orchids pl
 
 %description mod_prolog
 Module mod_prolog.
@@ -118,7 +125,7 @@ Module mod_prolog.
 %package mod_rawsnare
 Summary: Module mod_rawsnare
 Group: System Environment/Daemons
-Requires: orchids-mod_udp
+Requires: orchids orchids-mod_udp
 
 %description mod_rawsnare
 Module mod_rawsnare.
@@ -127,6 +134,7 @@ Module mod_rawsnare.
 %package mod_remoteadm
 Summary: Module mod_remoteadm
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_remoteadm
 Module mod_remoteadm.
@@ -135,6 +143,7 @@ Module mod_remoteadm.
 %package mod_ruletrace
 Summary: Module mod_ruletrace
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_ruletrace
 Module mod_ruletrace.
@@ -143,6 +152,7 @@ Module mod_ruletrace.
 %package mod_sharedvars
 Summary: Module mod_sharedvars
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_sharedvars
 Module mod_sharedvars.
@@ -152,6 +162,7 @@ Module mod_sharedvars.
 Summary: Module mod_snare
 Group: System Environment/Daemons
 BuildRequires: flex bison
+Requires: orchids
 
 %description mod_snare
 Module mod_snare.
@@ -169,7 +180,7 @@ Module mod_snare.
 Summary: Module mod_snmptrap
 Group: System Environment/Daemons
 BuildRequires: net-snmp-devel
-Requires: net-snmp orchids-mod_udp
+Requires: orchids net-snmp orchids-mod_udp
 
 %description mod_snmptrap
 Module mod_snmptrap.
@@ -178,6 +189,7 @@ Module mod_snmptrap.
 %package mod_sockunix
 Summary: Module mod_sockunix
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_sockunix
 Module mod_sockunix.
@@ -194,6 +206,7 @@ Module mod_sockunix.
 %package mod_sunbsm
 Summary: Module mod_sunbsm
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_sunbsm
 Module mod_sunbsm.
@@ -202,6 +215,7 @@ Module mod_sunbsm.
 %package mod_syslog
 Summary: Module mod_syslog
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_syslog
 Module mod_syslog.
@@ -226,6 +240,7 @@ Module mod_syslog.
 %package mod_textfile
 Summary: Module mod_textfile
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_textfile
 Module mod_textfile.
@@ -234,6 +249,7 @@ Module mod_textfile.
 %package mod_timeout
 Summary: Module mod_timeout
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_timeout
 Module mod_timeout.
@@ -242,6 +258,7 @@ Module mod_timeout.
 %package mod_udp
 Summary: Module mod_udp
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_udp
 Module mod_udp.
@@ -250,6 +267,7 @@ Module mod_udp.
 %package mod_wifi
 Summary: Module mod_wifi
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_wifi
 Module mod_wifi.
@@ -258,6 +276,7 @@ Module mod_wifi.
 %package mod_win32evt
 Summary: Module mod_win32evt
 Group: System Environment/Daemons
+Requires: orchids
 
 %description mod_win32evt
 Module mod_win32evt.
@@ -412,6 +431,9 @@ fi
 
 
 %changelog
+
+* Fri Feb 22 2008 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
+- Added orchids dependecy for all module mod_* packages.
 
 * Sun Dec 16 2007 Julien Olivain <julien.olivain@lsv.ens-cachan.fr>
 - Added cpp dependency for the main package.
