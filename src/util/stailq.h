@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Nov 29 11:24:47 2005
+ ** @date Last update: Tue Feb 26 14:11:32 2008
  **/
 
 /*
@@ -126,6 +126,21 @@ do {                                                                          \
 do {                                                                          \
   if ((STAILQ_FIRST((head)) = STAILQ_NEXT((elm), field)) == NULL)             \
     (head)->stqh_last = &STAILQ_FIRST((head));                                \
+} while (0)
+
+#define STAILQ_REVERSE(head, type_t, field)                                   \
+do {                                                                          \
+  type_t *curelm;                                                             \
+  type_t *nextelm;                                                            \
+  type_t *tailelm;                                                            \
+                                                                              \
+  tailelm = NULL;                                                             \
+  (head)->stqh_last = &STAILQ_FIRST((head));                                  \
+  STAILQ_FOREACH_SAFE(curelm, head, field, nextelm) {                         \
+    STAILQ_NEXT(curelm, field) = tailelm;                                     \
+    tailelm = curelm;                                                         \
+  }                                                                           \
+  STAILQ_FIRST((head)) = tailelm;                                              \
 } while (0)
 
 
