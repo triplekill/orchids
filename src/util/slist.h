@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Nov 29 11:24:47 2005
+ ** @date Last update: Tue Feb 26 12:51:41 2008
  **/
 
 /*
@@ -93,9 +93,24 @@ do {                                                                          \
 } while (0)
 
 #define SLIST_REMOVE_HEAD(head, field)                                        \
-do {                                                  \
+do {                                                                          \
   SLIST_FIRST((head)) = SLIST_NEXT(SLIST_FIRST((head)), field);               \
 } while (0)
+
+#define SLIST_REVERSE(head, type_t, field)                                    \
+do {                                                                          \
+  type_t *curelm;                                                             \
+  type_t *nextelm;                                                            \
+  type_t *tailelm;                                                            \
+                                                                              \
+  tailelm = NULL;                                                             \
+  SLIST_FOREACH_SAFE(curelm, head, field, nextelm) {                          \
+    SLIST_NEXT(curelm, field) = tailelm;                                      \
+    tailelm = curelm;                                                         \
+  }                                                                           \
+  SLIST_FIRST((head)) = tailelm;                                              \
+} while (0)
+
 
 #endif /* SLIST_H */
 
