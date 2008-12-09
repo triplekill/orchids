@@ -140,7 +140,7 @@ do {                                                                          \
     STAILQ_NEXT(curelm, field) = tailelm;                                     \
     tailelm = curelm;                                                         \
   }                                                                           \
-  STAILQ_FIRST((head)) = tailelm;                                              \
+  STAILQ_FIRST((head)) = tailelm;                                             \
 } while (0)
 
 
