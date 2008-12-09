@@ -122,12 +122,12 @@ do {                                                                          \
 } while (0)
 
 #define DTAILQ_LAST(head, headname)                                           \
-  (*(((struct dtailq_##headname##_t *)((head)->tqh_last))->tqh_last))
+  (*(((struct dtailq_##headname##_s *)((head)->tqh_last))->tqh_last))
 
 #define DTAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
 
 #define DTAILQ_PREV(elm, hname, field)                                        \
-  (*(((struct dtailq_##hname##_t *)((elm)->field.tqe_prev))->tqh_last))
+  (*(((struct dtailq_##hname##_s *)((elm)->field.tqe_prev))->tqh_last))
 
 #define DTAILQ_REMOVE(head, elm, field)                                       \
 do {                                                                          \
