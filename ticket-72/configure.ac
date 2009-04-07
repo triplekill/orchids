@@ -255,5 +255,7 @@ AC_CONFIG_FILES([Makefile
                  dist/conf.d/Makefile
                  dist/rules/Makefile
                  dist/htmlstate/Makefile
+                 dist/mods-enabled/Makefile
+                 dist/rules-enabled/Makefile
 ])
 AC_OUTPUT

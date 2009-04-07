@@ -2,7 +2,7 @@ orchidsconfdir = $(sysconfdir)/orchids
 
 EXTRA_DIST = orchids.conf.dist orchids-rules.conf.dist
 
-SUBDIRS = conf.d htmlstate rules
+SUBDIRS = conf.d htmlstate rules mods-enabled rules-enabled
 
 orchidsconf_DATA = orchids.conf orchids-rules.conf
 

@@ -24,26 +24,12 @@ SetModuleDir @@LIBDIR@@/orchids
 # This is the place where modules are loaded.
 
 LoadModule htmlstate
-LoadModule remoteadm
-LoadModule textfile
-LoadModule sockunix
 LoadModule udp
-LoadModule syslog
-LoadModule rawsnare
-LoadModule snare
 LoadModule generic
-LoadModule netfilter
 LoadModule cisco
 LoadModule snmptrap
-LoadModule consoles
-LoadModule prolog
-LoadModule clocks
 LoadModule period
-LoadModule pcap
-LoadModule wifi
 LoadModule timeout
-LoadModule sharedvars
-LoadModule ruletrace
 
 # Define preprocessor command for each rule file suffix.
 
@@ -91,7 +77,8 @@ ResolveIP  no
 
 # Include module specific configurations files...
 
-Include @@ETCDIR@@/orchids/conf.d/*.conf
+Include @@ETCDIR@@/orchids/mods-enabled/*.load
+Include @@ETCDIR@@/orchids/mods-enabled/*.conf
 
 
 # Include the rule rule definition file.

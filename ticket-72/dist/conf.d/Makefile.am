@@ -16,7 +16,21 @@ EXTRA_DIST =                  \
   13_mod_pcap.conf.dist       \
   14_mod_wifi.conf.dist       \
   15_mod_sharedvars.conf.dist \
-  16_mod_ruletrace.conf.dist
+  16_mod_ruletrace.conf.dist  \
+  01_mod_textfile.load.dist   \
+  02_mod_syslog.load.dist     \
+  04_mod_sockunix.load.dist   \
+  05_mod_consoles.load.dist   \
+  06_mod_remoteadm.load.dist  \
+  07_mod_snare.load.dist      \
+  08_mod_rawsnare.load.dist   \
+  09_mod_netfilter.load.dist  \
+  10_mod_prolog.load.dist     \
+  11_mod_clocks.load.dist     \
+  13_mod_pcap.load.dist       \
+  14_mod_wifi.load.dist       \
+  15_mod_sharedvars.load.dist \
+  16_mod_ruletrace.load.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
@@ -34,9 +48,31 @@ orchidsconfd_DATA =         \
   13_mod_pcap.conf          \
   14_mod_wifi.conf          \
   15_mod_sharedvars.conf    \
-  16_mod_ruletrace.conf
+  16_mod_ruletrace.conf     \
+  01_mod_textfile.load      \
+  02_mod_syslog.load        \
+  04_mod_sockunix.load      \
+  05_mod_consoles.load      \
+  06_mod_remoteadm.load     \
+  07_mod_snare.load         \
+  08_mod_rawsnare.load      \
+  09_mod_netfilter.load     \
+  10_mod_prolog.load        \
+  11_mod_clocks.load        \
+  13_mod_pcap.load          \
+  14_mod_wifi.load          \
+  15_mod_sharedvars.load    \
+  16_mod_ruletrace.load
 
 %.conf: $(srcdir)/%.conf.dist
+	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
+            -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
+            -e 's#@@LIBDIR@@#$(libdir)#g' \
+            -e 's#@@RUNUSER@@#$(ORCHIDS_RUNTIME_USER)#g' \
+           $< \
+           > $@
+
+%.load: $(srcdir)/%.load.dist
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
             -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
             -e 's#@@LIBDIR@@#$(libdir)#g' \
