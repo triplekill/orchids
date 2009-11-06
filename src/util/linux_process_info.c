@@ -8,7 +8,7 @@
  ** @ingroup util
  **
  ** @date  Started on: Thu Jun  5 18:57:14 2003
- ** @date Last update: Tue Nov 29 11:28:36 2005
+ ** @date Last update: Thu Nov  5 20:46:44 2009
  **/
 
 /*
@@ -198,7 +198,12 @@ get_linux_process_info(linux_process_info_t *p, pid_t pid)
   char stat_path[20]; /* max len is '/proc/12345/stat\0' (17) */
   FILE *fp;
 
-  snprintf(stat_path, 20, "/proc/%d/stat", pid);
+  if (pid == 0) {
+    strcpy(stat_path, "/proc/self/stat");
+  }
+  else {
+    snprintf(stat_path, 20, "/proc/%d/stat", pid);
+  }
 
   fp = fopen(stat_path, "r");
   if (fp == NULL)
