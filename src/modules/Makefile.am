@@ -28,7 +28,8 @@ pkglib_LTLIBRARIES = \
   mod_period.la \
   mod_sharedvars.la \
   mod_timeout.la \
-  mod_ruletrace.la
+  mod_ruletrace.la\
+  mod_auditd.la
 
 if ENABLE_HTMLOUTPUT
 pkglib_LTLIBRARIES += mod_htmlstate.la
@@ -151,6 +152,10 @@ endif
 
 mod_sockunix_la_SOURCES = mod_sockunix.c mod_sockunix.h
 mod_sockunix_la_LDFLAGS = -module -avoid-version
+
+
+mod_auditd_la_SOURCES = mod_auditd.c mod_auditd.h auditd_queue.h
+mod_auditd_la_LDFLAGS = -module -avoid-version
 
 # mod_stats_la_SOURCES = mod_stats.c
 # mod_stats_la_LDFLAGS = -module -avoid-version

@@ -1,0 +1,60 @@
+/*
+*   Memory leak vulnerability in ip_options_get   
+*   Systems affected: linux kernel 2.6 <= 2.6.9, 2.4 <= 2.4.28 on i386 (at least)
+*   http://www.guninski.com/where_do_you_want_billg_to_go_today_2.html
+*/
+
+
+#define MAX_CALLS 5
+#define SYSCALL 102
+
+
+rule leak_memory
+{
+  state init
+ {  
+    $attack_pid = .auditd.pid;
+
+    if (.auditd.syscall == SYSCALL &&
+        .auditd.varzero == "3")
+       goto start;
+  }
+
+  state start
+  { 
+    
+   $counter = 1 ;
+   if (.auditd.pid == $attack_pid &&
+       .auditd.syscall == SYSCALL &&
+       .auditd.varzero == "3")
+       goto listen_loop;
+  }
+
+  state listen_loop
+  {
+   
+    $counter = $counter + 1;
+    if ($counter == MAX_CALLS)
+       goto alert;
+
+    if ( .auditd.pid == $attack_pid &&
+         .auditd.syscall == SYSCALL &&
+         .auditd.varzero == "3" && 
+         $counter < MAX_CALLS)
+       goto listen_loop;
+  }
+
+ 
+  state alert
+  {
+    print("Memory leak DOS attack detected !!");
+   
+    $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
+    system( $reaction );
+    $msg= " --> Orchids is reacting : killing attack process !!";  
+    print($msg);
+    print( $reaction );
+    
+  }
+
+}/* end rule leak_memory*/

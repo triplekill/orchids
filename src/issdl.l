@@ -256,7 +256,7 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 }
 
   /* other illegal values */
-<QSTR>[0-9]+ {
+<QSTR>\\[0-9]+ {
   DPRINTF( ("ERROR: bad octal value (%s)\n", yytext) );
   return (0);
 }

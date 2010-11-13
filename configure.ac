@@ -246,6 +246,8 @@ if test "$XML2_CONFIG" != "" ; then
    AC_DEFINE([HAVE_XML2], 1, [Set to 1 if libxml2 is present])
 fi
 
+AC_CHECK_HEADERS(libaudit.h)
+
 CFLAGS="$CFLAGS -Wall -DPKGDATADIR=\\\"$datadir\\\" -DSYSCONFDIR=\\\"$sysconfdir\\\" -DLOCALSTATEDIR=\\\"$localstatedir\\\" -DLIBDIR=\\\"$libdir\\\""
 
 AC_CONFIG_FILES([Makefile 
