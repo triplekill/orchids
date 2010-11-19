@@ -235,6 +235,8 @@ if test "$NETSNMP_CONFIG" != "" ; then
    NETSNMP_CFLAGS=$($NETSNMP_CONFIG --cflags)
    AC_DEFINE([HAVE_NETSNMP], 1, [Set to 1 if libnetsnmp is present])
    AM_CONDITIONAL(USE_NETSNMP, true)
+else
+   AM_CONDITIONAL(USE_NETSNMP, false)
 fi
 AC_SUBST(NETSNMP_CFLAGS)
 AC_SUBST(NETSNMP_LDFLAGS)
