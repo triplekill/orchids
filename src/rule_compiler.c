@@ -8,7 +8,7 @@
  ** @ingroup compiler
  **
  ** @date  Started on: Sat Feb 22 17:57:07 2003
- ** @date Last update: Mon Feb  4 15:04:06 2008
+ ** @date Last update: Sat Nov 27 14:40:27 2010
  **/
 
 /*
@@ -1353,7 +1353,7 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   for (s = 0; s < rule->state_nb - 1; s++) {
     compile_state_ast(ctx, rule, &(rule->state[s+1]),
                       node_rule->statelist->states[s]);
-    rule->state[s].id = s; /* set state id */
+    rule->state[s+1].id = s+1; /* set state id */
 
     /* renumber transitions */
     for ( t = 0 ; t < rule->state[s+1].trans_nb ; t++) {
