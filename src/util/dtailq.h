@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Sun Nov 28 13:26:07 2010
+ ** @date Last update: Sun Nov 28 13:32:45 2010
  **/
 
 /*
@@ -137,6 +137,25 @@ do {                                                                          \
     (head)->tqh_last = (elm)->field.tqe_prev;                                 \
   }                                                                           \
   *(elm)->field.tqe_prev = DTAILQ_NEXT((elm), field);                         \
+} while (0)
+
+#define DTAILQ_REVERSE(head, type_t, field)                                   \
+do {                                                                          \
+  type_t *curelm;                                                             \
+  type_t *nextelm;                                                            \
+  type_t *tailelm;                                                            \
+                                                                              \
+  tailelm = NULL;                                                             \
+  (head)->tqh_last = &DTAILQ_FIRST((head));                                   \
+  DTAILQ_FOREACH_SAFE(curelm, head, field, nextelm) {                         \
+    if (tailelm == NULL)                                                      \
+      (curelm)->field.tqe_prev = &DTAILQ_FIRST((head));                       \
+    else                                                                      \
+      (curelm)->field.tqe_prev = &DTAILQ_NEXT((tailelm), field);              \
+    DTAILQ_NEXT(curelm, field) = tailelm;                                     \
+    tailelm = curelm;                                                         \
+  }                                                                           \
+  DTAILQ_FIRST((head)) = tailelm;                                             \
 } while (0)
 
 
