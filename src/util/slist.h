@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Feb 26 12:51:41 2008
+ ** @date Last update: Sun Nov 28 14:14:23 2010
  **/
 
 /*
@@ -27,7 +27,7 @@
  * Singly-linked List declarations.
  */
 #define SLIST_HEAD(name, type_t)                                              \
-struct slist_##name##_t {                                                     \
+struct slist_##name##_s {                                                     \
   type_t *slh_first;                                                          \
 }
 

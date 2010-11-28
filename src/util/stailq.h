@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Feb 26 14:11:32 2008
+ ** @date Last update: Sun Nov 28 14:14:57 2010
  **/
 
 /*
@@ -27,7 +27,7 @@
  * Singly-linked Tail queue declarations.
  */
 #define STAILQ_HEAD(name, type_t)                                             \
-struct stailq_##name##_t {            \
+struct stailq_##name##_s {                                                    \
   type_t  *stqh_first;                                                        \
   type_t **stqh_last;                                                         \
 }
