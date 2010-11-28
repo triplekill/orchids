@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Nov 29 11:24:47 2005
+ ** @date Last update: Sun Nov 28 13:26:07 2010
  **/
 
 /*
@@ -105,7 +105,7 @@ do {                                                                          \
 
 #define DTAILQ_INSERT_HEAD(head, elm, field)                                  \
 do {                                                                          \
-  if ((DTAILQ_NEXT((elm), field) = TAILQ_FIRST((head))) != NULL)              \
+  if ((DTAILQ_NEXT((elm), field) = DTAILQ_FIRST((head))) != NULL)             \
     DTAILQ_FIRST((head))->field.tqe_prev = &DTAILQ_NEXT((elm), field);        \
   else                                                                        \
     (head)->tqh_last = &DTAILQ_NEXT((elm), field);                            \
