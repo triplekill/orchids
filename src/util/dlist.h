@@ -7,7 +7,7 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Mon Jan 13 10:09:19 2003
- ** @date Last update: Tue Nov 29 11:24:47 2005
+ ** @date Last update: Sun Nov 28 12:52:32 2010
  **/
 
 /*
@@ -91,6 +91,23 @@ do {                                                                          \
   *(elm)->field.le_prev = DLIST_NEXT((elm), field);                           \
 } while (0)
 
+#define DLIST_REVERSE(head, type_t, field)                                    \
+do {                                                                          \
+  type_t *curelm;                                                             \
+  type_t *nextelm;                                                            \
+  type_t *tailelm;                                                            \
+                                                                              \
+  tailelm = NULL;                                                             \
+  DLIST_FOREACH_SAFE(curelm, head, field, nextelm) {                          \
+    if (tailelm == NULL)                                                      \
+      (curelm)->field.le_prev = &DLIST_FIRST((head));                         \
+    else                                                                      \
+      (curelm)->field.le_prev = &DLIST_NEXT((tailelm), field);                \
+    DLIST_NEXT(curelm, field) = tailelm;                                      \
+    tailelm = curelm;                                                         \
+  }                                                                           \
+  DLIST_FIRST((head)) = tailelm;                                              \
+} while (0)
 
 #endif /* DLIST_H */
 
