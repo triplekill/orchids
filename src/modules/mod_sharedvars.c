@@ -9,7 +9,7 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Sat Sep  8 19:22:20 2007
+ ** @date Last update: Wed Dec  1 15:30:29 2010
  **/
 
 /*
@@ -113,6 +113,11 @@ issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
 
   key = ovm_strdup(varname);
   new_value = issdl_clone(value);
+  /* This new cloned variable MUST NOT be marked with CANFREE (which
+   * is the default of issdl_clone()) because its memory is not under
+   * the control of the virtual machine.  It is this module which
+   * decide when allocate/deallocate it. */
+  FLAGS(new_value) &= ~TYPE_CANFREE;
   old_value = strhash_update_or_add(mod_sharedvars_cfg_g->vars_hash,
                                     new_value, key);
   if (old_value) {
