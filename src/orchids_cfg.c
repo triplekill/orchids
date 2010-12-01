@@ -8,7 +8,7 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Mon Feb  4 15:00:25 2008
+ ** @date Last update: Tue Nov 30 23:09:20 2010
  **/
 
 /*
@@ -200,7 +200,7 @@ proceed_includes(char *pattern, config_directive_t **root, config_directive_t **
     *last = get_last_dir(new_root);
   }
 
-  /* globfree(&globbuf); */
+  globfree(&globbuf);
 
   return (RETURN_SUCCESS);
 }
@@ -539,7 +539,7 @@ add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     }
   }
 
-  /* globfree(&globbuf); */
+  globfree(&globbuf);
 }
 
 
