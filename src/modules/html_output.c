@@ -8,7 +8,7 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Fri Sep 14 18:59:39 2007
+ ** @date Last update: Tue Nov 30 21:40:19 2010
  **/
 
 /*
@@ -532,7 +532,7 @@ generate_html_orchids_datatypes(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-functions.html");
+  generate_htmlfile_hardlink(ctx, file, "orchids-datatypes.html");
 }
 
 
