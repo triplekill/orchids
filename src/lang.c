@@ -2854,13 +2854,15 @@ get_issdl_functions(void)
 void
 fprintf_issdl_functions(FILE *fp, orchids_t *ctx)
 {
-  issdl_function_t *f;
+  int i;
 
   fprintf(fp, "-----------[ registered language functions ]---\n");
   fprintf(fp, "         function name | description \n");
   fprintf(fp, "-----------------------------------------------\n");
-  for (f = issdl_function_g; f->name; f++) {
-    fprintf(fp, "%20s() | %s\n", f->name, f->desc);
+  for (i = 0; i < ctx->vm_func_tbl_sz; i++) {
+    fprintf(fp, "%20s() | %s\n",
+            ctx->vm_func_tbl[i].name,
+            ctx->vm_func_tbl[i].desc);
   }
 }
 
