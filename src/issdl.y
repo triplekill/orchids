@@ -64,7 +64,7 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS
 
-%token RULE STATE INIT IF GOTO IF WAITFOR /* special keywords */
+%token RULE STATE IF GOTO WAITFOR /* special keywords */
 %token O_BRACE C_BRACE O_PARENT C_PARENT EQ /* ponctuation */
 %token SEMICOLUMN COMMA SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_TIMEVAL KW_COUNTER KW_REGEX
