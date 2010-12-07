@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <limits.h>
 
 #include "mod_mgr.h"
 
@@ -32,7 +33,7 @@
 input_module_t *
 load_add_shared_module(orchids_t *ctx, const char *name)
 {
-  char mod_fname[4096];
+  char mod_fname[PATH_MAX];
   void *mod_handle;
   input_module_t *mod;
 

@@ -26,17 +26,14 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
 /* #include <sys/resource.h> */
 #include <sys/utsname.h>
-
 #include <fcntl.h>
 #include <errno.h>
-
 #include <string.h>
 #include <dirent.h>
-
 #include <utime.h>
+#include <limits.h>
 
 #include "orchids.h"
 
@@ -59,7 +56,7 @@ cache_gc_compar(const struct dirent **a, const struct dirent **b)
 {
   struct stat stat_a;
   struct stat stat_b;
-  char path[4096];
+  char path[PATH_MAX];
 
   snprintf(path, sizeof (path), "%s/%s",
 	   cache_gc_dir_g, (*a)->d_name);
