@@ -24,7 +24,7 @@ static int
 cache_gc_select(const struct dirent *d);
 
 static int
-cache_gc_compar(const void *a, const void *b);
+cache_gc_compar(const struct dirent **a, const struct dirent **b);
 
 #endif /* FILE_CACHE_PRIV_H */
 

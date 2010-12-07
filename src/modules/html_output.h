@@ -148,7 +148,7 @@ select_report(const struct dirent *d);
 
 
 static int
-compar_report(const void *a, const void *b);
+compar_report(const struct dirent **a, const struct dirent **b);
 
 
 static void

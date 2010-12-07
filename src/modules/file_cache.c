@@ -55,18 +55,18 @@ cache_gc_select(const struct dirent *d)
 
 
 static int
-cache_gc_compar(const void *a, const void *b)
+cache_gc_compar(const struct dirent **a, const struct dirent **b)
 {
   struct stat stat_a;
   struct stat stat_b;
   char path[4096];
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*(struct dirent **)a)->d_name);
+	   cache_gc_dir_g, (*a)->d_name);
   Xstat(path, &stat_a);
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*(struct dirent **)b)->d_name);
+	   cache_gc_dir_g, (*b)->d_name);
   Xstat(path, &stat_b);
 
   return (stat_b.st_mtime - stat_a.st_mtime);
