@@ -322,7 +322,7 @@ consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   ret = pl_consult(dir->args);
 
   if (ret == FALSE) {
-    DebugLog(DF_MOD, DS_INFO, "Failed to consult prolog file %s\n", dir->args);
+    DebugLog(DF_MOD, DS_ERROR, "Failed to consult prolog file %s\n", dir->args);
   }
 
   cfg = (prolog_cfg_t *)mod->config;
