@@ -468,6 +468,7 @@ inject_event(orchids_t *ctx, event_t *event)
       }
       if (ctx->cur_retrig_qt)
         ctx->cur_retrig_qt->next = NULL;
+      ctx->current_tail = NULL;
       Xfree(t);
       continue ;
     }
@@ -576,6 +577,7 @@ inject_event(orchids_t *ctx, event_t *event)
       }
       if (ctx->cur_retrig_qt)
         ctx->cur_retrig_qt->next = NULL;
+      ctx->current_tail = NULL;
       Xfree(t);
       continue;
     }
