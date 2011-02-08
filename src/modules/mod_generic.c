@@ -8,7 +8,6 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:08:11 2003
- ** @date Last update: Fri Aug  3 00:02:15 2007
  **/
 
 /*

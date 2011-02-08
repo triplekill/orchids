@@ -9,7 +9,6 @@
  ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:38 2003
-;; @date Last update: Tue Jun 12 12:34:46 2007
  **/
 
 /*
@@ -32,8 +31,9 @@
 #include "issdl.tab.h"
 
 /*
-** since the maxline limit is usually 4096 and quoted string can't
-** be defined in multiple lines, we can't have a qstr bigger than 4096.
+** Since the maxline limit is usually 4096 and quoted string can't
+** be defined in multiple lines, we can't have a quoted string
+** bigger than 4096.
 */
 #define QSTRMAX 4096
 
@@ -53,7 +53,7 @@ char *issdlcurrentfile_g = NULL;
 SLIST_HEAD(filestack, filestack_t) issdlfilestack_g =
   SLIST_HEAD_INITIALIZER(filestack);
 
-/* static values for escape character interpretation and
+/* Static values for escape character interpretation and
 ** quoted string construction. */
 static char   qstr_buf_g[QSTRMAX];
 static char  *qstr_ptr_g;
@@ -71,10 +71,10 @@ static size_t qstr_sz_g;
 
 %%
 
-[\t ]+ /* ignore whitespace */ ;
+[\t ]+ /* Ignore whitespace */ ;
 "\n" { ++issdllineno_g; }
 
- /* reserved keywords and operators */
+ /* Reserved keywords and operators */
 "rule"     { return (RULE);     }
 "state"    { return (STATE);    }
 "synchronize" { return (SYNCHRONIZE); }
@@ -116,25 +116,29 @@ static size_t qstr_sz_g;
 "_COUNTER" { return (KW_COUNTER); }
 "_REGEX"   { return (KW_REGEX); }
 
- /* handle comments */
+ /* Handle comments */
 "/*"       { BEGIN COMMENT; }
 <COMMENT>. ;
 <COMMENT>\n   { ++issdllineno_g; }
 <COMMENT>"*/" { BEGIN INITIAL; }
 <COMMENT>"/*" { DPRINTF( ("warning! '/*' in comment.\n") ); }
 
+ /* Handle output of CPP line control */
 ^"# "[0-9]+" \"".+"\""(" "[1-4]){0,4}\n {
   int line, flag1, flag2, flag3, flag4;
   char file[1024];
   int ret;
   filestack_t *fs;
+
   /*
-    1 This indicates the start of a new file.
-    2 This indicates returning to a file (after having included another file).
-    3 This indicates that the following text comes from a system header file,
-      so certain warnings should be suppressed.
-    4 This indicates that the following text should be treated as being
-      wrapped in an implicit `extern "C"' block.
+    CPP output line control code:
+    1: This code indicates the start of a new file.
+    2: This code indicates returning to a file
+       (after having included another file).
+    3: This code indicates that the following text comes from a
+       system header file, so certain warnings should be suppressed.
+    4: This code indicates that the following text should be treated as being
+       wrapped in an implicit `extern "C"' block.
   */
   flag1 = 0;
   flag2 = 0;
@@ -147,16 +151,16 @@ static size_t qstr_sz_g;
   DebugLog(DF_OLC, DS_DEBUG, ">>> CPP sscanf(\"%s\") = %i\n", issdltext, ret);
 
   if ((ret >= 2) && (ret <= 6)) {
-    /* handle flags */
+    /* Handle flags */
     if (flag1 == 1) {
-      /* if 1 is set, push new file and set line counter */
+      /* If 1 is set, push new file and set line counter */
       fs = Xmalloc(sizeof (filestack_t));
       fs->file = strdup(issdlcurrentfile_g);
       fs->line = issdllineno_g;
       SLIST_INSERT_HEAD(&issdlfilestack_g, fs, elmt);
     }
     else if (flag1 == 2) {
-      /* if 2 is set, pop val, set new file value and line number */
+      /* If 2 is set, pop val, set new file value and line number */
       if ( ! SLIST_IS_EMPTY(&issdlfilestack_g) ) {
         fs = SLIST_FIRST(&issdlfilestack_g);
         SLIST_REMOVE_HEAD(&issdlfilestack_g, elmt);
@@ -167,7 +171,7 @@ static size_t qstr_sz_g;
         fprintf(stderr, "warning: cpp file inclusion underflow.\n");
       }
     }
-    /* other flags are c specifics  */
+    /* Other flags are specific to C */
 
     if (issdlcurrentfile_g)
       Xfree(issdlcurrentfile_g);
@@ -179,21 +183,21 @@ static size_t qstr_sz_g;
   }
 }
 
- /* variable name */
+ /* Variable name */
 $[A-Za-z_][A-Za-z0-9_\.]* {
   issdllval.string = strdup(issdltext + 1);
   /* DPRINTF( ("VARIABLE %s\n", issdltext) ); */
   return (VARIABLE);
 }
 
- /* field name */
+ /* Field name */
 \.[a-z]+\.[a-z_]+ {
   issdllval.string = strdup(issdltext + 1); /* +1 skip the dot */
   /* DPRINTF( ("FIELD %s\n", issdltext) ); */
   return(FIELD);
 }
 
- /* symbol names (same as cdecls) */
+ /* Symbol names (same as a C declaration) */
 [A-Za-z][A-Za-z0-9_]* {
   issdllval.sym.file = strdup(issdlcurrentfile_g);
   issdllval.sym.line = issdllineno_g;
@@ -206,29 +210,29 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
   return (SYMNAME);
 }
 
- /* floating point numbers */
+ /* Floating point numbers */
 ([0-9]*\.[0-9]+)([eE][-+]?[0-9]+)? {
   issdllval.fp_double = atof(issdltext);
   /* printf("FPDOUBLE %f\n", issdllval.fp_double); */
   return (FPDOUBLE);
 }
 
- /* integer numbers */
+ /* Integer numbers */
 [0-9]+ {
   issdllval.integer = atoi(issdltext);
   /* printf("NUMBER %i\n", issdllval.integer); */
   return (NUMBER);
 }
 
- /* quoted string handling */
- /* a double quote is the begin of a quoted string */
+ /* Quoted string handling */
+ /* A double quote is the begin of a quoted string */
 \" {
   qstr_sz_g = 0;
   qstr_ptr_g = qstr_buf_g;
   BEGIN QSTR;
 }
 
-  /* end of the string */
+  /* End of the string */
 <QSTR>\" {
   BEGIN INITIAL;
   *qstr_ptr_g = '\0';
@@ -236,13 +240,13 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
   return (STRING);
 }
 
-  /* newline in qstr must be specified as \n */
+  /* Newline in qstr must be specified as \n */
 <QSTR>\n {
   DPRINTF( ("ERROR: newline in multiline quoted strings must be escaped.\n") );
   return (0);
 }
 
-  /* octal sequence handling */
+  /* Octal sequence handling */
 <QSTR>\\[0-7]{1,3} {
   unsigned int res;
 
@@ -255,31 +259,31 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
   QSTR_PUTC(res);
 }
 
-  /* other illegal values */
+  /* Other illegal values */
 <QSTR>\\[0-9]+ {
   DPRINTF( ("ERROR: bad octal value (%s)\n", yytext) );
   return (0);
 }
 
-  /* new line */
+  /* New line */
 <QSTR>\\n { QSTR_PUTC('\n'); }
 
-  /* tabulation */
+  /* Tabulation */
 <QSTR>\\t { QSTR_PUTC('\t'); }
 
-  /* carriage return */
+  /* Carriage return */
 <QSTR>\\r { QSTR_PUTC('\r'); }
 
-  /* backspace */
+  /* Backspace */
 <QSTR>\\b { QSTR_PUTC('\b'); }
 
-  /* form feed */
+  /* Form feed */
 <QSTR>\\f { QSTR_PUTC('\f'); }
 
-  /* other escaped characters (\", \\n, ...) */
+  /* Other escaped characters (\", \\n, ...) */
 <QSTR>\\(.|\n) { QSTR_PUTC(yytext[1]); }
 
-  /* traditional string */
+  /* Traditional string */
 <QSTR>[^\\\n\"]+ {
   char *yptr;
 
@@ -288,7 +292,8 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
     QSTR_PUTC(*yptr++);
 }
 
- /* if we are here, something was wrong... */
+ /* If we are here, it means that something went wrong
+  * (this is a catch all rule)... */
 . {
   DPRINTF( ("error.\n") );
   return (issdltext[0]);

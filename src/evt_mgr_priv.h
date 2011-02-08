@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
- ** @date Last update: Fri Jul 27 15:43:57 2007
  **/
 
 /*
@@ -20,13 +19,29 @@
 
 #include "orchids.h"
 
+/**
+ ** @def Monitor_Activity
+ **   A macro which wrap the monitor_activity() function if this
+ **   feature is enabled.  Otherwise, it does nothing.
+ **/
+
 #ifdef ENABLE_ACTMON
+/**
+ ** An activity monitor for seeing Orchids moving.  This function is
+ ** only for demonstration purposes.
+ **/
 static void monitor_activity(void);
 # define Monitor_Activity() monitor_activity()
 #else
 # define Monitor_Activity()
 #endif /* ACTMON */
 
+
+/**
+ ** Get the next real-time action rtaction_t from the action queue.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @return The next real-time action in the action queue.
+ **/
 static rtaction_t *
 get_next_rtaction(orchids_t *ctx);
 

@@ -8,7 +8,6 @@
  ** @ingroup compiler
  **
  ** @date  Started on: Sat Feb 22 17:57:07 2003
- ** @date Last update: Sat Nov 27 14:40:27 2010
  **/
 
 /*
@@ -88,6 +87,7 @@ build_functions_hash(orchids_t *ctx);
 static void
 fprintf_term_expr(FILE *fp, node_expr_t *expr);
 
+
 rule_compiler_t *
 new_rule_compiler_ctx(void)
 {
@@ -141,6 +141,7 @@ dynamic_add(rule_compiler_t *ctx, char *var_name)
   ctx->dyn_var_name[ ctx->dyn_var_name_nb++ ] = var_name;
 }
 
+
 void
 compile_rules(orchids_t *ctx)
 {
@@ -149,7 +150,7 @@ compile_rules(orchids_t *ctx)
   DebugLog(DF_OLC, DS_NOTICE, "*** beginning rule compilation ***\n");
 
   build_fields_hash(ctx);
-  /* XXX functions hash construction moved to register_lan_function() */
+  /* XXX functions hash construction moved to register_lang_function() */
   build_functions_hash(ctx);
 
   for (rulefile = ctx->rulefile_list; rulefile; rulefile = rulefile->next)
@@ -219,7 +220,7 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
   ret = issdlparse();
   if (ret > 0) {
     DebugLog(DF_OLC, DS_FATAL,
-             "Error while compiling rulefile '%s'\n", rulefile);
+             "Error while compiling rule file '%s'\n", rulefile);
     exit(EXIT_FAILURE);
   }
 
@@ -234,13 +235,7 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
   gettimeofday(&ctx->last_rule_act, NULL);
 }
 
-/**
- * Create substate names for nested anonymous states.
- * state => state_0, state_1, etc...
- * @param refname Reference name.
- * @param n Number to append.
- * @return Anallocated string buffer containing the new name.
- **/
+
 char *
 build_substate_name(const char *refname, int n)
 {
@@ -258,11 +253,6 @@ build_substate_name(const char *refname, int n)
 
 /* Abstract syntax tree building functions (called by the yaccer issdl.y) */
 
-/**
- * Build a 'statelist' node and add the first state.
- * @param first_state The first state to add to the state list.
- * @return An allocated state list node.
- **/
 node_statelist_t *
 build_statelist(node_state_t *first_state)
 {
@@ -282,11 +272,7 @@ build_statelist(node_state_t *first_state)
   return (sl);
 }
 
-/**
- * Add a state node to a state list node.
- * @param list The state list node.
- * @param state The state to add to the state list.
- **/
+
 void
 statelist_add(node_statelist_t *list, node_state_t *state)
 {
@@ -302,12 +288,7 @@ statelist_add(node_statelist_t *list, node_state_t *state)
   list->states[ list->states_nb++ ] = state;
 }
 
-/**
- * Build a state node from an actionlist node and an transitionlist node.
- * @param actions Action list node.
- * @param transitions Transitions list node.
- * @return A new state node.
- **/
+
 node_state_t *
 build_state(node_actionlist_t *actions, node_translist_t *transitions)
 {
@@ -320,14 +301,7 @@ build_state(node_actionlist_t *actions, node_translist_t *transitions)
   return (s);
 }
 
-/**
- * Set a state node name (or label) to a given symbol.
- * @param ctx Rule compiler context.
- * @param state The state to label.
- * @param sym Symbol (name and line) to associate to the state node.
- * @param flags Optional state flags.
- * @return The labelised state (NOT REALLOCATED !)
- **/
+
 node_state_t *
 set_state_label(rule_compiler_t *ctx, node_state_t *state, symbol_token_t *sym, unsigned long flags)
 {
@@ -350,11 +324,7 @@ set_state_label(rule_compiler_t *ctx, node_state_t *state, symbol_token_t *sym, 
   return (state);
 }
 
-/**
- * Build a function call parameter list node.
- * @param first_param The first parameter to add to the list.
- * @return A new allocated paremeter list node.
- **/
+
 node_paramlist_t *
 build_paramlist(node_expr_t *first_param)
 {
@@ -370,11 +340,7 @@ build_paramlist(node_expr_t *first_param)
   return (pl);
 }
 
-/**
- * Add an expression to a parameter list.
- * @param list The parameter list node.
- * @param expr The expression node to add to the parameter list node.
- **/
+
 void
 paramlist_add(node_paramlist_t *list, node_expr_t *expr)
 {
@@ -388,11 +354,7 @@ paramlist_add(node_paramlist_t *list, node_expr_t *expr)
   list->params[ list->params_nb++ ] = expr;
 }
 
-/**
- * Build a variable list node.
- * @param first_param The first variable to add to the list.
- * @return A new allocated variable list node.
- **/
+
 node_varlist_t *
 build_varlist(node_expr_t *first_param)
 {
@@ -408,11 +370,7 @@ build_varlist(node_expr_t *first_param)
   return (vl);
 }
 
-/**
- * Add a variable to a parameter list.
- * @param list The variable list node.
- * @param expr The expression node to add to the variable list node.
- **/
+
 void
 varlist_add(node_varlist_t *list, node_expr_t *expr)
 {
@@ -426,11 +384,6 @@ varlist_add(node_varlist_t *list, node_expr_t *expr)
 }
 
 
-/**
- * Build a synchronization variable list node.
- * @param first_param  The first variable to add to the list.
- * @return A new allocated variable list node.
- **/
 node_syncvarlist_t *
 build_syncvarlist(char *first_syncvar)
 {
@@ -446,11 +399,7 @@ build_syncvarlist(char *first_syncvar)
   return (vl);
 }
 
-/**
- * Add a synchronization variable to a parameter list.
- * @param list The variable list node.
- * @param syncvar The synchronization variable to add to the list node.
- **/
+
 node_syncvarlist_t *
 syncvarlist_add(node_syncvarlist_t *list, char *syncvar)
 {
@@ -466,11 +415,6 @@ syncvarlist_add(node_syncvarlist_t *list, char *syncvar)
 }
 
 
-/**
- * Build an unconditional transition node.
- * @param dest The name string of the destination state.
- * @return The new unconditinoal transition node.
- **/
 node_translist_t *
 build_unconditional_transition(char *dest)
 {
@@ -483,6 +427,7 @@ build_unconditional_transition(char *dest)
   return (nl);
 }
 
+
 node_trans_t *
 build_unconditional_transition_test(char *dest)
 {
@@ -494,13 +439,6 @@ build_unconditional_transition_test(char *dest)
 }
 
 
-/**
- * Build a direct transition node.
- * A direct transition is "if (cond) goto somewhere".
- * @param cond The condition expression of the transition.
- * @param dest The name string of the destination state.
- * @return The new transition node.
- **/
 node_trans_t *
 build_direct_transition(node_expr_t *cond, char *dest)
 {
@@ -513,13 +451,7 @@ build_direct_transition(node_expr_t *cond, char *dest)
   return (trans);
 }
 
-/**
- * Build indirect transition.
- * An indirect transition is "if (cond) { do something }".
- * @param cond The condition expression of the transition.
- * @param substate The nested sub-state block.
- * @return The new transition node.
- **/
+
 node_trans_t *
 build_indirect_transition(node_expr_t *cond, node_state_t *substate)
 {
@@ -532,9 +464,7 @@ build_indirect_transition(node_expr_t *cond, node_state_t *substate)
   return (trans);
 }
 
-/**
- * Build transition list.
- **/
+
 node_translist_t *
 build_transitionlist(node_trans_t *trans)
 {
@@ -551,11 +481,7 @@ build_transitionlist(node_trans_t *trans)
   return (tl);
 }
 
-/**
- * Add a transition to a transition list.
- * @param list The transition list node.
- * @param trans The transition node to add to the transition list node.
- **/
+
 void
 transitionlist_add(node_translist_t *list, node_trans_t *trans)
 {
@@ -569,11 +495,7 @@ transitionlist_add(node_translist_t *list, node_trans_t *trans)
   list->trans[ list->trans_nb++ ] = trans;
 }
 
-/**
- * Build an action list node.
- * @param first_action The first parameter to add to the list.
- * @return A new allocated action list node.
- **/
+
 node_actionlist_t *
 build_actionlist(node_action_t *first_action)
 {
@@ -590,11 +512,7 @@ build_actionlist(node_action_t *first_action)
   return (al);
 }
 
-/**
- * Add an action to an action list node.
- * @param list The action list node.
- * @param action The action node to add to the action list node.
- **/
+
 void
 actionlist_add(node_actionlist_t *list, node_action_t *action)
 {
@@ -608,14 +526,7 @@ actionlist_add(node_actionlist_t *list, node_action_t *action)
   list->actions[ list->actions_nb++ ] = action;
 }
 
-/**
- * Build a rule node.
- * @param  sym          The rule name (symbol).
- * @param  init_state   The initial state of the rule.
- * @param  states       Additional state list.
- * @param  sync_vars   Synchronization variable list.
- * @return  A new allocated rule node.
- **/
+
 node_rule_t *
 build_rule(symbol_token_t   *sym,
            node_state_t     *init_state,
@@ -660,13 +571,6 @@ build_string_split(node_expr_t *source,
 }
 
 
-/**
- * Build a binary expression node.
- * @param op The operator identifier.
- * @param left_node The left part of the binary expression.
- * @param right_node The right part of the binary expression.
- * @return A new allocated expression node.
- **/
 node_expr_t *
 build_expr(int op, node_expr_t *left_node, node_expr_t *right_node)
 {
@@ -681,13 +585,7 @@ build_expr(int op, node_expr_t *left_node, node_expr_t *right_node)
   return (n);
 }
 
-/**
- * Build an association (affectation).
- * @param ctx Rule compiler context. Needed to resolve the variable name.
- * @param var The variable name (left value).
- * @param expr The expression to associate to the variable (right value).
- * @return A new allocated expression node.
- **/
+
 node_expr_t *
 build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr)
 {
@@ -702,12 +600,7 @@ build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr)
   return (n);
 }
 
-/**
- * Build a function call node.
- * @param ctx Rule compiler context. Needed to resolve function name.
- * @param sym The function name (symbol) to call.
- * @param paramlist The parameter list for this function.
- **/
+
 node_expr_t *
 build_function_call(rule_compiler_t  *ctx,
                     symbol_token_t   *sym,
@@ -732,12 +625,7 @@ build_function_call(rule_compiler_t  *ctx,
   return (call_node);
 }
 
-/**
- * Build a fieldname (of a module) expression node.
- * @param ctx Rule compiler context. Needed for field name resolution.
- * @param fieldname A registered module fieldname.
- * @return A new allocated expression node.
- **/
+
 node_expr_t *
 build_fieldname(rule_compiler_t *ctx, char *fieldname)
 {
@@ -760,13 +648,7 @@ build_fieldname(rule_compiler_t *ctx, char *fieldname)
   return (n);
 }
 
-/**
- * Build a variable name expression node.
- * @param ctx Rule compiler context. Needed to resolve/add
- *   variable to the global symbol table.
- * @param varname The variable name.
- * @return A new allocated variable name expression node.
- **/
+
 node_expr_t *
 build_varname(rule_compiler_t *ctx, char *varname)
 {
@@ -777,7 +659,7 @@ build_varname(rule_compiler_t *ctx, char *varname)
   n->type = NODE_VARIABLE;
   n->sym.name = varname;
 
-  /* resolve variable in envrironment variable hash table */
+  /* resolve variable in environment variable hash table */
   tmp = strhash_get(ctx->rule_env, varname);
 
   /* if it's doesn't exist, add it to the hash table */
@@ -793,13 +675,6 @@ build_varname(rule_compiler_t *ctx, char *varname)
 }
 
 
-
-/**
- * Build an interger expression node.
- * @param ctx Rule compiler context.
- * @param i The integer value.
- * @return A new allocated integer expression node.
- **/
 node_expr_t *
 build_integer(rule_compiler_t *ctx, int i)
 {
@@ -823,12 +698,6 @@ build_integer(rule_compiler_t *ctx, int i)
 }
 
 
-/**
- * Build a floating-point expression node.
- * @param ctx Rule compiler context.
- * @param i The double value.
- * @return A new allocated floating-point expression node.
- **/
 node_expr_t *
 build_double(rule_compiler_t *ctx, double f)
 {
@@ -850,13 +719,6 @@ build_double(rule_compiler_t *ctx, double f)
 }
 
 
-
-/**
- * Build a string expression node.
- * @param ctx Rule compiler context.
- * @param str The string value.
- * @return A new allocated string expression node.
- **/
 node_expr_t *
 build_string(rule_compiler_t *ctx, char *str)
 {
@@ -882,12 +744,7 @@ build_string(rule_compiler_t *ctx, char *str)
   return (n);
 }
 
-/**
- * Build a constant ipv4addr expression node.
- * @param ctx Rule compiler context.
- * @param hostname The hostname string.
- * @return A new allocated ipv4addr expression node.
- **/
+
 node_expr_t *
 build_ipv4(rule_compiler_t *ctx, char *hostname)
 {
@@ -919,6 +776,7 @@ build_ipv4(rule_compiler_t *ctx, char *hostname)
   return (n);
 }
 
+
 node_expr_t *
 build_ctime_from_int(rule_compiler_t *ctx, long ctime)
 {
@@ -938,6 +796,7 @@ build_ctime_from_int(rule_compiler_t *ctx, long ctime)
 
   return (n);
 }
+
 
 node_expr_t *
 build_ctime_from_string(rule_compiler_t *ctx, char *date)
@@ -959,6 +818,7 @@ build_ctime_from_string(rule_compiler_t *ctx, char *date)
   return (n);
 }
 
+
 node_expr_t *
 build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 {
@@ -978,6 +838,7 @@ build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 
   return (n);
 }
+
 
 node_expr_t *
 build_timeval_from_string(rule_compiler_t *ctx, char *date, long usec)
@@ -999,6 +860,7 @@ build_timeval_from_string(rule_compiler_t *ctx, char *date, long usec)
   return (n);
 }
 
+
 node_expr_t *
 build_counter(rule_compiler_t *ctx, long initial_value)
 {
@@ -1018,6 +880,7 @@ build_counter(rule_compiler_t *ctx, long initial_value)
 
   return (n);
 }
+
 
 node_expr_t *
 build_split_regex(rule_compiler_t *ctx, char *regex_str)
@@ -1100,6 +963,7 @@ build_fields_hash(orchids_t *ctx)
            h->size, h->elmts, strhash_collide_count(h));
 }
 
+
 /**
  * Build the ISSDL built-in functions hash table.
  * @param ctx Orchids context.
@@ -1129,12 +993,6 @@ build_functions_hash(orchids_t *ctx)
 }
 
 
-/**
- * Concatenate the second string into the first.  The first string
- * is reallocated to the correct size.  The second string is freed.
- * @param str1 First string.
- * @param str2 Second string.
- **/
 char *
 build_concat_string(char *str1, char *str2)
 {
@@ -1168,6 +1026,7 @@ datahash_pjw(unsigned long h, void *key, size_t keylen)
   return (h);
 }
 
+
 static unsigned long
 objhash_rule_instance(void *state_inst)
 {
@@ -1199,6 +1058,7 @@ objhash_rule_instance(void *state_inst)
 
   return (h);
 }
+
 
 static int
 objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
@@ -1250,14 +1110,6 @@ objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
 }
 
 
-/**
- * Final phase of rule compilation.
- * - all symbols should by added in entry table
- * - this phase resolve all symbols, create environements and generate bytecode
- * @param ctx Rule compiler context.
- * @param node_rule The rule node (abstract syntaxt tree root) to compile.
- * @callgraph
- **/
 void
 compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 {
@@ -1271,7 +1123,7 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
            "----- compiling rule \"%s\" (from file %s:%i) -----\n",
            node_rule->name, ctx->currfile, node_rule->line);
 
-  /* check if we don't already have this rule definition */
+  /* Check if we don't already have this rule definition */
   if ((rule = strhash_get(ctx->rulenames_hash, node_rule->name))) {
     DebugLog(DF_OLC, DS_FATAL,
              "rule %s already defined in %s:%i\n",
@@ -1290,19 +1142,19 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->dynamic_env_sz = ctx->rule_env->elmts;
   rule->id = ctx->rules;
 
-  /* allocate static env */
+  /* Allocate static env */
   rule->static_env = Xmalloc(rule->static_env_sz * sizeof (ovm_var_t *));
   for (s = 0; s < rule->static_env_sz; s++)
-    rule->static_env[s] = ctx->statics[s]; /* XXX use memcpy */
+    rule->static_env[s] = ctx->statics[s]; /* XXX use memcpy() */
 
-  /* allocate dynamic env. variable names */
+  /* Allocate dynamic env. variable names */
   if (rule->dynamic_env_sz > 0) {
     rule->var_name = Xmalloc(rule->dynamic_env_sz * sizeof (char *));
     for (s = 0; s < rule->dynamic_env_sz; s++)
-      rule->var_name[s] = ctx->dyn_var_name[s]; /* XXX use memcpy */
+      rule->var_name[s] = ctx->dyn_var_name[s]; /* XXX use memcpy() */
   }
 
-  /* create synchronization array */
+  /* Create synchronization array */
   if (node_rule->sync_vars) {
     DebugLog(DF_OLC, DS_INFO, "Creating synchronization array\n");
     rule->sync_vars_sz = node_rule->sync_vars->vars_nb;
@@ -1328,7 +1180,7 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
     /* XXX: should dynamically resize sync_lock hash. */
   }
 
-  /* compile init state */
+  /* Compile init state */
   if (!node_rule->init) {
     DebugLog(DF_OLC, DS_WARN, "!!! null init state\n");
     return ; /* XXX: Debug assertion : init state should not be NULL */
@@ -1355,7 +1207,7 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
                       node_rule->statelist->states[s]);
     rule->state[s+1].id = s+1; /* set state id */
 
-    /* renumber transitions */
+    /* Renumber transitions */
     for ( t = 0 ; t < rule->state[s+1].trans_nb ; t++) {
       rule->state[s+1].trans[t].global_id = tid++;
     }
@@ -1365,10 +1217,8 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
            "----- end of compilation of rule \"%s\" (from file %s:%i) -----\n",
            node_rule->name, ctx->currfile, node_rule->line);
 
-  /* add rule name in the rule hash table... */
   strhash_add(ctx->rulenames_hash, rule, rule->name);
 
-  /* ...and in the rule list */
   if (ctx->first_rule)
     ctx->last_rule->next = rule;
   else
@@ -1377,6 +1227,7 @@ compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 
   ctx->rules++;
 }
+
 
 /**
  * Compile a state node abstract syntax tree.
@@ -1434,11 +1285,11 @@ compile_actions_ast(rule_compiler_t   *ctx,
 
 
 /**
- * Compile a list of action expressions into bytecode.
+ * Compile a list of action expressions into byte code.
  * @param expr An array of action expression.
  * @param n Size on the array.
  * @param state State to compile.
- * @return An allocatated bytecode buffer.
+ * @return An allocated byte code buffer.
  **/
 static bytecode_t *
 compile_actions_bytecode(node_expr_t **expr, int n, state_t *state)
@@ -1479,7 +1330,7 @@ compile_actions_bytecode(node_expr_t **expr, int n, state_t *state)
  * Compile an evaluation expression into bytecode.
  *   @param expr  An evaluation expression.
  *   @param trans Transition to compile.
- *   @return An allocatated bytecode buffer.
+ *   @return An allocated byte code buffer.
  **/
 static bytecode_t *
 compile_bytecode(node_expr_t *expr, transition_t *trans)
@@ -1516,9 +1367,9 @@ compile_bytecode(node_expr_t *expr, transition_t *trans)
 
 
 /**
- * Bytecode compiler recursive sub-routine.
+ * Byte code compiler recursive sub-routine.
  * @param expr An expression to compile.
- * @param code An internal bytecode buffer structure.
+ * @param code An internal byte code buffer structure.
  **/
 static void
 compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
@@ -1551,7 +1402,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
 
     case NODE_FIELD:
       if (code->pos >= BYTECODE_BUF_SZ - 3) {
-        DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
         exit(EXIT_FAILURE);
       }
       code->bytecode[ code->pos++ ] = OP_PUSHFIELD;
@@ -1563,7 +1414,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
 
     case NODE_VARIABLE:
       if (code->pos >= BYTECODE_BUF_SZ - 3) {
-        DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
         exit(EXIT_FAILURE);
       }
       code->bytecode[ code->pos++ ] = OP_PUSH;
@@ -1572,7 +1423,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
 
     case NODE_CONST:
       if (code->pos >= BYTECODE_BUF_SZ - 3) {
-        DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
         exit(EXIT_FAILURE);
       }
       code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
@@ -1585,7 +1436,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
           for (i = expr->call.paramlist->params_nb - 1; i >= 0; --i)
             compile_bytecode_sub(expr->call.paramlist->params[i], code);
       if (code->pos >= BYTECODE_BUF_SZ - 2) {
-        DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
         exit(EXIT_FAILURE);
       }
       code->bytecode[ code->pos++ ] = OP_CALL;
@@ -1597,7 +1448,7 @@ compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
        * = 5 + 2n */
       if (code->pos >= (BYTECODE_BUF_SZ -
                         (5 + 2 * expr->regsplit.dest_vars->vars_nb))) {
-        DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
         exit(EXIT_FAILURE);
       }
 
@@ -1672,8 +1523,8 @@ compile_transitions_ast(rule_compiler_t  *ctx,
       DebugLog(DF_OLC, DS_DEBUG, "transition %i: \n", i);
       if (translist->trans[i]->cond) {
         if (translist->trans[i]->sub_state_dest) {
-          /* Conditional undirect transition */
-          DebugLog(DF_OLC, DS_TRACE, "Undirect transition (substates).\n");
+          /* Conditional indirect transition */
+          DebugLog(DF_OLC, DS_TRACE, "Indirect transition (sub-states).\n");
         }
         else {
           /* Conditional direct transition (general case) */
@@ -1727,11 +1578,6 @@ compile_transitions_ast(rule_compiler_t  *ctx,
 }
 
 
-/**
- * Reset a compiler context.
- * The compiler context need to be reseted for each new rule.
- * @param ctx Rule compiler context to reset.
- **/
 void
 compiler_reset(rule_compiler_t *ctx)
 {
@@ -1745,11 +1591,6 @@ compiler_reset(rule_compiler_t *ctx)
 }
 
 
-/**
- * Display the current rule environment in the compiler context.
- * @param fp Output stream.
- * @param ctx Rule compiler context.
- **/
 void
 fprintf_rule_environment(FILE *fp, rule_compiler_t *ctx)
 {
@@ -1820,11 +1661,6 @@ fprintf_term_expr(FILE *fp, node_expr_t *expr)
 }
 
 
-/**
- * Display a expression tree in a postfix order.
- * @param fp Output stream.
- * @param expr An expression tree to display.
- **/
 void
 fprintf_expr(FILE *fp, node_expr_t *expr)
 {
@@ -1837,6 +1673,7 @@ fprintf_expr(FILE *fp, node_expr_t *expr)
   else
     fprintf_term_expr(fp, expr);
 }
+
 
 static void
 fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
@@ -1907,20 +1744,6 @@ fprintf_expr_infix(FILE *fp, node_expr_t *expr)
 }
 
 
-/**
- * Display rule informations.
- * Given informations are :
- * Rule identifier (rid),
- * Rule name,
- * Number of state,
- * Number of transition,
- * Static environment size (sta e),
- * Dynamic environment size (dyn e),
- * Active instances of this rule (activ) and
- * Source file name.
- * @param ctx Orchids context.
- * @param fp Output stream.
- **/
 void
 fprintf_rule_stats(const orchids_t *ctx, FILE *fp)
 {

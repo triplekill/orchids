@@ -8,7 +8,6 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Fri Aug  3 12:42:20 2007
  **/
 
 /*
@@ -62,9 +61,9 @@ fprintf_rule_instances(FILE *fp, const orchids_t *ctx);
  **   the transition counter value,
  **   the bump flag.
  **
- ** @param fp   The output stream.
- ** @param ctx  Orchids application context.
- ** @param q    The waiting thread queue to display.
+ ** @param fp      The output stream.
+ ** @param ctx     Orchids application context.
+ ** @param thread  The waiting thread queue to display.
  **/
 void
 fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread);

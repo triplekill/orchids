@@ -8,7 +8,6 @@
  ** @ingroup output
  **
  ** @date  Started on: Fri May 23 12:18:40 2003
- ** @date Last update: Fri Jul 27 15:58:43 2007
  **/
 
 /*
@@ -25,9 +24,10 @@
 /**
  * Recursive function for displaying rule instance path tree.
  *
- * @param fp Output stream.
- * @param state State instance to display.
- * @param options Option flag for output.
+ * @param fp       Output stream.
+ * @param state    State instance to display.
+ * @param options  Option flag for output.
+ * @param limit    Maximum number of printed states.
  **/
 static void
 fprintf_state_instance_dot(FILE *fp,

@@ -8,7 +8,6 @@
  ** @ingroup ovm
  **
  ** @date  Started on: Wed Mar 12 12:14:53 2003
- ** @date Last update: Tue Jul 31 23:50:07 2007
  **/
 
 /*
@@ -50,7 +49,7 @@ ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
     ret = ops_g[ *isn_param.ip ].insn(&isn_param);
 
     if (ret) {
-      DebugLog(DF_OVM, DS_INFO, "OVM exeption\n");
+      DebugLog(DF_OVM, DS_INFO, "OVM exception\n");
       return (ret);
     }
   }
@@ -500,7 +499,7 @@ static int
 ovm_nop(isn_param_t *param)
 {
   DebugLog(DF_OVM, DS_ERROR,
-           "OP_NOP (why ? compiler doesn't produce OP_NOPs !)\n");
+           "OP_NOP (why ? Compiler doesn't produce OP_NOPs !)\n");
 
   param->ip += 1;
 
@@ -617,7 +616,7 @@ ovm_call(isn_param_t *param)
 {
   DebugLog(DF_OVM, DS_DEBUG, "OP_CALL [%02lx] (%s)\n", param->ip[1],
             param->ctx->vm_func_tbl[ param->ip[1] ].name);
-  /* check call table boundary */
+  /* Check call table boundary */
   param->ctx->vm_func_tbl[ param->ip[1] ].func(param->ctx, param->state);
   param->ip += 2;
 
@@ -645,7 +644,7 @@ ovm_add(isn_param_t *param)
   res = issdl_add(op1, op2);
   stack_push(param->ctx->ovm_stack, res);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_TRACE, "OP_ADD: free operand 1\n");
     Xfree(op1);
@@ -682,7 +681,7 @@ ovm_sub(isn_param_t *param)
   res = issdl_sub(op1, op2);
   stack_push(param->ctx->ovm_stack, res);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
       DebugLog(DF_OVM, DS_DEBUG,"free(op1);\n");
       Xfree(op1);
@@ -719,7 +718,7 @@ ovm_mul(isn_param_t *param)
   res = issdl_mul(op1, op2);
   stack_push(param->ctx->ovm_stack, res);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
       DebugLog(DF_OVM, DS_DEBUG, "free(op1);\n");
       Xfree(op1);
@@ -756,7 +755,7 @@ ovm_div(isn_param_t *param)
   res = issdl_div(op1, op2);
   stack_push(param->ctx->ovm_stack, res);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
       DebugLog(DF_OVM, DS_DEBUG, "free(op1);\n");
       Xfree(op1);
@@ -793,7 +792,7 @@ ovm_mod(isn_param_t *param)
   res = issdl_mod(op1, op2);
   stack_push(param->ctx->ovm_stack, res);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_DEBUG, "free(op1);\n");
     Xfree(op1);
@@ -972,7 +971,7 @@ ovm_ceq(isn_param_t *param)
 
   ret = issdl_cmp(op1, op2);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: free operand 1\n");
     Xfree(op1);
@@ -1202,7 +1201,7 @@ ovm_cgt(isn_param_t *param)
 
   ret = issdl_cmp(op1, op2);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_TRACE, "OP_CGT: free operand 1\n");
     Xfree(op1);
@@ -1244,7 +1243,7 @@ ovm_cle(isn_param_t *param)
 
   ret = issdl_cmp(op1, op2);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_TRACE, "OP_CLE: free operand 1\n");
     Xfree(op1);
@@ -1286,7 +1285,7 @@ ovm_cge(isn_param_t *param)
 
   ret = issdl_cmp(op1, op2);
 
-  /* of op1 and/or op2 was tmpvars, free them */
+  /* If op1 and/or op2 was temp vars, free them */
   if ( IS_NOT_BOUND(op1) ) {
     DebugLog(DF_OVM, DS_TRACE, "OP_CGE: free operand 1\n");
     Xfree(op1);

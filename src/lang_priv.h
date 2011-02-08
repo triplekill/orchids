@@ -8,7 +8,6 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Jul 27 16:17:13 2007
  **/
 
 /*

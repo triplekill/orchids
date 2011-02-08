@@ -9,7 +9,6 @@
  ** @version 1.0
  **
  ** @date  Started on: Tue Feb 25 18:51:02 2003
- ** @date Last update: Tue Jun 12 12:34:24 2007
  **/
 
 /*
@@ -64,12 +63,12 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS
 
-%token RULE STATE IF GOTO WAITFOR /* special keywords */
-%token O_BRACE C_BRACE O_PARENT C_PARENT EQ /* ponctuation */
+%token RULE STATE IF GOTO WAITFOR /* Special keywords */
+%token O_BRACE C_BRACE O_PARENT C_PARENT EQ /* Punctuation */
 %token SEMICOLUMN COMMA SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_TIMEVAL KW_COUNTER KW_REGEX
 %token <sym> SYMNAME INIT
-%token <string> FIELD VARIABLE /* raw data types */
+%token <string> FIELD VARIABLE /* Raw data types */
 %token <integer> NUMBER
 %token <fp_double> FPDOUBLE
 %token <string> STRING
@@ -97,7 +96,7 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 
 
 globaldef:
-  /* empty rule */
+  /* Empty rule */
     { DPRINTF( ("*** warning *** empty rule file.\n") ); }
 | rulelist
 ;
@@ -124,7 +123,7 @@ rule:
 
 
 synchro:
-  /* no synchro */
+  /* No synchro */
     { $$ = NULL; }
 | SYNCHRONIZE O_PARENT sync_var_list C_PARENT
     { $$ = $3; }
@@ -140,7 +139,7 @@ sync_var_list:
 
 
 states:
-  /* empty rule */
+  /* Empty rule */
     { $$ = NULL; DPRINTF( ("only init state\n") ); }
 | statelist
     { $$ = $1; }
@@ -168,7 +167,7 @@ state:
 
 
 state_options:
-  /* empty */
+  /* Empty */
     { $$ = SF_NOFLAGS; }
 ;
 
@@ -246,13 +245,13 @@ expr:
   { $$ = build_expr(OP_DIV, $1, $3); }
 | expr O_MOD expr
   { $$ = build_expr(OP_MOD, $1, $3); }
-| string /* type static string */
+| string /* Constant string */
     { $$ = build_string(compiler_ctx_g, $1); }
-| NUMBER /* type static int */
+| NUMBER /* Constant integer */
   { $$ = build_integer(compiler_ctx_g, $1); }
-| FPDOUBLE /* type static double */
+| FPDOUBLE /* Constant floating point (double precision) value */
   { $$ = build_double(compiler_ctx_g, $1); }
-| VARIABLE /* type varname */
+| VARIABLE /* Variable */
   { $$ = build_varname(compiler_ctx_g, $1); }
 | FIELD
   { $$ = build_fieldname(compiler_ctx_g, $1); }
@@ -278,7 +277,7 @@ expr:
 
 
 params:
-  /* empty */
+  /* Empty */
     { $$ = NULL; }
 | paramlist
     { $$ = $1; }

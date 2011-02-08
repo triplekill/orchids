@@ -8,7 +8,6 @@
  ** @ingroup ovm
  **
  ** @date  Started on: Wed Mar 12 12:20:17 2003
- ** @date Last update: Tue Nov 29 11:16:16 2005
  **/
 
 /*
@@ -75,7 +74,7 @@
 #define OP_PUSH 2
 
 /**
- * Load the value on top of the stack into a dynamic environement value.
+ * Load the value on top of the stack into a dynamic environment value.
  **/
 #define OP_POP 3
 
@@ -123,7 +122,7 @@
 #define OP_ADD 10
 
 /**
- * Substraction
+ * Subtraction
  **/
 #define OP_SUB 11
 
@@ -206,7 +205,7 @@
 #define OP_JRM 25
 
 /**
- * Jump if Not Regexp Matche
+ * Jump if Not Regexp Match
  **/
 #define OP_JNRM 26
 
@@ -232,7 +231,7 @@
 
 
 
-/* fast realtime evaluation for transition condition
+/* fast real-time evaluation for transition condition
    (continue if <> else HALT) */
 
 /*
@@ -250,12 +249,12 @@
 #define OP_CNEQ 32
 
 /**
- * Continue if Regexp Matche
+ * Continue if Regexp Match
  **/
 #define OP_CRM 33
 
 /**
- * Continue if Not Regexp Matche
+ * Continue if Not Regexp Match
  **/
 #define OP_CNRM 34
 

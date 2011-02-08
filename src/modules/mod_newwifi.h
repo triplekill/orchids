@@ -7,7 +7,6 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri Jun 15 09:05:21 2007
- ** @date Last update: Fri Jun 15 10:05:42 2007
  **/
 
 #ifndef MODWIFI_H

@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 29 13:50:41 2003
- ** @date Last update: Tue Nov 30 23:09:20 2010
  **/
 
 /*
@@ -40,7 +39,7 @@
 #include "orchids.h"
 
 #ifdef ORCHIDS_STATIC
-/* declare builtins modules */
+/* declare built-in modules */
 extern input_module_t mod_remoteadm;
 extern input_module_t mod_textfile;
 extern input_module_t mod_udp;
@@ -63,21 +62,328 @@ extern input_module_t mod_autohtml;
 extern input_module_t mod_sockunix;
 #endif
 
+
+/**
+ ** Build a very simple abstract syntax tree from a configuration file.
+ ** This function does not do anything else except reading the file and
+ ** building the tree (no configuration directive is executed during the
+ ** execution of this function).  This tree builder is recursive: this
+ ** function is only the wrapper, the real tree building function is
+ ** build_config_tree_sub().
+ ** @param config_filepath  The path of the configuration file name to parse.
+ ** @param root             A double pointer to where the root of the
+ **                         resulting tree will be stored.
+ ** @return                 RETURN_SUCCESS in case of success, an error code
+ **                         otherwise.
+ **/
 static int
 build_config_tree(const char *config_filepath, config_directive_t **root);
-static void proceed_config_tree(orchids_t *ctx);
+
+
+/**
+ ** Walk through the configuration tree and execute functions
+ ** corresponding to each directives.  This is this function
+ ** which really perform the configuration.
+ ** @param  ctx  A pointer to the Orchids application context.
+ **/
+static void
+proceed_config_tree(orchids_t *ctx);
+
+
+/**
+ ** Sub-function for the recursive tree building of the configuration.
+ ** @param fp         The stdio stream of the configuration file
+ **                   being parsed.
+ ** @param sect_root  A double pointer to the root element of the
+ **                   section being parsed.
+ ** @param parent     A pointer to the parent section
+ **                   (or NULL for top-level).
+ ** @param file       The name of the current file being parsed.
+ ** @param lineno     A pointer to the number of the current line
+ **                   being parsed.
+ ** @return           RETURN_SUCCESS on success, an error code otherwise.
+ **/
 static int
 build_config_tree_sub(FILE *fp,
                       config_directive_t **sect_root,
                       config_directive_t *parent,
                       const char *file,
                       int *lineno);
+
+/**
+ ** Split a text line to a directive and its arguments.  This function
+ ** is also responsible for skipping commented lines and removing comments
+ ** after arguments.
+ ** @param line       The line to be split.
+ ** @param directive  A double pointer to the directive.  Note that no
+ **                   memory will be allocated during this function.
+ **                   The resulting value will point to the memory of the
+ **                   'line' argument.
+ ** @param argument   A double pointer to the argument.  Note that no
+ **                   memory will be allocated during this function.
+ **                   The resulting value will point to the memory of the
+ **                   'line' argument.
+ ** @return           RETURN_SUCCESS on a normal line or
+ **                   CONFIG_IGNORE_LINE on a commented line.
+ **/
 static int
 split_line(char *line, char **directive, char **argument);
+
+
+/**
+ ** Locate the next token in the text string given in parameter.
+ ** The tokenization rule is simple: a token is any character sequence
+ ** separated by a space, a tab or a new line.
+ ** @param text    A pointer to the text string to search for the next token.
+ ** @param offset  A pointer to the offset, which will be updated with the
+ **                location of the next token found.  This offset is
+ **                relative the start of the 'text' parameter.
+ ** @param length  A pointer to the length, which will be updated with the
+ **                length of the next token found.
+ **/
 static void
 cfg_get_next_token(const char *text, size_t *offset, size_t *length);
+
+
+/**
+ ** Find the last directive in the configuration directive
+ ** (simply linked) list.
+ ** @param list  The list which will be searched.
+ ** @return      The last element of the list.
+ **/
+static config_directive_t *
+get_last_dir(config_directive_t *list);
+
+
+/**
+ ** The special handler for the "Include" configuration directive.
+ ** This handler is not called like others: since it is directly
+ ** responsible of the tree building (i.e. need to build the tree of
+ ** the included file and link it at the point of inclusion), this
+ ** directive needs to be executed now.  Other directives will be
+ ** executed on a second pass, during the proceed_config_tree()
+ ** function.
+ **
+ ** @param pattern A pointer to a string containing the inclusion
+ **                pattern (e.g. "/path/to/config*.conf").
+ ** @param root    A double pointer to the root directive.  If this
+ **                section is empty, the tree of the inclusion will be
+ **                directly linked in the root.  Otherwise, the tree will
+ **                be linked after the 'last' element given as parameter.
+ ** @param last    A double pointer to the last directive in the root section.
+ **                This value is updated at each included file (in case the
+ **                glob() expansion return more than one file).  This is for
+ **                simulating the concatenation of the multiple included
+ **                files.
+ ** @return        RETURN_SUCCESS on success.  On error, the return error
+ **                code of build_config_tree().
+ **/
+static int
+proceed_includes(char *pattern, config_directive_t **root, config_directive_t **last);
+
+
+/**
+ **  Strip the trailing garbage (useless trailing spaces and
+ **  comments), by taking care of the quotes and escape characters.
+ **  @param string  A pointer to the string to strip.  Note that the
+ **                 stripping will be made by adding a NULL-character at the
+ **                 right place.
+ **/
+static void
+strip_trailing_garbage(char *string);
+
+
+/**
+ ** Sub-function for the recursive config tree printer.
+ ** @param fp       A pointer to the stream where the output will be written.
+ ** @param section  The section to print.  This section will be listed and
+ **                 if a subsection is encountered, the function will enter
+ **                 into a new recursion level.
+ ** @param depth    The depth level from the root.  This parameter is used
+ **                 to control the indentation.
+ **/
+static void
+fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth);
+
+
+/**
+ ** Handler for the SetPollPeriod configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the AddRuleFile configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the AddRuleFiles configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the "<module" configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+#ifdef ORCHIDS_STATIC
+/**
+ ** Handler for the AddModule configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+#endif /* ORCHIDS_STATIC */
+
+/**
+ ** Handler for the LoadModule configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
 static void
 config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the HTMLOutputDir configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the RuntimeUser configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportDir configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportPrefix configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportExt configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the SetDefaultPreprocessorCmd configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the AddPreprocessorCmd configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the SetModuleDir configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the SetLockFile configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the MaxMemorySize configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ResolveIP configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the Nice configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 void
@@ -258,7 +564,7 @@ build_config_tree_sub(FILE *fp,
           *sect_root = new_dir;
         last_dir = new_dir;
 
-        /* Read section resursively */
+        /* Read section recursively */
         ret = build_config_tree_sub(fp,
                                     &new_dir->first_child,
                                     new_dir,
@@ -490,7 +796,6 @@ add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   rulefile->name = dir->args;
   rulefile->next = NULL;
 
-  /* if it is the first rulefile... */
   if (ctx->rulefile_list == NULL) {
     ctx->rulefile_list = rulefile;
     ctx->last_rulefile = rulefile;
@@ -529,7 +834,7 @@ add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     rulefile->name = globbuf.gl_pathv[i];
     rulefile->next = NULL;
 
-    /* if it is the first rulefile... */
+    /* if it is the first rule file... */
     if (ctx->rulefile_list == NULL) {
       ctx->rulefile_list = rulefile;
       ctx->last_rulefile = rulefile;
@@ -880,9 +1185,9 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "IDMEFdtd", set_idmef_dtd, "Set the IDMEF dtd"},
   { "IDMEFAnalyzerId", set_idmef_analyzer_id, "Set the IDMEF analyzer identifier"},
   { "IDMEFAnalyzerLocation", set_idmef_analyzer_loc, "Set the IDMEF analyzer location"},
-  { "IDMEFSensorHostname", set_idmef_sensor_hostname, "Set the IDMEF sensor hostname"},
+  { "IDMEFSensorHostname", set_idmef_sensor_hostname, "Set the IDMEF sensor host name"},
   { "RuntimeUser", set_runtime_user, "Set the runtime user." },
-  { "ReportDir", set_report_output_dir, "Set the outpout directory" },
+  { "ReportDir", set_report_output_dir, "Set the output directory" },
   { "ReportPrefix", set_report_prefix, "Set the report prefix" },
   { "ReportExt", set_report_ext, "Set the report extension" },
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
@@ -913,7 +1218,7 @@ proceed_config_tree(orchids_t *ctx)
     }
     else {
       DebugLog(DF_CORE, DS_WARN,
-               "No handler defined for [%s] direcrive\n", d->directive);
+               "No handler defined for [%s] directive\n", d->directive);
     }
   }
 }
@@ -1032,7 +1337,7 @@ proceed_post_compil(orchids_t *ctx)
 
   gettimeofday(&ctx->postcompil_time, NULL);
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
-  /* move this into orhcids stats */
+  /* move this into orchids stats */
   DebugLog(DF_CORE, DS_NOTICE, "post-compilation (real) time: %li.%03li ms\n",
            (diff_time.tv_sec) * 1000 +
            (diff_time.tv_usec) / 1000,

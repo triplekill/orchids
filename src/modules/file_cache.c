@@ -8,7 +8,6 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:48:03 2004
- ** @date Last update: Fri Sep 14 18:54:05 2007
  **/
 
 /*
@@ -139,7 +138,7 @@ fopen_cached(const char *path)
 
   DebugLog(DF_CORE, DS_INFO, "cache hit for \"%s\"\n", path);
 
-  /* file exists. touch it and return cache hit. */
+  /* File exists. Touch it and return cache hit. */
   utime(path, NULL);
 
   return (CACHE_HIT);

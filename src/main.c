@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
- ** @date Last update: Tue Jul 31 23:41:05 2007
  **/
 
 /*
@@ -167,7 +166,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       break;
 
     case 'r':
-      DebugLog(DF_CORE, DS_NOTICE, "adding the rulefile '%s'\n", optarg);
+      DebugLog(DF_CORE, DS_NOTICE, "adding the rule file '%s'\n", optarg);
       ctx->rulefile_list = Xzmalloc(sizeof (rulefile_t));
       ctx->last_rulefile = ctx->rulefile_list;
       ctx->rulefile_list->name = strdup(optarg);

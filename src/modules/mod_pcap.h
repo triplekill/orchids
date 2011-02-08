@@ -7,7 +7,6 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Fri May 25 14:29:20 2007
- ** @date Last update: Sat Sep  8 18:50:46 2007
  **/
 
 #ifndef MOD_PCAP_H

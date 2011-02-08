@@ -9,7 +9,6 @@
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
- ** @date Last update: Sat Sep  8 19:17:41 2007
  **/
 
 /*
@@ -36,6 +35,7 @@
 #include "graph_output.h"
 #include "mod_mgr.h"
 #include "orchids_api.h"
+#include "rule_compiler.h"
 
 #include "mod_remoteadm.h"
 

@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
- ** @date Last update: Mon Feb  4 14:24:29 2008
  **/
 
 /*
@@ -68,7 +67,7 @@ extern unsigned long dmalloc_orchids;
 #define CONFIG_IGNORE_LINE 1
 
 /* orchids module magic number ('ORCH' in an int) */
-#define MOD_MAGIC 0x4F524348 /* (0x4843524F w/ byteswaping) */
+#define MOD_MAGIC 0x4F524348 /* (0x4843524F with byte ordering) */
 
 #define ORCHIDS_MAJOR_VERSION 0
 #define ORCHIDS_MINOR_VERSION 1
@@ -98,7 +97,7 @@ extern unsigned long dmalloc_orchids;
 
 /**
  ** @struct config_directive_s
- **   Used for building the configuration tree from the config file
+ **   Used for building the configuration tree from the configuration file
  **   (tree represents pseudo-xml file structure).
  **/
 /**   @var config_directive_s::directive
@@ -205,7 +204,7 @@ typedef int (*rtaction_cb_t)(orchids_t *ctx, rtaction_t *e);
  **     The callback to execute.
  **/
 /**   @var rtaction_s::data
- **     Arbitraty data that may be used by the callback.
+ **     Arbitrary data that may be used by the callback.
  **/
 /**   @var rtaction_s::evtlist
  **     The list elements.
@@ -220,7 +219,7 @@ struct rtaction_s {
 
 /**
  ** @struct field_record_s
- **   Used for builing global field record array.
+ **   Used for building global field record array.
  **/
 /**   @var field_record_s::active
  **     Activation flag set by the compiler-optimizer.
@@ -235,7 +234,7 @@ struct rtaction_s {
  **     Description text field.
  **/
 /**   @var field_record_s::id
- **     Field identifier. used for reverse fieldname lookup from hashtables.
+ **     Field identifier. Used for reverse field name lookup from hash tables.
  **/
 /**   @var field_record_s::val
  **     Current field value resolution are not thread-safe.
@@ -274,6 +273,7 @@ struct field_record_s
 #define THREAD_IS_ONLYONCE(t) ((t)->flags & THREAD_ONLYONCE)
 #define THREAD_IS_KILLED(t) ((t)->flags & THREAD_KILLED)
 
+/** Mark a thread as killed.  It will be deallocated later. */
 #define KILL_THREAD(ctx, t) \
       (t)->flags |= THREAD_KILLED
 
@@ -310,13 +310,13 @@ typedef struct rule_compiler_s rule_compiler_t;
  **     Static conditions (required fields).
  **/
 /**   @var transition_s::eval_code
- **     Evaluation bytecode.
+ **     Evaluation byte code.
  **/
 /**   @var transition_s::id
- **     Transition identidier in state.
+ **     Transition identifier in state.
  **/
 /**   @var transition_s::global_id
- **     Transition identidier in rule.
+ **     Transition identifier in rule.
  **/
 struct transition_s
 {
@@ -341,7 +341,7 @@ struct transition_s
  **     Line number in the rule source file.
  **/
 /**   @var state_s::action
- **     Actions bytecode.
+ **     Actions byte code.
  **/
 /**   @var state_s::trans_nb
  **     Transitions array size.
@@ -375,7 +375,7 @@ struct state_s
  **   Rule structure.
  **/
 /**   @var rule_s::filename
- **     Filname which contain definition of this rule.
+ **     File name which contain definition of this rule.
  **/
 /**   @var rule_s::lineno
  **     Line number in source file.
@@ -439,9 +439,9 @@ struct rule_s
   int32_t           id;
 
   state_instance_t *init;
-  wait_thread_t    *ith;
-  wait_thread_t    *itt;
-  int32_t           nb_init_threads;
+  wait_thread_t    *ith; /* XXX: UNUSED */
+  wait_thread_t    *itt; /* XXX: UNUSED */
+  int32_t           nb_init_threads; /* XXX: UNUSED */
 
   objhash_t        *sync_lock;
   int32_t          *sync_vars;
@@ -451,6 +451,17 @@ struct rule_s
 };
 
 
+/**
+ ** @struct sync_lock_list_s
+ **   Structure for the list of state instance holding a lock over
+ **   synchronized variable(s).
+ **/
+/** @var sync_lock_list_s::next
+ **   A pointer to the next element in the list.
+ **/
+/** @var sync_lock_list_s::state
+ **   A pointer to a state instance holding a lock.
+ **/
 typedef struct sync_lock_list_s sync_lock_list_t;
 struct sync_lock_list_s {
   sync_lock_list_t *next;
@@ -463,10 +474,7 @@ struct sync_lock_list_s {
  **   Rule instance structure.
  **/
 /**   @var rule_instance_s::rule
- **     A refecence to the rule definition.
- **/
-/**   @var rule_instance_s::rigid_env
- **     'rigid' variables, used for the 'foreach()' keyword.
+ **     A reference to the rule definition.
  **/
 /**   @var rule_instance_s::first_state
  **     A pointer to the first state instance of this rule.
@@ -483,7 +491,7 @@ struct sync_lock_list_s {
  **     Rule instance creation date.
  **/
 /**   @var rule_instance_s::state_list
- **     Retrig list for this rule instance (reverse chronological order).
+ **     Re-trigger list for this rule instance (reverse chronological order).
  **/
 /**   @var rule_instance_s::max_depth
  **     Biggest path depth. (for statistics).
@@ -497,8 +505,6 @@ struct sync_lock_list_s {
 struct rule_instance_s
 {
   rule_t *rule;
-  ovm_var_t       **rigid_env;
-  size_t            rigid_env_sz;
   state_instance_t *first_state;
   rule_instance_t  *next;
   int32_t           state_instances;
@@ -521,10 +527,10 @@ struct rule_instance_s
  ** State instance structure.
  **/
 /**   @var state_instance_s::first_child
- **     Fisrt child (the next state in the exec path.
+ **     First child (the next state in the exec path.
  **/
 /**   @var state_instance_s::next_sibling
- **     Next sibling. (This is another 'thread' fork).
+ **     Next sibling. This is another 'thread' fork.
  **/
 /**   @var state_instance_s::parent
  **     Parent state instance (for issdl_dumpstack()).
@@ -533,7 +539,7 @@ struct rule_instance_s
  **     Event that permit to reach this state.
  **/
 /**   @var state_instance_s::flags
- **     State flags. (retrigger, ...).
+ **     State flags. (re-trigger, ...).
  **/
 /**   @var state_instance_s::state
  **     Reference to state declaration.
@@ -552,7 +558,7 @@ struct rule_instance_s
  **     (add a heap or a priority queue for future scheduling).
  **/
 /**   @var state_instance_s::retrig_next
- **     Retrig list for THIS rule instance only.
+ **     Re-trigger list for THIS rule instance only.
  **/
 /**   @var state_instance_s::depth
  **     Depth of this state
@@ -569,9 +575,9 @@ struct state_instance_s
   rule_instance_t  *rule_instance;
   ovm_var_t       **inherit_env;
   ovm_var_t       **current_env;
-  state_instance_t *global_next;
+  state_instance_t *global_next; /* XXX: UNUSED */
   state_instance_t *retrig_next;
-  int32_t           depth;
+  int32_t           depth; /* XXX: UNUSED (only in create_state_instance()) */
   wait_thread_t    *thread_list;
   state_instance_t *next_report_elmt;
 };
@@ -607,13 +613,13 @@ struct state_instance_s
 struct wait_thread_s
 {
   wait_thread_t    *next;
-  wait_thread_t    *prev;
-  rule_instance_t  *rule_instance;
+  wait_thread_t    *prev; /* XXX: UNUSED */
+  rule_instance_t  *rule_instance; /* XXX: UNUSED (state_instance->rule_instance is used instead) */
   transition_t     *trans;
   state_instance_t *state_instance;
   unsigned long     flags;
   unsigned int      pass;
-  wait_thread_t    *next_in_state_instance;
+  wait_thread_t    *next_in_state_instance; /* XXX: UNUSED */
   time_t            timeout;
 };
 
@@ -653,10 +659,10 @@ struct rulefile_s
  **     ISSDL build-in functions hash table (see lang.c and lang.h).
  **/
 /**   @var rule_compiler_s::fields_hash
- **     Fieldname hash table.
+ **     Field name hash table.
  **/
 /**   @var rule_compiler_s::rulenames_hash
- **     Rulename hash table.
+ **     Rule name hash table.
  **/
 /**   @var rule_compiler_s::statenames_hash
  **     State names hash table for current rule in compilation.
@@ -727,14 +733,14 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
  **     A pointer to the function implementation.
  **/
 /**   @var issdl_function_s::id
- **     The code identifier of function (used in bytecode).
- **     XXX: should be declared dynamicaly.
+ **     The code identifier of function (used in byte code).
+ **     XXX: should be declared dynamically.
  **/
 /**   @var issdl_function_s::name
  **     Name of the function. (symbol name for the compiler).
  **/
 /**   @var issdl_function_s::args_nb
- **     Number of argument (for a little type/proto-checking).
+ **     Number of argument (for a little type/prototype checking).
  **/
 /**   @var issdl_function_s::desc
  **     Function description (for a little help).
@@ -759,6 +765,26 @@ typedef struct mod_entry_s mod_entry_t;
  **/
 typedef int (*dissect_t)(orchids_t *ctx, mod_entry_t *mod, struct event_s *e, void *data);
 
+/**
+ ** @struct conditional_dissector_record_s
+ **   This structure is used to wrap a conditional dissector,
+ **   the pointer to module responsible for the dissection and
+ **   the abstract data for the dissector.  This structure was added
+ **   during the modularization of Orchids, more precisely when Orchids
+ **   start to build modules as shared objects.  A module configuration was
+ **   initially held in the ::input_module_s module structure.  This was
+ **   incompatible with security measures in newer OS.  See for example:
+ **   http://www.akkadia.org/drepper/selinux-mem.html
+ **/
+/** @var conditional_dissector_record_s::dissect
+ **   A pointer to the dissector.
+ **/
+/** @var conditional_dissector_record_s::mod
+ **   A pointer to the module which requested the dissector registration.
+ **/
+/** @var conditional_dissector_record_s::data
+ **   Abstract data which will be passed to the dissector.
+ **/
 typedef struct conditional_dissector_record_s conditional_dissector_record_t;
 struct conditional_dissector_record_s {
   dissect_t  dissect;
@@ -777,7 +803,7 @@ struct conditional_dissector_record_s {
  **     First fields position in global table.
  **/
 /**   @var mod_entry_s::config
- **     A void pointer to module config structure.
+ **     A void pointer to module configuration structure.
  **/
 /**   @var mod_entry_s::sub_dissectors
  **     Conditional, pattern-driven, sub-dissectors.
@@ -786,7 +812,7 @@ struct conditional_dissector_record_s {
  **     Unconditional registered sub-dissectors for this module.
  **/
 /**   @var mod_entry_s::data
- **     Data passed to the unconditionnal sub-dissector.
+ **     Data passed to the unconditional sub-dissector.
  **/
 /**   @var mod_entry_s::mod
  **     A reference to the loaded module
@@ -827,9 +853,11 @@ typedef int (*hook_cb_t)(orchids_t *ctx,
 
 
 /**
- ** @struct rtaction_s
- **   Real time action structure, element used in the
- **   wait queue orchids_s::rtactionlist.
+ ** @struct hook_list_elmt_s
+ **   Hook list element structure.  This structure is used
+ ** to register callback function of type ::hook_cb_t in a list.
+ ** This type was introduced to add the post event hook
+ ** orchids_s::post_evt_hook_list .
  **/
 typedef struct hook_list_elmt_s hook_list_elmt_t;
 struct hook_list_elmt_s {
@@ -862,9 +890,6 @@ struct preproc_cmd_s {
 /**   @var orchids_s::config_file
  **     Configuration file used for this context.
  **/
-/**   @var orchids_s::mod_list
- **     Input module list.
- **/
 /**   @var orchids_s::mods
  **     Input module array (should replace mod_list).
  **/
@@ -878,15 +903,15 @@ struct preproc_cmd_s {
  **     Date of the last poll.
  **/
 /**   @var orchids_s::realtime_handler_list
- **     List of realtime handlers. (and associated file/socket descriptor).
+ **     List of real-time handlers. (and associated file/socket descriptor).
  **/
 /**   @var orchids_s::maxfd
- **     Highest descriptor. (for the select() call in
- **     event_dispatcher_main_loop()).
+ **     Highest file descriptor, for the select() call in
+ **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::fds
- **     Descriptor set. (for the select() call in 
- **     event_dispatcher_main_loop()).
+ **     Descriptor set, for the select() call in 
+ **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::cfg_tree
  **     Configuration tree root.
@@ -930,27 +955,39 @@ struct preproc_cmd_s {
 /**   @var orchids_s::state_instances
  **     Number of total state instance.
  **/
+/**   @var orchids_s::threads
+ **     Total number of threads.
+ **/
 /**   @var orchids_s::ovm_stack
  **     Orchids virtual machine stack.
  **/
 /**   @var orchids_s::vm_func_tbl
  **     ISSDL built-in functions array.
  **/
+/**   @var orchids_s::vm_func_tbl_sz
+ **     ISSDL built-in functions array size.
+ **/
 /**   @var orchids_s::off_line_mode
  **     Off-line input file type.  Possible values are:
- **       - #MODE_ONLINE (0): default online analysis
- **       - #MODE_SYSLOG (1): default when -f ar -r is used
+ **       - #MODE_ONLINE: default online analysis
+ **       - #MODE_SYSLOG: default when -f ar -r is used
  **                        (register textfile and syslog modules)
- **       - #MODE_SNARE  (2): register textfile and snare module.
+ **       - #MODE_SNARE:  register textfile and snare module.
  **/
 /**   @var orchids_s::off_line_input_file
  **     Off-line input file.
  **/
+/**   @var orchids_s::current_tail
+ **     A pointer to the current thread being processed.  By following
+ **     the linked list of threads, it correspond to the all remaining
+ **     threads to be processed in the queue, for the current event
+ **     loop (this exclude the newly created threads).
+ **/
 /**   @var orchids_s::cur_retrig_qh
- **     Head of the current waiting threads queue to retrigger.
+ **     Head of the current waiting threads queue to re-trigger.
  **/
 /**   @var orchids_s::cur_retrig_qt
- **     Tail of the current waiting threads queue to retrigger.
+ **     Tail of the current waiting threads queue to re-trigger.
  **/
 /**   @var orchids_s::new_qh
  **     New thread queue head.
@@ -959,10 +996,10 @@ struct preproc_cmd_s {
  **     New thread queue tail.
  **/
 /**   @var orchids_s::retrig_qh
- **     Thread to retrig queue head.
+ **     Queue head of threads to re-trig.
  **/
 /**   @var orchids_s::retrig_qt
- **     Thread to retrig queue tail.
+ **     Queue tail of threads to re-trig.
  **/
 /**   @var orchids_s::active_event_head
  **     Active event queue head.
@@ -971,13 +1008,71 @@ struct preproc_cmd_s {
  **     Active event queue queue.
  **/
 /**   @var orchids_s::preconfig_time
- **     Preconfiguration end time.
+ **     Pre-configuration end time.
  **/
 /**   @var orchids_s::compil_time
  **     Compilation end time.
  **/
 /**   @var orchids_s::postconfig_time
- **     Postconfiguration end time.
+ **     Post-configuration end time.
+ **/
+/**   @var orchids_s::post_evt_hook_list
+ **     Post event injection hook list.
+ **/
+/**   @var orchids_s::daemon
+ **     A boolean value for requesting the daemonization or not.
+ **/
+/**   @var orchids_s::postcompil_time
+ **     Post-compilation end time.
+ **/
+/**   @var orchids_s::evt_fb_fp
+ **     Event feedback stream.  Every processed event by orchids are printed
+ **     on this stream (if not NULL).  This is for debugging / instrumentation
+ **     purposes.
+ **/
+/**   @var orchids_s::runtime_user
+ **     The user in which Orchids will drop its privileges, after its
+ **     configuration complete (and if it was started as root).
+ **/
+/**   @var orchids_s::report_dir
+ **     The directory where report will be written.
+ **/
+/**   @var orchids_s::report_prefix
+ **     The prefix of the report file name.
+ **/
+/**   @var orchids_s::report_ext
+ **     The extension of the report file name.
+ **/
+/**   @var orchids_s::reports
+ **     Total number of report generated since startup.
+ **/
+/**   @var orchids_s::last_evt_act
+ **     Last event activity: the last time when an event was kept.
+ **/
+/**   @var orchids_s::last_rule_act
+ **     Last rule activity: the last time when a rule was inserted or removed.
+ **/
+/**   @var orchids_s::last_ruleinst_act
+ **     Last rule instance activity: the last time when a rule instance
+ **     was created or removed.
+ **/
+/**   @var orchids_s::rtactionlist
+ **     The list of real-time actions.  These actions are registered and
+ **     will be executed at the scheduled time.
+ **/
+/**   @var orchids_s::cur_loop_time
+ **     The time of the current loop.  This was variable is used to
+ **     "cache" the time because gettimeofday() system call may me
+ **     slow on some systems.  Since there is exactly one loop per
+ **     event processed, this time may be used to time-stamp the
+ **     event; there is no possible confusion.
+ **/
+/**   @var orchids_s::modules_dir
+ **     The directory where Orchids modules are installed.
+ **/
+/**   @var orchids_s::lockfile
+ **     The Orchids daemon lock file.  This is used to prevent
+ **     accidental multiple instance of the daemon.
  **/
 struct orchids_s
 {
@@ -1038,16 +1133,12 @@ struct orchids_s
   /* HTML Output Config (dir/css/mode/etc...) XXX: move to module */
   char *html_output_dir;
 
-  /* Event feedback address */
-  /* struct sockaddr_in evt_fb_addr; */
-  /* event feedback socket desciptor */
   FILE *evt_fb_fp;
 
   /* global temporal information container */
   /* XXX: Move this into mod_period */
   strhash_t        *temporal;
 
-  /* Runtime User */
   char *runtime_user;
 
   rusage_t ru;
@@ -1060,10 +1151,10 @@ struct orchids_s
 
   uint32_t reports;
 
-  timeval_t last_evt_act; /* last time when an event is kept */
-  timeval_t last_mod_act; /* last time when a mod was ins or rem */
-  timeval_t last_rule_act; /* last time when a rule was ins or rem */
-  timeval_t last_ruleinst_act; /* last time when a report was created */
+  timeval_t last_evt_act;
+  timeval_t last_mod_act; /* XXX: UNUSED: last time when a mod was ins or rem */
+  timeval_t last_rule_act;
+  timeval_t last_ruleinst_act;
 
   DLIST_HEAD(evtlist, rtaction_t) rtactionlist;
 
@@ -1093,7 +1184,7 @@ typedef void (*dir_handler_t)(orchids_t *ctx, mod_entry_t *mod, config_directive
  **   Module configuration command definition.
  **/
 /**   @var mod_cfg_cmd_s::name
- **     Name of the command. (in the config file).
+ **     Name of the command. (in the configuration file).
  **/
 /**   @var mod_cfg_cmd_s::cmd
  **     Command handler.
@@ -1132,11 +1223,11 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
 /**
  ** @struct input_module_s
  **   Input Module Structure.
- **   These modules extract usefull info, prerocess and perpare them
+ **   These modules extract useful info, pre-process and prepare them
  **   to be proceeded by the analysis engine.
  **/
 /**   @var input_module_s::magic
- **     Magic number. Usefull for dynamic shared objects checking.
+ **     Magic number. Useful for dynamic shared objects checking.
  **     See MOD_MAGIC.
  **/
 /**   @var input_module_s::version
@@ -1144,6 +1235,9 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **/
 /**   @var input_module_s::name
  **     Module name.
+ **/
+/**   @var input_module_s::license
+ **     The license of the module.
  **/
 /**   @var input_module_s::dependencies
  **     Module dependencies.
@@ -1156,11 +1250,15 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **     should allocate some memory for 'config' ptr, 
  **     should register hooks ans callbacks, 
  **     allocate some memory if needed, 
- **     precompute some stuffs... 
+ **     pre-compute some stuffs... 
  **     and finally, return the module configuration structure.
  **/
 /**   @var input_module_s::post_config
  **     Post-configuration function.
+ **/
+/**   @var input_module_s::post_compil
+ **     Function to be executed after the rule compilation.
+ **     This field may be NULL if there is nothing to execute.
  **/
 struct input_module_s
 {
@@ -1180,7 +1278,7 @@ struct input_module_s
 
 /**
  ** @typedef realtime_callback_t
- **   Realtime callback function pointer type. This callback will be triggered
+ **   Real-time callback function pointer type. This callback will be triggered
  **   when there is activity on associated descriptor.
  **/
 typedef int (*realtime_callback_t)(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
@@ -1188,10 +1286,10 @@ typedef int (*realtime_callback_t)(orchids_t *ctx, mod_entry_t *mod, int fd, voi
 
 /**
  ** @struct realtime_input_s
- **   List of registered callback for realtime event creation
+ **   List of registered callback for real-time event creation
  **/
 /**   @var realtime_input_s::next
- **     Next realtime input.
+ **     Next real-time input.
  **/
 /**   @var realtime_input_s::data
  **     Data passed to the callback.
@@ -1200,7 +1298,10 @@ typedef int (*realtime_callback_t)(orchids_t *ctx, mod_entry_t *mod, int fd, voi
  **     The callback itself.
  **/
 /**   @var realtime_input_s::fd
- **     file/socket descriptor used for realtime input.
+ **     File/socket descriptor used for real-time input.
+ **/
+/**   @var realtime_input_s::mod_id
+ **     This unique identifier of this registered module.
  **/
 struct realtime_input_s
 {
@@ -1214,7 +1315,7 @@ struct realtime_input_s
 
 /**
  ** @typedef poll_callback_t
- **   Callback for polled intputs.
+ **   Callback for polled inputs.
  **/
 typedef int (*poll_callback_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
 
@@ -1235,6 +1336,9 @@ typedef int (*poll_callback_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
 /**   @var polled_input_s::cb
  **     Module callback supposed to poll data. (and post events).
  **/
+/**   @var polled_input_s::mod
+ **     The module which registered this polled input.
+ **/
 struct polled_input_s
 {
   polled_input_t        *next;
@@ -1249,13 +1353,13 @@ struct polled_input_s
  **   Used for field declaration in modules
  **/
 /**   @var field_s::name
- **     Full fieldname. (ex. ".module.field").
+ **     Full field name. (ex. ".module.field").
  **/
 /**   @var field_s::type
  **     Field data type. (ISSDL type, @see lang.h).
  **/
 /**   @var field_s::desc
- **     Field descriprion.
+ **     Field description.
  **/
 typedef struct field_s field_t;
 struct field_s
@@ -1291,7 +1395,7 @@ typedef int (*mod_func_t)(orchids_t *ctx, mod_entry_t *mod, void *params);
  ** Display a configuration tree on a stream.
  **
  ** @param fp    The output stream.
- ** @param root  The root config directive.
+ ** @param root  The root configuration directive.
  **/
 void
 fprintf_cfg_tree(FILE *fp, config_directive_t *root);
@@ -1308,7 +1412,7 @@ proceed_pre_config(orchids_t *ctx);
 
 /**
  ** Proceed to the post-configuration.
- ** Post-configuration execute postconfig handler of registered modules.
+ ** Post-configuration execute post-config handler of registered modules.
  ** Actions are executed AFTER the configuration file but BEFORE
  ** rule compilation.  For example, a module can register new fields
  ** into the compiler (e.g. virtual modules).
@@ -1320,7 +1424,7 @@ proceed_post_config(orchids_t *ctx);
 
 /**
  ** Proceed to the post-compilation actions.
- ** Post-compilation execute postcompil handler of registered modules.
+ ** Post-compilation execute post-compilation handler of registered modules.
  ** Actions are executed AFTER the rule compilation.
  **
  ** @param ctx  Orchids application context.
@@ -1367,30 +1471,6 @@ size_t
 get_next_token(const char *pos, int c, size_t n);
 
 
-/* rule_compiler.c */
-
-/**
- ** Rule compiler context constructor.
- **
- ** @return A compiler context initialised with default values.
- **/
-rule_compiler_t *
-new_rule_compiler_ctx(void);
-
-/**
- ** Compile all rulefiles included in the config file.
- **
- ** @param ctx Orchids application context.
- **/
-void
-compile_rules(orchids_t *ctx);
-
-void
-fprintf_rule_environment(FILE *fp, rule_compiler_t *ctx);
-
-void
-fprintf_rule_stats(const orchids_t *ctx, FILE *fp);
-
 /* issdl.l */
 void
 set_lexer_context(rule_compiler_t *ctx);
@@ -1423,7 +1503,7 @@ issdlparse(void); /* yyparse() */
  **
  ** @param ctx       Orchids application context.
  ** @param s         State instance for the execution context.
- ** @param bytecode  Bytecode to execute.
+ ** @param bytecode  Byte code to execute.
  **
  ** @return  0 for a normal exit (OP_END) or the error code.
  **/
@@ -1431,19 +1511,19 @@ int
 ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
 
 /**
- ** Convert an ovm opcode into the nmemonic name.
+ ** Convert an ovm opcode into the mnemonic name.
  **
  ** @param opcode  The numeric opcode to convert.
  **
- ** @return  The corresponding nmemonic name string.
+ ** @return  The corresponding mnemonic name string.
  **/
 const char *
 get_opcode_name(bytecode_t opcode);
 
 /**
- ** Disassemble and display an ovm bytecode.
+ ** Disassemble and display an ovm byte code.
  ** @param fp        Output stream.
- ** @param bytecode  Bytecode to disassemble.
+ ** @param bytecode  Byte code to disassemble.
  **/
 void
 fprintf_bytecode(FILE *fp, bytecode_t *bytecode);
@@ -1453,22 +1533,47 @@ fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode);
 
 
 /**
- ** Display a raw bytecode dump in hexadecimal.
+ ** Display a raw byte code dump in hexadecimal.
  **
  ** @param fp    Output stream.
- ** @param code  Bytecode to display.
+ ** @param code  Byte code to display.
  **/
 void
 fprintf_bytecode_dump(FILE *fp, bytecode_t *code);
 
 
+/**
+ ** Create HTML pages reflecting the internal state of Orchids.
+ ** @param ctx  A pointer to the Orchids application context.
+ **/
 void
 html_output(orchids_t *ctx);
 
 
+/**
+ ** @typedef mod_htmloutput_t
+ **   Module HTML Output function pointer type.
+ **   These function should be implemented by modules which want to produce
+ **   output with the mod_htmlstate module.
+ **/
 typedef int (*mod_htmloutput_t)(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
 
 typedef struct htmloutput_list_s htmloutput_list_t;
+
+
+/**
+ ** @struct htmloutput_list_s
+ **   Structure for managing html output callback functions of modules.
+ **/
+/** @var htmloutput_list_s::mod_htmloutput_t
+ **   A pointer to the html output function.
+ **/
+/** @var htmloutput_list_s::mod
+ **   A pointer to the module which requested the registration.
+ **/
+/** @var htmloutput_list_s::next
+ **   A pointer to the next element of the list.
+ **/
 struct htmloutput_list_s {
   mod_htmloutput_t output;
   mod_entry_t *mod;
@@ -1525,9 +1630,25 @@ snprintf_uptime_short(char *str, size_t size, time_t uptime);
 /* lang.h */
 /* XXX: separate structure and prototype definitions and
    move this in lang files */
+/**
+ ** Accessor to the global built-in Orchids function table.
+ ** @return  A pointer to the function table.
+ **/
 issdl_function_t *
 get_issdl_functions(void);
 
+
+/**
+ ** Register a new function in the Orchids language.
+ ** This function may be used by loadable module to register
+ ** new functions.
+ ** @param ctx   A pointer to the Orchids application context.
+ ** @param func  A pointer to the C function which handle this
+ **              Orchids function.
+ ** @param name  The name of the function in the Orchids language.
+ ** @param arity The number of arguments of the function.
+ ** @param desc  A short description of the function.
+ **/
 void
 register_lang_function(orchids_t *ctx,
                        ovm_func_t func,
@@ -1535,9 +1656,19 @@ register_lang_function(orchids_t *ctx,
                        int arity,
                        const char *desc);
 
+/**
+ ** Print the table of all registered functions on a stream.
+ ** @param fp   The output stream.
+ ** @param ctx  A pointer to the Orchids application context.
+ **/
 void
 fprintf_issdl_functions(FILE *fp, orchids_t *ctx);
 
+
+/**
+ ** Register built-in functions of the Orchids language.
+ ** @param ctx  A pointer to the Orchids application context.
+ **/
 void
 register_core_functions(orchids_t *ctx);
 

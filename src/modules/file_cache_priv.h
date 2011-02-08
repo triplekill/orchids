@@ -8,7 +8,6 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:48:03 2004
- ** @date Last update: Fri Sep 14 19:05:03 2007
  **/
 
 /*

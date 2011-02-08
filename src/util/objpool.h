@@ -7,7 +7,6 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Wed Apr 14 17:10:43 2004
- ** @date Last update: Tue Nov 29 11:30:28 2005
  **/
 
 /*

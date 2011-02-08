@@ -7,7 +7,6 @@
  ** @version 0.1.0
  ** 
  ** @date  Started on: Thu Jul  5 13:10:33 2007
- ** @date Last update: Fri Aug  3 13:09:11 2007
  **/
 
 #ifndef MOD_RULETRACE_H

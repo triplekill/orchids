@@ -11,7 +11,6 @@
  ** @ingroup modules
  **
  ** @date  Started on: Wed May 21 14:03:49 2003
- ** @date Last update: Tue Nov 29 10:54:27 2005
  **/
 
 /*

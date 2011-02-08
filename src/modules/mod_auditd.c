@@ -1,4 +1,3 @@
-
 /**
  ** @file mod_auditd.c
  ** The auditd module.
@@ -10,7 +9,6 @@
  ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
- ** @date Last update: Sat Nov 13 16:53:42 2010
  **/
 
 /*

@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Mon Feb  4 14:26:23 2008
  **/
 
 /*
@@ -41,6 +40,7 @@
 
 #include "engine.h"
 #include "mod_mgr.h"
+#include "rule_compiler.h"
 
 #include "orchids_api.h"
 
@@ -131,7 +131,7 @@ new_orchids_context(void)
   ctx->lockfile = DEFAULT_ORCHIDS_LOCKFILE;
 
   /* initialise a rule compiler context -- XXX: This is not thread safe !
-   * but we don't usualyly want to parse file in parallel */
+   * but we don't usually want to parse file in parallel */
   ctx->rule_compiler = new_rule_compiler_ctx();
 
   /* initialise OVM stack */
@@ -202,9 +202,9 @@ add_input_descriptor(orchids_t *ctx,
 {
   realtime_input_t *rti;
 
-  DebugLog(DF_CORE, DS_INFO, "Adding intput descriptor (%i)...\n", fd);
+  DebugLog(DF_CORE, DS_INFO, "Adding input descriptor (%i)...\n", fd);
 
-  /* input fd MUST be a socket (and a fifo ???) XXX - Put sanity checks */
+  /* Input fd MUST be a socket (and a fifo ???) XXX - Put sanity checks */
 
   rti = Xzmalloc(sizeof (realtime_input_t));
   rti->fd = fd;
@@ -214,7 +214,7 @@ add_input_descriptor(orchids_t *ctx,
   rti->next = ctx->realtime_handler_list;
   ctx->realtime_handler_list = rti;
 
-  /* add desciptor to global set */
+  /* Add descriptor to global set */
   if (fd > ctx->maxfd)
     ctx->maxfd = fd;
   FD_SET(fd, &ctx->fds);
@@ -230,7 +230,7 @@ register_dissector(orchids_t *ctx,
 {
   mod_entry_t *parent_mod;
 
-  DebugLog(DF_CORE, DS_INFO, "register unconditionnal dissector...\n");
+  DebugLog(DF_CORE, DS_INFO, "Register unconditional dissector...\n");
 
   parent_mod = find_module_entry(ctx, parent_modname);
   if (!parent_mod) {
@@ -268,7 +268,7 @@ register_conditional_dissector(orchids_t *ctx,
   mod_entry_t *parent_mod;
   conditional_dissector_record_t *cond_dissect;
 
-  DebugLog(DF_CORE, DS_INFO, "register conditionnal dissector...\n");
+  DebugLog(DF_CORE, DS_INFO, "register conditional dissector...\n");
 
   parent_mod = find_module_entry(ctx, parent_modname);
   if (!parent_mod) {
@@ -286,7 +286,7 @@ register_conditional_dissector(orchids_t *ctx,
     /* XXX Hard-coded hash size... */
     parent_mod->sub_dissectors = new_hash(31);
   } else if (hash_get(parent_mod->sub_dissectors, key, keylen)) {
-    DebugLog(DF_CORE, DS_FATAL, "another moduler registered this value.\n");
+    DebugLog(DF_CORE, DS_FATAL, "another module registered this value.\n");
     exit(EXIT_FAILURE);
   }
 
@@ -351,7 +351,7 @@ register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
   }
 
   /* 2 - index of first module field in global array
-  ** (need an offset, because ptr should be relocated by realloc() ) */
+  ** (need an offset, because a pointer could be relocated by realloc() ) */
   mod->first_field_pos = ctx->num_fields;
 
   /* 3 - Add entries in global list and update counters */
@@ -386,7 +386,7 @@ add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
   int i;
 
   for (i = 0; i < sz; ++i) {
-    /* handle filled fields */
+    /* Handle filled fields */
     if ((tbl_event[i] != NULL) && (tbl_event[i] != F_NOT_NEEDED)) {
       /* This field is activated, so add it to current event */
       /* XXX: add checks here ??? (if module is well coded
@@ -460,8 +460,8 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
   sender->posts++;
 
   if (sender->dissect) {
-    /* check for unconditionnal dissector */
-    DebugLog(DF_CORE, DS_DEBUG, "Call unconditionnal sub-dissector.\n");
+    /* check for unconditional dissector */
+    DebugLog(DF_CORE, DS_DEBUG, "Call unconditional sub-dissector.\n");
     ret = sender->dissect(ctx, sender->dissect_mod, event, NULL);
     /* Free and optionally inject event if sub-dissector fail */
     if (ret) {
@@ -469,14 +469,14 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
       inject_event(ctx, event);
     }
   } else if (sender->sub_dissectors) {
-    /* check for conditionnal dissectors */
-    DebugLog(DF_CORE, DS_DEBUG, "Resolve conditionnal dissector\n");
+    /* Check for conditional dissectors */
+    DebugLog(DF_CORE, DS_DEBUG, "Resolve conditional dissector\n");
     /* XXX: Fix this / check if event is present */
     cond_dissect = hash_get(sender->sub_dissectors,
                             issdl_get_data(event->next->value),
                             issdl_get_data_len(event->next->value));
     if (cond_dissect) {
-      DebugLog(DF_CORE, DS_DEBUG, "call found conditional subdissector.\n");
+      DebugLog(DF_CORE, DS_DEBUG, "call found conditional sub-dissector.\n");
       ret = cond_dissect->dissect(ctx,
                                   cond_dissect->mod,
                                   event,
@@ -487,11 +487,11 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
         inject_event(ctx, event);
       }
     } else {
-      DebugLog(DF_CORE, DS_TRACE, "no subdissectors found. --> inject -->\n");
+      DebugLog(DF_CORE, DS_TRACE, "no sub-dissectors found. --> inject -->\n");
       inject_event(ctx, event);
     }
   } else {
-    /* if no sub dissetors found, inject into the analysis engine */
+    /* If no sub-dissectors is found, then inject into the analysis engine */
     DebugLog(DF_CORE, DS_TRACE, "--> Injection into analysis engine -->\n");
     inject_event(ctx, event);
   }
@@ -581,7 +581,7 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
   fprintf(fp, "current poll period : %li\n", ctx->poll_period.tv_sec);
-  fprintf(fp, "    registed fields : %i\n", ctx->num_fields);
+  fprintf(fp, "  registered fields : %i\n", ctx->num_fields);
   fprintf(fp, "    injected events : %u\n", ctx->events);
   fprintf(fp, "      active events : %u\n", ctx->active_events);
   fprintf(fp, "     rule instances : %u\n", ctx->rule_instances);
@@ -676,7 +676,7 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
-  fprintf(fp, "    registed fields : %i\n", ctx->num_fields);
+  fprintf(fp, "  registered fields : %i\n", ctx->num_fields);
   fprintf(fp, "    injected events : %lu\n", ctx->events);
   fprintf(fp, "      active events : %lu\n", ctx->active_events);
   fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);

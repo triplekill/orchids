@@ -8,7 +8,6 @@
  ** @ingroup util
  **
  ** @date  Started on: Tue Mar  4 16:22:21 2003
- ** @date Last update: Tue Nov 29 11:31:01 2005
  **/
 
 /*

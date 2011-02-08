@@ -7,7 +7,6 @@ dnl
 dnl @version 0.1.0
 dnl 
 dnl @date  Started on: Mon Dec  1 01:01:06 2003
-dnl @date Last update: Fri May  4 11:09:32 2007
 dnl
 dnl
 dnl

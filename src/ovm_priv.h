@@ -8,7 +8,6 @@
  ** @ingroup ovm
  ** 
  ** @date  Started on: Thu Dec  4 12:06:04 2003
- ** @date Last update: Tue Jul 31 23:50:32 2007
  **/
 
 /*
@@ -19,6 +18,22 @@
 #ifndef _OVM_PRIVATE_H_
 #define _OVM_PRIVATE_H_
 
+/**
+ ** @struct isn_param_s
+ **   A structure which wrap all necessary information for an instruction.
+ **/
+/** @var isn_param_s::ip
+ **   The instruction pointer in the current isn_param_s::bytecode sequence.
+ **/
+/** @var isn_param_s::bytecode
+ **   The current bytecode sequence being executed.
+ **/
+/** @var isn_param_s::state
+ **   A pointer to the state instance in which the bytecode is executed.
+ **/
+/** @var isn_param_s::ctx
+ **   A pointer to the Orchids application context.
+ **/
 typedef struct isn_param_s isn_param_t;
 struct isn_param_s
 {
@@ -154,16 +169,33 @@ ovm_cesv(isn_param_t *param);
 static int
 ovm_past(isn_param_t *param);
 
-
+/**
+ ** The type of a function implementing a virtual machine instruction.
+ **/
 typedef int (*ovm_insn_t)(isn_param_t *param);
 
+
+/**
+ ** @struct ovm_insn_rec_s
+ **   A virtual machine instruction record.  These records are used to
+ **   build a table which is used, for example, in the bytecode
+ **   execution function ovm_exec() and the disassembly function
+ **   fprintf_bytecode().  An instruction value correspond to the
+ **   offset in this table.
+ **/
+/** @var ovm_insn_rec_s::insn
+ **   A pointer to the C function which implement the isntruction.
+ **/
+/** @var ovm_insn_rec_s::name
+ **   The name (mnemonic) of the instruction.
+ **/
 typedef struct ovm_insn_rec_s ovm_insn_rec_t;
 struct ovm_insn_rec_s
 {
   ovm_insn_t insn;
-  int        insn_sz;
+  int        insn_sz; /* XXX: UNUSED */
   char      *name;
-  void      *padding;
+  void      *padding; /* XXX: UNUSED: no longer needed if insn_sz is removed */
 };
 
 /**

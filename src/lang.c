@@ -8,7 +8,6 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
- ** @date Last update: Fri Aug  3 14:22:22 2007
  **/
 
 /*
@@ -43,7 +42,9 @@
 #include "lang.h"
 #include "lang_priv.h"
 
-
+/**
+ ** Table of data type natively recognized in the Orchids language.
+ **/
 static struct issdl_type_s issdl_types_g[] = {
   { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Null type for error/exception managmnent" },
   { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Function reference" },
@@ -58,8 +59,8 @@ static struct issdl_type_s issdl_types_g[] = {
   { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, ipv4_clone, "IPv4 address (struct in_addr)" },
   { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, timeval_mul, timeval_div, timeval_mod, timeval_clone, "Seconds and microseconds since Epoch, (struct timeval)" },
   { "counter", 0, counter_get_data, counter_get_data_len, counter_cmp, counter_add, NULL, counter_mul, NULL, NULL, counter_clone, "Counter (a monotonic integer)" },
-  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, without substring adressing" },
-  { "sregex",  0, splitregex_get_data, splitregex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, with substring adressing" },
+  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, without substring addressing" },
+  { "sregex",  0, splitregex_get_data, splitregex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, with substring addressing" },
   { "ptr32",   0, address_get_data, address_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "32-bit memory pointer" },
   { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_mul, uint_div, uint_mod, uint_clone, "Non negative integer (32-bits unsigned int)" },
   { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "SNMP Object Identifier" },
@@ -265,7 +266,7 @@ int_clone(ovm_var_t *var)
 
 /*
 ** Unsigned integer type
-** store an 'unsigned long' value.
+** store an 'uint32_t' value.
 */
 
 ovm_var_t *
@@ -476,7 +477,7 @@ ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *str)
 
 /*
 ** Virtual Binary String
-** store references on allocatated Binary string.
+** store references on an already allocated binary string.
 */
 
 ovm_var_t *
@@ -833,7 +834,7 @@ ctime_sub(ovm_var_t *var1, ovm_var_t *var2)
 {
   ovm_var_t *res;
 
-  /* XXX: To overflow check */
+  /* XXX: check for overflows */
 
   if (TYPE(var2) == T_CTIME) {
     res = ovm_ctime_new();
@@ -857,7 +858,7 @@ ctime_mul(ovm_var_t *var1, ovm_var_t *var2)
 {
   ovm_var_t *res;
 
-  /* XXX: To overflow check */
+  /* XXX: check for overflows */
 
   if (TYPE(var2) == T_CTIME) {
     res = ovm_ctime_new();
@@ -881,7 +882,7 @@ ctime_div(ovm_var_t *var1, ovm_var_t *var2)
 {
   ovm_var_t *res;
 
-  /* XXX: To overflow check */
+  /* XXX: check for overflows */
 
   if (TYPE(var2) == T_CTIME && CTIME(var2) != 0) {
     res = ovm_ctime_new();
@@ -905,7 +906,7 @@ ctime_mod(ovm_var_t *var1, ovm_var_t *var2)
 {
   ovm_var_t *res;
 
-  /* XXX: To overflow check */
+  /* XXX: check for overflows */
 
   if (TYPE(var2) == T_CTIME && CTIME(var2) != 0) {
     res = ovm_ctime_new();
@@ -1845,7 +1846,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
 
-  /* display variable info: affected to a named variable, or temp result */
+  /* Display variable info: affected to a named variable, or temp result */
   if (FLAGS(val) & TYPE_CANFREE)
     fputc('F', fp);
   else
@@ -1872,7 +1873,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
   }
   fputc(' ', fp);
 
-  /* display data */
+  /* Display data */
   switch (val->type) {
 
     case T_NULL:
@@ -1998,7 +1999,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
 
 
 /* -------------------------------------------------------------------------- *
-** built-in functions
+** Built-in functions
 */
 
 static void
@@ -2060,7 +2061,7 @@ issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumppathtree()\n");
   fprintf_rule_instance_dot(stdout, state->rule_instance,
                             DOT_RETRIGLIST, ctx->new_qh, 100);
-  /* XXX: hardcoded limit */
+  /* XXX: hard-coded limit */
 }
 
 static void
@@ -2083,7 +2084,7 @@ issdl_system(orchids_t *ctx, state_instance_t *state)
 
   param = stack_pop(ctx->ovm_stack);
   if (param && param->type == T_STR) {
-    /* copy value, and append '\0' XXX should be remplaced */
+    /* copy value, and append '\0' XXX should be replaced by ovm_strdup() */
     cmd_line = Xmalloc(STRLEN(param) + 1);
     memcpy(cmd_line, STR(param), STRLEN(param));
     cmd_line[ STRLEN(param) ] = '\0';
@@ -2191,7 +2192,7 @@ do_recursive_cut(state_instance_t *state)
 
   state->flags |= SF_PRUNED;
 
-  /* cut current state instance threads */
+  /* Cut current state instance threads */
   for (t = state->thread_list; t; t = t->next_in_state_instance) {
     if ( !(t->flags & THREAD_ONLYONCE) ) {
       DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (cut)\n", t);
@@ -2199,7 +2200,7 @@ do_recursive_cut(state_instance_t *state)
     }
   }
 
-  /* and call recursively */
+  /* Then call recursively */
   if (state->first_child)
     do_recursive_cut(state->first_child);
 
@@ -2213,10 +2214,11 @@ issdl_cut(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *str;
   state_instance_t *si;
 
-  /* Cut first poor implementation:
-   * the Cut should be included in the language, and should also be resoleved
-   * at compil-time to apply syntaxic restrictins and avoid problems
-   * (ONE CUT per state MAX ! and a dest is reachable) */
+  /* First poor implementation of cuts:
+   * The cut should be included in the language, and should also be resolved
+   * at compilation-time to apply syntactic restrictions and avoid problems
+   * (ONE CUT per state MAX! And ensure at the compilation time that the
+   * destination exists and is reachable) */
 
   str = stack_pop(ctx->ovm_stack);
 
@@ -2225,7 +2227,7 @@ issdl_cut(orchids_t *ctx, state_instance_t *state)
     return ;
   }
 
-  /* find the cut destination */
+  /* Find the destination of the cut */
   for (si = state;
        si->parent && strcmp(STR(str), si->state->name);
        si = si->parent)
@@ -2233,7 +2235,6 @@ issdl_cut(orchids_t *ctx, state_instance_t *state)
 
   DebugLog(DF_ENG, DS_INFO, "found cut dest @ %s:%p\n", si->state->name, si);
 
-  /* recursive cut ! ;-) */
   do_recursive_cut(si);
 }
 
@@ -2278,7 +2279,7 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
   int f;
   char *mono = NULL;
 
-  DebugLog(DF_ENG, DS_INFO, "Generatig report\n");
+  DebugLog(DF_ENG, DS_INFO, "Generating report\n");
 
   if (state->rule_instance == NULL)
     return ;
@@ -2296,7 +2297,7 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
 
   fp = Xfopen(report, "w");
 
-  /* build reversed backtrace list */
+  /* build reversed back-trace list */
   for (report_events = NULL; state; state = state->parent) {
     state->next_report_elmt = report_events;
     report_events = state;
@@ -2380,7 +2381,7 @@ issdl_pastval(orchids_t *ctx, state_instance_t *state)
   varname = stack_pop(ctx->ovm_stack);
   n = stack_pop(ctx->ovm_stack);
 
-  /* lookup var id */
+  /* Lookup var id */
   var_array = state->rule_instance->rule->var_name;
   var_array_sz = state->rule_instance->rule->dynamic_env_sz;
   for (i = 0;
@@ -2415,6 +2416,7 @@ issdl_pastval(orchids_t *ctx, state_instance_t *state)
     DebugLog(DF_ENG, DS_ERROR, "past value FOUND (%s)\n", STR(varname));
   }
 
+/* XXX: Clone the value, set the correct flags (if required) and push */
 /*   stack_push(ctx->ovm_stack, si->current_env[i]); */
 }
 
@@ -2598,12 +2600,12 @@ issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
 }
 
 
-/* compute the number of different bit of two variable of
-the same type and size. */
+/* Compute the number of different bit between two variables of
+the same type and size (binary distance). */
 static void
 issdl_bindist(orchids_t *ctx, state_instance_t *state)
 {
-  static int bitcnt_tbl[] = { /* precomputed table of 1-bit in each bytes */
+  static int bitcnt_tbl[] = { /* Precomputed table of 1-bit in each bytes */
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
@@ -2778,6 +2780,11 @@ issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
   }
 }
 
+/**
+ ** Table of built-in function of the Orchids language.  This table is
+ ** used at startup by the function register_core_functions() to
+ ** register them.
+ **/
 static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "noop", 0, "No Operation function" },
   { issdl_print, 1, "print", 1, "display a string (TEST FUNCTION)" },

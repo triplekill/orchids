@@ -8,7 +8,6 @@
  ** @ingroup engine
  **
  ** @date  Started on: Mon Jan 27 16:54:31 2003
- ** @date Last update: Fri Aug  3 13:57:53 2007
  **/
 
 /*
@@ -59,22 +58,21 @@
 #define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
-/* types falgs mask -- this allow 2^16 types and 16 bits for flags */
+/* types flags mask -- this allow 2^16 types and 16 bits for flags */
 #define TYPE_FLAGS 0xFFFF0000
 #define TYPE_MASK  0x0000FFFF
 
 /* monotony flags */
-#define MONOTONY_MASK 3 /* == 0x00030000 */
-#define TYPE_UNKNOWN 0  /* 0 */
-#define TYPE_MONO     1  /* 0x10000 */
-#define TYPE_ANTI     2  /* 0x20000 */
-#define TYPE_CONST    3  /* 0x30000 (TYPE_MONO | TYPE_ANTI) */
+#define MONOTONY_MASK 3
+#define TYPE_UNKNOWN  0
+#define TYPE_MONO     1
+#define TYPE_ANTI     2
+#define TYPE_CONST    (TYPE_MONO|TYPE_ANTI)
 
-/* named variable or anonymous data
-** used for intermediate temporary veriable in expressions
-** temp vars can (must) be freed, but named vars have to be kept
-** (in // envs) */
-/* #define TYPE_TEMP 4 */ /* 0x40000 */
+/* Named variable or anonymous value.
+** Used for intermediate temporary values in expressions.
+** Intermediate values must be freed, but value bound to a variable
+** must be kept. */
 #define TYPE_CANFREE     (1 << 2)
 #define TYPE_NOTBOUND    (1 << 3)
 
@@ -141,7 +139,7 @@
 /**   @var ovm_var_s::data
  **     Generic binary data. 
  **     It should be a zero-length array... but it use STR_PAD_LEN to be ISO-C
- **     copmliant (ISO-C doesn't allow zero length arrays)
+ **     compliant (ISO-C doesn't allow zero length arrays)
  **     and to keep alignment...
  **/
 typedef struct ovm_var_s ovm_var_t;
@@ -188,7 +186,7 @@ typedef ovm_var_t *(*var_clone_t)(ovm_var_t *var);
  **     Addition function handler.
  **/
 /**   @var issdl_type_s::sub
- **     Substraction function handler.
+ **     Subtraction function handler.
  **/
 /**   @var issdl_type_s::mul
  **     Multiplication function handler.
@@ -201,6 +199,9 @@ typedef ovm_var_t *(*var_clone_t)(ovm_var_t *var);
  **/
 /**   @var issdl_type_s::clone
  **     Cloning function handler.
+ **/
+/**   @var issdl_type_s::desc
+ **     A shot text description of the type.
  **/
 typedef struct issdl_type_s issdl_type_t;
 struct issdl_type_s
@@ -300,9 +301,9 @@ struct ovm_uint_s
  **     String length.
  **/
 /**   @var ovm_str_s::str
- **     Dynamically allcoated string memory.
+ **     Dynamically allocated string memory.
  **     This dummy size is used to be ISO-C compliant
- **     and keep memory alignement.
+ **     and keep memory alignment.
  **/
 typedef struct ovm_str_s ovm_str_t;
 struct ovm_str_s
@@ -470,7 +471,7 @@ struct ovm_timeval_s
 
 /**
  ** @struct @ovm_counter_s
- **   ISSDL counter data type. Contain a 'C unsigned long'.
+ **   ISSDL counter data type. Contain a 'C uint32_t'.
  **/
 /**   @var ovm_counter_s::type
  **     Data type identifier: T_COUNTER.
@@ -592,7 +593,7 @@ typedef unsigned long oid_t;
 /**   @var ovm_snmpoid_s::objoid
  **     Dynamically allocated oid memory.
  **     This dummy size is used to be ISO-C compliant
- **     and keep memory alignement.
+ **     and keep memory alignment.
  **/
 typedef struct ovm_snmpoid_s ovm_snmpoid_t;
 struct ovm_snmpoid_s
@@ -651,32 +652,101 @@ struct ovm_double_s
 ** function prototypes                                                       **
 *----------------------------------------------------------------------------*/
 
+/**
+ ** Accessor to the global type table.
+ ** @return  A pointer to the type table.
+ **/
 issdl_type_t *
 issdlgettypes(void);
 
 
-int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2);
+/**
+ ** Comparison function of the Orchids language.  This functions is used in
+ ** the implementation of comparison opcode (equal, less than, greater
+ ** than...).  This function is a dispatcher which use the comparison
+ ** function implemented in the type of var1.  If var1 and var2 are of
+ ** different types, the comparison function of var1 must be aware of
+ ** the existence of the type of the var2 (or the test will fail
+ ** otherwise).
+ ** @param var1  The first variable to compare.
+ ** @param var2  The second variable to compare.
+ ** @return      An integer equal to 0 if var1 is equal to var2, less than
+ **              0 if var1 is less than var2, or greater than 0 if var1 is
+ **              greater than var2.
+ **/
+int
+issdl_cmp(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Addition function of the Orchids language.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
 ovm_var_t *
 issdl_add(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Subtraction function of the Orchids language.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
 ovm_var_t *
 issdl_sub(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Multiplication function of the Orchids language.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
 ovm_var_t *
 issdl_mul(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Division function of the Orchids language.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
 ovm_var_t *
 issdl_div(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Modulo function of the Orchids language.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
 ovm_var_t *
 issdl_mod(ovm_var_t *var1, ovm_var_t *var2);
 
+
+/**
+ ** Variable cloning function.  This function not necessarily clone
+ ** the whole memory representation of the object.  Some constant part
+ ** may be shared during the cloning operation.
+ ** @param var  The variable to be cloned.
+ ** @return     A new allocated copy.
+ **/
 ovm_var_t *
 issdl_clone(ovm_var_t *var);
 
+
+/**
+ ** Return the type name string given a type id.
+ ** @param type  The type id.
+ ** @return      The type name.
+ **/
 char *
 str_issdltype(int type);
+
 
 ovm_var_t *
 ovm_null_new(void);
@@ -784,6 +854,11 @@ void
 ovm_uint_fprintf(FILE *fp, ovm_uint_t *val);
 
 
+/**
+ ** Print a variable on a stream.
+ ** @param fp  The stream on which the variable will be printed.
+ ** @param val The variable to print.
+ **/
 void
 fprintf_ovm_var(FILE *fp, ovm_var_t *val);
 
@@ -797,12 +872,14 @@ ovm_var_t *
 ovm_snmpoid_new(size_t len);
 
 
+/**
+ ** Duplicate a string of the orchids language, and convert it to a C
+ ** string (null terminated).
+ ** @param str  A virtual machine variable.
+ ** @return     A newly allocated C string.
+ **/
 char *
 ovm_strdup(ovm_var_t *str);
-
-/* --- */
-
-
 
 
 #endif /* LANG_H */

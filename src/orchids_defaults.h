@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Tue Jan 14 14:00:41 2003
- ** @date Last update: Mon Feb  4 14:27:31 2008
  **/
 
 

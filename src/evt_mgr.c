@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
- ** @date Last update: Fri Jul 27 15:44:34 2007
  **/
 
 /*
@@ -136,11 +135,8 @@ event_dispatcher_main_loop(orchids_t *ctx)
   ctx->last_poll = curr_time;
   wait_time_ptr = &wait_time;
 
-  /* retreive all polled data now...
-  ** inject or skip them... (module config specific) */
-
   DebugLog(DF_CORE, DS_NOTICE,
-           "*** setup done. entering in event dispatcher main loop ***\n");
+           "*** Setup done. Entering in event dispatcher main loop ***\n");
 
 #ifdef ENABLE_ACTMON
   printf("[pid %i] Running...\n ", getpid());
@@ -156,7 +152,7 @@ event_dispatcher_main_loop(orchids_t *ctx)
     gettimeofday(&cur_time, NULL);
     ctx->cur_loop_time = cur_time;
 
-    /* consume past event, if any */
+    /* Consume past event, if any */
     while ( e && timercmp( &e->date, &cur_time, <= )) {
       if (e->cb)
         e->cb(ctx, e);
@@ -175,14 +171,14 @@ event_dispatcher_main_loop(orchids_t *ctx)
     memcpy(&rfds, &ctx->fds, sizeof(fd_set));
 
     DebugLog(DF_CORE, DS_DEBUG,
-             "*** waiting for realtime event (or timeout) *** wait=%li.%06li\n",
+             "*** waiting for real-time event (or timeout) *** wait=%li.%06li\n",
              wait_time_ptr ? wait_time_ptr->tv_sec : 0,
              wait_time_ptr ? wait_time_ptr->tv_usec : 0);
 
     retval = Xselect(ctx->maxfd + 1, &rfds, NULL, NULL, wait_time_ptr);
 
     if (retval) {
-      DebugLog(DF_CORE, DS_INFO, "New realtime input data.... (%i)\n", retval);
+      DebugLog(DF_CORE, DS_INFO, "New real-time input data.... (%i)\n", retval);
       for (rti = ctx->realtime_handler_list; rti && retval; ) {
         next = rti->next;
         if (FD_ISSET(rti->fd, &rfds)) {
@@ -193,18 +189,20 @@ event_dispatcher_main_loop(orchids_t *ctx)
       }
     }
     else {
-      DebugLog(DF_CORE, DS_DEBUG, "Timeout... calling real-time callback...\n");
+      DebugLog(DF_CORE, DS_DEBUG, "Timeout... Calling real-time callback...\n");
       gettimeofday(&cur_time, NULL);
 
-      /* force execution, assuming timout was correct.
-       * this correct select() imprecisions... */
+      /* Force the callback execution here.
+       * We assume the timeout was correct.
+       * This corrects small imprecisions we may have here. */
       do {
         if (e->cb)
           e->cb(ctx, e);
         e = get_next_rtaction(ctx);
       } while ( e && timercmp( &e->date, &cur_time, <= ));
-      /* handle the case where event execution was longer than the delay
-       * to the next event. */
+      /* Here, the do {} while construct is for handling the special case
+       * when action execution is longer than the delay
+       * to the next action. */
     }
   }
 }

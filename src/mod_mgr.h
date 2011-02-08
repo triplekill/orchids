@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Mon Jul 30 23:41:38 2007
  **/
 
 /*
@@ -27,7 +26,7 @@
  ** @param mod  The information structure of the module to register.
  ** @param dlhandle  The handle returned by dlopen() or NULL if not dynamic.
  **
- ** @return mod_id if module was succefully added, or -1 if an error occurred.
+ ** @return mod_id if module was successfully added, or -1 if an error occurred.
  **/
 int
 add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
@@ -40,7 +39,7 @@ add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
  ** @param name  The module name to load.
  **
  ** @return A pointer to the information structure of the module, or
- **   NULL if an erro occurs.
+ **   NULL if an error occurs.
  **/
 input_module_t *
 load_add_shared_module(orchids_t *ctx, const char *name);
@@ -53,7 +52,7 @@ load_add_shared_module(orchids_t *ctx, const char *name);
  ** @param name  The module name to load.
  **
  ** @return A pointer to the information structure of the module, or
- **   NULL if an erro occurs.
+ **   NULL if an error occurs.
  **/
 /* input_module_t * */
 /* load_add_module(orchids_t *ctx, const char *name); */
@@ -65,7 +64,7 @@ load_add_shared_module(orchids_t *ctx, const char *name);
  ** @param ctx  Orchids application context.
  ** @param name The module name to remove.
  **
- ** @return 0 if module was succefully removed, or -1 if an error occurred.
+ ** @return 0 if module was successfully removed, or -1 if an error occurred.
  **/
 int
 remove_module(orchids_t *ctx, char *name);
@@ -112,10 +111,10 @@ find_module_entry(orchids_t *ctx, const char *name);
  ** Try to call a module function, if the module is loaded and if the
  ** function is found.
  **
- ** @param ctx      Orchids context.
- ** @param modname  Module name to find.
- ** @param funcname Function name to find.
- ** @param funcparams Arbitrary parameters passed to the called function.
+ ** @param ctx         Orchids context.
+ ** @param modname     Module name to find.
+ ** @param funcname    Function name to find.
+ ** @param funcparams  Arbitrary parameters passed to the called function.
  **
  ** @return      An error code.
  **/
@@ -127,10 +126,15 @@ call_mod_func(orchids_t *ctx,
 
 
 /**
- ** Display loaded modules on a stream.
+ ** Display loaded modules.
+ ** Available informations are :
+ ** the module identifier (id),
+ ** memory address,
+ ** number of posted events (successfully dissected message)
+ ** and the module name.
  **
- ** @param ctx  Orchids application context.
- ** @param fp   The output stream.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param fp   Output stream.
  **/
 void
 fprintf_loaded_modules(orchids_t *ctx, FILE *fp);

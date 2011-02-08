@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Fri Jan 17 16:57:51 2003
- ** @date Last update: Mon Jul 30 23:38:30 2007
  **/
 
 /*
@@ -65,7 +64,6 @@ add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
   int mod_id;
   void *mod_cfg;
 
-  /* -1 :) check if we reached the module limit number */
   if (ctx->loaded_modules >= MAX_MODULES) {
     fprintf(stderr, "module limit reached.\n");
     exit(EXIT_FAILURE);
@@ -227,17 +225,6 @@ call_mod_func(orchids_t *ctx,
 }
 
 
-/**
- * Display loaded modules.
- * Available informations are :
- * the module identifier (id),
- * memory address,
- * number of posted events (succefully disected message)
- * and the module name.
- *
- * @param ctx Orchids context.
- * @param fp Output stream.
- **/
 void
 fprintf_loaded_modules(orchids_t *ctx, FILE *fp)
 {

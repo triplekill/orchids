@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
- ** @date Last update: Fri Jul 27 15:34:26 2007
  **/
 
 /*
@@ -20,6 +19,7 @@
 
 #include "orchids.h"
 
+
 /**
  ** Runtime main loop.
  **
@@ -27,6 +27,7 @@
  **/
 void
 event_dispatcher_main_loop(orchids_t *ctx);
+
 
 /**
  ** Register a real-time action.  This scheduled action will be
@@ -38,9 +39,18 @@ event_dispatcher_main_loop(orchids_t *ctx);
 void
 register_rtaction(orchids_t *ctx, rtaction_t *e);
 
-rtaction_t *
-create_register_rtaction(orchids_t *ctx, rtaction_cb_t cb, time_t delay);
 
+/**
+ ** Helper function to register a real-time callback rtaction_cb_t.
+ ** This function just create a rtaction_t object from giver
+ ** parameters, then call register_rtaction().
+ ** @param ctx    A pointer to the Orchids application context.
+ ** @param cb     A function pointer to the function callback.
+ ** @param data   Abritrary data which will be passed to the callback at
+ **               the execution time.
+ ** @param delay  The delay (from now) when the callback will be executed.
+ ** @return A pointer to the created and register real-time action rtaction_t.
+ **/
 rtaction_t *
 register_rtcallback(orchids_t *ctx, rtaction_cb_t cb, void *data, time_t delay);
 

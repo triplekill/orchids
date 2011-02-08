@@ -8,7 +8,6 @@
  ** @ingroup engine
  **
  ** @date  Started on: Fri Feb 21 16:18:12 2003
- ** @date Last update: Sat Dec 22 22:05:54 2007
  **/
 
 /*
@@ -35,17 +34,16 @@
 #include "engine.h"
 #include "engine_priv.h"
 
-/* WARNING -- Field list in event_t, and field ids in int array must
+/* WARNING -- Field list in event_t, and field IDs in int array must
    be sorted in decreasing order */
 
 
-/* need to sort threads by rule instance */
+/* XXX: need to sort threads by rule instance, for fast marking */
 static void
 mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 {
   wait_thread_t *t;
 
-  /* mark threads */
   for (t = ctx->cur_retrig_qh; t; t = t->next) {
     if (t->state_instance->rule_instance == rule) {
       DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (cur)\n", t);
@@ -74,14 +72,13 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
     }
   }
 
-  /* mark rule as killed */
   rule->flags |= THREAD_KILLED;
 }
 
 
 
 static void
-rip_dead_rule(orchids_t *ctx, rule_instance_t *rule)
+reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 {
   rule_instance_t *r;
   rule_instance_t *next_rule;
@@ -106,12 +103,6 @@ rip_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 }
 
 
-/**
- * Return TRUE if the synchronization variable environement
- * is completely defined.
- * @param ctx  Orchids context.
- * @param state  Current state instance.
- **/
 static int
 sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
 {
@@ -132,15 +123,6 @@ sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
 }
 
 
-/**
- * Simulate a state, execute byte code, and create new treads.
- * (Jean's algo  -> q-add primitive).
- * @param ctx Orchids context.
- * @param state The state instance to simulate.
- * @param event A reference to the current event.
- * @param only_once THREAD_ONLYONCE flag (for rule initialisation).
- * @return Returns the number of created thread
- **/
 static int
 simulate_state_and_create_threads(orchids_t        *ctx,
                                   state_instance_t *state,
@@ -205,7 +187,7 @@ simulate_state_and_create_threads(orchids_t        *ctx,
   }
 
   for (t = 0; t < trans_nb; t++) {
-    /* if we have an e-trans, pass-it */
+    /* if we have an e-transition, pass-it */
     if (state->state->trans[t].required_fields_nb == 0) {
       vmret = 0;
       if (state->state->trans[t].eval_code)
@@ -226,7 +208,7 @@ simulate_state_and_create_threads(orchids_t        *ctx,
         new_state->retrig_next = state->rule_instance->state_list;
         state->rule_instance->state_list = new_state;
 
-        /* and recursively call simul() */
+        /* and recursively call the simulation function */
         simul_ret = simulate_state_and_create_threads(ctx,
                                                       new_state,
                                                       event,
@@ -249,12 +231,12 @@ simulate_state_and_create_threads(orchids_t        *ctx,
                thread, state->state->name, t);
 
       if (only_once == 0) {
-      /* add it to the thread-list of the current state instance */
-      thread->next_in_state_instance = state->thread_list;
-      state->thread_list = thread;
+        /* add it to the thread-list of the current state instance */
+        thread->next_in_state_instance = state->thread_list;
+        state->thread_list = thread;
       }
 
-      /* compute timeout date */
+      /* compute the timeout date */
       thread->timeout = time(NULL) + DEFAULT_TIMEOUT;
 
       /* add thread into the 'new thread' queue */
@@ -272,13 +254,6 @@ simulate_state_and_create_threads(orchids_t        *ctx,
 }
 
 
-/**
- * Create initial threads of each rules, put the COMMIT flags
- * and merge to the current wait queue.
- * (Jean's algo -> q-init).
- * @param ctx Orchids context.
- * @param event A reference to the current event.
- **/
 static void
 create_rule_initial_threads(orchids_t *ctx,
                             active_event_t *event /* XXX: NOT USED */)
@@ -316,7 +291,7 @@ create_rule_initial_threads(orchids_t *ctx,
     }
   }
 
-  /* prepare the current retrig queue by merging new and retirg queues
+  /* Prepare the current retrig queue by merging new and retirg queues
      (q_cur = q_new @ q_retrig) */
   if (ctx->new_qh) {
     ctx->new_qt->next = ctx->retrig_qh;
@@ -444,22 +419,22 @@ inject_event(orchids_t *ctx, event_t *event)
     next_thread = t->next;
     ctx->current_tail = t;
 
-    /* check timeout date */
+    /* Check timeout date */
     if ( !(t->flags & THREAD_ONLYONCE) && (t->timeout <= cur_time) ) {
       DebugLog(DF_ENG, DS_DEBUG, "thread %p timed-out ! (killing)\n", t);
       t->flags |= THREAD_KILLED;
     }
 
-    /* thread ripper (and rule instance if apply) */
+    /* Killed thread reaper (and rule instance if apply) */
     if ( THREAD_IS_KILLED(t) ) {
       ctx->last_ruleinst_act = ctx->cur_loop_time;
       DebugLog(DF_ENG, DS_DEBUG, "Rip and overide killed thread (%p)\n", t);
       t->state_instance->rule_instance->threads--;
       ctx->threads--;
       if ( NO_MORE_THREAD(t->state_instance->rule_instance) ) {
-        /* uptade rule instance list links (before removing) */
+        /* Update rule instance list links (before removing) */
         t->state_instance->rule_instance->flags |= THREAD_KILLED;
-        rip_dead_rule(ctx, t->state_instance->rule_instance);
+        reap_dead_rule(ctx, t->state_instance->rule_instance);
       } else {
         unlink_thread_in_state_instance_list(t);
       }
@@ -504,28 +479,28 @@ inject_event(orchids_t *ctx, event_t *event)
         ctx->rule_instances++;
       }
 
-      /* create a new state instance */
+      /* Create a new state instance */
       new_state = create_state_instance(ctx, t->trans->dest, t->state_instance);
 
-      /* link new_state instance in the tree */
+      /* Link the new_state instance in the tree */
       new_state->next_sibling = t->state_instance->first_child;
       t->state_instance->first_child = new_state;
       new_state->parent = t->state_instance;
       new_state->event = active_event;
-      active_event->refs++; /* update event references count */
+      active_event->refs++;
 
-      /* update state instance list of the current rule instance */
+      /* Update state instance list of the current rule instance */
       new_state->retrig_next = t->state_instance->rule_instance->state_list;
       t->state_instance->rule_instance->state_list = new_state;
 
-      /* and recursively call simul() */
+      /* And recursively call simulation function */
       sret = simulate_state_and_create_threads(ctx, new_state, active_event, 0);
       if (sret < 0)
 	ret -= sret;
       else
 	ret += sret;
 
-      /* static analysis flags test here (RETRIGGER) */
+      /* Static analysis flags test here (RETRIGGER) */
       if ( backtrack_is_not_needed(ctx, t) ) {
         DebugLog(DF_ENG, DS_DEBUG, "Backtrack not needed\n");
         KILL_THREAD(ctx, t);
@@ -534,13 +509,13 @@ inject_event(orchids_t *ctx, event_t *event)
 
     if ( THREAD_IS_ONLYONCE(t)) {
       KILL_THREAD(ctx, t);
-      /* initial thread ripper: can't be free()d at the next loop
-       * because initial environment can make reference to the current
-       * event.  In the case of the event didn't match any transition,
-       * it will be free()d _before_ the initial environment, so we'll
-       * lose the reference.  */
+      /* Initial thread reaper: an initial thread can't be free()d at
+       * the next loop because initial environment can make references
+       * to the current event.  In the case of the event didn't match
+       * any transition, it will be free()d _before_ the initial
+       * environment, so we'll lose the reference.  */
 
-      DebugLog(DF_ENG, DS_DEBUG, "Rip INITIAL thread (%p)\n", t);
+      DebugLog(DF_ENG, DS_DEBUG, "Reap INITIAL thread (%p)\n", t);
 
       if (t->flags & THREAD_BUMP) {
         DebugLog(DF_ENG, DS_DEBUG,
@@ -566,9 +541,9 @@ inject_event(orchids_t *ctx, event_t *event)
       t->state_instance->rule_instance->threads--;
       ctx->threads--;
       if ( NO_MORE_THREAD(t->state_instance->rule_instance) ) {
-        /* uptade rule instance list links (before removing) */
+        /* Update rule instance list links (before removing) */
         t->state_instance->rule_instance->flags |= THREAD_KILLED;
-        rip_dead_rule(ctx, t->state_instance->rule_instance);
+        reap_dead_rule(ctx, t->state_instance->rule_instance);
       } else {
         unlink_thread_in_state_instance_list(t);
       }
@@ -600,7 +575,7 @@ inject_event(orchids_t *ctx, event_t *event)
     fprintf_thread_queue(stdout, ctx, ctx->retrig_qh);
 #endif
 
-    /* if we need to commit new threads... merge two queues */
+    /* If we need to commit new threads, then merge two queues */
     if (t->flags & THREAD_BUMP) {
       DebugLog(DF_ENG, DS_DEBUG,
                "thread bump (commit q'_{new} = q_{new} @ q_{retrig})\n");
@@ -633,7 +608,7 @@ inject_event(orchids_t *ctx, event_t *event)
 
   execute_post_inject_hooks(ctx, active_event->event);
 
-  /* free unreferenced event here (the the current event didn't passed any
+  /* Free unreferenced event here (if the current event didn't passed any
      transition, Xfree() it) */
   if (active_event->refs == 0) {
     DebugLog(DF_ENG, DS_DEBUG,
@@ -667,16 +642,7 @@ inject_event(orchids_t *ctx, event_t *event)
 }
 
 
-/**
- * Create an instance of a state and inherits environment from parent.
- * This function doesn't link new state instance and its parent.
- *
- * @param ctx    The Orchids context.
- * @param state  The state definition to instantiate.
- * @param parent The parent state instance, in the path tree.
- * @return The new state instance.
- **/
-/* Environments managment really needs _HEAVY_ optimizations */
+/* XXX: Environments management really needs _HEAVY_ optimizations */
 static state_instance_t *
 create_state_instance(orchids_t *ctx,
                       state_t *state,
@@ -686,24 +652,28 @@ create_state_instance(orchids_t *ctx,
   int env_sz;
   int i;
 
-  /* alloc and init state instance */
+  /* Allocate and init state instance */
   new_state = Xzmalloc(sizeof (state_instance_t));
   new_state->state = state;
   new_state->rule_instance = parent->rule_instance;
   new_state->depth = parent->depth + 1;
 
-  /* build inherited environment */
+  /* Build inherited environment */
   if (state->rule->dynamic_env_sz > 0) {
     env_sz = state->rule->dynamic_env_sz * sizeof (ovm_var_t *);
-    new_state->inherit_env = Xmalloc(env_sz); /* will be entirely overwritten */
-    new_state->current_env = Xzmalloc(env_sz); /* initialise env to 0 */
+    /* inherit_env will be entirely overwritten
+     * (no need to initialize the memory) */
+    new_state->inherit_env = Xmalloc(env_sz);
+    new_state->current_env = Xzmalloc(env_sz);
   }
   /* IDEA of optimization :
-  ** if there is no action bytecode in this state, shadow-env can be
-  ** a reference to parent envs (PBs for desallocating) */
+  ** if there is no action byte-code in this state, inherit_env can be
+  ** a reference to parent environments (this add a problem for
+  ** freeing memory).  Maybe a third environment pointer should
+  ** be added */
 
-  /* shadow_env construction
-     XXX: optimize this, remove pointer resolution !!! */
+  /* inherit_env construction:
+     XXX: optimize this: remove pointer resolution. */
   for (i = 0; i < state->rule->dynamic_env_sz; ++i) {
     if (parent->current_env[i])
       new_state->inherit_env[i] = parent->current_env[i];
@@ -717,14 +687,6 @@ create_state_instance(orchids_t *ctx,
 }
 
 
-/**
- * Create an instance of the initial state of a rule.
- * 'init' state is a special case (environment aren't inherited).
- *
- * @param ctx  Orchids context.
- * @param rule The rule definition to instantiate its 'init' state.
- * @return The new 'init' state instance.
- **/
 static state_instance_t *
 create_init_state_instance(orchids_t *ctx, const rule_t *rule)
 {
@@ -733,14 +695,15 @@ create_init_state_instance(orchids_t *ctx, const rule_t *rule)
   int env_sz;
 
   state = &rule->state[0];
-  /* alloc and init state instance */
   new_state = Xzmalloc(sizeof (state_instance_t));
   new_state->state = state;
 
-  /* build inherited environment */
   if (state->rule->dynamic_env_sz > 0) {
     env_sz = state->rule->dynamic_env_sz * sizeof (ovm_var_t *);
     new_state->current_env = Xzmalloc(env_sz);
+    /* XXX: Initial state does not have parent, so it can't inherit
+     * of something.  This should be removed, and the inheritance logic
+     * should be enhanced. */
     new_state->inherit_env = Xzmalloc(env_sz);
   }
 
@@ -750,13 +713,6 @@ create_init_state_instance(orchids_t *ctx, const rule_t *rule)
 }
 
 
-/**
- * Free an entire rule instance (state instances and environments)
- * and update global statistics (active states and rules).
- *
- * @param ctx Orchids context.
- * @param rule_instance Rule instance to destroy.
- **/
 static void
 free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
 {
@@ -770,7 +726,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
 
   DebugLog(DF_ENG, DS_DEBUG, "free_rule_instance(%p)\n", rule_instance);
 
-  /* remove synchronization locks, if any */
+  /* Remove synchronization locks, if any exists */
   for (lock_elmt = rule_instance->sync_lock_list;
        lock_elmt;
        lock_elmt = lock_next) {
@@ -785,7 +741,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
     Xfree(lock_elmt);
   }
 
-  /* free init state */
+  /* Free the initial state instance */
   if (rule_instance->first_state->inherit_env)
     Xfree(rule_instance->first_state->inherit_env);
 
@@ -805,10 +761,10 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
   si = rule_instance->state_list;
   while (si) {
     next_si = si->retrig_next;
-    if (si->inherit_env) /* can be null for init state */
+    if (si->inherit_env)
       Xfree(si->inherit_env);
 
-    /* free all 'current dynamic environment' variables */
+    /* Free all variables in the current environment */
     dyn_env_sz = rule_instance->rule->dynamic_env_sz;
     if (dyn_env_sz > 0) {
       for (i = 0, cur_env = si->current_env; i < dyn_env_sz; ++i)
@@ -818,12 +774,16 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
       Xfree(si->current_env);
     }
 
-    /* update event reference count */
+    /* Update event reference count */
     if (si->event) {
 
       si->event->refs--;
 
-      /* unreferenced active events are freed in inject_event() */
+      /* The current active event is freed in inject_event() if unreferenced.
+       * There is the special case of rules that terminate after exactly one
+       * event: the event matches a transition, is referenced, the rule reach
+       * instantaneously a final state, then terminate.  Here, we have to
+       * only free events other than the current one (i.e. past events). */
       if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
         ctx->last_evt_act = ctx->cur_loop_time;
         DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
@@ -831,27 +791,27 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
         si->event->event = NULL;
         ctx->active_events--;
         /* unlink */
-        if (!si->event->prev) { /* if we are in the first event reference */
+        if (!si->event->prev) { /* If we are in the first event reference */
 
-          if (!si->event->next) { /* if it is also the last (it is alone) */
+          if (!si->event->next) { /* If it is also the last (it is alone) */
             ctx->active_event_head = NULL;
             ctx->active_event_tail = NULL;
           }
           else {
-            /* else it is the first, and there is other references after it */
+            /* Else it is the first, and there is other references after it */
             ctx->active_event_head = si->event->next;
             ctx->active_event_head->prev = NULL;
           }
           /* si->event->next->prev = si->event->prev; */
         }
-        else { /* ...else the event reference is not the first */
+        else { /* Else the event reference is not the first */
 
-          if (!si->event->next) { /* if it is exactly the last one */
-            /* ...there is other event references before... */
+          if (!si->event->next) { /* If it is exactly the last one */
+            /* Then update the previous element */
             si->event->prev->next = NULL;
             ctx->active_event_tail = si->event->prev;
           }
-          else { /* ...else the event reference is not the last
+          else { /* Else the event reference is not the last
                     we are in the middle of the list */
             si->event->prev->next = si->event->next;
             si->event->next->prev = si->event->prev;
@@ -867,7 +827,6 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
     ctx->state_instances--;
   }
 
-  /* update statistics */
   if (rule_instance->creation_date) {
     rule_instance->rule->instances--;
     ctx->rule_instances--;
@@ -991,9 +950,6 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
           "-----+----------+----+-----+----\n");
 }
 
-/**
- * Display all active events
- **/
 void
 fprintf_active_events(FILE *fp, orchids_t *ctx)
 {

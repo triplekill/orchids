@@ -8,7 +8,6 @@
  ** @ingroup output
  ** 
  ** @date  Started on: Fri Mar 12 10:44:59 2004
- ** @date Last update: Tue Nov 30 21:40:19 2010
  **/
 
 /*
@@ -312,7 +311,6 @@ generate_html_orchids_modules(orchids_t *ctx)
   unsigned long ntpl, ntph;
 
   Timer_to_NTP(&ctx->cur_loop_time, ntph, ntpl);
-  //Timer_to_NTP(&ctx->start_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-modules-%08lx-%08lx.html", ntph, ntpl);
   fp = create_html_file(ctx, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
@@ -1171,7 +1169,7 @@ generate_html_rule_instances(orchids_t *ctx)
                                 HTMLSTATE_STATE_LIMIT);
       Xfclose(fp);
 
-      /* convert in various formats (eps/pdf/jpeg) */
+      /* Convert in various formats (eps/pdf/jpeg) */
       snprintf(cmdline, sizeof (cmdline),
                COMMAND_PREFIX PATH_TO_DOT
                " -Tps -Grankdir=LR "
@@ -1181,7 +1179,7 @@ generate_html_rule_instances(orchids_t *ctx)
       DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
-      /* smaller eps, for thumbs (for better image quality) */
+      /* Smaller eps, for thumbs (for better image quality) */
       snprintf(cmdline, sizeof (cmdline),
                COMMAND_PREFIX PATH_TO_DOT
                " -Tps -Grankdir=LR "
@@ -1627,7 +1625,6 @@ generate_html_config(orchids_t *ctx)
   FILE *fp;
 
   fp = create_html_file(ctx, "orchids-config.html", NO_CACHE);
-/*   fprintf_html_header(fp, "Orchids configuration tree"); */
 
   fprintf(fp,
           "<!DOCTYPE html PUBLIC \"-//W3C//"
@@ -1645,7 +1642,6 @@ generate_html_config(orchids_t *ctx)
 #else /* USE_HTTP_11 */
   fprintf(fp, "<meta http-equiv=\"cache-control\" content=\"no-cache\">\n");
 #endif /* USE_HTTP_11 */
-/*   fprintf(fp, "  <meta http-equiv=\"refresh\" content=\"" HTML_AUTOREFRESH "\">\n"); */
 
   /* Add JavaScript tree functions */
   fputs("<script type=\"text/javascript\" src=\"tree.js\"></script>",fp);
@@ -1870,7 +1866,7 @@ generate_html_menu(orchids_t *ctx)
           "<a href=\"orchids-reports.html\" "
           "target=\"main\">Reports</a><br/>\n");
 
-  /* execute registered outputs */
+  /* Execute registered outputs */
   if (htmloutput_list_head_g) {
     fprintf(fp, "<hr/>\n");
     fprintf(fp, "Modules:<br/>\n");
@@ -1895,7 +1891,7 @@ do_html_output(orchids_t *ctx)
   int fd;
   int ret;
 
-  /* acquire lock or return */
+  /* Acquire lock or return */
   fd = Xopen(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
   ret = Write_lock(fd, 0, SEEK_SET, 0);
   if (ret) {

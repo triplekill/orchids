@@ -8,7 +8,6 @@
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:31:59 2003
- ** @date Last update: Fri Aug  3 12:28:50 2007
  **/
 
 /*
@@ -22,30 +21,102 @@
 
 #include "orchids.h"
 
+/**
+ ** Wrapper function to the fcntl advisory locking subsystem.
+ **
+ ** @param fd       The file descriptor on which to operate.
+ ** @param cmd      Command for fcntl() for record locking operation (may
+ **                 be one of F_GETLK, F_SETLK or F_SETLKW).  See your system
+ **                 documentation (fcntl and fcntl.h manual pages).
+ ** @param type     The type of lock (the l_type field of the flock
+ **                 structure, may be one of F_RDLCK, F_UNLCK or F_WRLCK).
+ **                 See your system documentation (fcntl and fcntl.h manual
+ **                 pages).
+ ** @param offset   The offset of the lock (the l_start field of the
+ **                 flock structure).  See your system documentation (fcntl
+ **                 and fcntl.h manual pages).
+ ** @param whence   The manner how to interpret the offset (the l_whence
+ **                 field of the flock structure, value may be one of
+ **                 SEEK_SET, SEEK_CUR or SEEK_END).  See your system
+ **                 documentation (fcntl and fcntl.h manual pages).
+ ** @param len      The length (number of bytes) to lock (the l_len field
+ **                 of the flock structure).  See your system documentation
+ **                 (fcntl and fcntl.h manual pages).
+ **
+ ** @return         The same return code as the fcntl() system call (see your
+ **                 system documentation).
+ **/
 int
 lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len);
 
 
+/**
+ ** Wrapper function to test a lock of the fcntl advisory locking subsystem.
+ **
+ ** @param fd       The file descriptor on which to operate.
+ ** @param type     The type of lock (the l_type field of the flock
+ **                 structure, may be one of F_RDLCK, F_UNLCK or F_WRLCK).
+ **                 See your system documentation (fcntl and fcntl.h manual
+ **                 pages).
+ ** @param offset   The offset of the lock (the l_start field of the
+ **                 flock structure).  See your system documentation (fcntl
+ **                 and fcntl.h manual pages).
+ ** @param whence   The manner how to interpret the offset (the l_whence
+ **                 field of the flock structure, value may be one of
+ **                 SEEK_SET, SEEK_CUR or SEEK_END).  See your system
+ **                 documentation (fcntl and fcntl.h manual pages).
+ ** @param len      The length (number of bytes) to lock (the l_len field
+ **                 of the flock structure).  See your system documentation
+ **                 (fcntl and fcntl.h manual pages).
+ **
+ ** @return The PID of the process which hold the lock, or 0 if unlocked.
+ **/
 pid_t
 lock_test(int fd, int type, off_t offset, int whence, off_t len);
 
 
+/**
+ ** Helper macro for requesting a read lock (or fail if a conflicting
+ ** lock is held by another process).
+ **/
 #define Read_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLK, F_RDLCK, offset, whence, len)
 
+/**
+ ** Helper macro for requesting a read lock (or wait if a conflicting
+ ** lock is held by another process).
+ **/
 #define Readw_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLKW, F_RDLCK, offset, whence, len)
 
+/**
+ ** Helper macro for requesting a write lock (or fail if a conflicting
+ ** lock is held by another process).
+ **/
 #define Write_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLK, F_WRLCK, offset, whence, len)
 
+/**
+ ** Helper macro for requesting a write lock (or wait if a conflicting
+ ** lock is held by another process).
+ **/
 #define Writew_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLKW, F_WRLCK, offset, whence, len)
 
+/**
+ ** Helper macro for releasing a lock.
+ **/
 #define Un_lock(fd, offset, whence, len) \
           lock_reg(fd, F_SETLK, F_UNLCK, offset, whence, len)
 
 
+/**
+ ** Create a global application lock file.  This is a protection for
+ ** avoiding accidental multiple instance of a orchids daemon.
+ ** Nevertheless, the lock file is a parameter to allow well
+ ** configured multiple instances of Orchids.
+ ** @param lockfile  The path of the lock file name.
+ **/
 void
 orchids_lock(const char *lockfile);
 
@@ -63,9 +134,11 @@ new_orchids_context(void);
 /**
  ** Add a new polled input callback.
  **
- ** @param ctx Orchids application context.
- ** @param cb A Polled input callback.
- ** @param data Data to pass to the callback. (some configuration for exemple).
+ ** @param ctx  Orchids application context.
+ ** @param mod  A pointer to the caller module entry adding
+ **             the polled input callback.
+ ** @param cb   A Polled input callback.
+ ** @param data Data to pass to the callback. (some configuration for example).
  **/
 void
 add_polled_input_callback(orchids_t *ctx,
@@ -75,13 +148,14 @@ add_polled_input_callback(orchids_t *ctx,
 
 
 /**
- ** Add a new realtime input descriptor.
- ** New data on the descriptor will be monitored with select() syscall.
+ ** Add a new real-time input descriptor.
+ ** New data on the descriptor will be monitored with select() system call.
  **
  ** @param ctx  Orchids application context.
- ** @param cb   A realtime input callback.
- ** @param fd   The file descriptor associated to the realtime input.
- ** @param data Data to pass realtime input callback. (module config fer ex.).
+ ** @param mod  A pointer to the caller module entry adding the descriptor.
+ ** @param cb   A real-time input callback.
+ ** @param fd   The file descriptor associated to the real-time input.
+ ** @param data Data to pass real-time input callback. (module config fer ex.).
  **/
 void
 add_input_descriptor(orchids_t *ctx,
@@ -92,7 +166,7 @@ add_input_descriptor(orchids_t *ctx,
 
 
 /** 
- ** Remove a realtime input descriptor.
+ ** Remove a real-time input descriptor.
  **
  ** @param ctx Orchids application context.
  ** @param fd  Descriptor to remove.
@@ -102,12 +176,14 @@ del_input_descriptor(orchids_t *ctx, int fd);
 
 
 /**
- ** Register an unconditional disector.
+ ** Register an unconditional dissector.
  **
- ** @param ctx Orchids application context.
- ** @param parent_modname The module to hook.
- ** @param dissect The dissector to register.
- ** @param data  Data passed to the dissector.
+ ** @param ctx             Orchids application context.
+ ** @param mod             A pointer to the caller module entry registering
+ **                        the unconditional dissector.
+ ** @param parent_modname  The module to hook.
+ ** @param dissect         The dissector to register.
+ ** @param data            Data passed to the dissector.
  **/
 void
 register_dissector(orchids_t *ctx,
@@ -118,12 +194,14 @@ register_dissector(orchids_t *ctx,
 
 
 /**
- ** Register a conditionnal dissector.
+ ** Register a conditional dissector.
  **
  ** @param ctx             Orchids application context.
+ ** @param mod             The caller module registering the
+ **                        conditional dissector.
  ** @param parent_modname  The module to hook.
  ** @param key             The key value to trig the dissector.
- ** @param keylen          The legth of the key.
+ ** @param keylen          The length of the key.
  ** @param dissect         The sub-dissector to register.
  ** @param data            Data passed to the dissector.
  **/
@@ -149,6 +227,9 @@ register_post_inject_hook(orchids_t *ctx,
 
 /**
  ** Execute all registered callbacks in the post-inject-event hook.
+ ** @param ctx    A pointer to the Orchids application context.
+ ** @param event  A pointer to the event which will be given as
+ **               argument to post injection callback functions.
  **/
 void
 execute_post_inject_hooks(orchids_t *ctx, event_t *event);
@@ -175,7 +256,7 @@ register_fields(orchids_t *ctx,
  ** Free fields.
  **
  ** @param tbl_event Event property table.
- ** @param s         Event proterty table size.
+ ** @param s         Event property table size.
  **/
 void
 free_fields(ovm_var_t **tbl_event, size_t s);
@@ -202,7 +283,7 @@ add_fields_to_event(orchids_t *ctx,
 
 
 /**
- ** Print an event on a strio stream.
+ ** Print an event on a standard I/O stream.
  **
  ** @param fp     The stdio stream to print on.
  ** @param ctx    Orchids application context.
@@ -224,8 +305,8 @@ free_event(event_t *event);
 
 /**
  ** Post an event.
- ** If a module have registered a sub-disector, the function will call it.
- ** If no more module can apply, the event will be injectect into the
+ ** If a module have registered a sub-dissector, the function will call it.
+ ** If no more module can apply, the event will be injected into the
  ** analysis engine with inject_event().
  **
  ** @param ctx            Orchids application context.
@@ -244,7 +325,7 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event);
  ** modules, the current poll period, the number of registered fields,
  ** the number of injected events, the number of active events, the current
  ** number of rule instances and the current total number of state instances.
- ** Additionnaly, on a linux operating system, this function displays some
+ ** Additionally, on a linux operating system, this function displays some
  ** specifics informations (Memory usage, attached CPU, etc...).
  **
  ** @param fp  The stdio stream to print on.

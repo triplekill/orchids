@@ -8,7 +8,6 @@
  ** @ingroup core
  ** 
  ** @date  Started on: Fri Nov 28 15:32:53 2003
- ** @date Last update: Fri May 11 09:56:10 2007
  **/
 
 /*
