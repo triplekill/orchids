@@ -165,7 +165,7 @@ pl_execute_var(const char *goal_str, const char *var_name)
         PL_get_chars(val, &val_str, CVT_WRITE);
         ret_str = strdup(val_str);
         PL_discard_foreign_frame(fid);
-        return (val_str);
+        return (ret_str);
       }
     }
   }
@@ -285,7 +285,7 @@ prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
 #if 1
   set_prolog_io("/dev/null",
-                LOCALSTATEDIR "/orchids/log/mod_prolog.stdout", 
+                LOCALSTATEDIR "/orchids/log/mod_prolog.stdout",
                 LOCALSTATEDIR "/orchids/log/mod_prolog.stderr");
 #else
   set_prolog_io("/dev/null", "/dev/null", "/dev/null");
@@ -329,7 +329,7 @@ consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static mod_cfg_cmd_t prolog_config_commands[] = 
+static mod_cfg_cmd_t prolog_config_commands[] =
 {
   { "Consult", consult_plfile, "Consult a prolog file" },
   { NULL, NULL, NULL }
@@ -350,19 +350,21 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
   DebugLog(DF_MOD, DS_INFO, "Prolog HTML output\n");
 
   fprintf(menufp,
-	  "<a href=\"orchids-prolog.html\" "
+  	  "<a href=\"orchids-prolog.html\" "
           "target=\"main\">Prolog</a><br/>\n");
 
   cfg = (prolog_cfg_t *)mod->config;
   Timer_to_NTP(&cfg->last_db_update, ntph, ntpl);
 
+  printf(">>>1 %s %s\n",ctx->html_output_dir, bodyfile);
   snprintf(bodyfile, sizeof (bodyfile),
-	   "orchids-prolog-%08lx-%08lx.html", ntph, ntpl);
+  	   "orchids-prolog-%08lx-%08lx.html", ntph, ntpl);
 
   if (cached_html_file(ctx, bodyfile)) {
     generate_htmlfile_hardlink(ctx, bodyfile, "orchids-prolog.html");
     return (0);
   }
+  printf(">>>2 %s %s\n",ctx->html_output_dir, bodyfile);
 
   /* generate header */
   fp = create_html_file(ctx, bodyfile, NO_CACHE);
@@ -376,18 +378,19 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 
   /* generate html prolog listing */
   snprintf(pl_code, sizeof (pl_code),
-	   "prolog_htmloutput("
-	     "'source-highlight -n -s prolog >> %s/%s'"
-	   ").",
-	   ctx->html_output_dir, bodyfile);
+  	   "prolog_htmloutput("
+  	     "'source-highlight -n -s prolog >> %s/%s'"
+  	   ").",
+  	   ctx->html_output_dir, bodyfile);
 
   ret = pl_execute(pl_code);
 
   DebugLog(DF_MOD, DS_INFO, "Executed '%s': %s\n", pl_code, ret ? "Yes" : "No");
+  DebugLog(DF_MOD, DS_INFO, "Executed '%s': %s\n", pl_code, ret ? "Yes" : "No");
 
   /* generate footer */
   snprintf(file, sizeof (file),
-	   "%s/%s", ctx->html_output_dir, bodyfile);
+  	   "%s/%s", ctx->html_output_dir, bodyfile);
   fp = Xfopen(file, "a");
   fprintf(fp, "</td></tr></table></center>\n");
   fprintf_html_trailer(fp);

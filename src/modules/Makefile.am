@@ -9,7 +9,6 @@ EXTRA_DIST = cisco.l cisco.y \
              snare.l snare.y
 
 pkglib_LTLIBRARIES = \
-  mod_autohtml.la \
   mod_cisco.la \
   mod_clocks.la \
   mod_consoles.la \
@@ -18,7 +17,6 @@ pkglib_LTLIBRARIES = \
   mod_rawsnare.la \
   mod_remoteadm.la \
   mod_snare.la \
-  mod_snmptrap.la \
   mod_sockunix.la \
   mod_sunbsm.la \
   mod_syslog.la \
@@ -45,14 +43,16 @@ pkglib_LTLIBRARIES += mod_prism2.la
 pkglib_LTLIBRARIES += mod_wifi.la
 endif
 
-#  mod_stats.la
-#  mod_snmp.la
-#  mod_template.la
-#  mod_test2.la
-#  mod_test.la
+if USE_NETSNMP
+pkglib_LTLIBRARIES += mod_snmptrap.la
+endif
 
-mod_autohtml_la_SOURCES = mod_autohtml.c mod_autohtml.h
-mod_autohtml_la_LDFLAGS = -module -avoid-version
+if USE_PRELUDE
+pkglib_LTLIBRARIES += mod_prelude.la
+endif
+
+
+#  mod_stats.la
 
 mod_cisco_la_SOURCES =     \
   mod_cisco.c mod_cisco.h  \
@@ -122,6 +122,8 @@ pkglib_DATA = mod_prolog.prc
 mod_prolog.prc:
 	$(SWIPL) -f none -F none -g true \
 -t "consult([]),qsave_program('mod_prolog.prc',[toplevel=prolog])"
+
+
 endif
 
 mod_rawsnare_la_SOURCES = mod_rawsnare.c mod_rawsnare.h rawsnare.h
@@ -139,9 +141,6 @@ $(srcdir)/snare.tab.c $(srcdir)/snare.tab.h: $(srcdir)/snare.y
 $(srcdir)/snare.yy.c: $(srcdir)/snare.l
 	$(LEX) -f -Psnare -o$(srcdir)/snare.yy.c $(srcdir)/snare.l
 
-
-# mod_snmp_la_SOURCES = mod_snmp.c mod_snmp.h
-# mod_snmp_la_LDFLAGS = -module -avoid-version
 
 if USE_NETSNMP
 mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
@@ -165,15 +164,6 @@ mod_sunbsm_la_LDFLAGS = -module -avoid-version
 
 mod_syslog_la_SOURCES = mod_syslog.c mod_syslog.h
 mod_syslog_la_LDFLAGS = -module -avoid-version
-
-# mod_template_la_SOURCES = mod_template.c
-# mod_template_la_LDFLAGS = -module -avoid-version
-
-# mod_test2_la_SOURCES = mod_test2.c
-# mod_test2_la_LDFLAGS = -module -avoid-version
-
-# mod_test_la_SOURCES = mod_test.c
-# mod_test_la_LDFLAGS = -module -avoid-version
 
 mod_textfile_la_SOURCES = mod_textfile.c mod_textfile.h
 mod_textfile_la_LDFLAGS = -module -avoid-version
@@ -201,4 +191,11 @@ mod_ruletrace_la_SOURCES = mod_ruletrace.c mod_ruletrace.h
 mod_ruletrace_la_LDFLAGS = -module -avoid-version
 
 
+
+if USE_PRELUDE
+mod_prelude_la_SOURCES = mod_prelude.c mod_prelude.h
+mod_prelude_la_CFLAGS = $(LIBPRELUDE_CFLAGS)
+mod_prelude_la_LDFLAGS = -module -avoid-version
+mod_prelude_la_LIBADD = $(LIBPRELUDE_LDFLAGS)
+endif
 # End-of-file

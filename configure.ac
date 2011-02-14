@@ -248,11 +248,31 @@ if test "$XML2_CONFIG" != "" ; then
    AC_DEFINE([HAVE_XML2], 1, [Set to 1 if libxml2 is present])
 fi
 
+AC_PATH_PROG(LIBPRELUDE_CONFIG, libprelude-config)
+AC_CHECK_HEADERS([libprelude/prelude.h])
+AC_CHECK_HEADERS([libprelude/prelude-client.h])
+AC_CHECK_HEADERS([libprelude/idmef.h])
+AC_CHECK_LIB(prelude)
+if test "$LIBPRELUDE_CONFIG" != ""  \
+   -a "$ac_cv_header_libprelude_prelude_h" = "yes"       \
+   -a "$ac_cv_header_libprelude_prelude_client_h" = "yes" \
+   -a "$ac_cv_header_libprelude_idmef_h" = "yes" \
+   -a "$ac_cv_lib_prelude" = "yes" ; then
+   LIBPRELUDE_LDFLAGS=$($LIBPRELUDE_CONFIG --libs)
+   LIBPRELUDE_CFLAGS=$($LIBPRELUDE_CONFIG --cflags)
+   AM_CONDITIONAL(USE_PRELUDE, true)
+else
+   AM_CONDITIONAL(USE_PRELUDE, false)
+fi
+AC_SUBST(LIBPRELUDE_CFLAGS)
+AC_SUBST(LIBPRELUDE_LDFLAGS)
+
+
 AC_CHECK_HEADERS(libaudit.h)
 
 CFLAGS="$CFLAGS -Wall -DPKGDATADIR=\\\"$datadir\\\" -DSYSCONFDIR=\\\"$sysconfdir\\\" -DLOCALSTATEDIR=\\\"$localstatedir\\\" -DLIBDIR=\\\"$libdir\\\""
 
-AC_CONFIG_FILES([Makefile 
+AC_CONFIG_FILES([Makefile
                  src/Makefile
                  src/modules/Makefile
                  dist/Makefile

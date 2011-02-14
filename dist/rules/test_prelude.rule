@@ -1,0 +1,53 @@
+/*
+** test prelude analyzer mode
+*/
+
+rule testPrelude synchronize($source)
+{
+  state init
+  {
+    $count = 0;
+    $source = .prelude.first_source_addr;
+    if ((.prelude.classification_text == "Login") &&
+	(.prelude.assessment_completion == "failed") &&
+	($source == .prelude.first_source_addr))
+      goto loop;
+  }
+
+  state loop
+  {
+    cut("init");
+    $count = $count + 1;
+    print("loop !");
+    print($count);
+
+    if (($count >= 10)
+	&& (.prelude.classification_text == "Login")
+	&& (.prelude.assessment_completion == "failed")
+	&& ($source == .prelude.first_source_addr))
+      goto end;
+
+    if (($count < 10)
+	&& (.prelude.classification_text == "Login")
+	&& (.prelude.assessment_completion == "failed")
+	&& ($source == .prelude.first_source_addr))
+      goto loop;
+  }
+
+  state end
+  {
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.assessment.impact.description", "Brute force detected");
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_set($idmef, "alert.classification.text", "ssh bruteforce");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $source);
+    $name = idmef_message_get_string(.prelude.ptr, "alert.target(0).user.user_id(0).name");
+    idmef_message_set($idmef, "alert.target(0).user.user_id(0).name", $name);
+    $name = idmef_message_get_string(.prelude.ptr, "alert.target(0).node.name");
+    idmef_message_set($idmef, "alert.target(0).node.name",
+		      $name);
+    idmef_message_send($idmef);
+  }
+}

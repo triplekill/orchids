@@ -647,7 +647,7 @@ struct rulefile_s
 
 /**
  ** @struct rule_compiler_s
- ** The main rule compiler context.                                          
+ ** The main rule compiler context.
  **/
 /**   @var rule_compiler_s::currfile
  **     Current file in compilation.
@@ -700,7 +700,7 @@ struct rulefile_s
  **/
 struct rule_compiler_s
 {
-  char             *currfile;        
+  char             *currfile;
   int32_t           rules;
   strhash_t        *functions_hash;
   strhash_t        *fields_hash;
@@ -910,7 +910,7 @@ struct preproc_cmd_s {
  **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::fds
- **     Descriptor set, for the select() call in 
+ **     Descriptor set, for the select() call in
  **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::cfg_tree
@@ -1247,10 +1247,10 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **/
 /**   @var input_module_s::pre_config
  **     Generic function for module initialisation/post-registration.
- **     should allocate some memory for 'config' ptr, 
- **     should register hooks ans callbacks, 
- **     allocate some memory if needed, 
- **     pre-compute some stuffs... 
+ **     should allocate some memory for 'config' ptr,
+ **     should register hooks ans callbacks,
+ **     allocate some memory if needed,
+ **     pre-compute some stuffs...
  **     and finally, return the module configuration structure.
  **/
 /**   @var input_module_s::post_config

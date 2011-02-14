@@ -167,15 +167,6 @@ Requires: orchids
 %description mod_snare
 Module mod_snare.
 
-
-#%package mod_snmp
-#Summary: Module mod_snmp
-#Group: System Environment/Daemons
-#
-#%description mod_snmp
-#Module mod_snmp.
-
-
 %package mod_snmptrap
 Summary: Module mod_snmptrap
 Group: System Environment/Daemons
@@ -219,23 +210,6 @@ Requires: orchids
 
 %description mod_syslog
 Module mod_syslog.
-
-
-#%package mod_test2
-#Summary: Module mod_test2
-#Group: System Environment/Daemons
-#
-#%description mod_test2
-#Module mod_test2.
-
-
-#%package mod_test
-#Summary: Module mod_test
-#Group: System Environment/Daemons
-#
-#%description mod_test
-#Module mod_test.
-
 
 %package mod_textfile
 Summary: Module mod_textfile
@@ -281,7 +255,21 @@ Requires: orchids
 %description mod_win32evt
 Module mod_win32evt.
 
+%package mod_auditd
+Summary: Module mod_auditd
+Group: System Environment/Daemons
+Requires: orchids
 
+%description mod_auditd
+Module mod_auditd.
+
+%package mod_prelude
+Summary: Module mod_prelude
+Group: System Environment/Daemons
+Requires: orchids
+
+%description mod_prelude
+Module mod_prelude.
 
 %prep
 
@@ -369,9 +357,6 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %{prefix}/usr/lib/orchids/mod_snare.*
 %config %{prefix}/etc/orchids/conf.d/07_mod_snare.conf
 
-#%files mod_snmp
-#%{prefix}/usr/lib/orchids/mod_snmp.*
-
 %files mod_snmptrap
 %{prefix}/usr/lib/orchids/mod_snmptrap.*
 
@@ -388,12 +373,6 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %files mod_syslog
 %{prefix}/usr/lib/orchids/mod_syslog.*
 %config %{prefix}/etc/orchids/conf.d/02_mod_syslog.conf
-
-#%files mod_test
-#%{prefix}/usr/lib/orchids/mod_test.*
-
-#%files mod_test2
-#%{prefix}/usr/lib/orchids/mod_test2.*
 
 %files mod_textfile
 %{prefix}/usr/lib/orchids/mod_textfile.*
@@ -413,6 +392,12 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %files mod_win32evt
 %{prefix}/usr/lib/orchids/mod_win32evt.*
 
+%files mod_auditd
+%{prefix}/usr/lib/orchids/mod_auditd.*
+
+%files mod_auditd
+%{prefix}/usr/lib/orchids/mod_prelude.*
+%config %{prefix}/etc/orchids/conf.d/17_mod_prelude.conf
 
 %clean
 rm -r $RPM_BUILD_ROOT
