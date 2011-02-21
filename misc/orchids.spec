@@ -18,16 +18,6 @@ Requires: cpp /usr/sbin/sendmail
 %description
 A real-time intrusion detection system.
 
-
-%package mod_autohtml
-Summary: Module mod_autohtml
-Group: System Environment/Daemons
-Requires: orchids
-
-%description mod_autohtml
-Module mod_autohtml.
-
-
 %package mod_cisco
 Summary: Module mod_cisco
 Group: System Environment/Daemons
@@ -295,9 +285,6 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %attr(-,nobody,nobody) %{prefix}/var/orchids/log
 %attr(-,nobody,nobody)%{prefix}/var/orchids/reports
 %doc AUTHORS ChangeLog COPYING* NEWS README
-
-%files mod_autohtml
-%{prefix}/usr/lib/orchids/mod_autohtml.*
 
 %files mod_cisco
 %{prefix}/usr/lib/orchids/mod_cisco.*

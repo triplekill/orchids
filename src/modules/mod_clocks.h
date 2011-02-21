@@ -1,12 +1,12 @@
 /**
  ** @file mod_clocks.c
  ** A module for handling clock uncertainty.
- ** 
+ **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- ** 
+ **
  ** @version 0.1.0
  ** @ingroup modules
- ** 
+ **
  ** @date  Started on: Mon Dec 01 00:57:32 2003
  **/
 
@@ -150,7 +150,7 @@ static int
 qsort_clockcmp(const void *a, const void *b);
 
 static int
-clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
+clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
 
 
 

@@ -58,7 +58,6 @@ extern input_module_t mod_snmptrap;
 extern input_module_t mod_sunbsm;
 extern input_module_t mod_win32evt;
 extern input_module_t mod_consoles;
-extern input_module_t mod_autohtml;
 extern input_module_t mod_sockunix;
 #endif
 
@@ -284,37 +283,6 @@ set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  **/
 static void
 set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-/**
- ** Handler for the ReportDir configuration directive.
- ** @param ctx  A pointer to the Orchids application context.
- ** @param mod  A pointer to the current module being configured.
- ** @param dir  A pointer to the configuration directive record.
- **/
-static void
-set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-/**
- ** Handler for the ReportPrefix configuration directive.
- ** @param ctx  A pointer to the Orchids application context.
- ** @param mod  A pointer to the current module being configured.
- ** @param dir  A pointer to the configuration directive record.
- **/
-static void
-set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-/**
- ** Handler for the ReportExt configuration directive.
- ** @param ctx  A pointer to the Orchids application context.
- ** @param mod  A pointer to the current module being configured.
- ** @param dir  A pointer to the configuration directive record.
- **/
-static void
-set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
 
 /**
  ** Handler for the SetDefaultPreprocessorCmd configuration directive.
@@ -906,7 +874,6 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     &mod_sunbsm,
     &mod_win32evt,
     &mod_consoles,
-    &mod_autohtml,
     &mod_sockunix,
     NULL
   };
@@ -936,21 +903,6 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     return ;
   }
 }
-
-/* XXX move this to mod_htmlstate */
-static void
-set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  struct stat stat_buf;
-
-  DebugLog(DF_CORE, DS_INFO, "setting HTML output directory to '%s'\n", dir->args);
-
-  ctx->html_output_dir = dir->args;
-
-  /* check if the output directory exists */
-  Xstat(ctx->html_output_dir, &stat_buf);
-}
-
 
 static void
 set_idmef_dtd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -998,39 +950,6 @@ set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
            "setting RuntimeUser to '%s'\n", dir->args);
 
   ctx->runtime_user = dir->args;
-}
-
-
-static void
-set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  struct stat stat_buf;
-
-  DebugLog(DF_CORE, DS_INFO, "setting report output directory to '%s'\n",
-           dir->args);
-
-  ctx->report_dir = dir->args;
-
-  /* check if the directory exists */
-  Xstat(ctx->report_dir, &stat_buf);
-}
-
-
-static void
-set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_CORE, DS_INFO, "setting report prefix to '%s'\n", dir->args);
-
-  ctx->report_prefix = dir->args;
-}
-
-
-static void
-set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_CORE, DS_INFO, "setting report extension to '%s'\n", dir->args);
-
-  ctx->report_ext = dir->args;
 }
 
 
@@ -1181,15 +1100,11 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "<module"   , module_config  , "Configuration section for a module" },
   { "AddRuleFile", add_rule_file , "Add a rule file" },
   { "AddRuleFiles", add_rule_files , "Add a rule files with a pattern" },
-  { "HTMLOutputDir", set_html_output_dir , "Set the HTML output directory" },
   { "IDMEFdtd", set_idmef_dtd, "Set the IDMEF dtd"},
   { "IDMEFAnalyzerId", set_idmef_analyzer_id, "Set the IDMEF analyzer identifier"},
   { "IDMEFAnalyzerLocation", set_idmef_analyzer_loc, "Set the IDMEF analyzer location"},
   { "IDMEFSensorHostname", set_idmef_sensor_hostname, "Set the IDMEF sensor host name"},
   { "RuntimeUser", set_runtime_user, "Set the runtime user." },
-  { "ReportDir", set_report_output_dir, "Set the output directory" },
-  { "ReportPrefix", set_report_prefix, "Set the report prefix" },
-  { "ReportExt", set_report_ext, "Set the report extension" },
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
   { "AddPreprocessorCmd", add_preproc_cmd, "Add a preprocessor command for a file suffix" },
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },

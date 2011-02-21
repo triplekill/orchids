@@ -1,0 +1,7 @@
+#
+# Configuration file for the htmlstate input module
+#
+
+<module htmlstate>
+	HTMLOutputDir @@VARDIR@@/orchids/htmlstate
+</module>

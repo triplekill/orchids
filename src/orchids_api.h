@@ -224,6 +224,13 @@ register_post_inject_hook(orchids_t *ctx,
                           hook_cb_t cb,
                           void *data);
 
+/**
+ ** Register a new output module for alert reports
+ **/
+
+reportmod_t *
+register_report_output(orchids_t *ctx, mod_entry_t *mod_entry, report_cb_t cb, void *data);
+
 
 /**
  ** Execute all registered callbacks in the post-inject-event hook.

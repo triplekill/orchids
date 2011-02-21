@@ -1782,7 +1782,7 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
     for (i = 0; i < VSTRLEN(val); i++)
       fprintf(fp, "%c", VSTR(val)[i]);
     break;
-      
+
   case T_CTIME:
     strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y", localtime(&CTIME(val)));
     fprintf(fp, "%s (%li)", asc_time, CTIME(val));
@@ -1923,7 +1923,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
         fputc(VSTR(val)[i], fp);
       fprintf(fp, "\"\n");
       break;
-      
+
     case T_CTIME:
       strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y", localtime(&CTIME(val)));
       fprintf(fp, "ctime : (%li) = %s\n", CTIME(val), asc_time);
@@ -2261,94 +2261,19 @@ ovm_strdup(ovm_var_t *str)
   return (s);
 }
 
-
-
-
 static void
 issdl_report(orchids_t *ctx, state_instance_t *state)
 {
-  char report[PATH_MAX];
-  struct timeval tv;
-  unsigned long ntph;
-  unsigned long ntpl;
-  FILE *fp;
-  state_instance_t *report_events;
-  event_t *e;
-  int i;
-  int p;
-  int f;
-  char *mono = NULL;
+  reportmod_t* r;
 
   DebugLog(DF_ENG, DS_INFO, "Generating report\n");
 
   if (state->rule_instance == NULL)
     return ;
 
-  if (ctx->report_dir == NULL) {
-    DebugLog(DF_ENG, DS_ERROR, "Report output directory isn't set\n");
-    return ;
+  SLIST_FOREACH(r, &ctx->reportmod_list, list) {
+    r->cb(ctx, r->mod, r->data, state);
   }
-
-  gettimeofday(&tv, NULL);
-  Timer_to_NTP(&tv, ntph, ntpl);
-  snprintf(report, sizeof (report),
-           "%s/%s%08lx-%08lx%s",
-           ctx->report_dir, ctx->report_prefix, ntph, ntpl, ctx->report_ext);
-
-  fp = Xfopen(report, "w");
-
-  /* build reversed back-trace list */
-  for (report_events = NULL; state; state = state->parent) {
-    state->next_report_elmt = report_events;
-    report_events = state;
-  }
-
-  fprintf(fp, "<center><h1>Report for rule: %s</h1></center>\n", report_events->rule_instance->rule->name);
-
-  DebugLog(DF_ENG, DS_INFO, "Generating report\n");
-
-  /* walk report list */
-  fprintf(fp, "<center>\n");
-  for (i = 0 ; report_events ; report_events = report_events->next_report_elmt, i++) {
-
-    if (report_events->event) {
-
-      fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
-      fprintf(fp, "  <tr class=\"h\"> <th colspan=\"5\"> Event %i (id:%p %i ref) </th> </tr>\n", i, report_events->event->event, report_events->event->refs);
-      fprintf(fp, "  <tr class=\"hh\"> <th> FID </th> <th> Field </th> <th> Type </th> <th> Monotony </th> <th> Data content </th> </tr>\n\n");
-
-      for (e = report_events->event->event, f = 0; e; e = e->next, f++) {
-        p = f % 2;
-        switch (e->value->flags & MONOTONY_MASK) {
-        case TYPE_UNKNOWN:
-          mono = "unkn";
-          break;
-        case TYPE_MONO:
-          mono = "mono";
-          break;
-        case TYPE_ANTI:
-          mono = "anti";
-          break;
-        case TYPE_CONST:
-          mono = "const";
-          break;
-        }
-
-        fprintf(fp, "  <tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td> <td class=\"v%i\"> %s </td> <td class=\"v%i\"> %s </td> ",
-                p, e->field_id,
-                p, ctx->global_fields[ e->field_id ].name,
-                p, str_issdltype(e->value->type),
-                p, mono);
-        fprintf(fp, "<td class=\"v%i\"> ", p);
-        fprintf_ovm_var(fp, e->value);
-        fprintf(fp, " </td></tr>\n");
-      }
-      fprintf(fp, "</table> <br>\n\n");
-    }
-  }
-  fprintf(fp, "</center>\n");
-  Xfclose(fp);
-
   ctx->reports++;
 }
 
@@ -2606,21 +2531,21 @@ static void
 issdl_bindist(orchids_t *ctx, state_instance_t *state)
 {
   static int bitcnt_tbl[] = { /* Precomputed table of 1-bit in each bytes */
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
-    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
     4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
   };
 

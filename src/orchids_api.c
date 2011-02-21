@@ -317,6 +317,20 @@ register_post_inject_hook(orchids_t *ctx,
   SLIST_INSERT_HEAD(&ctx->post_evt_hook_list, e, hooklist);
 }
 
+reportmod_t *
+register_report_output(orchids_t *ctx, mod_entry_t *mod_entry, report_cb_t cb, void *data)
+{
+  reportmod_t *mod;
+
+  mod = Xzmalloc(sizeof (reportmod_t));
+  mod->mod = mod_entry;
+  mod->cb = cb;
+  mod->data = data;
+
+  SLIST_INSERT_HEAD(&(ctx->reportmod_list), mod, list);
+
+  return (mod);
+}
 
 void
 execute_post_inject_hooks(orchids_t *ctx, event_t *event)

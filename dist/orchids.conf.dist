@@ -55,13 +55,6 @@ AddPreprocessorCmd  .m4.rule  m4
 # It is set here to cpp for convenience
 SetDefaultPreprocessorCmd     cpp
 
-# This directive is deprecated and should be moved
-# in the htmlstate module section.
-# This is the place where html pages will be generated.
-
-HTMLOutputDir @@VARDIR@@/orchids/htmlstate
-
-
 # These directives are deprecated and should be moved in
 # a specific idmef module.
 
@@ -73,14 +66,6 @@ IDMEFSensorHostname   orchids-sensor
 # This is the runtime user id in which Orchids will drop root provoleges.
 
 RuntimeUser @@RUNUSER@@
-
-
-# Configure reports generation paremeters.
-
-ReportDir     @@VARDIR@@/orchids/reports
-ReportPrefix  report-
-ReportExt     .rpt
-
 
 # Disable Network name resolution by default
 

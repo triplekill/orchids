@@ -337,7 +337,7 @@ static mod_cfg_cmd_t prolog_config_commands[] =
 
 
 static int
-prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
+prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
 {
   FILE *fp;
   char pl_code[PATH_MAX];
@@ -356,18 +356,16 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
   cfg = (prolog_cfg_t *)mod->config;
   Timer_to_NTP(&cfg->last_db_update, ntph, ntpl);
 
-  printf(">>>1 %s %s\n",ctx->html_output_dir, bodyfile);
   snprintf(bodyfile, sizeof (bodyfile),
   	   "orchids-prolog-%08lx-%08lx.html", ntph, ntpl);
 
-  if (cached_html_file(ctx, bodyfile)) {
-    generate_htmlfile_hardlink(ctx, bodyfile, "orchids-prolog.html");
+  if (cached_html_file(htmlcfg, bodyfile)) {
+    generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
     return (0);
   }
-  printf(">>>2 %s %s\n",ctx->html_output_dir, bodyfile);
 
   /* generate header */
-  fp = create_html_file(ctx, bodyfile, NO_CACHE);
+  fp = create_html_file(htmlcfg, bodyfile, NO_CACHE);
   fprintf_html_header(fp, "Orchids Prolog Database");
   fprintf(fp, "<center><h1>Orchids Prolog Database<h1></center>\n");
   fprintf(fp,
@@ -381,7 +379,7 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
   	   "prolog_htmloutput("
   	     "'source-highlight -n -s prolog >> %s/%s'"
   	   ").",
-  	   ctx->html_output_dir, bodyfile);
+  	   htmlcfg->html_output_dir, bodyfile);
 
   ret = pl_execute(pl_code);
 
@@ -390,13 +388,13 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 
   /* generate footer */
   snprintf(file, sizeof (file),
-  	   "%s/%s", ctx->html_output_dir, bodyfile);
+  	   "%s/%s", htmlcfg->html_output_dir, bodyfile);
   fp = Xfopen(file, "a");
   fprintf(fp, "</td></tr></table></center>\n");
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, bodyfile, "orchids-prolog.html");
+  generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
 
   return (0);
 }

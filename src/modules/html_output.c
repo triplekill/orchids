@@ -1,12 +1,12 @@
 /**
  ** @file html_output.c
  ** HTML Output
- ** 
+ **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- ** 
+ **
  ** @version 0.1.0
  ** @ingroup output
- ** 
+ **
  ** @date  Started on: Fri Mar 12 10:44:59 2004
  **/
 
@@ -24,8 +24,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/time.h>
-/* #include <sys/resource.h> */
-/* #include <unistd.h> */
 #include <sys/utsname.h>
 
 #include <fcntl.h>
@@ -47,27 +45,40 @@
 
 #include "html_output.h"
 
-/*
-typedef int (*mod_htmloutput_t)(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
 
-typedef struct htmloutput_list_s htmloutput_list_t;
-struct htmloutput_list_s {
-  mod_htmloutput_t output;
-  mod_entry_t *mod;
-  htmloutput_list_t *next;
-};
-*/
+static void
+do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg);
+
+static void
+convert_filename(char *file);
+
+static void
+fprintf_html_cfg_tree(FILE *fp, config_directive_t *root);
+
+static void
+fprintf_html_cfg_tree_sub(FILE *fp,
+                          config_directive_t *section,
+                          int depth,
+                          unsigned long mask,
+                          int *counter);
+
+static void
+generate_html_report(orchids_t		*ctx,
+		     mod_entry_t	*mod,
+		     void		*data,
+		     state_instance_t	*state);
+
 
 static htmloutput_list_t  *htmloutput_list_head_g = NULL;
 static htmloutput_list_t **htmloutput_list_tail_g = NULL;
 
-static char *report_prefix_g = NULL;
-static char *report_ext_g = NULL;
+static char *report_prefix_g;
+static char *report_ext_g;
 
 
 void
-html_output_add_menu_entry(orchids_t *ctx, 
-			   mod_entry_t *mod, 
+html_output_add_menu_entry(orchids_t *ctx,
+			   mod_entry_t *mod,
 			   mod_htmloutput_t outputfunc)
 {
   htmloutput_list_t *elmt;
@@ -87,13 +98,14 @@ html_output_add_menu_entry(orchids_t *ctx,
 }
 
 
-static int
+
+int
 rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e)
 {
   DebugLog(DF_CORE, DS_TRACE,
            "HTML cache cleanup...\n");
 
-  html_output_cache_cleanup(ctx);
+  html_output_cache_cleanup(e->data);
 
   e->date.tv_sec += 60; /* XXX: use a customizable parameter */
 
@@ -103,13 +115,13 @@ rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e)
 }
 
 
-static int
+int
 rtaction_html_regeneration(orchids_t *ctx, rtaction_t *e)
 {
   DebugLog(DF_CORE, DS_TRACE,
            "HTML periodic regeneration...\n");
 
-  html_output(ctx);
+  html_output(ctx, e->data);
 
   e->date.tv_sec += 20; /* XXX: use a customizable parameter */
 
@@ -136,22 +148,16 @@ html_output_preconfig(orchids_t *ctx)
     exit(EXIT_FAILURE);
   }
 
-  /* register cache cleanup periodic job */
-  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, 10);
-
-  /* register regeneration job */
-  register_rtcallback(ctx, rtaction_html_regeneration, NULL, 15);
 }
 
-
 void
-html_output(orchids_t *ctx)
+html_output(orchids_t *ctx, html_output_cfg_t *cfg)
 {
 #ifndef ORCHIDS_DEBUG
   pid_t pid;
 #endif
 
-  if (ctx->html_output_dir == NULL) {
+  if (cfg->html_output_dir == NULL) {
     DebugLog(DF_CORE, DS_ERROR, "HTML Output isn't set. Aborting.\n");
     return ;
   }
@@ -162,7 +168,7 @@ html_output(orchids_t *ctx)
 
 #ifdef ORCHIDS_DEBUG
 
-  do_html_output(ctx);
+  do_html_output(ctx, cfg);
 
 #else /* ORCHIDS_DEBUG */
 
@@ -171,7 +177,7 @@ html_output(orchids_t *ctx)
     int i;
     for (i = 3; i < 64; i++)
       close(i);
-    do_html_output(ctx);
+    do_html_output(ctx, cfg);
     exit(EXIT_SUCCESS);
   } else if (pid < 0) {
     perror("fork()");
@@ -184,13 +190,13 @@ html_output(orchids_t *ctx)
 
 
 FILE *
-create_html_file(orchids_t *ctx, char *file, int cache)
+create_html_file(html_output_cfg_t  *cfg, char *file, int cache)
 {
   char absolute_dir[PATH_MAX];
   char absolute_filepath[PATH_MAX];
   FILE *fp;
 
-  Xrealpath(ctx->html_output_dir, absolute_dir);
+  Xrealpath(cfg->html_output_dir, absolute_dir);
   snprintf(absolute_filepath, PATH_MAX, "%s/%s", absolute_dir, file);
 
   if (cache) {
@@ -205,13 +211,13 @@ create_html_file(orchids_t *ctx, char *file, int cache)
 
 
 int
-cached_html_file(orchids_t *ctx, char *file)
+cached_html_file(html_output_cfg_t  *cfg, char *file)
 {
   char absolute_dir[PATH_MAX];
   char absolute_filepath[PATH_MAX];
   int ret;
 
-  Xrealpath(ctx->html_output_dir, absolute_dir);
+  Xrealpath(cfg->html_output_dir, absolute_dir);
   snprintf(absolute_filepath, PATH_MAX, "%s/%s", absolute_dir, file);
 
   ret = cached_file(absolute_filepath);
@@ -283,13 +289,13 @@ fprintf_html_trailer(FILE *fp)
 
 
 void
-generate_htmlfile_hardlink(orchids_t *ctx, char *file, char *link)
+generate_htmlfile_hardlink(html_output_cfg_t  *cfg, char *file, char *link)
 {
   char abs_dir[PATH_MAX];
   char abs_file[PATH_MAX];
   char abs_link[PATH_MAX];
 
-  Xrealpath(ctx->html_output_dir, abs_dir);
+  Xrealpath(cfg->html_output_dir, abs_dir);
   snprintf(abs_file, PATH_MAX, "%s/%s", abs_dir, file);
   snprintf(abs_link, PATH_MAX, "%s/%s", abs_dir, link);
 
@@ -302,7 +308,7 @@ generate_htmlfile_hardlink(orchids_t *ctx, char *file, char *link)
 
 
 static void
-generate_html_orchids_modules(orchids_t *ctx)
+generate_html_orchids_modules(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int m;
@@ -312,9 +318,9 @@ generate_html_orchids_modules(orchids_t *ctx)
 
   Timer_to_NTP(&ctx->cur_loop_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-modules-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-modules.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids Modules");
@@ -343,12 +349,12 @@ generate_html_orchids_modules(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-modules.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
 }
 
 
 static void
-generate_html_orchids_fields(orchids_t *ctx)
+generate_html_orchids_fields(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int m;
@@ -361,9 +367,9 @@ generate_html_orchids_fields(orchids_t *ctx)
 
   Timer_to_NTP(&ctx->start_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-fields-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-fields.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
     return ;
   }
 
@@ -420,12 +426,12 @@ generate_html_orchids_fields(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-fields.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
 }
 
 
 static void
-generate_html_orchids_functions(orchids_t *ctx)
+generate_html_orchids_functions(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int fid;
@@ -438,9 +444,9 @@ generate_html_orchids_functions(orchids_t *ctx)
   snprintf(file, sizeof (file),
            "orchids-functions-%08lx-%08lx.html",
            ntph, ntpl);
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-functions.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids Registered Language Functions");
@@ -478,12 +484,12 @@ generate_html_orchids_functions(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-functions.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
 }
 
 
 static void
-generate_html_orchids_datatypes(orchids_t *ctx)
+generate_html_orchids_datatypes(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int tid;
@@ -496,9 +502,9 @@ generate_html_orchids_datatypes(orchids_t *ctx)
   snprintf(file, sizeof (file),
            "orchids-datatypes-%08lx-%08lx.html",
            ntph, ntpl);
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-datatypes.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids Registered Data Types");
@@ -530,12 +536,12 @@ generate_html_orchids_datatypes(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-datatypes.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
 }
 
 
 static void
-generate_html_orchids_stats(orchids_t *ctx)
+generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   struct timeval diff_time;
@@ -554,9 +560,9 @@ generate_html_orchids_stats(orchids_t *ctx)
   Timer_to_NTP(&curr_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-stats-%08lx-%08lx.html", ntph, ntpl);
   /* cache never hit here... just add USE_CACHE for backlogging statistics */
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-stats.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
     return ;
   }
 
@@ -745,12 +751,12 @@ generate_html_orchids_stats(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-stats.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
 }
 
 
 static void
-generate_html_rule_list(orchids_t *ctx)
+generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   rule_t *r;
@@ -763,9 +769,9 @@ generate_html_rule_list(orchids_t *ctx)
 
   Timer_to_NTP(&ctx->last_rule_act, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-rules-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-rules.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
     return ;
   }
 
@@ -829,7 +835,7 @@ generate_html_rule_list(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-rules.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
 }
 
 
@@ -847,7 +853,7 @@ fprintf_file(FILE *fp, const char *filename)
 
 
 static void
-generate_html_rules(orchids_t *ctx)
+generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int i;
@@ -868,7 +874,7 @@ generate_html_rules(orchids_t *ctx)
   }
 
   for (r = ctx->rule_compiler->first_rule, i = 0; r; r = r->next, i++) {
-    Xrealpath(ctx->html_output_dir, absolute_dir);
+    Xrealpath(cfg->html_output_dir, absolute_dir);
     strncpy(rulefile, r->filename, sizeof (rulefile));
     convert_filename(rulefile);
     snprintf(basefile, PATH_MAX,
@@ -979,7 +985,7 @@ generate_html_rules(orchids_t *ctx)
               "</tr>\n",
               r->filename, r->lineno);
       fprintf(fp, "</table><br/><br/>\n");
-   
+
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
       fprintf(fp,
               "  <tr class=\"h\"> <th colspan=\"5\"> State list </th> </tr>\n");
@@ -996,7 +1002,7 @@ generate_html_rules(orchids_t *ctx)
                 "<td class=\"v%i\"> %s </td> "
                 "<td class=\"v%i\"> %i </td> "
                 "<td class=\"v%i\"> %i </td> ",
-                p, s, 
+                p, s,
                 p, r->state[s].name,
                 p, r->state[s].line,
                 p, r->state[s].trans_nb);
@@ -1132,7 +1138,7 @@ generate_html_rules(orchids_t *ctx)
 
 
 static void
-generate_html_rule_instances(orchids_t *ctx)
+generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int i;
@@ -1149,7 +1155,7 @@ generate_html_rule_instances(orchids_t *ctx)
   }
 
   for (r = ctx->first_rule_instance, i = 0; r; r = r->next, i++) {
-    Xrealpath(ctx->html_output_dir, absolute_dir);
+    Xrealpath(cfg->html_output_dir, absolute_dir);
     Timer_to_NTP(&r->new_creation_date, ntpch, ntpcl);
     Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
     snprintf(basefile, sizeof (basefile),
@@ -1236,7 +1242,7 @@ generate_html_rule_instances(orchids_t *ctx)
 
 
 static void
-generate_html_rule_instance_list(orchids_t *ctx)
+generate_html_rule_instance_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   char asc_time[32];
   rule_instance_t *r;
@@ -1255,9 +1261,9 @@ generate_html_rule_instance_list(orchids_t *ctx)
            "orchids-ruleinsts-%08lx-%08lx.html",
            ntph, ntpl);
 
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-ruleinsts.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids rules instances");
@@ -1268,7 +1274,7 @@ generate_html_rule_instance_list(orchids_t *ctx)
     fprintf(fp, "<center> No rule instance. </center>\n");
     fprintf_html_trailer(fp);
     Xfclose(fp);
-    generate_htmlfile_hardlink(ctx, file, "orchids-ruleinsts.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
     return ;
   }
 
@@ -1330,12 +1336,12 @@ generate_html_rule_instance_list(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-ruleinsts.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
 }
 
 
 static void
-generate_html_thread_queue(orchids_t *ctx)
+generate_html_thread_queue(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int i;
@@ -1347,9 +1353,9 @@ generate_html_thread_queue(orchids_t *ctx)
   Timer_to_NTP(&ctx->last_ruleinst_act, ntph, ntpl);
   snprintf(file, PATH_MAX, "orchids-thread-queue-%08lx-%08lx.html", ntph, ntpl);
 
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-thread-queue.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids thread queue");
@@ -1360,7 +1366,7 @@ generate_html_thread_queue(orchids_t *ctx)
     fprintf(fp, "<center> No active thread. </center>\n");
     fprintf_html_trailer(fp);
     Xfclose(fp);
-    generate_htmlfile_hardlink(ctx, file, "orchids-thread-queue.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
     return ;
   }
 
@@ -1400,12 +1406,12 @@ generate_html_thread_queue(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-thread-queue.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
 }
 
 
 static void
-generate_html_events(orchids_t *ctx)
+generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   active_event_t *ae;
@@ -1420,9 +1426,9 @@ generate_html_events(orchids_t *ctx)
   Timer_to_NTP(&ctx->last_evt_act, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-events-%08lx-%08lx.html", ntph, ntpl);
 
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-events.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
     return;
   }
   fprintf_html_header(fp, "Orchids active events");
@@ -1433,7 +1439,7 @@ generate_html_events(orchids_t *ctx)
     fprintf(fp, "<center> No active event. </center>\n");
     fprintf_html_trailer(fp);
     Xfclose(fp);
-    generate_htmlfile_hardlink(ctx, file, "orchids-events.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
     return ;
   }
 
@@ -1489,7 +1495,7 @@ generate_html_events(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-events.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
 }
 
 
@@ -1507,68 +1513,159 @@ select_report(const struct dirent *d)
 static int
 compar_report(const struct dirent **a, const struct dirent **b)
 {
-  return (-strcmp((*a)->d_name, (*b)->d_name));
+  return (-strcmp((*a)->d_name,
+                  (*b)->d_name));
 }
 
 
-/* traduce a raw report into html
- * actually, it's a pure html inlining.
- * It should be a XML translation instead... XXX: TODO ! ;) */
-static void
-generate_html_report(orchids_t *ctx, const char *reportfile)
+void
+generate_html_report_cb(orchids_t	*ctx,
+			mod_entry_t	*mod,
+			void		*data,
+			state_instance_t *state)
 {
-  char reportname[PATH_MAX];
-  FILE *fp_out;
-  FILE *fp_in;
-  size_t readsz;
-  char readbuf[8192];
+#ifndef ORCHIDS_DEBUG
+  pid_t pid;
+#endif
 
-  snprintf(reportname, PATH_MAX, "reports/%s.html", reportfile);
-  fp_out = create_html_file(ctx, reportname, USE_CACHE);
-  if (fp_out == CACHE_HIT)
-    return ;
-  fprintf_html_header(fp_out, "Orchids report");
 
-  snprintf(reportname, PATH_MAX, "%s/%s", ctx->report_dir, reportfile);
-  fp_in = Xfopen(reportname, "r");
+#ifdef ORCHIDS_DEBUG
 
-  while ( (readsz = fread(readbuf, 1, sizeof (readbuf), fp_in)) > 0 ) {
-    fwrite(readbuf, 1, readsz, fp_out);
+  generate_html_report(ctx, mod, data, state);
+#else /* ORCHIDS_DEBUG */
+
+  pid = fork();
+  if (pid == 0) {
+    int i;
+    for (i = 3; i < 64; i++)
+      close(i);
+    generate_html_report(ctx, mod, data, state);
+    exit(EXIT_SUCCESS);
+  } else if (pid < 0) {
+    perror("fork()");
+    exit(EXIT_FAILURE);
+  }
+#endif /* ORCHIDS_DEBUG */
+}
+
+static void
+generate_html_report(orchids_t		*ctx,
+		     mod_entry_t	*mod,
+		     void		*data,
+		     state_instance_t	*state)
+{
+  html_output_cfg_t  *cfg = data;
+  char report[PATH_MAX];
+  struct timeval tv;
+  unsigned long ntph;
+  unsigned long ntpl;
+  FILE *fp;
+  state_instance_t *report_events;
+  event_t *e;
+  int i;
+  int p;
+  int f;
+  char *mono = NULL;
+
+  gettimeofday(&tv, NULL);
+  Timer_to_NTP(&tv, ntph, ntpl);
+  snprintf(report, sizeof (report),
+           "%s/reports/%s%08lx-%08lx%s",
+           cfg->html_output_dir, cfg->report_prefix, ntph, ntpl, ".html");
+
+  fp = Xfopen(report, "w");
+
+  /* build reversed backtrace list */
+  for (report_events = NULL; state; state = state->parent) {
+    state->next_report_elmt = report_events;
+    report_events = state;
   }
 
-  Xfclose(fp_in);
-  Xfclose(fp_out);
+  fprintf_html_header(fp, "Orchids report");
+
+
+  fprintf(fp, "<center><h1>Report for rule: %s</h1></center>\n",
+	  report_events->rule_instance->rule->name);
+
+  DebugLog(DF_ENG, DS_INFO, "Generating html report\n");
+
+  /* walk report list */
+  fprintf(fp, "<center>\n");
+  for (i = 0 ; report_events ; report_events = report_events->next_report_elmt, i++) {
+
+    if (report_events->event) {
+
+      fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
+      fprintf(fp, "  <tr class=\"h\"> <th colspan=\"5\"> Event %i (id:%p %i ref) " \
+	      "</th> </tr>\n", i, report_events->event->event, report_events->event->refs);
+      fprintf(fp, "  <tr class=\"hh\"> <th> FID </th> <th> Field </th> <th> Type </th> " \
+	      "<th> Monotony </th> <th> Data content </th> </tr>\n\n");
+
+      for (e = report_events->event->event, f = 0; e; e = e->next, f++) {
+        p = f % 2;
+        switch (e->value->flags & MONOTONY_MASK) {
+        case TYPE_UNKNOWN:
+          mono = "unkn";
+          break;
+        case TYPE_MONO:
+          mono = "mono";
+          break;
+        case TYPE_ANTI:
+          mono = "anti";
+          break;
+        case TYPE_CONST:
+          mono = "const";
+          break;
+        }
+
+        fprintf(fp, "  <tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td> " \
+		"<td class=\"v%i\"> %s </td> <td class=\"v%i\"> %s </td> ",
+                p, e->field_id,
+                p, ctx->global_fields[ e->field_id ].name,
+                p, str_issdltype(e->value->type),
+                p, mono);
+        fprintf(fp, "<td class=\"v%i\"> ", p);
+        fprintf_ovm_var(fp, e->value);
+        fprintf(fp, " </td></tr>\n");
+      }
+      fprintf(fp, "</table> <br>\n\n");
+    }
+  }
+  fprintf(fp, "</center>\n");
+  Xfclose(fp);
 }
 
-
 static void
-generate_html_report_list(orchids_t *ctx)
+generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   struct dirent **namelist;
   int n;
   int i;
+  char reportdir[PATH_MAX];
   char reportfile[1024];
   char asc_time[32];
   struct stat s;
   char file[PATH_MAX];
 
-  Xstat(ctx->report_dir, &s);
+  snprintf(reportdir, sizeof (reportdir), "%s/reports", cfg->html_output_dir);
+  Xstat(reportdir, &s);
   snprintf(file, sizeof (file), "orchids-reports-%08lx.html", s.st_mtime);
 
-  fp = create_html_file(ctx, file, USE_CACHE);
+  fp = create_html_file(cfg, file, USE_CACHE);
   if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(ctx, file, "orchids-reports.html");
+    generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
     return ;
   }
   fprintf_html_header(fp, "Orchids reports");
 
   fprintf(fp, "<center><h1>Orchids reports<h1></center>\n");
 
-  report_prefix_g = ctx->report_prefix;
-  report_ext_g = ctx->report_ext;
 
-  n = scandir(ctx->report_dir, &namelist, select_report, compar_report);
+  report_prefix_g = cfg->report_prefix;
+  report_ext_g = cfg->report_ext;
+  n = scandir(reportdir, &namelist, select_report, compar_report);
+
   if (n < 0)
     perror("scandir()");
   else {
@@ -1586,22 +1683,20 @@ generate_html_report_list(orchids_t *ctx)
 
     for (i = 0; i < n; i++) {
       snprintf(reportfile, sizeof (reportfile), "%s/%s",
-               ctx->report_dir, namelist[i]->d_name);
+               reportdir, namelist[i]->d_name);
       Xstat(reportfile, &s);
       strftime(asc_time, sizeof (asc_time),
                "%a %b %d %H:%M:%S %Y",
                localtime(&s.st_mtime));
       fprintf(fp,
               "  <tr> "
-              "<td class=\"e%i\"> <a href=\"reports/%s.html\"> %s </a> </td> "
+              "<td class=\"e%i\"> <a href=\"reports/%s\"> %s </a> </td> "
               "<td class=\"v%i\"> %li </td> "
               "<td class=\"v%i\"> %s </td> "
               "</tr>\n",
               i % 2, namelist[i]->d_name, namelist[i]->d_name,
-              i % 2, s.st_size, 
+              i % 2, s.st_size,
               i % 2, asc_time);
-
-      generate_html_report(ctx, namelist[i]->d_name);
 
       free(namelist[i]);
     }
@@ -1614,17 +1709,17 @@ generate_html_report_list(orchids_t *ctx)
   fprintf_html_trailer(fp);
   Xfclose(fp);
 
-  generate_htmlfile_hardlink(ctx, file, "orchids-reports.html");
+  generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
 }
 
 
 /* XXX: Rewrite this */
 static void
-generate_html_config(orchids_t *ctx)
+generate_html_config(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
 
-  fp = create_html_file(ctx, "orchids-config.html", NO_CACHE);
+  fp = create_html_file(cfg, "orchids-config.html", NO_CACHE);
 
   fprintf(fp,
           "<!DOCTYPE html PUBLIC \"-//W3C//"
@@ -1744,13 +1839,13 @@ fprintf_html_cfg_tree_sub(FILE *fp,
 
 #if 0
 static void
-generate_html_menu_timestamps(orchids_t *ctx)
+generate_html_menu_timestamps(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   unsigned long ntpl, ntph;
   htmloutput_list_t *m;
 
-  fp = create_html_file(ctx, "orchids-menu.html", NO_CACHE);
+  fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
   fprintf_html_header(fp, "Orchids Menu");
 
   fprintf(fp, "<center>\n");
@@ -1790,7 +1885,7 @@ generate_html_menu_timestamps(orchids_t *ctx)
           ntph, ntpl);
 
   Timer_to_NTP(&ctx->last_evt_act, ntph, ntpl);
-  fprintf(fp, 
+  fprintf(fp,
           "<a href=\"orchids-events-%08lx-%08lx.html\" "
           "target=\"main\">Active events</a><br/>\n",
           ntph, ntpl);
@@ -1818,12 +1913,13 @@ generate_html_menu_timestamps(orchids_t *ctx)
 
 
 static void
-generate_html_menu(orchids_t *ctx)
+generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   htmloutput_list_t *m;
 
-  fp = create_html_file(ctx, "orchids-menu.html", NO_CACHE);
+  fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
+
   fprintf_html_header(fp, "Orchids Menu");
 
   fprintf(fp, "<center>\n");
@@ -1858,7 +1954,7 @@ generate_html_menu(orchids_t *ctx)
   fprintf(fp,
           "<a href=\"orchids-thread-queue.html\" "
           "target=\"main\">Thread queue</a><br/>\n");
-  fprintf(fp, 
+  fprintf(fp,
           "<a href=\"orchids-events.html\" "
           "target=\"main\">Active events</a><br/>\n");
 
@@ -1871,7 +1967,7 @@ generate_html_menu(orchids_t *ctx)
     fprintf(fp, "<hr/>\n");
     fprintf(fp, "Modules:<br/>\n");
     for (m = htmloutput_list_head_g; m; m = m->next)
-      m->output(ctx, m->mod, fp);
+      m->output(ctx, m->mod, fp, cfg);
   }
 
   fprintf(fp, "<hr/>\n");
@@ -1886,7 +1982,7 @@ generate_html_menu(orchids_t *ctx)
 
 
 static void
-do_html_output(orchids_t *ctx)
+do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   int fd;
   int ret;
@@ -1905,21 +2001,21 @@ do_html_output(orchids_t *ctx)
     }
   }
 
-  generate_html_orchids_modules(ctx);
-  generate_html_orchids_fields(ctx);
-  generate_html_orchids_functions(ctx);
-  generate_html_orchids_stats(ctx);
-  generate_html_orchids_datatypes(ctx);
-  generate_html_rules(ctx);
-  generate_html_rule_list(ctx);
-  generate_html_rule_instances(ctx);
-  generate_html_rule_instance_list(ctx);
-  generate_html_thread_queue(ctx);
-  generate_html_events(ctx);
-  generate_html_report_list(ctx);
-  generate_html_config(ctx);
+  generate_html_orchids_modules(ctx, cfg);
+  generate_html_orchids_fields(ctx, cfg);
+  generate_html_orchids_functions(ctx, cfg);
+  generate_html_orchids_stats(ctx, cfg);
+  generate_html_orchids_datatypes(ctx, cfg);
+  generate_html_rules(ctx, cfg);
+  generate_html_rule_list(ctx, cfg);
+  generate_html_rule_instances(ctx, cfg);
+  generate_html_rule_instance_list(ctx,cfg);
+  generate_html_thread_queue(ctx, cfg);
+  generate_html_events(ctx, cfg);
+  generate_html_report_list(ctx, cfg);
+  generate_html_config(ctx, cfg);
 
-  generate_html_menu(ctx);
+  generate_html_menu(ctx, cfg);
 
   /* Lock will be released by child-process exit */
   /* but in DEBUG mode, no child is created. */
@@ -1942,12 +2038,12 @@ convert_filename(char *file)
 
 
 void
-html_output_cache_cleanup(orchids_t *ctx)
+html_output_cache_cleanup(html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
   char dir[PATH_MAX];
 
-  Xrealpath(ctx->html_output_dir, base_dir);
+  Xrealpath(cfg->html_output_dir, base_dir);
 
   cache_gc(base_dir, "orchids-modules-",  4, 128 * 1024, 24 * 3600);
   cache_gc(base_dir, "orchids-fields-",   4, 512 * 1024, 24 * 3600);
@@ -1969,12 +2065,12 @@ html_output_cache_cleanup(orchids_t *ctx)
 
 
 void
-html_output_cache_flush(orchids_t *ctx)
+html_output_cache_flush(html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
   char dir[PATH_MAX];
 
-  Xrealpath(ctx->html_output_dir, base_dir);
+  Xrealpath(cfg->html_output_dir, base_dir);
 
   cache_gc(base_dir, "orchids-modules-",  0, 0, 0);
   cache_gc(base_dir, "orchids-fields-",   0, 0, 0);

@@ -19,6 +19,7 @@
 
 #include "orchids_types.h"
 #include "orchids.h"
+#include "html_output.h"
 
 typedef struct prolog_cfg_s prolog_cfg_t;
 struct prolog_cfg_s {
@@ -62,7 +63,7 @@ consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 static int
-prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
+prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
 
 
 #endif /* MOD_PROLOG_H */

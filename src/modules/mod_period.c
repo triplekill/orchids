@@ -6,7 +6,7 @@
  **
  ** @version 0.1
  ** @ingroup modules
- ** 
+ **
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
  **/
@@ -39,7 +39,7 @@ qsort_strcmp(const void *a, const void *b)
 }
 
 static int
-period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
+period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
 {
   FILE *fp;
   int i;
@@ -51,7 +51,7 @@ period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 	  "<a href=\"orchids-period.html\" "
           "target=\"main\">Periods</a><br/>\n");
 
-  fp = create_html_file(ctx, "orchids-period.html", NO_CACHE);
+  fp = create_html_file(htmlcfg, "orchids-period.html", NO_CACHE);
   fprintf_html_header(fp, "Orchids frequencies / phases tables");
 
   fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
@@ -164,7 +164,7 @@ set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 #endif
 
-static mod_cfg_cmd_t period_config_commands[] = 
+static mod_cfg_cmd_t period_config_commands[] =
 {
   { NULL, NULL, NULL }
 };

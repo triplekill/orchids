@@ -21,8 +21,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "orchids.h"
+#include "evt_mgr.h"
+#include "orchids_api.h"
+#include "html_output.h"
 
 #include "mod_htmlstate.h"
 
@@ -31,15 +35,29 @@ input_module_t mod_htmlstate;
 static void *
 htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  htmlstatecfg_t *mod_cfg;
+  html_output_cfg_t *mod_cfg;
 
   DebugLog(DF_MOD, DS_INFO,
            "loading htmlstate module @ %p\n", (void *) &mod_htmlstate);
 
-  mod_cfg = Xzmalloc(sizeof (htmlstatecfg_t));
+  mod_cfg = Xzmalloc(sizeof (html_output_cfg_t));
   /* default initialisation here */
 
+  mod_cfg->report_prefix = "report-";
+  mod_cfg->report_ext = ".html";
+
   html_output_preconfig(ctx);
+
+  /* register cache cleanup periodic job */
+  register_rtcallback(ctx, rtaction_html_cache_cleanup, mod_cfg, 10);
+
+  /* register regeneration job */
+  register_rtcallback(ctx, rtaction_html_regeneration, mod_cfg, 2);
+
+
+
+  /* register report output*/
+  register_report_output(ctx, mod, generate_html_report_cb, mod_cfg);
 
   return (mod_cfg);
 }
@@ -47,41 +65,43 @@ htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
 static void
 htmlstate_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  /* configure cache */
+//  html_output_postconfig(ctx, (html_output_cfg_t *)mod->config);
 }
 
 static void
 enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  htmlstatecfg_t *cfg;
+  html_output_cfg_t *cfg;
 
-  cfg = (htmlstatecfg_t *)mod->config;
+  cfg = (html_output_cfg_t *)mod->config;
   cfg->enable_cache = 1;
 }
 
 static void
 add_cache_params(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  htmlstatecfg_t *cfg;
-
-  cfg = (htmlstatecfg_t *)mod->config;
-  /* XXX */
+  // XXX FIXME
 }
 
-static mod_cfg_cmd_t htmlstate_dir[] = 
+static void
+set_HTML_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  html_output_cfg_t *cfg;
+
+  cfg = (html_output_cfg_t *)mod->config;
+
+
+  cfg->html_output_dir = strdup(dir->args);
+}
+
+
+static mod_cfg_cmd_t htmlstate_dir[] =
 {
   { "EnableCache", enable_cache, "Enable file cache" },
   { "<cache", add_cache_params, "Add cache parameters" },
+  { "HTMLOutputDir", set_HTML_output_dir, "set HTML output directory" },
   { NULL, NULL }
 };
-
-int
-mod_htmlstate_do_update(orchids_t *ctx, mod_entry_t *mod, void *params)
-{
-  html_output(ctx);
-
-  return (0);
-}
 
 input_module_t mod_htmlstate = {
   MOD_MAGIC,
