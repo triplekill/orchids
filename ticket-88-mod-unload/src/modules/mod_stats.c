@@ -61,6 +61,7 @@ input_module_t mod_remoteadm = {
   stats_dir,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

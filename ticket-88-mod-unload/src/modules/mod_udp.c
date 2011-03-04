@@ -160,6 +160,7 @@ input_module_t mod_udp = {
   udp_dir,
   udp_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

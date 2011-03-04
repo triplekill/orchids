@@ -225,6 +225,7 @@ input_module_t mod_netfilter = {
   netfilter_cfgcmds,
   netfilter_preconfig,
   netfilter_postconfig,
+  NULL,
   NULL
 };
 

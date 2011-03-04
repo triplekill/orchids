@@ -494,6 +494,7 @@ input_module_t mod_prolog = {
   prolog_preconfig,         /* called just after module registration */
   NULL             ,        /* called after all mods preconfig,
                                and after all module configuration*/
+  NULL,
   NULL
 };
 

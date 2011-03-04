@@ -142,6 +142,7 @@ input_module_t mod_prism2 = {
   NULL,
   prism2_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

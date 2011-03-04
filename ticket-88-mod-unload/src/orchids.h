@@ -1233,6 +1233,12 @@ typedef void (*post_config_t)(orchids_t *ctx, mod_entry_t *mod);
  **/
 typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
 
+/**
+ ** @typedef mod_unload_t
+ **   Module unload function pointer type.
+ **/
+typedef void (*mod_unload_t)(orchids_t *ctx, mod_entry_t *mod);
+
 
 /**
  ** @struct input_module_s
@@ -1274,6 +1280,10 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **     Function to be executed after the rule compilation.
  **     This field may be NULL if there is nothing to execute.
  **/
+/**   @var input_module_s::unload
+ **     Function to be executed on module unloading request,
+ **     for disposing allocated resources.
+ **/
 struct input_module_s
 {
   uint32_t               magic;
@@ -1285,6 +1295,7 @@ struct input_module_s
   pre_config_t           pre_config;
   post_config_t          post_config;
   post_compil_t          post_compil;
+  mod_unload_t           unload;
 };
 
 

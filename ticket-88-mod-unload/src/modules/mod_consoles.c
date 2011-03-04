@@ -224,7 +224,8 @@ input_module_t mod_consoles = {
   cons_dir,
   cons_preconfig,
   NULL, /* cons_postconfig */
-  NULL  /* cons_postcompil */
+  NULL, /* cons_postcompil */
+  NULL
 };
 
 

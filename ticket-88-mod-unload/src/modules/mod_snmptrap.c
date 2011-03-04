@@ -278,6 +278,7 @@ input_module_t mod_snmptrap = {
   snmptrap_preconfig,       /* called just after module registration */
   snmptrap_postconfig,       /* called after all mods preconfig,
                                and after all module configuration*/
+  NULL,
   NULL
 };
 

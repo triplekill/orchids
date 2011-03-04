@@ -189,6 +189,7 @@ input_module_t mod_pcap = {
   pcap_dir,
   pcap_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

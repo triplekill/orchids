@@ -621,6 +621,7 @@ input_module_t mod_auditd = {
   NULL,
   auditd_preconfig,         /* called just after module registration */
   auditd_postconfig,
+  NULL,
   NULL
 };
 

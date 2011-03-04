@@ -159,6 +159,7 @@ input_module_t mod_sockunix = {
   sockunix_dir,
   sockunix_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

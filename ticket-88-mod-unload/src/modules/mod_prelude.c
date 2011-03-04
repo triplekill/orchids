@@ -535,6 +535,7 @@ input_module_t mod_prelude = {
   prelude_dir,
   mod_prelude_preconfig,
   mod_prelude_postconfig,
+  NULL,
   NULL
 };
 

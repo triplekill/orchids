@@ -508,6 +508,7 @@ input_module_t mod_remoteadm = {
   radm_dir,
   radm_preconfig,
   radm_postconfig,
+  NULL,
   NULL
 };
 

@@ -589,6 +589,7 @@ input_module_t mod_rawsnare = {
   rawsnare_cfgcmds,
   rawsnare_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

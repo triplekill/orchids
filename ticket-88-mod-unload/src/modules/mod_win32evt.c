@@ -465,7 +465,8 @@ input_module_t mod_win32evt = {
   win32evt_preconfig,       /* called just after module registration */
   win32evt_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
-  win32evt_postcompil
+  win32evt_postcompil,
+  NULL
 };
 
 

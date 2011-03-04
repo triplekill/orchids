@@ -331,6 +331,7 @@ input_module_t mod_syslog = {
   syslog_cfgcmds,
   syslog_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

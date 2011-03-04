@@ -462,6 +462,7 @@ input_module_t mod_wifi = {
   wifi_dir,
   wifi_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

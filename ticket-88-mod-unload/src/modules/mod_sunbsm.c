@@ -147,7 +147,8 @@ input_module_t mod_sunbsm = {
   sunbsm_preconfig,         /* called just after module registration */
   sunbsm_postconfig,         /* called after all mods preconfig,
                                and after all module configuration*/
-  sunbsm_postcompil
+  sunbsm_postcompil,
+  NULL
 };
 
 

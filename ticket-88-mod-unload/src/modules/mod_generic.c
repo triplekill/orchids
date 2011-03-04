@@ -456,6 +456,7 @@ input_module_t mod_generic = {
   generic_config_commands,
   generic_preconfig,
   generic_postconfig,
+  NULL,
   NULL
 };
 

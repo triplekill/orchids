@@ -203,7 +203,8 @@ input_module_t mod_sharedvars = {
   sharedvars_preconfig,         /* called just after module registration */
   sharedvars_postconfig,        /* called after all mods preconfig,
                                and after all module configuration*/
-  sharedvars_postcompil
+  sharedvars_postcompil,
+  NULL
 };
 
 

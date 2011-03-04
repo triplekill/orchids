@@ -166,6 +166,7 @@ input_module_t mod_snare = {
   snare_cfgcmds,
   snare_preconfig,
   NULL,
+  NULL,
   NULL
 };
 
