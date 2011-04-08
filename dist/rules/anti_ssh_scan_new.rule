@@ -25,7 +25,7 @@ rule anti_ssh_scan /* foreachsame($attacker) */ {
     $end_time = .udp.time + DELAY;
     $attacker = .sshd.src_ip;
 
-    if (.sshd.action == "Failed" && $attacker == .sshd.src_ip)
+    expect (.sshd.action == "Failed" && $attacker == .sshd.src_ip)
       goto failed_loop;
   }
 
@@ -34,24 +34,24 @@ rule anti_ssh_scan /* foreachsame($attacker) */ {
    print( $msg );
 
    /* Capture other network activities of the suspected attacker. */
-   if (    .netfilter.src == $attacker
+   expect (    .netfilter.src == $attacker
         && .nfhub.desc != "ssh"
         && .nfhub.desc != "ssh*")
      goto failed_loop;
 
    /* Log successful loggin of the attacker. */
-   if (    .sshd.src_ip == $attacker
+   expect (    .sshd.src_ip == $attacker
         && .sshd.action == "Accepted")
      goto failed_loop;
 
    /* Count the number of failed attempts. */
-   if (    .sshd.action == "Failed"
+   expect (    .sshd.action == "Failed"
         && $attacker == .sshd.src
         && $attempts < MAX_ATTEMPT)
      goto update_counter;
  
    /* If the limit is reached, block the attacked. */
-   if (    .sshd.action == "Failed"
+   expect (    .sshd.action == "Failed"
         && $attacker == .sshd.src_ip
 /*        && .syslog.time < $end_time */
         &&  $attempts >= MAX_ATTEMPT )

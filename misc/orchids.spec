@@ -282,6 +282,7 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %config %{prefix}/etc/orchids/orchids-rules.conf
 %config %{prefix}/etc/orchids/rules/*
 %dir %{prefix}/etc/orchids/conf.d
+%attr(-,nobody,nobody) %{prefix}/var/run/orchids
 %attr(-,nobody,nobody) %{prefix}/var/orchids/log
 %attr(-,nobody,nobody)%{prefix}/var/orchids/reports
 %doc AUTHORS ChangeLog COPYING* NEWS README
@@ -382,7 +383,7 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %files mod_auditd
 %{prefix}/usr/lib/orchids/mod_auditd.*
 
-%files mod_auditd
+%files mod_prelude
 %{prefix}/usr/lib/orchids/mod_prelude.*
 %config %{prefix}/etc/orchids/conf.d/17_mod_prelude.conf
 

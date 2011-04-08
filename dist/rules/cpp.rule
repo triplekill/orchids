@@ -10,9 +10,9 @@ rule cpp {
 
   state init {
 #ifdef TITI
-    if (.syslog.prog == "titi")
+    expect (.syslog.prog == "titi")
 #else
-    if (.syslog.prog == "toto")
+    expect (.syslog.prog == "toto")
 #endif
       goto state2;
   }

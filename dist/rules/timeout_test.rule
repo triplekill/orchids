@@ -7,10 +7,10 @@ rule timeout_test {
 
   state init {
 
-    if (.pcap.interface == "eth0")
+    expect (.pcap.interface == "eth0")
       goto create_timeout;
 
-    if (.timeout.name == "a_test_timeout")
+    expect (.timeout.name == "a_test_timeout")
       goto got_timeout;
   }
 

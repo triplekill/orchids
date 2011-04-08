@@ -698,6 +698,12 @@ struct rulefile_s
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
+/**   @var rule_compiler_s::static_1_res_id
+ **     Ressource id for const int 1 (used for boolean)
+ **/
+/**   @var rule_compiler_s::static_0_res_id
+ **     Ressource id for const int 0 (used for boolean)
+ **/
 struct rule_compiler_s
 {
   char             *currfile;
@@ -715,6 +721,9 @@ struct rule_compiler_s
   int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
+
+  int		static_1_res_id;
+  int		static_0_res_id;
 };
 
 

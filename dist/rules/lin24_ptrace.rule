@@ -6,7 +6,7 @@ rule ptrace
 {
   state init
   {
-    if (.rawsnare.syscall == "(26) SYS_ptrace" &&
+    expect (.rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(16) PTRACE_ATTACH" &&
         .rawsnare.euid != 0 &&
         .rawsnare.egid != 0)
@@ -19,7 +19,7 @@ rule ptrace
     $target_pid = .rawsnare.ptrace_pid;
     $attacker_uid = .rawsnare.euid;
 
-    if (.rawsnare.syscall == "(11) SYS_execve" &&
+    expect (.rawsnare.syscall == "(11) SYS_execve" &&
         .rawsnare.path == "/sbin/modprobe" &&
         .rawsnare.pid == $target_pid)
       goto exec_modprobe;
@@ -27,7 +27,7 @@ rule ptrace
 
   state exec_modprobe
   {
-    if (.rawsnare.pid == $attack_pid &&
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(24) PTRACE_SYSCALL" &&
         .rawsnare.ptrace_pid == $target_pid)
@@ -36,14 +36,14 @@ rule ptrace
 
   state ptrace_syscall
   {
-    if (.rawsnare.pid == $attack_pid &&
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(12) PTRACE_GETREGS" &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_getregs;
 
-    /* if regs are guessed, attacker don't use GETREGS */
-    if (.rawsnare.pid == $attack_pid &&
+    /* expect regs are guessed, attacker don't use GETREGS */
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
         .rawsnare.ptrace_pid == $target_pid)
@@ -53,7 +53,7 @@ rule ptrace
 
   state ptrace_getregs
   {
-    if (.rawsnare.pid == $attack_pid &&
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
         .rawsnare.ptrace_pid == $target_pid)
@@ -62,7 +62,7 @@ rule ptrace
 
   state ptrace_poketext
   {
-    if (.rawsnare.pid == $attack_pid &&
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(17) PTRACE_DETACH" &&
         .rawsnare.ptrace_pid == $target_pid)
@@ -71,7 +71,7 @@ rule ptrace
 
     /* get all repetitions of poketext */
 /*
-    if (.rawsnare.pid == $attack_pid &&
+    expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == "(26) SYS_ptrace" &&
         .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
         .rawsnare.ptrace_pid == $target_pid)

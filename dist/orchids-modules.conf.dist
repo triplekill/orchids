@@ -1,0 +1,32 @@
+
+# Set the module directory.  This is the place where
+# module binary files will be loaded.
+
+SetModuleDir @@LIBDIR@@/orchids
+
+
+# Module section.
+# This is the place where modules are loaded.
+
+LoadModule htmlstate
+LoadModule remoteadm
+LoadModule textfile
+LoadModule sockunix
+LoadModule udp
+LoadModule syslog
+LoadModule rawsnare
+LoadModule snare
+LoadModule generic
+LoadModule netfilter
+LoadModule cisco
+LoadModule snmptrap
+LoadModule consoles
+LoadModule prolog
+LoadModule clocks
+LoadModule period
+LoadModule pcap
+LoadModule wifi
+LoadModule timeout
+LoadModule sharedvars
+LoadModule ruletrace
+LoadModule prelude

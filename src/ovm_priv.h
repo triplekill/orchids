@@ -1,12 +1,12 @@
 /**
  ** @file ovm_priv.h
  ** Private definitions for ovm.c.
- ** 
+ **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- ** 
+ **
  ** @version 1.0
  ** @ingroup ovm
- ** 
+ **
  ** @date  Started on: Thu Dec  4 12:06:04 2003
  **/
 
@@ -62,13 +62,7 @@ static int
 ovm_pushfield(isn_param_t *param);
 
 static int
-ovm_aload(isn_param_t *param);
-
-static int
-ovm_astore(isn_param_t *param);
-
-static int
-ovm_alength(isn_param_t *param);
+ovm_trash(isn_param_t *param);
 
 static int
 ovm_call(isn_param_t *param);
@@ -113,28 +107,7 @@ static int
 ovm_jmp(isn_param_t *param);
 
 static int
-ovm_je(isn_param_t *param);
-
-static int
-ovm_jne(isn_param_t *param);
-
-static int
-ovm_jrm(isn_param_t *param);
-
-static int
-ovm_jnrm(isn_param_t *param);
-
-static int
-ovm_jlt(isn_param_t *param);
-
-static int
-ovm_jgt(isn_param_t *param);
-
-static int
-ovm_jle(isn_param_t *param);
-
-static int
-ovm_jge(isn_param_t *param);
+ovm_popcjmp(isn_param_t *param);
 
 static int
 ovm_ceq(isn_param_t *param);

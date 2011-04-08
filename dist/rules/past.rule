@@ -4,7 +4,7 @@
 
 rule pastval {
   state init {
-    if (.snort.message == "PORTSCAN DETECTED")
+    expect (.snort.message == "PORTSCAN DETECTED")
       goto portscan_begin;
   }
 
@@ -25,17 +25,17 @@ rule pastval {
     print($tmp);
     cut ("portscan_begin");
 
-    if (.snort.message == "portscan status" &&
+    expect (.snort.message == "portscan status" &&
 	.snort.sip == $sip)
       goto portscan_status;
 
     /* log all firewall activity corresponding to this scan */
-    if (.netfilter.src == $sip)
+    expect (.netfilter.src == $sip)
       goto portscan_status;
-    if (.netfilter.dst == $sip)
+    expect (.netfilter.dst == $sip)
       goto portscan_status;
 
-    if (.snort.message == "End of portscan" &&
+    expect (.snort.message == "End of portscan" &&
 	.snort.sip == $sip)
       goto portscan_alert;
   }

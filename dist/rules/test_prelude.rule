@@ -8,7 +8,7 @@ rule testPrelude synchronize($source)
   {
     $count = 0;
     $source = .prelude.first_source_addr;
-    if ((.prelude.classification_text == "Login") &&
+    expect ((.prelude.classification_text == "Login") &&
 	(.prelude.assessment_completion == "failed") &&
 	($source == .prelude.first_source_addr))
       goto loop;
@@ -21,13 +21,13 @@ rule testPrelude synchronize($source)
     print("loop !");
     print($count);
 
-    if (($count >= 10)
+    expect (($count >= 10)
 	&& (.prelude.classification_text == "Login")
 	&& (.prelude.assessment_completion == "failed")
 	&& ($source == .prelude.first_source_addr))
       goto end;
 
-    if (($count < 10)
+    expect (($count < 10)
 	&& (.prelude.classification_text == "Login")
 	&& (.prelude.assessment_completion == "failed")
 	&& ($source == .prelude.first_source_addr))

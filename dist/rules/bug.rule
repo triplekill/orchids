@@ -1,7 +1,7 @@
 
 rule bug {
   state init {
-    if (.syslog.prog == "bug")
+    expect (.syslog.prog == "bug")
       goto end;
   }
 
@@ -15,14 +15,14 @@ rule bug {
 rule ok1 {
 
   state init {
-    if (.syslog.prog == "ok" && .syslog.msg == "start")
+    expect (.syslog.prog == "ok" && .syslog.msg == "start")
       goto state1;
   }
 
   state state1 {
     $pid = .syslog.pid;
     /* print("Start of OK"); */
-    if (.syslog.prog == "ok" && .syslog.msg == "end" && .syslog.pid == $pid)
+    expect (.syslog.prog == "ok" && .syslog.msg == "end" && .syslog.pid == $pid)
       goto state2;
   }
 

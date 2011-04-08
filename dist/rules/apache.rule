@@ -18,7 +18,7 @@ rule apachessl
 {
   state init
   {
-    if (.entropy.message == "RISING ALARM" &&
+    expect (.entropy.message == "RISING ALARM" &&
         .entropy.dst_port == 443)
       goto entropy_alert;
   }
@@ -28,13 +28,13 @@ rule apachessl
     $attacker = .entropy.src_ip;
     /* print("entropy alert"); */
 
-      if (.ssl_error.module  == "mod_ssl" &&
+      expect (.ssl_error.module  == "mod_ssl" &&
           .ssl_error.severity == "error" &&
           .ssl_error.message == "SSL handshake failed" &&
           .ssl_error.cli_addr == $attacker)
         goto ssl_error;
 
-      if (.ssl_error.module  == "OpenSSL" &&
+      expect (.ssl_error.module  == "OpenSSL" &&
           .ssl_error.severity == "error" &&
           .ssl_error.message == "error" &&
           .ssl_error.openssl_lib == 20 &&
@@ -47,7 +47,7 @@ rule apachessl
   state ssl_error {
     print("ssl error");
 
-      if (.ssl_error.module  == "OpenSSL" &&
+      expect (.ssl_error.module  == "OpenSSL" &&
           .ssl_error.severity == "error" &&
           .ssl_error.message == "error" &&
           .ssl_error.openssl_lib == 20 &&
@@ -57,7 +57,7 @@ rule apachessl
   }
 
   state ssl_error2 {
-      if (.ssl_error.module  == "mod_ssl" &&
+      expect (.ssl_error.module  == "mod_ssl" &&
           .ssl_error.severity == "error" &&
           .ssl_error.message == "SSL handshake failed" &&
           .ssl_error.cli_addr == $attacker)

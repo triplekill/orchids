@@ -4,7 +4,7 @@
 
 rule dhcp_lease_check {
   state init {
-    if (.dhcpd.method == "DHCPDISCOVER")
+    expect (.dhcpd.method == "DHCPDISCOVER")
       goto discover;
   }
 
@@ -12,10 +12,10 @@ rule dhcp_lease_check {
     $mac = .dhcpd.mac;
     print ("DHCP discover: a machine is waking up to the network");
 
-    if (.dhcpd.method == "DHCPOFFER" &&
+    expect (.dhcpd.method == "DHCPOFFER" &&
 	.dhcpd.mac == $mac)
       goto offer;
-    if (.dhcpd.method != "DHCPOFFER" &&
+    expect (.dhcpd.method != "DHCPOFFER" &&
 	.dhcpd.mac == $mac)
       goto alert_offer;
   }
@@ -29,14 +29,14 @@ rule dhcp_lease_check {
     $ip = .dhcpd.ip;
     cut ("discover");
 
-    if (.dhcpd.method == "DHCPREQUEST" &&
+    expect (.dhcpd.method == "DHCPREQUEST" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip == $ip)
       goto request;
-    if (.dhcpd.method == "DHCPRELEASE" &&
+    expect (.dhcpd.method == "DHCPRELEASE" &&
 	.dhcpd.mac == $mac)
       goto release;
-    if (.dhcpd.method != "DHCPREQUEST" &&
+    expect (.dhcpd.method != "DHCPREQUEST" &&
 	.dhcpd.method != "DHCPRELEASE" &&
 	.dhcpd.mac == $mac)
       goto alert_request;
@@ -50,26 +50,26 @@ rule dhcp_lease_check {
   state request {
     cut ("offer");
 
-    if (.dhcpd.method == "DHCPACK" &&
+    expect (.dhcpd.method == "DHCPACK" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip == $ip)
       goto offer;
-    if (.dhcpd.method == "DHCPREQUEST" &&
+    expect (.dhcpd.method == "DHCPREQUEST" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip == $ip)
       goto request;
-    if (.dhcpd.method == "DHCPREQUEST" &&
+    expect (.dhcpd.method == "DHCPREQUEST" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip != $ip)
       goto alert_client_request;
-    if (.dhcpd.method == "DHCPRELEASE" &&
+    expect (.dhcpd.method == "DHCPRELEASE" &&
 	.dhcpd.mac == $mac)
       goto release;
-    if (.dhcpd.method != "DHCPACK" &&
+    expect (.dhcpd.method != "DHCPACK" &&
 	.dhcpd.method != "DHCPRELEASE" &&
 	.dhcpd.mac == $mac)
       goto alert_ack;
-    if (.dhcpd.method == "DHCPACK" &&
+    expect (.dhcpd.method == "DHCPACK" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip != $ip)
       goto alert_bad_ip;

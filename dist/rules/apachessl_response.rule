@@ -18,7 +18,7 @@ rule apachessl
 {
   state init
   {
-    if (.entropy.message == "RISING ALARM" &&
+    expect (.entropy.message == "RISING ALARM" &&
         .entropy.dst_port == 443)
       goto entropy_alert;
   }
@@ -29,7 +29,7 @@ rule apachessl
     $port = .entropy.src_port;
     print("entropy alert");
 
-    if (.sslerror.module  == "mod_ssl" &&
+    expect (.sslerror.module  == "mod_ssl" &&
         .sslerror.severity == "error" &&
         .sslerror.message == "SSL handshake failed" &&
         .sslerror.cli_addr == $attacker)
@@ -39,7 +39,7 @@ rule apachessl
   state ssl_error
   {
      print("SSL Error");
-      if (.sslerror.module  == "OpenSSL" &&
+      expect (.sslerror.module  == "OpenSSL" &&
           .sslerror.severity == "error" &&
           .sslerror.message == "error" &&
           .sslerror.openssl_lib == 20 &&

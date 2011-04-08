@@ -9,27 +9,27 @@ rule shortestrun
 
   state init
   {
-    if (.syslog.prog == "a")
+    expect (.syslog.prog == "a")
       goto have_a;
   }
 
   state have_a
   {
-    if (.syslog.prog == "b")
+    expect (.syslog.prog == "b")
       goto have_b;
   }
 
   state have_b
   {
-    if (.syslog.prog == "c")
+    expect (.syslog.prog == "c")
       goto have_c;
-    if (.syslog.prog == "d")
+    expect (.syslog.prog == "d")
       goto have_d;
   }
 
   state have_c
   {
-    if (.syslog.prog == "b")
+    expect (.syslog.prog == "b")
       goto have_b;
   }
 

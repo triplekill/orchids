@@ -25,7 +25,7 @@ rule anti_ssh_scan synchronize($attacker) {
     $end_time = .udp.time + DELAY;
     $attacker = .sshd.src_ip;
 
-    if (.sshd.action == "Failed" && $attacker == .sshd.src_ip)
+    expect (.sshd.action == "Failed" && $attacker == .sshd.src_ip)
       goto failed_loop;
   }
 
@@ -36,22 +36,22 @@ rule anti_ssh_scan synchronize($attacker) {
    print( $msg );
    print_event();
 
-   if (    .sshd.action == "Failed"
-        && $attacker == .sshd.src_ip 
+   expect (    .sshd.action == "Failed"
+        && $attacker == .sshd.src_ip
         && $attempts < MAX_ATTEMPT)
      goto failed_loop;
 
-   if (    .sshd.action == "Failed"
+   expect (    .sshd.action == "Failed"
         && $attacker == .sshd.src_ip
-        && .udp.time < $end_time 
+        && .udp.time < $end_time
         &&  $attempts >= MAX_ATTEMPT )
      goto block_attacker;
 
   /* optim: kill rule if */
 #ifdef OPTIM
-  if (    .sshd.action == "Failed"
+  expect (    .sshd.action == "Failed"
         && $attacker == .sshd.src_ip
-        && .udp.time >= $end_time 
+        && .udp.time >= $end_time
         &&  $attempts >= MAX_ATTEMPT )
      goto normal_end;
 #endif /* OPTIM */

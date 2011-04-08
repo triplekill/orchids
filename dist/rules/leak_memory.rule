@@ -15,7 +15,7 @@ rule leak_memory
  {  
     $attack_pid = .auditd.pid;
 
-    if (.auditd.syscall == SYSCALL &&
+    expect (.auditd.syscall == SYSCALL &&
         .auditd.varzero == "3")
        goto start;
   }
@@ -24,7 +24,7 @@ rule leak_memory
   { 
     
    $counter = 1 ;
-   if (.auditd.pid == $attack_pid &&
+   expect (.auditd.pid == $attack_pid &&
        .auditd.syscall == SYSCALL &&
        .auditd.varzero == "3")
        goto listen_loop;
@@ -34,10 +34,10 @@ rule leak_memory
   {
    
     $counter = $counter + 1;
-    if ($counter == MAX_CALLS)
+    expect ($counter == MAX_CALLS)
        goto alert;
 
-    if ( .auditd.pid == $attack_pid &&
+    expect ( .auditd.pid == $attack_pid &&
          .auditd.syscall == SYSCALL &&
          .auditd.varzero == "3" && 
          $counter < MAX_CALLS)

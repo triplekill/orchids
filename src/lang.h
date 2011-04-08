@@ -54,8 +54,7 @@
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
 #define T_TCPPORT 0
-#define T_IPV4PEER 0
-#define T_IPV6ADDR 0
+#define T_IPV4PEER 0#define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
 /* types flags mask -- this allow 2^16 types and 16 bits for flags */
@@ -137,7 +136,7 @@
  **     TYPE_MONO, TYPE_ANTI, TYPE_CONST and TYPE_TEMP.
  **/
 /**   @var ovm_var_s::data
- **     Generic binary data. 
+ **     Generic binary data.
  **     It should be a zero-length array... but it use STR_PAD_LEN to be ISO-C
  **     compliant (ISO-C doesn't allow zero length arrays)
  **     and to keep alignment...
@@ -607,7 +606,7 @@ struct ovm_snmpoid_s
 
 /**
  ** @struct ovm_float_s
- **   ISSDL 32-bits floating point value. 
+ **   ISSDL 32-bits floating point value.
  **/
 /**   @var ovm_float_s::type
  **     Data type identifier: T_FLOAT.
@@ -658,6 +657,10 @@ struct ovm_double_s
  **/
 issdl_type_t *
 issdlgettypes(void);
+
+
+int
+issdl_test(ovm_var_t *var);
 
 
 /**

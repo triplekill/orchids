@@ -6,45 +6,81 @@ rule demoRule
 {
   state init
   {
-    if ( .rawsnare.syscall == $rawsnare.SYS_EXECVE &&
-    (.rawsnare.cmdline =~ "^cp /bin/*sh") && $toto == 2)
-      goto shell_copy;
-  }
 
-  state shell_copy
-  {
-    regsplit(.rawsnare.cmdline, "^cp /bin/*sh \(.*\)$", $dest);
+    // Test 1 Const print
+    print(1);
+    print("OK");
 
-    if (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
-        .rawsnare.createmode > 2048) /* 4000 in octal */
+    // Test 2 Var assignement
+    $var1 = 1;
+    $var2 = "OK";
+    print($var1);
+    print($var2);
+
+
+    // Test 3 if then else
+    if ($var1)
+      print("OK");
+    else
+      print("KO");
+
+    // Test 4 if then else multiple actions
+    if ($var1)
     {
-      print("shell copy: ", $dest);
-
-      goto change_perms;
+      $msg = "OK";
+      print($msg);
     }
+    else
+    {
+      $msg = "KO";
+      print($msg);
+    }
+
+    // Test 5 Logic expression assignement
+    $var1 = 1;
+    $var2 = (($var1 == 0) || ($var1 == 1));
+    if ($var2)
+      print("OK");
+    else
+      print("KO");
+
+    // Test 6 Regex Split
+    $string = "Hello World !";
+    / $string / "([^ ]+) ([^ ]+)" / $hello / $world;
+    print($string);
+    print($hello);
+    print($world);
+
+    // Test 7 Regex Match
+    $string = "Hello World !";
+    if ($string =~ _REGEX ("Hello"))
+      print("OK");
+    else
+      print("KO");
+
+    // Test 8 Regex Not Match
+    $string = "Hello World !";
+    if ($string !~ _REGEX ("Hllo"))
+      print("OK");
+    else
+      print("KO");
+
+
+
+    expect (defined (.udp.msg) == 1)
+      goto udp;
+
+    expect (defined (.textfile.line) == 1)
+      goto txt;
   }
 
-  state change_perms
+  state udp
   {
-    print("Alert !\n");
-    dump_stack();
-
-    /* no transitions -- end of automata */
+    print("UDP packet received");
   }
-}
 
-rule myScenar
-{
-  state init
+  state txt
   {
-    waitfor ( .rawsnare.syscall == $rawsnare.SYS_EXECVE &&
-              .rawsnare.cmdline =~ "^cp /bin/*sh" && $toto == 2);
-    regsplit(.rawsnare.cmdline, "^cp /bin/*sh \(.*\)$", $dest);
-    waitfor (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
-             .rawsnare.createmode > 2048); /* 4000 in octal */
-    $abc = "blabla";
-    $toto = 123 * 456 + 564 - 654 * 456 % ( 231 * 654 ) + $titi;
-    print("alert: shell copy: ", $dest);
-    dump_stack();
+    print("TXT line read");
   }
 }

@@ -1,10 +1,10 @@
 orchidsconfdir = $(sysconfdir)/orchids
 
-EXTRA_DIST = orchids.conf.dist orchids-rules.conf.dist
+EXTRA_DIST = orchids.conf.dist orchids-rules.conf.dist orchids-modules.conf.dist
 
 SUBDIRS = conf.d htmlstate rules
 
-orchidsconf_DATA = orchids.conf orchids-rules.conf
+orchidsconf_DATA = orchids.conf orchids-rules.conf orchids-modules.conf
 
 %.conf: $(srcdir)/%.conf.dist
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \

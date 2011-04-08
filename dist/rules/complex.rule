@@ -6,7 +6,7 @@ rule demoRule
 {
   state begin
   {
-    if ( (.rawsnare.syscall == $rawsnare.SYS_EXECVE) &&
+    expect ( (.rawsnare.syscall == $rawsnare.SYS_EXECVE) &&
     (.rawsnare.args =~ "^cp /bin/*sh") )
     {
       goto shell_copy;
@@ -17,7 +17,7 @@ rule demoRule
   {
     regsplit(.rawsnare.args, "^cp /bin/*sh \(.*\)$", $dest);
 
-    if (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
+    expect (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
         .rawsnare.createmode > 2048) /* 4000 in octal */
     {
       print("shell copy: ", $dest);

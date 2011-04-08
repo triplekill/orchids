@@ -252,12 +252,10 @@ AC_PATH_PROG(LIBPRELUDE_CONFIG, libprelude-config)
 AC_CHECK_HEADERS([libprelude/prelude.h])
 AC_CHECK_HEADERS([libprelude/prelude-client.h])
 AC_CHECK_HEADERS([libprelude/idmef.h])
-AC_CHECK_LIB(prelude)
 if test "$LIBPRELUDE_CONFIG" != ""  \
    -a "$ac_cv_header_libprelude_prelude_h" = "yes"       \
    -a "$ac_cv_header_libprelude_prelude_client_h" = "yes" \
-   -a "$ac_cv_header_libprelude_idmef_h" = "yes" \
-   -a "$ac_cv_lib_prelude" = "yes" ; then
+   -a "$ac_cv_header_libprelude_idmef_h" = "yes" ; then
    LIBPRELUDE_LDFLAGS=$($LIBPRELUDE_CONFIG --libs)
    LIBPRELUDE_CFLAGS=$($LIBPRELUDE_CONFIG --cflags)
    AM_CONDITIONAL(USE_PRELUDE, true)

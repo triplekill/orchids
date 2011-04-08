@@ -19,33 +19,6 @@ MaxMemorySize 134217728
 
 SetModuleDir @@LIBDIR@@/orchids
 
-
-# Module section.
-# This is the place where modules are loaded.
-
-LoadModule htmlstate
-LoadModule remoteadm
-LoadModule textfile
-LoadModule sockunix
-LoadModule udp
-LoadModule syslog
-LoadModule rawsnare
-LoadModule snare
-LoadModule generic
-LoadModule netfilter
-LoadModule cisco
-LoadModule snmptrap
-LoadModule consoles
-LoadModule prolog
-LoadModule clocks
-LoadModule period
-LoadModule pcap
-LoadModule wifi
-LoadModule timeout
-LoadModule sharedvars
-LoadModule ruletrace
-LoadModule prelude
-
 # Define preprocessor command for each rule file suffix.
 
 AddPreprocessorCmd .cpp.rule  cpp
@@ -75,11 +48,16 @@ ResolveIP  no
 # Remove this comment to set the process priority
 # Nice -10
 
+
+# Include the used module file.
+
+Include @@ETCDIR@@/orchids/orchids-modules.conf
+
 # Include module specific configurations files...
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
 
 
-# Include the rule rule definition file.
+# Include the rule definition file.
 
 Include @@ETCDIR@@/orchids/orchids-rules.conf

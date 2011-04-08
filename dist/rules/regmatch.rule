@@ -4,10 +4,10 @@
 */
 rule regmatch_static {
   state init {
-    if (.syslog.prog !~ _REGEX("^(snort|ntpd)") )
+    expect (.syslog.prog !~ _REGEX("^(snort|ntpd)") )
       goto q1;
 
-    if (.syslog.prog =~ _REGEX("^(httpd|sshd)") )
+    expect (.syslog.prog =~ _REGEX("^(httpd|sshd)") )
       goto q2;
 
   }
@@ -32,7 +32,7 @@ rule regmatch_dynamic {
     $regexstr = "^[0-9]+ Message from " + $prog + " blah blah";
     $regex = regex_from_str($regexstr);
 
-    if (.syslog.msg =~ $regex)
+    expect (.syslog.msg =~ $regex)
       goto q1;
   }
 

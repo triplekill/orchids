@@ -12,7 +12,7 @@ rule listen_atm_vcc
   state init
  {  
     $attack_pid = .auditd.pid;
-    if (.auditd.syscall == SYSCALL &&
+    expect (.auditd.syscall == SYSCALL &&
         .auditd.varzero == "4")
        goto start;
   }
@@ -21,7 +21,7 @@ rule listen_atm_vcc
   { 
     
    $counter = 1 ;
-   if (.auditd.pid == $attack_pid &&
+   expect (.auditd.pid == $attack_pid &&
        .auditd.syscall == SYSCALL &&
        .auditd.varzero == "4")
        goto listen_loop;
@@ -32,10 +32,10 @@ rule listen_atm_vcc
     print($counter);
     $counter = $counter + 1;
 
-    if ($counter == MAX_CALLS)
+    expect ($counter == MAX_CALLS)
        goto alert;
 
-    if ( .auditd.pid == $attack_pid &&
+    expect ( .auditd.pid == $attack_pid &&
          .auditd.syscall == SYSCALL &&
          .auditd.varzero == "4" && 
          $counter < MAX_CALLS)

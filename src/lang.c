@@ -39,6 +39,7 @@
 #include "graph_output.h"
 #include "orchids_api.h"
 
+#include "ovm.h"
 #include "lang.h"
 #include "lang_priv.h"
 
@@ -1538,6 +1539,25 @@ issdl_get_data_len(ovm_var_t *val)
 
 /* type specific actions */
 
+
+int
+issdl_test(ovm_var_t *var)
+{
+  if (!var)
+    return 0;
+  switch (var->type)
+  {
+    case T_INT :
+      return (INT(var));
+    case T_UINT :
+      return (UINT(var));
+    default :
+      return (1);
+  }
+}
+
+
+
 int
 issdl_cmp(ovm_var_t *var1, ovm_var_t *var2)
 {
@@ -2011,6 +2031,7 @@ issdl_print(orchids_t *ctx, state_instance_t *state)
   param = stack_pop(ctx->ovm_stack);
   if (param)
     fprintf_issdl_val(stdout, param);
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2020,6 +2041,9 @@ issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
 
   if (state->rule_instance == NULL)
     return ;
+
+  // push before state == NULL
+  PUSH_RETURN_TRUE(ctx, state)
 
   fprintf(stdout, ">>>> rule: %s <<<<<\n", state->rule_instance->rule->name);
   while (state)
@@ -2032,12 +2056,14 @@ issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
         fprintf(stdout, "no event.\n");
       state = state->parent;
     }
+
 }
 
 static void
 issdl_printevent(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_printevent()\n");
+  PUSH_RETURN_TRUE(ctx, state)
   for ( ; state && state->event == NULL; state = state->parent)
     ;
   if (state && state->event)
@@ -2062,6 +2088,7 @@ issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
   fprintf_rule_instance_dot(stdout, state->rule_instance,
                             DOT_RETRIGLIST, ctx->new_qh, 100);
   /* XXX: hard-coded limit */
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2095,12 +2122,14 @@ issdl_system(orchids_t *ctx, state_instance_t *state)
   else {
     DebugLog(DF_OVM, DS_DEBUG, "issdl_system(): param error\n");
   }
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
 issdl_stats(orchids_t *ctx, state_instance_t *state)
 {
   fprintf_orchids_stats(stdout, ctx);
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2183,6 +2212,7 @@ issdl_kill_threads(orchids_t *ctx, state_instance_t *state)
       t->flags |= THREAD_KILLED;
     }
   }
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2236,6 +2266,8 @@ issdl_cut(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_ENG, DS_INFO, "found cut dest @ %s:%p\n", si->state->name, si);
 
   do_recursive_cut(si);
+
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 
@@ -2261,6 +2293,9 @@ ovm_strdup(ovm_var_t *str)
   return (s);
 }
 
+
+
+
 static void
 issdl_report(orchids_t *ctx, state_instance_t *state)
 {
@@ -2269,12 +2304,13 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_ENG, DS_INFO, "Generating report\n");
 
   if (state->rule_instance == NULL)
-    return ;
+    return;
 
   SLIST_FOREACH(r, &ctx->reportmod_list, list) {
     r->cb(ctx, r->mod, r->data, state);
   }
   ctx->reports++;
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 
@@ -2406,6 +2442,7 @@ issdl_sendmail(orchids_t *ctx, state_instance_t *state)
   }
 
   /* parent returns */
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 
@@ -2491,6 +2528,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
   }
 
   /* parent returns */
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2502,6 +2540,7 @@ issdl_drop_event(orchids_t *ctx, state_instance_t *state)
   }
 
   state->event_level = -1;
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 static void
@@ -2522,6 +2561,7 @@ issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
   }
 
   state->event_level = INT(level);
+  PUSH_RETURN_TRUE(ctx, state)
 }
 
 
@@ -2705,6 +2745,20 @@ issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
   }
 }
 
+static void
+issdl_defined(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *field;
+  ovm_var_t *res;
+
+  field = stack_pop(ctx->ovm_stack);
+
+  res = ovm_int_new();
+  INT(res) = (field == NULL) ? 0 : 1;
+  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  stack_push(ctx->ovm_stack, res);
+}
+
 /**
  ** Table of built-in function of the Orchids language.  This table is
  ** used at startup by the function register_core_functions() to
@@ -2738,6 +2792,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_vstr_from_regex, 22, "vstr_from_regex", 1, "Return the source virtual string of a compiled regex" },
   { issdl_str_from_regex, 23, "str_from_regex", 1, "Return the source string of a compiled regex" },
   { issdl_regex_from_str, 24, "regex_from_str", 1, "Compile a regex from a string" },
+  { issdl_defined, 25, "defined", 1, "Return if a field is defined" },
   { NULL, 0, NULL, 0, NULL }
 };
 

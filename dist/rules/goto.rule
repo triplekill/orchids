@@ -11,7 +11,7 @@ rule goto_test
   {
     print("state2\n");
 
-    if (.syslog.prog == "blah")
+    expect (.syslog.prog == "blah")
       goto fin;
   }
 
@@ -19,7 +19,7 @@ rule goto_test
   {
     print("state3\n");
 
-    if (.syslog.prog == "bloh")
+    expect (.syslog.prog == "bloh")
       goto fin;
   }
 
