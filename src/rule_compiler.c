@@ -1864,8 +1864,8 @@ compiler_reset(rule_compiler_t *ctx)
 
   clear_strhash(ctx->statenames_hash, NULL);
   clear_strhash(ctx->rule_env, NULL);
-  // Need to keep the two boolean values
-  ctx->statics_nb = 2;
+  // Need to keep the two boolean values and the null variables
+  ctx->statics_nb = 5;
   ctx->dyn_var_name_nb = 0;
 }
 

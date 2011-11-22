@@ -11,6 +11,8 @@ orchidsrule_DATA = \
   lin24_ptrace.rule\
   listen_atm_vcc.rule\
   lock_lease_dos.rule\
-  leak_memory.rule
+  leak_memory.rule\
+  ssh_failed_burst.rule\
+  ssh_failed_long_window.rule
 
 EXTRA_DIST = $(orchidsrule_DATA) test/*.rule

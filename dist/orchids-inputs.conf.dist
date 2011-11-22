@@ -6,27 +6,28 @@
 # INPUT	<module> <input parameter>
 # DISSECT <dissector> <module to dissect> <condition to dissect>
 # example :
-INPUT			textfile	/var/log/messages
-DISSECT syslog	textfile	/var/log/messages
 
 # Syslog events
-#INPUT			textfile	/var/log/messages
-#DISSECT	syslog	textfile	/var/log/messages
+INPUT			textfile	/var/log/messages
+DISSECT syslog	textfile	/var/log/messages
+INPUT			textfile	/var/log/auth.log
+DISSECT syslog	textfile	/var/log/auth.log
 ## (standard syslog udp)
 INPUT			udp		514
 DISSECT	syslog	udp		514
 ##  (user-defined syslog udp, for testing without being root)
-INPUT			udp		15014
-DISSECT	syslog	udp		15014
-INPUT			sockunix	/dev/log
-DISSECT syslog	sockunix	/dev/log
+#INPUT			udp		15014
+#DISSECT	syslog	udp		15014
+
+#INPUT			sockunix	/dev/log
+#DISSECT syslog	sockunix	/dev/log
 
 # Snare events
-INPUT			textfile	/var/log/snare.log
-DISSECT	snare	textfile	/var/log/snare.log
-INPUT			udp		6161
-DISSECT snare	udp		6161
+#INPUT			textfile	/var/log/snare.log
+#DISSECT	snare	textfile	/var/log/snare.log
+#INPUT			udp		6161
+#DISSECT snare	udp		6161
 
 # Rawsnare events
-INPUT			udp		6262
-DISSECT	rawsnare	udp		6262
+#INPUT			udp		6262
+#DISSECT	rawsnare	udp		6262

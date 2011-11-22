@@ -81,7 +81,7 @@ ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
 
   res = stack_pop(ctx->ovm_stack);
   ovm_flush(ctx);
-  if (res && TYPE(res) == T_INT)
+  if ((!(IS_NULL(res))) && TYPE(res) == T_INT)
     return (!(INT(res)));
   else
     return (1);
