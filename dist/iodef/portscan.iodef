@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<IODEF-Template>
+  <insert path="/IODEF-Document/Incident">
+    <Description>Portscan detected by snort</Description>
+    <Assessment>
+      <Impact type="recon" completion="failed"/>
+    </Assessment>
+    <Method>
+      <Reference>
+        <ReferenceName>portscan tool : nmap</ReferenceName>
+        <URL>http://www.nmap.org</URL>
+      </Reference>
+    </Method>
+    <Contact role="creator" type="organization">
+      <ContactName>Orchids</ContactName>
+      <Email>Orchids@orchrids.ids</Email>
+    </Contact>
+    <EventData>
+      <Flow>
+        <System category="source">
+          <Node>
+            <Address category="ipv4-addr">$.snort.sip</Address>
+          </Node>
+        </System>
+        <System category="target">
+          <Node>
+            <Address category="ipv4-addr">$.snort.dip</Address>
+          </Node>
+        </System>
+      </Flow>
+    </EventData>
+  </insert>
+</IODEF-Template>

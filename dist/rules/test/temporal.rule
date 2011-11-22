@@ -1,7 +1,5 @@
 /*
-
- rule for testing temporal analyzer
-
+ [TEST] terule for testing temporal analyzer (mod_period)
 */
 
 rule temporal {

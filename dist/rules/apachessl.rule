@@ -27,7 +27,6 @@ rule apachessl
   {
     $attacker = .entropy.src_ip;
     $port = .entropy.src_port;
-    print("entropy alert");
 
     expect (.sslerror.module  == "mod_ssl" &&
         .sslerror.severity == "error" &&
@@ -38,8 +37,6 @@ rule apachessl
 
   state ssl_error
   {
-    print("SSL error");
-
     expect (.sslerror.module  == "OpenSSL" &&
         .sslerror.severity == "error" &&
         .sslerror.message == "error" &&
@@ -49,11 +46,10 @@ rule apachessl
 
   state ssl_alert {
     $response = "ssh root@10.0.0.100 '/sbin/iptables --append orchids --proto TCP --source-port 443 --destination " +
-                str_from_ipv4( $attacker ) + " --destination-port " + str_from_int( $port ) + " --jump DROP' &";
+    str_from_ipv4( $attacker ) + " --destination-port " + str_from_int( $port ) + " --jump DROP' &";
 
     system( $response );
 
-    dump_stack();
     report();
   }
 }

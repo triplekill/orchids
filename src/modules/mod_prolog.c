@@ -44,9 +44,7 @@ plld -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DHAVE_SWIPROLOG \
 
 #include "mod_prolog.h"
 
-
 input_module_t mod_prolog;
-
 
 static int
 pl_init(char *name, char *bootfile)
@@ -64,6 +62,8 @@ pl_init(char *name, char *bootfile)
   }
   plav[plac] = NULL;
 
+  putenv("SWI_HOME_DIR=/usr/lib/swi-prolog");
+
   if ( !PL_initialise(plac, plav) ) {
     PL_cleanup(1);
     return (FALSE);
@@ -73,18 +73,19 @@ pl_init(char *name, char *bootfile)
   pl_execute("set_prolog_flag(generate_debug_info,false). ");
   pl_execute("set_prolog_flag(debug_on_error,false). ");
   pl_execute("set_prolog_flag(report_error,false). ");
-  /* pl_execute("set_prolog_flag(abort_with_exception,false). "); */
+  pl_execute("set_prolog_flag(abort_with_exception,false). ");
 
   return (TRUE);
 }
 
-
-static int
+int
 pl_execute(const char *goal)
 {
   fid_t fid;
   term_t g;
   int retval;
+
+  DebugLog(DF_MOD, DS_DEBUG, "prolog Executing '%s'\n", goal);
 
   fid = PL_open_foreign_frame();
   g = PL_new_term_ref();
@@ -95,6 +96,8 @@ pl_execute(const char *goal)
     retval = 0;
 
   PL_discard_foreign_frame(fid);
+
+  DebugLog(DF_MOD, DS_DEBUG, "prolog Executed '%s': %s\n", goal, retval ? "Yes" : "No");
 
   return (retval);
 }
@@ -309,6 +312,11 @@ prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (cfg);
 }
 
+static void
+execute_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  pl_execute(dir->args);
+}
 
 static void
 consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -328,13 +336,12 @@ consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   gettimeofday(&cfg->last_db_update, NULL);
 }
 
-
 static mod_cfg_cmd_t prolog_config_commands[] =
 {
   { "Consult", consult_plfile, "Consult a prolog file" },
+  { "Execute", execute_dir, "Execute a prolog query at configuration time" },
   { NULL, NULL, NULL }
 };
-
 
 static int
 prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
@@ -383,9 +390,6 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
 
   ret = pl_execute(pl_code);
 
-  DebugLog(DF_MOD, DS_INFO, "Executed '%s': %s\n", pl_code, ret ? "Yes" : "No");
-  DebugLog(DF_MOD, DS_INFO, "Executed '%s': %s\n", pl_code, ret ? "Yes" : "No");
-
   /* generate footer */
   snprintf(file, sizeof (file),
   	   "%s/%s", htmlcfg->html_output_dir, bodyfile);
@@ -398,90 +402,6 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
 
   return (0);
 }
-
-
-#if 0
-static int
-prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
-{
-  FILE *fp;
-  char pl_code[64];
-  int ret;
-
-  fp = create_html_file(ctx, "orchids-prolog.html", NO_CACHE);
-  fprintf_html_header(fp, "Orchids Prolog Database");
-
-  fprintf(fp, "<center><h1>Orchids Prolog Database<h1></center>\n");
-  fprintf(fp,
-          "<center>"
-          "<table border=\"0\" cellpadding=\"3\" width=\"600\">"
-          "<tr> <td class=\"v1\"> <pre>");
-
-  snprintf(pl_code, sizeof (pl_code), "listing_html(%i).", fileno(fp));
-
-  ret = pl_execute(pl_code);
-
-  DebugLog(DF_MOD, DS_INFO, "Executed '%s': %s\n", pl_code, ret ? "Yes" : "No");
-
-  fprintf(fp, "</pre></td></tr></table></center>\n");
-
-  fprintf_html_trailer(fp);
-  Xfclose(fp);
-
-
-  fprintf(menufp,
-	  "<a href=\"orchids-prolog.html\" "
-          "target=\"main\">Prolog</a><br/>\n");
-
-  return (0);
-}
-#endif
-
-#if 0
-static void
-generate_prolog_database(orchids_t *ctx)
-{
-  char pl_out[PATH_MAX];
-  char readbuf[8192];
-  FILE *fp;
-  FILE *fp_in;
-  size_t readsz;
-
-  fp = create_html_file(ctx, "orchids-prolog-db.html", NO_CACHE);
-  fprintf_html_header(fp, "Orchids Prolog Database");
-
-#ifdef HAVE_SWIPROLOG
-
-  snprintf(pl_out, sizeof (pl_out), "%s/orchids-prolog-db.pl",
-           ctx->html_output_dir);
-
-  /* pl_dump_dyndb(pl_out); */
-
-  fprintf(fp, "<center><h1>Orchids Prolog Database</h1></center>\n");
-
-  fprintf(fp,
-          "<center>"
-          "<table border=\"0\" cellpadding=\"3\" width=\"600\">"
-          "<tr> <td class=\"v1\"> <pre>");
-
-  fp_in = Xfopen(pl_out, "r");
-  while ( (readsz = fread(readbuf, 1, sizeof (readbuf), fp_in)) > 0 ) {
-    fwrite(readbuf, 1, readsz, fp);
-  }
-  Xfclose(fp_in);
-
-  fprintf(fp, "</pre></td></tr></table></center>\n");
-
-#else /* HAVE_SWIPROLOG */
-
-  fprintf(fp, "Prolog support is disabled.\n");
-
-#endif /* HAVE_SWIPROLOG */
-
-  fprintf_html_trailer(fp);
-  Xfclose(fp);
-}
-#endif
 
 input_module_t mod_prolog = {
   MOD_MAGIC,                /* Magic number */

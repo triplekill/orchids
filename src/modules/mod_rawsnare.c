@@ -44,7 +44,6 @@ static char *linux24_ptrace_reqname_g[26];
 
 static char *linux24_signal_g[32];
 
-
 static int
 read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
@@ -75,7 +74,6 @@ read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 
   attr[F_MODE] = ovm_int_new();
   INT(attr[F_MODE]) = io->t_attributes.mode;
-
   attr[F_CREATEMODE] = ovm_int_new();
   INT(attr[F_CREATEMODE]) = io->t_attributes.createmode;
 
@@ -536,43 +534,11 @@ rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
-
-static void
-add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+int
+generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
-  int *p;
-  /* XXXXXX Rhaaa p is in the stack ! correct this rapidly !!! */
-  /* add it in module configuration */
-
-  DebugLog(DF_MOD, DS_INFO, "Adding udp source port %s\n", dir->args);
-
-  p = Xmalloc(sizeof (int));
-  *p = atoi(dir->args);
-  register_conditional_dissector(ctx, mod, "udp",
-                                 (void *)p, sizeof(int),
-                                 rawsnare_dissect, NULL);
+  return rawsnare_dissect(ctx, mod, event, data);
 }
-
-static mod_cfg_cmd_t rawsnare_cfgcmds[] = 
-{
-  { "AddUdpSource", add_udp_source, "Add udp port source" },
-  { NULL, NULL }
-};
-
-/* void */
-/* fprintf_attrs(FILE *fp, ovm_var_t **attrs, size_t s) */
-/* { */
-/*   int i; */
-
-/*   for (i = 0; i < s; ++i) */
-/*     { */
-/*       if (attrs[i]) */
-/*         { */
-/*           fprintf(fp, "attr: %-32s | ", rawsnare_fields[i].name); */
-/*           fprintf_issdl_val(fp, attrs[i]); */
-/*         } */
-/*     } */
-/* } */
 
 
 static char *rawsnare_deps[] = {
@@ -586,7 +552,7 @@ input_module_t mod_rawsnare = {
   "rawsnare",
   "CeCILL2",
   rawsnare_deps,
-  rawsnare_cfgcmds,
+  NULL,
   rawsnare_preconfig,
   NULL,
   NULL

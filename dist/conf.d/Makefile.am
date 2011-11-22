@@ -18,7 +18,10 @@ EXTRA_DIST =                  \
   15_mod_sharedvars.conf.dist \
   16_mod_ruletrace.conf.dist  \
   17_mod_prelude.conf.dist    \
-  18_mod_htmlstate.conf.dist
+  18_mod_htmlstate.conf.dist  \
+  19_mod_prolog_history.conf.dist \
+  20_mod_idmef.conf.dist \
+  21_mod_iodef.conf.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
@@ -38,7 +41,11 @@ orchidsconfd_DATA =         \
   15_mod_sharedvars.conf    \
   16_mod_ruletrace.conf     \
   17_mod_prelude.conf	    \
-  18_mod_htmlstate.conf
+  18_mod_htmlstate.conf     \
+  19_mod_prolog_history.conf \
+  20_mod_idmef.conf \
+  21_mod_iodef.conf
+
 
 %.conf: $(srcdir)/%.conf.dist
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \

@@ -1,6 +1,6 @@
-
-/* Quick and dirty portscan detector, through snort.
-*/
+/*
+ * Quick and dirty portscan detector, through snort.
+ */
 
 rule portscan {
   state init {

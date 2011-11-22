@@ -104,7 +104,7 @@ rule_compiler_t *
 new_rule_compiler_ctx(void)
 {
   rule_compiler_t *ctx;
-  ovm_var_t    *integer;
+  ovm_var_t    *var;
 
   ctx = Xzmalloc(sizeof (rule_compiler_t));
 
@@ -118,17 +118,35 @@ new_rule_compiler_ctx(void)
   ctx->dyn_var_name = Xzmalloc(DYNVARNAME_SZ * sizeof (char *));
 
   /* Create to static integers 1 and 0 used for boolean values */
-  integer = ovm_int_new();
-  integer->flags |= TYPE_CONST;
-  INT(integer) = 1;
+  var = ovm_int_new();
+  var->flags |= TYPE_CONST;
+  INT(var) = 1;
   ctx->static_1_res_id = ctx->statics_nb;
-  statics_add(ctx, integer);
+  statics_add(ctx, var);
 
-  integer = ovm_int_new();
-  integer->flags |= TYPE_CONST;
-  INT(integer) = 0;
+  var = ovm_int_new();
+  var->flags |= TYPE_CONST;
+  INT(var) = 0;
   ctx->static_0_res_id = ctx->statics_nb;
-  statics_add(ctx, integer);
+  statics_add(ctx, var);
+
+  var = ovm_null_new();
+  var->flags |= TYPE_CONST;
+  ctx->static_null_res_id = ctx->statics_nb;
+  statics_add(ctx, var);
+
+  var = ovm_null_new();
+  var->flags |= TYPE_CONST;
+  ERRNO(var) = ERRNO_PARAMETER_ERROR;
+  ctx->static_param_error_res_id = ctx->statics_nb;
+  statics_add(ctx, var);
+
+  var = ovm_null_new();
+  var->flags |= TYPE_CONST;
+  ERRNO(var) = ERRNO_REGEX_ERROR;
+  ctx->static_regex_error_res_id = ctx->statics_nb;
+  statics_add(ctx, var);
+
 
   return (ctx);
 }
@@ -984,7 +1002,7 @@ build_regex(rule_compiler_t *ctx, char *regex_str)
   /* compile regex */
   ret = regcomp(&(REGEX(regex)), regex_str, REG_EXTENDED | REG_NOSUB);
   if (ret) {
-    DPRINTF( ("REGEX compilation error (%s)\n", regex_str) );
+    DebugLog(DF_OLC, DS_ERROR, "REGEX compilation error (%s)\n", regex_str);
     exit(EXIT_FAILURE);
   }
 
@@ -1569,7 +1587,7 @@ compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       code->bytecode[ code->pos++ ] = expr->bin.lval->sym.res_id;
       code->bytecode[ code->pos++ ] = OP_PUSH;
       code->bytecode[ code->pos++ ] = expr->bin.lval->sym.res_id;
-
+      break;
 
     /* binary operator */
     case NODE_BINOP:

@@ -19,6 +19,7 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include <unistd.h>
 
 /* standard types unification */
@@ -39,8 +40,10 @@ typedef unsigned short uint16_t;
 typedef   signed int  int32_t;
 typedef unsigned int uint32_t;
 
+# if __WORDSIZE != 64
 typedef   signed long long  int64_t;
 typedef unsigned long long uint64_t;
+# endif
 
 #endif /* HAVE_STDINT */
 

@@ -28,6 +28,35 @@
 #include "ovm.h"
 #include "ovm_priv.h"
 
+#define NULL_VAR (param->state->state->rule->static_env[	\
+		    param->ctx->rule_compiler->static_null_res_id	\
+		    ])
+
+#define PARAM_ERROR_VAR (param->state->state->rule->static_env[		\
+			   param->ctx->rule_compiler->static_param_error_res_id \
+			   ])
+
+#define REGEX_ERROR_VAR (param->state->state->rule->static_env[		\
+			   param->ctx->rule_compiler->static_regex_error_res_id \
+			   ])
+
+#define TRUE_VAR (param->state->state->rule->static_env[		\
+		    param->ctx->rule_compiler->static_1_res_id \
+		    ])
+#define FALSE_VAR (param->state->state->rule->static_env[		\
+		     param->ctx->rule_compiler->static_0_res_id		\
+		     ])
+
+
+static void
+ovm_flush(orchids_t *ctx)
+{
+   ovm_var_t   *res;
+
+   while ((res = stack_pop(ctx->ovm_stack)) != NULL)
+     FREE_IF_NEEDED(res);
+}
+
 int
 ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
 {
@@ -43,23 +72,20 @@ ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
   while (*isn_param.ip != OP_END) {
     if (*isn_param.ip >= OPCODE_NUM) {
       DebugLog(DF_OVM, DS_ERROR, "unknown opcode 0x%02lx\n", *isn_param.ip);
+      ovm_flush(ctx);
       return (1);
     }
 
     ret = ops_g[ *isn_param.ip ].insn(&isn_param);
-    if (ret) {
-      DebugLog(DF_OVM, DS_INFO, "OVM exception\n");
-      return (ret);
-    }
   }
 
   res = stack_pop(ctx->ovm_stack);
+  ovm_flush(ctx);
   if (res && TYPE(res) == T_INT)
     return (!(INT(res)));
   else
     return (1);
 }
-
 
 void
 fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
@@ -450,19 +476,23 @@ ovm_nop(isn_param_t *param)
 static int
 ovm_push(isn_param_t *param)
 {
+  ovm_var_t *res;
   DebugLog(DF_OVM, DS_DEBUG,
            "OP_PUSH [%02lx] ($%s)\n",
             param->ip[1], param->state->state->rule->var_name[ param->ip[1] ]);
 
   /* XXX: optimize env checking and resolution */
   if (param->state->current_env && param->state->current_env[ param->ip[1] ])
-    stack_push(param->ctx->ovm_stack, param->state->current_env[ param->ip[1] ]);
+    res = param->state->current_env[ param->ip[1] ];
   else if (param->state->inherit_env && param->state->inherit_env[ param->ip[1] ])
-    stack_push(param->ctx->ovm_stack, param->state->inherit_env[ param->ip[1] ]);
-  else {
-    DebugLog(DF_OVM, DS_ERROR, "env error\n");
-    return (-1);
+    res = param->state->inherit_env[ param->ip[1] ];
+  else
+  {
+    res = NULL_VAR;
   }
+
+  stack_push(param->ctx->ovm_stack, res);
+
   param->ip += 2;
 
   return (0);
@@ -562,7 +592,7 @@ ovm_add(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
+  ovm_var_t *res = NULL;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_ADD\n");
 
@@ -571,18 +601,10 @@ ovm_add(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
-
-  res = issdl_add(op1, op2);
-
-  if (res == NULL) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    res = issdl_add(op1, op2);
+  if (res == NULL)
+    res = NULL_VAR;
 
   stack_push(param->ctx->ovm_stack, res);
 
@@ -605,7 +627,7 @@ ovm_sub(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
+  ovm_var_t *res = NULL;
 
   DebugLog(DF_OVM, DS_DEBUG,"OP_SUB\n");
 
@@ -614,18 +636,10 @@ ovm_sub(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR,"op error\n");
-    return (1);
-  }
-
-  res = issdl_sub(op1, op2);
-
-  if (res == NULL) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    res = issdl_sub(op1, op2);
+  if (res == NULL)
+    res = NULL_VAR;
 
   stack_push(param->ctx->ovm_stack, res);
 
@@ -648,7 +662,7 @@ ovm_mul(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
+  ovm_var_t *res = NULL;
 
   DPRINTF( ("OP_MUL\n") );
 
@@ -657,18 +671,10 @@ ovm_mul(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
-
-  res = issdl_mul(op1, op2);
-
-  if (res == NULL) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    res = issdl_mul(op1, op2);
+  if (res == NULL)
+    res = NULL_VAR;
 
   stack_push(param->ctx->ovm_stack, res);
 
@@ -691,7 +697,7 @@ ovm_div(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
+  ovm_var_t *res = NULL;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_DIV\n");
 
@@ -700,18 +706,10 @@ ovm_div(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
-
-  res = issdl_div(op1, op2);
-
-  if (res == NULL) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    res = issdl_div(op1, op2);
+  if (res == NULL)
+    res = NULL_VAR;
 
   stack_push(param->ctx->ovm_stack, res);
 
@@ -734,7 +732,7 @@ ovm_mod(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
+  ovm_var_t *res = NULL;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_MOD\n");
 
@@ -743,18 +741,11 @@ ovm_mod(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    res = issdl_mod(op1, op2);
+  if (res == NULL)
+    res = NULL_VAR;
 
-  res = issdl_mod(op1, op2);
-
-  if (res == NULL) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
-  }
 
   stack_push(param->ctx->ovm_stack, res);
 
@@ -867,8 +858,8 @@ ovm_ceq(isn_param_t *param)
 {
   ovm_var_t *op1;
   ovm_var_t *op2;
-  ovm_var_t *res;
-  int ret;
+  ovm_var_t *res = NULL;
+  int ret = 1; // False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CEQ\n");
 
@@ -877,31 +868,21 @@ ovm_ceq(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    res = (ret) ? FALSE_VAR : TRUE_VAR;
+    if (!ret)
+      DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: true\n");
   }
-
-  ret = issdl_cmp(op1, op2);
-
-  res = ovm_int_new();
-  INT(res) = !ret;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  else
+  {
+    res = NULL_VAR;
+  }
   stack_push(param->ctx->ovm_stack, res);
 
-  if (!ret)
-    DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: true\n");
-
-  /* If op1 and/or op2 was temp vars, free them */
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: free operand 2\n");
-    Xfree(op2);
-  }
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
 
   return (0);
 }
@@ -913,7 +894,7 @@ ovm_cneq(isn_param_t *param)
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret;
+  int ret = 1;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CNEQ\n");
 
@@ -922,26 +903,22 @@ ovm_cneq(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    res = (ret) ? TRUE_VAR : FALSE_VAR;
+    if (ret)
+      DebugLog(DF_OVM, DS_TRACE, "OP_CNEQ: true\n");
+  }
+  else
+  {
+    res = NULL_VAR;
   }
 
-  ret = issdl_cmp(op1, op2);
-  res = ovm_int_new();
-  INT(res) = ret;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
   stack_push(param->ctx->ovm_stack, res);
 
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CNEQ: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CNEQ: free operand 2\n");
-    Xfree(op2);
-  }
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
 
   return (0);
 }
@@ -963,49 +940,41 @@ ovm_crm(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((regex == NULL) || (string == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (IS_NULL(regex) || IS_NULL(string))
+  {
+    res = NULL_VAR;
+  }
+  else if ((TYPE(regex) != T_REGEX) ||
+	   ((TYPE(string) != T_STR) && TYPE(string) != T_VSTR)) {
+    res = PARAM_ERROR_VAR;
+  }
+  else
+  {
+    s = ovm_strdup(string);
+
+    DebugLog(DF_OVM, DS_DEBUG, "OP_CRM str=\"%s\" regex=\"%s\"\n",
+	     s, REGEXSTR(regex));
+
+    ret = regexec(&REGEX(regex), s, 0, NULL, 0);
+    Xfree(s);
+    if (ret == REG_NOMATCH) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CRM (false)\n");
+      res = FALSE_VAR;
+    }
+    else if (ret != 0) {
+      char err_buf[64];
+      regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+      DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
+      res = PARAM_ERROR_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CRM (true)\n");
+      res = TRUE_VAR;
+    }
   }
 
-  if ((TYPE(regex) != T_REGEX) ||
-      ((TYPE(string) != T_STR) && TYPE(string) != T_VSTR)) {
-    DebugLog(DF_OVM, DS_ERROR, "op type error\n");
-    FREE_IF_NEEDED(string);
-    FREE_IF_NEEDED(regex);
-    return (1);
-  }
-
-  s = ovm_strdup(string);
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CRM str=\"%s\" regex=\"%s\"\n", s, REGEXSTR(regex));
-
-  ret = regexec(&REGEX(regex), s, 0, NULL, 0);
-  Xfree(s);
-  if (ret == REG_NOMATCH) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CRM (false)\n");
-    FREE_IF_NEEDED(string);
-    FREE_IF_NEEDED(regex);
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-
-    return (0);
-  }
-  else if (ret != 0) {
-    char err_buf[64];
-    regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
-    DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
-    return (1);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CRM (true)\n");
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
   stack_push(param->ctx->ovm_stack, res);
-
   FREE_IF_NEEDED(string);
   FREE_IF_NEEDED(regex);
 
@@ -1028,46 +997,38 @@ ovm_cnrm(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((regex == NULL) || (string == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (IS_NULL(regex) || IS_NULL(string))
+  {
+    res = NULL_VAR;
   }
-
-  if ((TYPE(regex) != T_REGEX) ||
-      ((TYPE(string) != T_STR) && TYPE(string) != T_VSTR)) {
-    DebugLog(DF_OVM, DS_ERROR, "op type error\n");
-    FREE_IF_NEEDED(string);
-    FREE_IF_NEEDED(regex);
-    return (1);
+  else if ((TYPE(regex) != T_REGEX) ||
+	   ((TYPE(string) != T_STR) && TYPE(string) != T_VSTR)) {
+    res = PARAM_ERROR_VAR;
   }
+  else
+  {
+    s = ovm_strdup(string);
 
-  s = ovm_strdup(string);
+    DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM str=\"%s\" regex=\"%s\"\n", s, REGEXSTR(regex));
 
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM str=\"%s\" regex=\"%s\"\n", s, REGEXSTR(regex));
-
-  ret = regexec(&REGEX(regex), s, 0, NULL, 0);
-  Xfree(s);
-  if (ret == 0) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM (false)\n");
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-    FREE_IF_NEEDED(string);
-    FREE_IF_NEEDED(regex);
-    return (0);
+    ret = regexec(&REGEX(regex), s, 0, NULL, 0);
+    Xfree(s);
+    if (ret == 0) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM (false)\n");
+      res = FALSE_VAR;
+    }
+    else if (ret != REG_NOMATCH) {
+      char err_buf[64];
+      regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+      DebugLog(DF_OVM, DS_ERROR, "regexec eror (%s)\n", err_buf);
+      res = REGEX_ERROR_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM (true)\n");
+      res = TRUE_VAR;
+    }
   }
-  else if (ret != REG_NOMATCH) {
-    char err_buf[64];
-    regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
-    DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
-    return (1);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CNRM (true)\n");
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
   stack_push(param->ctx->ovm_stack, res);
   FREE_IF_NEEDED(string);
   FREE_IF_NEEDED(regex);
@@ -1081,7 +1042,7 @@ ovm_clt(isn_param_t *param)
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret;
+  int ret = 0; //False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CLT\n");
 
@@ -1090,37 +1051,26 @@ ovm_clt(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    if (ret >= 0) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (false ret=%i)\n", ret);
+      res = FALSE_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (true ret=%i)\n", ret);
+      res = TRUE_VAR;
+    }
+  }
+  else
+  {
+    res = NULL_VAR;
   }
 
-  ret = issdl_cmp(op1, op2);
-
-  /* of op1 and/or op2 was tmpvars, free them */
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CLT: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CLT: free operand 2\n");
-    Xfree(op2);
-  }
-
-  if (ret >= 0) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (false ret=%i)\n", ret);
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-    return (0);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (true ret=%i)\n", ret);
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
   stack_push(param->ctx->ovm_stack, res);
 
   return (0);
@@ -1132,7 +1082,7 @@ ovm_cgt(isn_param_t *param)
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret;
+  int ret = 0; // False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CGT\n");
 
@@ -1141,37 +1091,26 @@ ovm_cgt(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    if (ret <= 0) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (false ret=%i)\n", ret);
+      res = FALSE_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (true ret=%i)\n", ret);
+      res = TRUE_VAR;
+    }
+  }
+  else
+  {
+    res = NULL_VAR;
   }
 
-  ret = issdl_cmp(op1, op2);
-
-  /* If op1 and/or op2 was temp vars, free them */
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CGT: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CGT: free operand 2\n");
-    Xfree(op2);
-  }
-
-  if (ret <= 0) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (false ret=%i)\n", ret);
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-    return (0);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (true ret=%i)\n", ret);
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
   stack_push(param->ctx->ovm_stack, res);
 
   return (0);
@@ -1183,7 +1122,7 @@ ovm_cle(isn_param_t *param)
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret;
+  int ret = 1; // False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CLE\n");
 
@@ -1192,37 +1131,26 @@ ovm_cle(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    if (ret > 0) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (false ret=%i)\n", ret);
+      res = FALSE_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (true ret=%i)\n", ret);
+      res = TRUE_VAR;
+    }
+  }
+ else
+  {
+    res = NULL_VAR;
   }
 
-  ret = issdl_cmp(op1, op2);
-
-  /* If op1 and/or op2 was temp vars, free them */
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CLE: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CLE: free operand 2\n");
-    Xfree(op2);
-  }
-
-  if (ret > 0) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (false ret=%i)\n", ret);
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-    return (0);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (true ret=%i)\n", ret);
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
   stack_push(param->ctx->ovm_stack, res);
 
   return (0);
@@ -1234,7 +1162,7 @@ ovm_cge(isn_param_t *param)
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret;
+  int ret = -1; // False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CGE\n");
 
@@ -1243,37 +1171,26 @@ ovm_cge(isn_param_t *param)
 
   param->ip += 1;
 
-  if ((op1 == NULL) || (op2 == NULL)) {
-    DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+  {
+    ret = issdl_cmp(op1, op2);
+    if (ret < 0) {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (false ret=%i)\n", ret);
+      res = FALSE_VAR;
+    }
+    else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (true ret=%i)\n", ret);
+      res = TRUE_VAR;
+    }
+  }
+  else
+  {
+    res = NULL_VAR;
   }
 
-  ret = issdl_cmp(op1, op2);
-
-  /* If op1 and/or op2 was temp vars, free them */
-  if ( IS_NOT_BOUND(op1) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CGE: free operand 1\n");
-    Xfree(op1);
-  }
-
-  if ( IS_NOT_BOUND(op2) ) {
-    DebugLog(DF_OVM, DS_TRACE, "OP_CGE: free operand 2\n");
-    Xfree(op2);
-  }
-
-  if (ret < 0) {
-    DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (false ret=%i)\n", ret);
-    res = ovm_int_new();
-    INT(res) = 0;
-    FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(param->ctx->ovm_stack, res);
-    return (0);
-  }
-
-  DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (true ret=%i)\n", ret);
-  res = ovm_int_new();
-  INT(res) = 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
+  FREE_IF_NEEDED(op1);
+  FREE_IF_NEEDED(op2);
   stack_push(param->ctx->ovm_stack, res);
 
   return (0);
@@ -1295,41 +1212,44 @@ ovm_regsplit(isn_param_t *param)
 
   param->ip += 1;
 
-  /* XXX: REMOVE THIS */
-  if ((pattern == NULL) || (string == NULL)) {
+  if (IS_NULL(pattern) && IS_NULL(string))
+  {
     DebugLog(DF_OVM, DS_ERROR, "op error\n");
-    return (1);
   }
-
-  if ((TYPE(pattern) != T_SREGEX) || (TYPE(string) != T_STR)) {
+  else if ((TYPE(pattern) != T_SREGEX) || (TYPE(string) != T_STR)) {
     DebugLog(DF_OVM, DS_ERROR, "op type error\n");
-    return (1);
   }
-
+  else
+  {
 /*   DPRINTF( ("  regsplit string  = %s\n", STR(string)) ); */
 /*   DPRINTF( ("  regsplit pattern = %s\n", SREGEXSTR(pattern)) ); */
 /*   DPRINTF( ("  regsplit output  = %i\n", SREGEXNUM(pattern)) ); */
 
-  ret = regexec(&SREGEX(pattern), STR(string), SREGEXNUM(pattern) + 1, match, 0);
-  if (ret)
+    ret = regexec(&SREGEX(pattern), STR(string), SREGEXNUM(pattern) + 1, match, 0);
+    if (ret)
     {
       char err_buf[64];
       regerror(ret, &(SREGEX(pattern)), err_buf, sizeof (err_buf));
       DebugLog(DF_OVM, DS_DEBUG, "regexec error (%s)\n", err_buf);
-      return (1);
     }
-
-  for (i = SREGEXNUM(pattern); i > 0; i--)
+    else
     {
-      size_t res_sz;
-      ovm_var_t *res;
+      for (i = SREGEXNUM(pattern); i > 0; i--)
+      {
+	size_t res_sz;
+	ovm_var_t *res;
 
 /*       DPRINTF( ("rm_so[%i]=%i rm_eo[%i]=%i\n", i, match[i].rm_so, i, match[i].rm_eo) ); */
-      res_sz = match[i].rm_eo - match[i].rm_so;
-      res = ovm_str_new(res_sz);
-      memcpy(STR(res), &(STR(string)[match[i].rm_so]), res_sz);
-      stack_push(param->ctx->ovm_stack, res);
+	res_sz = match[i].rm_eo - match[i].rm_so;
+	res = ovm_str_new(res_sz);
+	memcpy(STR(res), &(STR(string)[match[i].rm_so]), res_sz);
+	stack_push(param->ctx->ovm_stack, res);
+      }
     }
+  }
+
+  FREE_IF_NEEDED(pattern);
+  FREE_IF_NEEDED(string);
 
   return (0);
 }

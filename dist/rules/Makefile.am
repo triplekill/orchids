@@ -8,9 +8,9 @@ orchidsrule_DATA = \
   dhcp_lease_check.rule \
   password_sniff.rule \
   anti_ssh_scan.rule \
-  lin24_ptrace_audit.rule\
+  lin24_ptrace.rule\
   listen_atm_vcc.rule\
   lock_lease_dos.rule\
   leak_memory.rule
 
-EXTRA_DIST = $(orchidsrule_DATA)
+EXTRA_DIST = $(orchidsrule_DATA) test/*.rule

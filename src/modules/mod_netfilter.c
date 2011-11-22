@@ -1,12 +1,12 @@
 /**
  ** @file mod_netfilter.c
  ** Netfilter log module.
- ** 
+ **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- ** 
+ **
  ** @version 0.1
  ** @ingroup modules
- ** 
+ **
  ** @date  Started on: Wed Nov  5 16:18:07 2003
  **/
 
@@ -155,29 +155,10 @@ netfilter_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
-static void
-add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+int
+generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
-  int *p;
-  /* XXXXXX Rhaaa p is in the stack ! correct this rapidly !!! */
-
-  DebugLog(DF_MOD, DS_DEBUG, "Adding udp source port %s\n", dir->args);
-
-  p = Xmalloc(sizeof (int)); /* XXX: OUCH ! */
-  *p = atoi(dir->args);
-  register_conditional_dissector(ctx, mod, "udp",
-                                 (void *)p, sizeof(int),
-                                 netfilter_dissect, NULL);
-}
-
-static void
-add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_MOD, DS_DEBUG, "Adding textfile source file %s\n", dir->args);
-
-  register_conditional_dissector(ctx, mod, "textfile",
-                                 (void *)dir->args, strlen(dir->args),
-                                 netfilter_dissect, NULL);
+  return netfilter_dissect(ctx, mod, event, data);
 }
 
 static void
@@ -202,10 +183,8 @@ netfilter_postconfig(orchids_t *ctx, mod_entry_t *mod)
     register_dissector(ctx, mod, nf_hook_g, netfilter_dissect, NULL);
 }
 
-static mod_cfg_cmd_t netfilter_cfgcmds[] = 
+static mod_cfg_cmd_t netfilter_cfgcmds[] =
 {
-  { "AddTextfileSource", add_textfile_source, "Add text source file" },
-  { "AddUdpSource", add_udp_source, "Add udp port source" },
   { "AddHook", add_hook, "Add an unconditionnal hook" },
   { NULL, NULL }
 };

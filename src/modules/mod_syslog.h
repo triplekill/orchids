@@ -55,15 +55,6 @@ dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
 static void *
 syslog_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
-
-static void
-add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-static void
-add_sockunix_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
 #endif /* MOD_SYSLOG_H */
 
 /*

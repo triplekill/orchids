@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<IODEF-Template>
+  <insert path="/*/iodef:Incident" state="alert">
+    <Description>Orchids IODEF Incident test</Description>
+    <Assessment>
+      <Impact type="policy" completion="succeeded" severity="high"/>
+      <Confidence rating="numeric">100</Confidence>
+    </Assessment>
+    <Contact role="creator" type="organization">
+      <ContactName>Orchids</ContactName>
+      <Email>Orchids@orchids.ids</Email>
+    </Contact>
+    <EventData>
+      <Flow>
+	<System category="source" interface="unknown" spoofed="unknown">
+	  <Node>
+	    <NodeName>$src</NodeName>
+	  </Node>
+	</System>
+	<System category="target" interface="unknown" spoofed="unknown">
+	  <Node>
+	    <NodeName>$tar</NodeName>
+	  </Node>
+	</System>
+      </Flow>
+    </EventData>
+  </insert>
+  <insert path="/*/iodef:Incident" state="loop">
+    <AdditionalData dtype="string" meaning="LogLogic Alert Id">$.idmef.message_id</AdditionalData>
+  </insert>
+</IODEF-Template>

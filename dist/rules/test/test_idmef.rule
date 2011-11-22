@@ -1,0 +1,39 @@
+rule test_idmef synchronize($class)
+{
+  state init
+  {
+    $count = 0;
+    $class = .idmef.classification_text;
+    print (.idmef.detect_time);
+    print (.idmef.message_id);
+    print (.idmef.analyzer_ip);
+
+    expect (defined($class))
+      goto loop;
+  }
+
+  state loop
+  {
+    cut("init");
+    $count = $count + 1;
+    /* $msg = "idmef : " + .idmef.message_id + " => " + .idmef.classification_text; */
+    /* print ($count); */
+    /* print ($class); */
+    /* $msg = $class + " " + $count; */
+    /* print($msg); */
+    expect ((.idmef.classification_text == $class) && ($count == 10))
+      goto alert;
+    expect ((.idmef.classification_text == $class) && ($count < 10))
+      goto loop;
+  }
+
+  state alert
+  {
+    $msg = "more than 10 " + $class;
+    $src = "SOURCE";
+    $tar = "TARGET";
+    print ($msg);
+    report ();
+    kill_threads();
+  }
+}

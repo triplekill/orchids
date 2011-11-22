@@ -30,6 +30,23 @@
 
 #include <netinet/in.h>
 
+// On a 64 bit architecture, the following syscall are not present
+#if __WORDSIZE == 64
+# define SYS_truncate64	 -1
+# define SYS_ftruncate64 -1
+# define SYS_chown32	 -1
+# define SYS_lchown32	 -1
+# define SYS_socketcall  -1
+# define SYS_umount      -1
+# define SYS_setuid32    -1
+# define SYS_setgid32    -1
+# define SYS_setreuid32  -1
+# define SYS_setregid32  -1
+# define SYS_setresuid32 -1
+# define SYS_setresgid32 -1
+#endif
+
+
 #include "orchids.h"
 
 /* from  /usr/include/bits/fcntl.h */

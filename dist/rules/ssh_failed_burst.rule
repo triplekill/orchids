@@ -1,0 +1,127 @@
+// DIFF_TIME : Maximum time gap between two events
+// THRESH : Number of chained events to detect
+#define DIFF_TIME 53
+#define THRESH 100
+
+#define TIME_FIELD .syslog.time
+#define AGGR_INIT $source = .sshd.src_ip;
+#define AGGR_VARS $source
+#define AGGR_COND .sshd.src_ip == $source
+#define CONDITION .sshd.action == "Failed"
+
+#define ALERT_ACTION ;
+
+/*
+ * SSH bruteforce detection : Detect bursts (rapid ssh failures) from the same source
+ * To use on syslog logs
+ * Detects chains of events (minimum THRESH chained events)
+ * Events must be separated by DIFF_TIME time gap at most
+ * Here a single rule instance is started and stay for a specific source ip
+ *
+ * [IPS] To block the attacker in real time. See rule anti_ssh_scan.rule
+ *
+ * XXX ===> Need to check what appens if events are not in the right order
+ */
+rule ssh_failed_burst synchronize (AGGR_VARS)
+{
+  state init
+  {
+    $start_new = 1;
+    expect (CONDITION)
+      goto first;
+  }
+
+  state first
+  {
+    AGGR_INIT
+
+    if ($start_new == 1)
+    {
+      $total = 0;
+      $total_begin = TIME_FIELD;
+      $nb_burst = 0;
+    }
+    else
+    {
+      $total = $total + $count;
+      $nb_burst = $nb_burst + 1;
+    }
+    $count = 0;
+    $begin = TIME_FIELD;
+    $last = TIME_FIELD;
+
+    $diff_begin = 0;
+    $diff_last = 0;
+    $mark = mark();
+    // If a rule instance is already running with the same AGGR_VARS, this one is stopped here.
+    goto loop;
+  }
+
+  state loop
+  {
+    // Delete the waiting threads from the previous state
+    mark_cut($mark);
+    mark_update($mark);
+
+    $count = $count + 1;
+    if ($begin != TIME_FIELD)
+    {
+      $diff_begin = difftime(TIME_FIELD, $begin);
+      $diff_last = difftime(TIME_FIELD, $last);
+    }
+    $last = TIME_FIELD;
+
+    // We don't need the event information anymore
+    drop_event();
+
+    expect ((CONDITION)
+	    && (AGGR_COND)
+	    && ($diff_last < DIFF_TIME)
+	    && ($count >= THRESH))
+      goto alert;
+
+    expect ((CONDITION)
+	    && (AGGR_COND)
+	    && ($diff_last < DIFF_TIME)
+	    && ($count < THRESH))
+      goto loop;
+
+    expect ((CONDITION)
+	    && (AGGR_COND)
+	    && ($diff_last > DIFF_TIME))
+      goto stop;
+
+    expect (defined(TIME_FIELD)
+	    && (difftime(TIME_FIELD, $last) > DIFF_TIME))
+      goto stop;
+  }
+
+
+  state alert
+  {
+    $m = "Alert : Burst ==> More than " + str_from_int(THRESH) + ". Source : " + str_from_ipv4($source)  +". Burst started at " + str_from_time($begin);
+    print ($m);
+    $start_new = 0;
+
+    // [DEV] we should discard all previous states.
+    mark_cut($mark);
+
+    goto first;
+  }
+
+  state stop
+  {
+    if ($nb_burst > 0)
+    {
+      $m = "Alert : Multiple burst : " + str_from_int($nb_burst) + " consecutive bursts. Total : " + str_from_int($count)  +". Bursts started at " + str_from_time($total_begin) + " Source : " + str_from_ipv4($source);
+      print ($m);
+    }
+    $start_new = 1;
+
+    // Here we start a new burst detection by going back to the first state.
+    // [DEV] we should discard all previous states.
+    mark_cut($mark);
+    goto first;
+  }
+
+}

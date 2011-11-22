@@ -100,12 +100,17 @@ regex_get_data(ovm_var_t *regex);
 static size_t
 regex_get_data_len(ovm_var_t *regex);
 
+void
+regex_destruct(ovm_var_t *regex);
 
 static void *
 splitregex_get_data(ovm_var_t *regex);
 
 static size_t
 splitregex_get_data_len(ovm_var_t *regex);
+
+void
+splitregex_destruct(ovm_var_t *regex);
 
 
 static void *
@@ -267,6 +272,14 @@ ctime_mod(ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *
 ctime_clone(ovm_var_t *var);
 
+static void *
+extern_get_data(ovm_var_t *address);
+
+static size_t
+extern_get_data_len(ovm_var_t *address);
+
+void
+extern_destruct(ovm_var_t *var);
 
 #endif /* LANG_PRIV_H */
 

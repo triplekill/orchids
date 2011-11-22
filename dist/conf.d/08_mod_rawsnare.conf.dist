@@ -4,8 +4,4 @@
 
 <module rawsnare>
 
-  # A modified auditd daemon forwards snare events directly in UDP.
-  # This is the port number to hook.
-  AddUdpSource 6262
-
 </module>

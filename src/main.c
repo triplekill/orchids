@@ -218,6 +218,8 @@ orchids_usage(char *prg)
 {
   fprintf(stderr, "orchids usage :\n");
   fprintf(stderr, "%s <options>\n", prg);
+  fprintf(stderr, "  -h			print this help\n");
+  fprintf(stderr, "  -D		        Daemon mode\n");
   fprintf(stderr, "  -c <config_file>   configuration file\n");
   fprintf(stderr, "  -o <off-line_mode> off-line input file type (default syslog)\n");
   fprintf(stderr, "  -f <input_file>    input file\n");
@@ -235,7 +237,7 @@ daemonize(const char *stdout_file, const char *stderr_file)
 
   if (stdout_file == NULL)
     stdout_file = devnull_str;
-    
+
   if (stderr_file == NULL)
     stderr_file = devnull_str;
 

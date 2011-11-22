@@ -1,0 +1,25 @@
+#
+# Configuration file for the idmef input module
+#
+
+<module idmef>
+
+  # The module can read files from the mod_textfile module
+
+  #### idmef input ####
+    int_field message_id	   /*/idmef:Alert/@messageid
+    str_field classification_text  /*/idmef:Alert/idmef:Classification/@text
+    str_field classification_ident /*/idmef:Alert/idmef:Classification/@ident
+    time_field create_time	   /*/idmef:Alert/idmef:CreateTime
+    time_field detect_time	   /*/idmef:Alert/idmef:DetectTime
+    ipv4_field analyzer_ip	   /*/idmef:Alert/idmef:Analyzer/idmef:Node/idmef:Address/idmef:address
+
+  #### idmef reporting ####
+  AnalyzerId 42
+  AnalyzerName orchids
+  AnalyzerNodeName orchids.lsv.ens-cachan.fr
+  AnalyzerNodeLocation LSV Cachan
+  AnalyzerNodeAddress 42.42.42.42
+
+  IDMEFOutputDir	@@VARDIR@@/orchids/reports
+</module>

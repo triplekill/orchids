@@ -165,7 +165,7 @@ add_input_descriptor(orchids_t *ctx,
                      void *data);
 
 
-/** 
+/**
  ** Remove a real-time input descriptor.
  **
  ** @param ctx Orchids application context.
@@ -216,6 +216,15 @@ register_conditional_dissector(orchids_t *ctx,
 
 
 /**
+ ** Register a new callback in the pre-inject-event hook.
+ **/
+void
+register_pre_inject_hook(orchids_t *ctx,
+                          mod_entry_t *mod,
+                          hook_cb_t cb,
+                          void *data);
+
+/**
  ** Register a new callback in the post-inject-event hook.
  **/
 void
@@ -230,6 +239,17 @@ register_post_inject_hook(orchids_t *ctx,
 
 reportmod_t *
 register_report_output(orchids_t *ctx, mod_entry_t *mod_entry, report_cb_t cb, void *data);
+
+
+
+/**
+ ** Execute all registered callbacks in the pre-inject-event hook.
+ ** @param ctx    A pointer to the Orchids application context.
+ ** @param event  A pointer to the event which will be given as
+ **               argument to post injection callback functions.
+ **/
+void
+execute_pre_inject_hooks(orchids_t *ctx, event_t *event);
 
 
 /**
@@ -274,7 +294,7 @@ free_fields(ovm_var_t **tbl_event, size_t s);
  **
  ** @param ctx        Orchids application context.
  ** @param mod        The module entry which want this event construction.
- **   This is used by the rule compiler which proceed to a statical analysis 
+ **   This is used by the rule compiler which proceed to a statical analysis
  **   of rules, and mark as `disabled' field that are unused in rules.
  **   This can speed-up dissection, when a module can skip a sub-dissection.
  ** @param event      The destination event to append.

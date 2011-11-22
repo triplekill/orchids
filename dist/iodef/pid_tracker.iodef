@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<IODEF-Template>
+  <insert path="/*/iodef:Incident">
+    <Description>PID Tracker alert</Description>
+    <Description>$str</Description>
+    <Assessment>
+      <Impact type="policy" completion="succeeded"/>
+    </Assessment>
+    <Contact role="creator" type="organization">
+      <ContactName>Orchids</ContactName>
+      <Email>Orchids@orchids.ids</Email>
+    </Contact>
+  </insert>
+</IODEF-Template>

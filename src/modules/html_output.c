@@ -102,7 +102,7 @@ html_output_add_menu_entry(orchids_t *ctx,
 int
 rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e)
 {
-  DebugLog(DF_CORE, DS_TRACE,
+  DebugLog(DF_MOD, DS_TRACE,
            "HTML cache cleanup...\n");
 
   html_output_cache_cleanup(e->data);
@@ -118,7 +118,7 @@ rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e)
 int
 rtaction_html_regeneration(orchids_t *ctx, rtaction_t *e)
 {
-  DebugLog(DF_CORE, DS_TRACE,
+  DebugLog(DF_MOD, DS_TRACE,
            "HTML periodic regeneration...\n");
 
   html_output(ctx, e->data);
@@ -158,7 +158,7 @@ html_output(orchids_t *ctx, html_output_cfg_t *cfg)
 #endif
 
   if (cfg->html_output_dir == NULL) {
-    DebugLog(DF_CORE, DS_ERROR, "HTML Output isn't set. Aborting.\n");
+    DebugLog(DF_MOD, DS_ERROR, "HTML Output isn't set. Aborting.\n");
     return ;
   }
 
@@ -299,7 +299,7 @@ generate_htmlfile_hardlink(html_output_cfg_t  *cfg, char *file, char *link)
   snprintf(abs_file, PATH_MAX, "%s/%s", abs_dir, file);
   snprintf(abs_link, PATH_MAX, "%s/%s", abs_dir, link);
 
-  DebugLog(DF_CORE, DS_INFO, "link \"%s\" to \"%s\"\n", file, link);
+  DebugLog(DF_MOD, DS_INFO, "link \"%s\" to \"%s\"\n", file, link);
 
   unlink(abs_link);
 
@@ -887,7 +887,7 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
     fp = fopen_cached(absolute_filepath);
 
     if (fp != CACHE_HIT && fp != NULL) {
-      DebugLog(DF_CORE, DS_INFO, "dot file (%s).\n", absolute_filepath);
+      DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
 
       fprintf_rule_dot(fp, r);
       Xfclose(fp);
@@ -897,20 +897,20 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
                COMMAND_PREFIX PATH_TO_DOT
                " -Tps -Grankdir=LR \"%s\" -o \"%s.eps\"",
                absolute_filepath, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
       snprintf(cmdline, sizeof(cmdline),
                COMMAND_PREFIX PATH_TO_DOT
                " -Tps -Grankdir=LR \"%s\" -Gsize=8,8 -o \"%s.thumb.eps\"",
                absolute_filepath, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
 #ifndef ORCHIDS_DEMO
       snprintf(cmdline, sizeof(cmdline),
                COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 #endif
 
@@ -918,14 +918,14 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
                COMMAND_PREFIX PATH_TO_CONVERT
                " \"%s.eps\" \"%s.jpg\"",
                base_name, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
       snprintf(cmdline, sizeof(cmdline),
                COMMAND_PREFIX PATH_TO_CONVERT
                " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
                base_name, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
     }
 
@@ -1167,7 +1167,7 @@ generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
              "%s.dot", base_name);
     fp = fopen_cached(absolute_filepath);
     if (fp != CACHE_HIT && fp != NULL) {
-      DebugLog(DF_CORE, DS_INFO, "dot file (%s).\n", absolute_filepath);
+      DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
       fprintf_rule_instance_dot(fp,
                                 r,
                                 DOT_RETRIGLIST,
@@ -1182,7 +1182,7 @@ generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
                "-Gnodesep=0.05 -Granksep=0.05 \"%s\" "
                "-o \"%s.eps\"",
                absolute_filepath, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
       /* Smaller eps, for thumbs (for better image quality) */
@@ -1192,27 +1192,27 @@ generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
                "-Gnodesep=0.05 -Granksep=0.05 -Gsize=8,8 \"%s\" "
                "-o \"%s.thumb.eps\"",
                absolute_filepath, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
 #ifndef ORCHIDS_DEMO
       snprintf(cmdline, sizeof (cmdline),
                COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 #endif
 
       snprintf(cmdline, sizeof (cmdline),
                COMMAND_PREFIX PATH_TO_CONVERT " \"%s.eps\" \"%s.jpg\"",
                base_name, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
 
       snprintf(cmdline, sizeof (cmdline),
                COMMAND_PREFIX PATH_TO_CONVERT
                " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
                base_name, base_name);
-      DebugLog(DF_CORE, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
       system(cmdline);
     }
 
@@ -1992,7 +1992,7 @@ do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
   ret = Write_lock(fd, 0, SEEK_SET, 0);
   if (ret) {
     if (errno == EACCES || errno == EAGAIN) {
-      DebugLog(DF_CORE, DS_NOTICE, "HTML already in rendering...\n");
+      DebugLog(DF_MOD, DS_NOTICE, "HTML already in rendering...\n");
       return ;
     }
     else {

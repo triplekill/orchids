@@ -22,22 +22,19 @@
 #include "html_output.h"
 
 typedef struct prolog_cfg_s prolog_cfg_t;
+
 struct prolog_cfg_s {
   timeval_t last_db_update;
 };
 
-
 static int
 pl_init(char *name, char *bootfile);
 
-
-static int
+int
 pl_execute(const char *goal);
-
 
 static char *
 pl_execute_var(const char *goal_str, const char *var_name);
-
 
 static int
 set_prolog_io(const char *in, const char *out, const char *err);

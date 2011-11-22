@@ -6,7 +6,7 @@
  **
  ** @version 0.1
  ** @ingroup modules
- ** 
+ **
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
  **/
@@ -45,6 +45,7 @@ issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
   varname = stack_pop(ctx->ovm_stack);
   if (TYPE(varname) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    ISSDL_RETURN_FALSE(ctx, state);
     return ;
   }
 
@@ -52,10 +53,14 @@ issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
 
   value = strhash_get(mod_sharedvars_cfg_g->vars_hash, key);
 
-  /* XXX: test if NULL ? */
-
-  stack_push(ctx->ovm_stack, value);
-
+  if (!value)
+    ISSDL_RETURN_FALSE(ctx, state);
+  else
+  {
+    value = issdl_clone(value);
+    FLAGS(value) |= TYPE_CANFREE | TYPE_NOTBOUND;
+    stack_push(ctx->ovm_stack, value);
+  }
   Xfree(key);
 }
 
@@ -87,6 +92,7 @@ issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
   }
 
   Xfree(key);
+  ISSDL_RETURN_TRUE(ctx, state);
 }
 
 
@@ -102,6 +108,7 @@ issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
   varname = stack_pop(ctx->ovm_stack);
   if (TYPE(varname) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    ISSDL_RETURN_FALSE(ctx, state);
     return ;
   }
 
@@ -123,6 +130,7 @@ issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
     Xfree(old_value);
     Xfree(key);
   }
+  ISSDL_RETURN_TRUE(ctx, state);
 }
 
 

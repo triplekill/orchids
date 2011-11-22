@@ -4,22 +4,4 @@
 
 <module udp>
 
-  # Adds the port 162 for receiving snmp traps (root privilege required)
-  AddListenPort 162
-
-  # for receiving syslog udp (root privilege required)
-  AddListenPort 514
-
-  # for textual snare events in udp
-  #AddListenPort 6161
-
-  # for raw snare events in udp
-  AddListenPort 6262
-
-  # for raw net-filter logs in udp.
-  #AddListenPort 6363
-
-  # for user syslog udp (for testing without being root)
-  AddListenPort 10514
-
 </module>

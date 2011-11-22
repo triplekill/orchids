@@ -337,7 +337,7 @@ static int
 backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
 {
 #if 1
-  /* if destination state is fully blocking AND doesn't bind field value 
+  /* if destination state is fully blocking AND doesn't bind field value
    * to a free variable, this is THE shortest run.
    * Next threads will be redundant. */
   if (thread->trans->dest->trans_nb > 0 &&
@@ -377,6 +377,8 @@ inject_event(orchids_t *ctx, event_t *event)
   active_event = Xzmalloc(sizeof (active_event_t));
   active_event->event = event;
   ctx->active_event_cur = active_event;
+
+  execute_pre_inject_hooks(ctx, active_event->event);
 
   /* UDP event feedback monitoring */
   if (ctx->evt_fb_fp) {
@@ -731,7 +733,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
        lock_elmt;
        lock_elmt = lock_next) {
     lock_next = lock_elmt->next;
-    DebugLog(DF_ENG, DS_ERROR, "free_rule_instance(%p): removing lock %p\n",
+    DebugLog(DF_ENG, DS_DEBUG, "free_rule_instance(%p): removing lock %p\n",
              rule_instance, lock_elmt->state);
     si = objhash_del(rule_instance->rule->sync_lock, lock_elmt->state);
     if (si == NULL) {
@@ -749,7 +751,7 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
   cur_env = rule_instance->first_state->current_env;
   for (i = 0; i < dyn_env_sz; ++i)
     if (cur_env[i] && CAN_FREE_VAR(cur_env[i]) ) {
-      Xfree(cur_env[i]);
+      issdl_free(cur_env[i]);
     }
 
   if (rule_instance->first_state->current_env)

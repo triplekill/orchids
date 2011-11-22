@@ -1,7 +1,7 @@
 /*
 ** Linux Kernel Time_Out_Leases PrintK Local Denial of Service Vulnerability
 *  CVE-2005-3857
-*  Attack published : Nov 29 2005 12:00AM 
+*  Attack published : Nov 29 2005 12:00AM
 *  Vulnerable : ubunto, redhat,MandrakeSoft Multi Network Firewall,
 *              SGI ProPack,Trustix Secure Linux, linux kernel 2.6.X ...
 *  Notice : just make auditd sensor audit the "fcntl64" syscall !
@@ -15,44 +15,44 @@
 rule lock_lease_dos
 {
   state init
- {  
-    $attack_pid = .auditd.pid;
+  {
     expect (.auditd.syscall == SYSCALL)
-       goto start;
+      goto start;
   }
 
   state start
-  {     
-   $counter = 1 ;
-   expect (.auditd.pid == $attack_pid &&
-       .auditd.syscall == SYSCALL)
-       goto listen_loop;
+  {
+    $counter = 1 ;
+    $attack_pid = .auditd.pid;
+
+    expect (.auditd.pid == $attack_pid &&
+	    .auditd.syscall == SYSCALL)
+      goto listen_loop;
   }
 
   state listen_loop
   {
-   
     $counter = $counter + 1;
     expect ($counter == MAX_CALLS)
-       goto alert;
+      goto alert;
 
     expect ( .auditd.pid == $attack_pid &&
-         .auditd.syscall == SYSCALL &&
-         $counter < MAX_CALLS)
-       goto listen_loop;
+	     .auditd.syscall == SYSCALL &&
+	     $counter < MAX_CALLS)
+      goto listen_loop;
   }
 
- 
+
   state alert
   {
     print("Time_Out_Leases PrintK Local Denial of Service attack detected !!");
-   
+
     $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
     system( $reaction );
-    $msg= " ---> Orchids is reacting : killing attack process !!";  
+    $msg= " ---> Orchids is reacting : killing attack process !!";
     print($msg);
     print( $reaction );
-    
+
   }
 
 }/* end rule lock_lease_dos*/

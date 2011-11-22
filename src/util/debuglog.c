@@ -99,6 +99,14 @@ libdebug_log(int fac, int sev, const char *file,
   va_list ap;
 
   va_start(ap, format);
+  libdebug_log_va(fac, sev, file, line, format, ap);
+  va_end(ap);
+}
+
+void
+libdebug_log_va(int fac, int sev, const char *file,
+		int line, const char *format, va_list ap)
+{
   if ( sev <= debug_facility_g[ fac ].level ) {
     if ( libdebug_config_g.log_to_stderr) {
       fprintf(stderr, "%16s:%-4d:%-4s:%-7s: ",

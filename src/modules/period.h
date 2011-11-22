@@ -40,7 +40,9 @@
 
 #define DEFAULT_PERIOD_BACKLOG 100000
 
+#if __WORDSIZE != 64
 typedef unsigned long long uint64_t;
+#endif
 
 typedef unsigned long flags_t;
 

@@ -100,7 +100,7 @@ input_module_t mod_cisco = {
   cisco_preconfig,          /* called just after module registration */
   cisco_postconfig,         /* called after all mods preconfig,
                                and after all module configuration*/
-  cisco_postcompil
+  cisco_postcompil,
 };
 
 

@@ -1,8 +1,0 @@
-
-rule integers {
-
-  state init {
-    $var1 = 123;
-    $var2 = -456;
-  }
-}

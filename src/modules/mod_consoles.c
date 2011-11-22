@@ -51,12 +51,14 @@ issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   con = stack_pop(ctx->ovm_stack);
   if (TYPE(con) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
+    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return ;
   }
 
   str = stack_pop(ctx->ovm_stack);
   if (TYPE(str) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(str));
+    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return ;
   }
 
@@ -64,6 +66,7 @@ issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   s = ovm_strdup(str);
 
   output_console_msg(c, s);
+  ISSDL_RETURN_TRUE(ctx, state);
 }
 
 
@@ -76,12 +79,14 @@ issdl_console_evt(orchids_t *ctx, state_instance_t *state)
   con = stack_pop(ctx->ovm_stack);
   if (TYPE(con) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
+    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return ;
   }
 
   c = ovm_strdup(con);
 
   output_console_evt(ctx, c, state);
+  ISSDL_RETURN_TRUE(ctx, state);
 }
 
 

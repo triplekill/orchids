@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <ctype.h>
+
 
 #include "orchids.h"
 
@@ -72,8 +74,15 @@ static char *syslog_facility_g[] = {
   "(21) local use 5  (local5)"                   ,
   "(22) local use 6  (local6)"                   ,
   "(23) local use 7  (local7)"                   ,
-  NULL                                           
+  NULL
 };
+
+
+int
+generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+{
+  return dissect_syslog(ctx, mod, event, data);
+}
 
 
 static int
@@ -124,7 +133,7 @@ dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
     attr[F_TIME] = ovm_ctime_new();
     attr[F_TIME]->flags |= TYPE_MONO;
     CTIME(attr[F_TIME]) = mktime(t);
-      
+
     txt_line += 16;
     txt_len -= 16;
   } else {
@@ -267,68 +276,19 @@ syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
-
-static void
-add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  int *p;
-
-  DebugLog(DF_MOD, DS_INFO, "Adding udp source port %s\n", dir->args);
-
-  /* XXXXXX Rhaaa p is in the stack ! correct this rapidly !!!
-  ** now it is an unreferenced int... ;-/ */
-  p = Xmalloc(sizeof (int));
-  *p = atoi(dir->args);
-  register_conditional_dissector(ctx, mod, "udp",
-                                 (void *)p, sizeof(int),
-                                 dissect_syslog, NULL);
-}
-
-
-static void
-add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_MOD, DS_INFO, "Adding textfile source file %s\n", dir->args);
-
-  register_conditional_dissector(ctx, mod, "textfile",
-                                 (void *)dir->args, strlen(dir->args),
-                                 dissect_syslog, NULL);
-}
-
-
-static void
-add_sockunix_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_MOD, DS_INFO, "Adding sockunix source %s\n", dir->args);
-
-  register_conditional_dissector(ctx, mod, "sockunix",
-                                 (void *)dir->args, strlen(dir->args),
-                                 dissect_syslog, NULL);
-}
-
-
-static mod_cfg_cmd_t syslog_cfgcmds[] = {
-  { "AddTextfileSource", add_textfile_source, "Add text source file" },
-  { "AddUdpSource", add_udp_source, "Add udp port source" },
-  { "AddUnixSocketSource", add_sockunix_source, "Add a unix socket source"},
-  { NULL, NULL, NULL }
-};
-
-
 static char *syslog_deps[] = {
   "udp",
   "textfile",
   NULL
 };
 
-
 input_module_t mod_syslog = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
   "syslog",
   "CeCILL2",
-  syslog_deps,
-  syslog_cfgcmds,
+  NULL,
+  NULL,
   syslog_preconfig,
   NULL,
   NULL

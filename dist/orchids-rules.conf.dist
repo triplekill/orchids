@@ -2,7 +2,7 @@
 # Rule files for Orchids
 #
 
-AddRuleFile @@ETCDIR@@/orchids/rules/lin24_ptrace_audit.rule
+AddRuleFile @@ETCDIR@@/orchids/rules/lin24_ptrace.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/pid_tracker.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/apachessl.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/portscan.rule

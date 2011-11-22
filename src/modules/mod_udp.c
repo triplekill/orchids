@@ -147,6 +147,7 @@ add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
 static mod_cfg_cmd_t udp_dir[] = {
   { "AddListenPort", add_listen_port, "Add a listen port for udp input" },
+  { "INPUT", add_listen_port, "Add a listen port for udp input" },
   { NULL, NULL }
 };
 

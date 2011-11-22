@@ -95,6 +95,7 @@ issdl_temporal(orchids_t *ctx, state_instance_t *state)
   str = stack_pop(ctx->ovm_stack);
   if (TYPE(str) != T_STR) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return ;
   }
 
@@ -115,6 +116,7 @@ issdl_temporal(orchids_t *ctx, state_instance_t *state)
   }
 
   /* update temporal info */
+  ISSDL_RETURN_TRUE(ctx, state);
 }
 
 static void *

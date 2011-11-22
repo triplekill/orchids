@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<IODEF-Template>
+  <insert path="/IODEF-Document/Incident">
+    <Description>Local attack on linux kernel : Linux ptrace attack</Description>
+    <Assessment>
+      <Impact type="admin" completion="failed"/>
+    </Assessment>
+    <Method>
+      <Reference>
+        <ReferenceName>ptrace attack</ReferenceName>
+        <URL>www.juniper.net/security/auto/vulnerabilities/vuln3447.html</URL>
+      </Reference>
+    </Method>
+    <Contact role="creator" type="organization">
+      <ContactName>Orchids</ContactName>
+      <Email>Orchids@orchrids.ids</Email>
+    </Contact>
+    <EventData>
+      <Flow>
+        <System category="source">
+	  <Node>
+	    <Address category="ipv4-addr">$source</Address>
+	    <Counter type="event">$counter</Counter>
+          </Node>
+	  <Description>attack_pid($attack_pid), target_pid($target_pid), attacker_uid($attacker_uid)</Description>
+        </System>
+      </Flow>
+      <Record>
+	<RecordData>
+	  <Description>User block command</Description>
+	  <RecordItem dtype="string">$str</RecordItem>
+	</RecordData>
+      </Record>
+    </EventData>
+  </insert>
+</IODEF-Template>

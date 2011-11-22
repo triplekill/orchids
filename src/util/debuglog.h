@@ -83,6 +83,8 @@ void libdebug_openlog(char *ident, const char *file, int options);
 void libdebug_set_level(int fac, int sevlevel);
 void libdebug_log(int fac, int sev, const char *file,
                   int line, const char *format, ...);
+void libdebug_log_va(int fac, int sev, const char *file,
+		     int line, const char *format, va_list ap);
 void libdebug_log_func(int fac, int sev, const char *file,
                        int line, log_func_t func, void *data);
 void libdebug_show_info(FILE *fp);
@@ -94,6 +96,9 @@ void libdebug_setopt(char *optstr);
 #define DebugLog(fac, sev, ...) \
   libdebug_log(fac, sev, basename(__FILE__), __LINE__, __VA_ARGS__) \
 
+#define DebugLogVa(fac, sev, format, ap)			    \
+  libdebug_log_va(fac, sev, basename(__FILE__), __LINE__, format, ap)  \
+
 #define DebugLogFunc(fac, sev, func, data) \
   libdebug_log_func(fac, sev, basename(__FILE__), __LINE__, func, data)
 
@@ -101,6 +106,10 @@ void libdebug_setopt(char *optstr);
 
 #define DebugLog(fac, sev, ...) \
   libdebug_log(fac, sev, __FILE__, __LINE__, __VA_ARGS__) \
+
+#define DebugLogVa(fac, sev, format, ap)			    \
+  libdebug_log_va(fac, sev, __FILE__, __LINE__, format, ap)  \
+
 
 #define DebugLogFunc(fac, sev, func, data) \
   libdebug_log_func(fac, sev, __FILE__, __LINE__, func, data)

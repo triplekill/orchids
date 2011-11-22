@@ -2,24 +2,22 @@
 ** test prelude analyzer mode
 */
 
-rule testPrelude synchronize($source)
+rule preludeSSHBruteforce synchronize($source)
 {
   state init
   {
     $count = 0;
-    $source = .prelude.first_source_addr;
     expect ((.prelude.classification_text == "Login") &&
-	(.prelude.assessment_completion == "failed") &&
-	($source == .prelude.first_source_addr))
+	    (.prelude.assessment_completion == "failed"))
       goto loop;
   }
 
   state loop
   {
-    cut("init");
+    if ($count == 0)
+      $source = .prelude.first_source_addr;
+
     $count = $count + 1;
-    print("loop !");
-    print($count);
 
     expect (($count >= 10)
 	&& (.prelude.classification_text == "Login")

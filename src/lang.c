@@ -47,27 +47,28 @@
  ** Table of data type natively recognized in the Orchids language.
  **/
 static struct issdl_type_s issdl_types_g[] = {
-  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Null type for error/exception managmnent" },
-  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Function reference" },
-  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_mul, int_div, int_mod, int_clone, "Integer numbers (32-bits signed int)" },
-  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, "Binary string, allocated, (unsigned char *)" },
-  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, "Virtual binary string, not allocated, only pointer/offset reference" },
-  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, string_clone, "Character string, allocated, (char *)" },
-  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, vstr_clone, "Virtual string, not allocated, only pointer/offset reference" },
-  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Array" },
-  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Hash table" },
-  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, ctime_mul, ctime_div, ctime_mod, ctime_clone, "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
-  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, ipv4_clone, "IPv4 address (struct in_addr)" },
-  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, timeval_mul, timeval_div, timeval_mod, timeval_clone, "Seconds and microseconds since Epoch, (struct timeval)" },
-  { "counter", 0, counter_get_data, counter_get_data_len, counter_cmp, counter_add, NULL, counter_mul, NULL, NULL, counter_clone, "Counter (a monotonic integer)" },
-  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, without substring addressing" },
-  { "sregex",  0, splitregex_get_data, splitregex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Posix Extended Regular Expression, with substring addressing" },
-  { "ptr32",   0, address_get_data, address_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "32-bit memory pointer" },
-  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_mul, uint_div, uint_mod, uint_clone, "Non negative integer (32-bits unsigned int)" },
-  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "SNMP Object Identifier" },
-  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_mul, float_div, NULL, float_clone, "IEEE 32-bit floating point number (float)" },
-  { "double",  0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "IEEE 64-bit floating point number (double)" },
-  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
+  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Null type for error/exception managmnent" },
+  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Function reference" },
+  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_mul, int_div, int_mod, int_clone, NULL, "Integer numbers (32-bits signed int)" },
+  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, NULL, "Binary string, allocated, (unsigned char *)" },
+  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, NULL, "Virtual binary string, not allocated, only pointer/offset reference" },
+  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, string_clone, NULL, "Character string, allocated, (char *)" },
+  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, vstr_clone, NULL, "Virtual string, not allocated, only pointer/offset reference" },
+  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Array" },
+  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Hash table" },
+  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, ctime_mul, ctime_div, ctime_mod, ctime_clone, NULL, "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
+  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, ipv4_clone, NULL, "IPv4 address (struct in_addr)" },
+  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, timeval_mul, timeval_div, timeval_mod, timeval_clone, NULL, "Seconds and microseconds since Epoch, (struct timeval)" },
+  { "counter", 0, counter_get_data, counter_get_data_len, counter_cmp, counter_add, NULL, counter_mul, NULL, NULL, counter_clone, NULL, "Counter (a monotonic integer)" },
+  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, regex_destruct, "Posix Extended Regular Expression, without substring addressing" },
+  { "sregex",  0, splitregex_get_data, splitregex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, splitregex_destruct, "Posix Extended Regular Expression, with substring addressing" },
+  { "ptr32",   0, address_get_data, address_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "32-bit memory pointer" },
+  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_mul, uint_div, uint_mod, uint_clone, NULL, "Non negative integer (32-bits unsigned int)" },
+  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "SNMP Object Identifier" },
+  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_mul, float_div, NULL, float_clone, NULL, "IEEE 32-bit floating point number (float)" },
+  { "double",  0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "IEEE 64-bit floating point number (double)" },
+  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, extern_destruct, "External data (provided by a plugin)" },
+  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
 
 static int resolve_ipv4_g = 0;
@@ -82,6 +83,18 @@ issdl_type_t *
 issdlgettypes(void)
 {
   return (issdl_types_g);
+}
+
+void
+issdl_free(ovm_var_t	*var)
+{
+  if (!var)
+    return;
+
+  if (issdl_types_g[TYPE(var)].destruct)
+    issdl_types_g[TYPE(var)].destruct(var);
+
+  Xfree(var);
 }
 
 /*
@@ -1261,6 +1274,13 @@ ovm_regex_new(void)
   return ( OVM_VAR(regex) );
 }
 
+void
+regex_destruct(ovm_var_t *regex)
+{
+  regfree(&(REGEX(regex)));
+  Xfree(REGEXSTR(regex));
+}
+
 static void *regex_get_data(ovm_var_t *regex)
 {
   return (REGEXSTR(regex));
@@ -1298,6 +1318,13 @@ ovm_sregex_new(void)
   sregex->flags = 0;
 
   return ( OVM_VAR(sregex) );
+}
+
+void
+splitregex_destruct(ovm_var_t *regex)
+{
+  regfree(&(SREGEX(regex)));
+  Xfree(SREGEXSTR(regex));
 }
 
 static void *splitregex_get_data(ovm_var_t *regex)
@@ -1537,6 +1564,46 @@ issdl_get_data_len(ovm_var_t *val)
   return (0);
 }
 
+/*
+** External data type
+** store an 'void *' pointer.
+*/
+
+ovm_var_t *
+ovm_extern_new(void)
+{
+  ovm_extern_t *addr;
+
+  addr = Xmalloc(sizeof (ovm_extern_t));
+  addr->type = T_EXTERNAL;
+  addr->flags = 0;
+  addr->ptr = 0;
+  addr->desc = 0;
+  addr->free = 0;
+
+  return ( OVM_VAR(addr) );
+}
+
+void
+extern_destruct(ovm_var_t *i)
+{
+  if (EXTFREE(i) != NULL)
+    EXTFREE(i)(EXTPTR(i));
+}
+
+static void *
+extern_get_data(ovm_var_t *i)
+{
+  return ( &((ovm_extern_t *)i)->ptr );
+}
+
+static size_t
+extern_get_data_len(ovm_var_t *i)
+{
+  return (sizeof (void *));
+}
+
+
 /* type specific actions */
 
 
@@ -1547,6 +1614,8 @@ issdl_test(ovm_var_t *var)
     return 0;
   switch (var->type)
   {
+    case T_NULL :
+      return 0;
     case T_INT :
       return (INT(var));
     case T_UINT :
@@ -1764,6 +1833,93 @@ ovm_counter_fprintf(FILE *fp, ovm_counter_t *val)
 
 
 /* Display function */
+
+
+int
+snprintf_ovm_var(char *buff, unsigned int buff_length, ovm_var_t *val)
+{
+  int i; /* for STRINGs */
+  char asc_time[32]; /* for dates conversions */
+  struct hostent *hptr; /* for IPV4ADDR */
+  char **pptr; /* for IPV4ADDR */
+  int offset = 0; /* for chars */
+
+  /* display data */
+  switch (val->type) {
+
+  case T_NULL:
+    return snprintf(buff, buff_length, "(null %i)\n", ERRNO(val));
+
+  case T_INT:
+    return snprintf(buff, buff_length, "%li", INT(val));
+
+  case T_BSTR:
+    for (i = 0; i < BSTRLEN(val); i++) {
+      if (isprint(BSTR(val)[i]))
+        offset += snprintf(buff + offset, buff_length - offset, "%c", BSTR(val)[i]);
+      else
+        offset += snprintf(buff + offset, buff_length - offset, ". ");
+    }
+    return offset;
+
+  case T_STR:
+    for (i = 0; i < STRLEN(val); i++)
+      offset += snprintf(buff + offset, buff_length - offset, "%c", STR(val)[i]);
+    return offset;
+
+  case T_VSTR:
+    for (i = 0; i < VSTRLEN(val); i++)
+       offset += snprintf(buff + offset, buff_length - offset, "%c", VSTR(val)[i]);
+    return offset;
+
+  case T_CTIME:
+    strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y", localtime(&CTIME(val)));
+    return snprintf(buff, buff_length, "%s (%li)", asc_time, CTIME(val));
+
+  case T_IPV4:
+    offset += snprintf(buff, buff_length, "%s", inet_ntoa(IPV4(val)));
+    hptr = gethostbyaddr((char *) &IPV4(val),
+                         sizeof (struct in_addr), AF_INET);
+    if (hptr == NULL) {
+      return offset;
+    } else if (hptr->h_name != NULL) {
+      offset += snprintf(buff + offset, buff_length - offset, " (%s", hptr->h_name);
+    } else {
+      return offset;
+    }
+    for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+      offset += snprintf(buff + offset, buff_length - offset, ", %s", *pptr);
+    offset += snprintf(buff + offset, buff_length - offset, ")");
+    return offset;
+
+  case T_TIMEVAL:
+    strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
+             localtime(&TIMEVAL(val).tv_sec));
+    return snprintf(buff, buff_length, "%s +%li us (%li.%06li)",
+            asc_time, TIMEVAL(val).tv_usec,
+            TIMEVAL(val).tv_sec, TIMEVAL(val).tv_usec);
+
+  case T_COUNTER:
+    return snprintf(buff, buff_length, "%lu", COUNTER(val));
+
+  case T_REGEX:
+    return snprintf(buff, buff_length, "%s", REGEXSTR(val));
+
+  case T_SREGEX:
+    return snprintf(buff, buff_length, "%s", SREGEXSTR(val));
+
+  case T_PTR32:
+    return snprintf(buff, buff_length, "%p", PTR32(val));
+
+  case T_FLOAT:
+    return snprintf(buff, buff_length, "%f", FLOAT(val));
+
+  default:
+    return snprintf(buff, buff_length, "type %i doesn't support display\n", val->type);
+  }
+}
+
+
 
 void
 fprintf_ovm_var(FILE *fp, ovm_var_t *val)
@@ -2153,6 +2309,7 @@ issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
   }
   else {
     DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): param error\n");
+    PUSH_RETURN_FALSE(ctx, state)
   }
 }
 
@@ -2177,6 +2334,7 @@ issdl_str_from_ipv4(orchids_t *ctx, state_instance_t *state)
   }
   else {
     DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): param error\n");
+    PUSH_RETURN_FALSE(ctx, state)
   }
 }
 
@@ -2198,6 +2356,7 @@ issdl_int_from_str(orchids_t *ctx, state_instance_t *state)
     }
   } else {
     DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): param error\n");
+    PUSH_RETURN_FALSE(ctx, state)
   }
 }
 
@@ -2749,15 +2908,62 @@ static void
 issdl_defined(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *field;
-  ovm_var_t *res;
 
   field = stack_pop(ctx->ovm_stack);
 
-  res = ovm_int_new();
-  INT(res) = (field == NULL) ? 0 : 1;
-  FLAGS(res) |= TYPE_CANFREE | TYPE_NOTBOUND;
-  stack_push(ctx->ovm_stack, res);
+  if (IS_NULL(field))
+    ISSDL_RETURN_FALSE(ctx, state);
+  else
+    ISSDL_RETURN_TRUE(ctx, state);
+
 }
+
+
+static void
+issdl_difftime(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *t1, *t2, *res;
+
+  t1 = stack_pop(ctx->ovm_stack);
+  t2 = stack_pop(ctx->ovm_stack);
+
+  if ((TYPE(t1) & TYPE(t2)) == T_CTIME)
+  {
+    res = ovm_int_new();
+    INT(res) = difftime(CTIME(t1), CTIME(t2));
+    stack_push(ctx->ovm_stack, res);
+  }
+  else
+    ISSDL_RETURN_FALSE(ctx, state);
+}
+
+static void
+issdl_str_from_time(orchids_t *ctx, state_instance_t *state)
+{
+  char buff[128];
+  ovm_var_t *str;
+  ovm_var_t *t;
+  struct tm time;
+  int len;
+
+  t = stack_pop(ctx->ovm_stack);
+  if (t->type == T_CTIME) {
+    time = *localtime (&(CTIME(t)));
+    len = strftime(buff, 128 * sizeof (char), "%Y-%m-%dT%H:%M:%S%z", &time);
+    str = ovm_str_new(len);
+    FLAGS(str) |= TYPE_CANFREE | TYPE_NOTBOUND;
+    memcpy(STR(str), buff, len);
+    stack_push(ctx->ovm_stack, str);
+    if ( IS_NOT_BOUND(t) ) {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_time(): free temp var\n");
+      Xfree(t);
+    }
+  }
+  else {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_time(): param error\n");
+  }
+}
+
 
 /**
  ** Table of built-in function of the Orchids language.  This table is
@@ -2793,6 +2999,8 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_str_from_regex, 23, "str_from_regex", 1, "Return the source string of a compiled regex" },
   { issdl_regex_from_str, 24, "regex_from_str", 1, "Compile a regex from a string" },
   { issdl_defined, 25, "defined", 1, "Return if a field is defined" },
+  { issdl_difftime, 26, "difftime", 1, "The difftime() function shall return the difference expressed in seconds as a type int."},
+  { issdl_str_from_time, 12, "str_from_time", 0, "convert an time to a string" },
   { NULL, 0, NULL, 0, NULL }
 };
 

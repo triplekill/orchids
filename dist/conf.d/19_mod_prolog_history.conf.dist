@@ -1,0 +1,14 @@
+#
+# Configuration file for the prolog-history module
+#
+
+<module prolog_history>
+
+  History 01/01/2011 0111_orchids
+  History 01/02/2011 0211_orchids
+  History 01/03/2011 0311_orchids
+  ODBC orchids
+
+  FollowTimeField rawsnare.time
+
+</module>

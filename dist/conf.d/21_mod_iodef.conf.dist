@@ -1,0 +1,14 @@
+#
+# Configuration file for iodef input module
+
+<module iodef>
+  # Text files to read data from.
+  IODEFTemplatesDir @@ETCDIR@@/orchids/iodef
+  IODEFOutputDir @@VARDIR@@/orchids/reports
+  CSIRTName Orchids.LSV
+
+  # Uncomment the following line if you want the the IODEF reports to be validated
+  #  IODEFSchema @@ETCDIR@@/orchids/iodef/iodef.xsd
+  # Add all events data in the report (additionnal data)
+  FullDump 0
+</module>
