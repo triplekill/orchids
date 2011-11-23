@@ -19,22 +19,24 @@
 
 #include "orchids_types.h"
 #include "orchids.h"
-#include "html_output.h"
 
 typedef struct prolog_cfg_s prolog_cfg_t;
-
 struct prolog_cfg_s {
   timeval_t last_db_update;
 };
 
+
 static int
 pl_init(char *name, char *bootfile);
 
-int
+
+static int
 pl_execute(const char *goal);
+
 
 static char *
 pl_execute_var(const char *goal_str, const char *var_name);
+
 
 static int
 set_prolog_io(const char *in, const char *out, const char *err);
@@ -60,7 +62,7 @@ consult_plfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 static int
-prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
+prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
 
 
 #endif /* MOD_PROLOG_H */

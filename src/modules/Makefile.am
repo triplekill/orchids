@@ -9,6 +9,7 @@ EXTRA_DIST = cisco.l cisco.y \
              snare.l snare.y
 
 pkglib_LTLIBRARIES = \
+  mod_autohtml.la \
   mod_cisco.la \
   mod_clocks.la \
   mod_consoles.la \
@@ -17,6 +18,7 @@ pkglib_LTLIBRARIES = \
   mod_rawsnare.la \
   mod_remoteadm.la \
   mod_snare.la \
+  mod_snmptrap.la \
   mod_sockunix.la \
   mod_sunbsm.la \
   mod_syslog.la \
@@ -27,16 +29,14 @@ pkglib_LTLIBRARIES = \
   mod_sharedvars.la \
   mod_timeout.la \
   mod_ruletrace.la\
-  mod_auditd.la \
-  mod_htmlstate.la \
-  mod_metaevent.la \
-  mod_mark.la
+  mod_auditd.la
 
-
+if ENABLE_HTMLOUTPUT
+pkglib_LTLIBRARIES += mod_htmlstate.la
+endif
 
 if USE_SWIPROLOG
 pkglib_LTLIBRARIES += mod_prolog.la
-pkglib_LTLIBRARIES += mod_prolog_history.la
 endif
 
 if HAVE_LIBPCAP
@@ -45,13 +45,14 @@ pkglib_LTLIBRARIES += mod_prism2.la
 pkglib_LTLIBRARIES += mod_wifi.la
 endif
 
-
-if USE_PRELUDE
-pkglib_LTLIBRARIES += mod_prelude.la
-endif
-
-
 #  mod_stats.la
+#  mod_snmp.la
+#  mod_template.la
+#  mod_test2.la
+#  mod_test.la
+
+mod_autohtml_la_SOURCES = mod_autohtml.c mod_autohtml.h
+mod_autohtml_la_LDFLAGS = -module -avoid-version
 
 mod_cisco_la_SOURCES =     \
   mod_cisco.c mod_cisco.h  \
@@ -111,9 +112,6 @@ mod_prolog_la_LIBADD = $(SWIPL_LDADD)
 mod_prolog_la_CFLAGS = $(SWIPL_CFLAGS)
 mod_prolog_la_DEPENDENCIES = mod_prolog.prc
 
-mod_prolog_history_la_SOURCES = mod_prolog_history.c mod_prolog_history.h
-mod_prolog_history_la_LDFLAGS = -module -avoid-version
-
 pkglib_DATA = mod_prolog.prc
 
 # original line was:
@@ -124,8 +122,6 @@ pkglib_DATA = mod_prolog.prc
 mod_prolog.prc:
 	$(SWIPL) -f none -F none -g true \
 -t "consult([]),qsave_program('mod_prolog.prc',[toplevel=prolog])"
-
-
 endif
 
 mod_rawsnare_la_SOURCES = mod_rawsnare.c mod_rawsnare.h rawsnare.h
@@ -144,6 +140,16 @@ $(srcdir)/snare.yy.c: $(srcdir)/snare.l
 	$(LEX) -f -Psnare -o$(srcdir)/snare.yy.c $(srcdir)/snare.l
 
 
+# mod_snmp_la_SOURCES = mod_snmp.c mod_snmp.h
+# mod_snmp_la_LDFLAGS = -module -avoid-version
+
+if USE_NETSNMP
+mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
+mod_snmptrap_la_CFLAGS = $(NETSNMP_CFLAGS)
+mod_snmptrap_la_LDFLAGS = -module -avoid-version
+mod_snmptrap_la_LIBADD = $(NETSNMP_LDFLAGS)
+endif
+
 mod_sockunix_la_SOURCES = mod_sockunix.c mod_sockunix.h
 mod_sockunix_la_LDFLAGS = -module -avoid-version
 
@@ -160,6 +166,15 @@ mod_sunbsm_la_LDFLAGS = -module -avoid-version
 mod_syslog_la_SOURCES = mod_syslog.c mod_syslog.h
 mod_syslog_la_LDFLAGS = -module -avoid-version
 
+# mod_template_la_SOURCES = mod_template.c
+# mod_template_la_LDFLAGS = -module -avoid-version
+
+# mod_test2_la_SOURCES = mod_test2.c
+# mod_test2_la_LDFLAGS = -module -avoid-version
+
+# mod_test_la_SOURCES = mod_test.c
+# mod_test_la_LDFLAGS = -module -avoid-version
+
 mod_textfile_la_SOURCES = mod_textfile.c mod_textfile.h
 mod_textfile_la_LDFLAGS = -module -avoid-version
 
@@ -169,12 +184,13 @@ mod_udp_la_LDFLAGS = -module -avoid-version
 mod_win32evt_la_SOURCES = mod_win32evt.c mod_win32evt.h
 mod_win32evt_la_LDFLAGS = -module -avoid-version
 
+if ENABLE_HTMLOUTPUT
 mod_htmlstate_la_SOURCES = \
   mod_htmlstate.c mod_htmlstate.h \
   html_output.c html_output.h \
   file_cache.c file_cache.h file_cache_priv.h
 mod_htmlstate_la_LDFLAGS = -module -avoid-version
-
+endif
 mod_sharedvars_la_SOURCES = mod_sharedvars.c mod_sharedvars.h
 mod_sharedvars_la_LDFLAGS = -module -avoid-version
 
@@ -184,43 +200,5 @@ mod_timeout_la_LDFLAGS = -module -avoid-version
 mod_ruletrace_la_SOURCES = mod_ruletrace.c mod_ruletrace.h
 mod_ruletrace_la_LDFLAGS = -module -avoid-version
 
-if USE_PRELUDE
-mod_prelude_la_SOURCES = mod_prelude.c mod_prelude.h
-mod_prelude_la_CFLAGS = $(LIBPRELUDE_CFLAGS) $(LIBPRELUDEDB_CFLAGS)
-mod_prelude_la_LDFLAGS = -module -avoid-version
-mod_prelude_la_LIBADD = $(LIBPRELUDE_LDFLAGS) $(LIBPRELUDEDB_LDFLAGS)
-endif
-
-if HAVE_XML2
-
-mod_iodef_la_SOURCES = mod_iodef.c mod_iodef.h
-mod_iodef_la_CFLAGS = $(XML2_CFLAGS)
-mod_iodef_la_LDFLAGS = -module -avoid-version
-mod_iodef_la_LIBADD = $(XML2_LDFLAGS)
-
-mod_idmef_la_SOURCES = mod_idmef.c mod_idmef.h
-mod_idmef_la_CFLAGS = $(XML2_CFLAGS)
-mod_idmef_la_LDFLAGS = -module -avoid-version
-mod_idmef_la_LIBADD = $(XML2_LDFLAGS)
-
-mod_xml_la_SOURCES = mod_xml.c mod_xml.h
-mod_xml_la_CFLAGS = $(XML2_CFLAGS)
-mod_xml_la_LDFLAGS = -module -avoid-version
-mod_xml_la_LIBADD = $(XML2_LDFLAGS)
-
-pkglib_LTLIBRARIES += mod_idmef.la mod_iodef.la mod_xml.la
-endif
-
-mod_metaevent_la_SOURCES = mod_metaevent.c mod_metaevent.h
-mod_metaevent_la_LDFLAGS = -module -avoid-version
-
-mod_mark_la_SOURCES = mod_mark.c mod_mark.h
-mod_mark_la_LDFLAGS = -module -avoid-version
-
-if USE_NETSNMP
-mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
-mod_snmptrap_la_LDFLAGS = -module -avoid-version
-pkglib_LTLIBRARIES += mod_snmptrap.la
-endif
 
 # End-of-file

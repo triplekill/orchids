@@ -1,0 +1,71 @@
+/*
+
+openssl-too-open attack
+
+Check Apache error log for
+
+[Thu Sep 23 17:50:19 2004] [error] OpenSSL: error:1406908F:lib(20):func(105):reason(143)
+[Thu Sep 23 17:51:08 2004] [error] mod_ssl: SSL handshake failed (server mure.lsv.ens-cachan.fr:443, ...
+
+    lib(20) == ERR_LIB_SSL                       in ./crypto/err/err.h
+  func(105) == SSL_F_GET_CLIENT_FINISHED         in ./crypto/ssl/ssl.h
+reason(143) == SSL_R_CONNECTION_ID_IS_DIFFERENT  in ./crypto/ssl/ssl.h
+
+*/
+
+
+rule apachessl
+{
+  state init
+  {
+    if (.entropy.message == "RISING ALARM" &&
+        .entropy.dst_port == 443)
+      goto entropy_alert;
+  }
+
+  state entropy_alert
+  {
+    $attacker = .entropy.src_ip;
+    /* print("entropy alert"); */
+
+      if (.ssl_error.module  == "mod_ssl" &&
+          .ssl_error.severity == "error" &&
+          .ssl_error.message == "SSL handshake failed" &&
+          .ssl_error.cli_addr == $attacker)
+        goto ssl_error;
+
+      if (.ssl_error.module  == "OpenSSL" &&
+          .ssl_error.severity == "error" &&
+          .ssl_error.message == "error" &&
+          .ssl_error.openssl_lib == 20 &&
+          .ssl_error.openssl_func == 105 &&
+          .ssl_error.openssl_reason == 143 )
+        goto ssl_error2;
+
+  }
+
+  state ssl_error {
+    print("ssl error");
+
+      if (.ssl_error.module  == "OpenSSL" &&
+          .ssl_error.severity == "error" &&
+          .ssl_error.message == "error" &&
+          .ssl_error.openssl_lib == 20 &&
+          .ssl_error.openssl_func == 105 &&
+          .ssl_error.openssl_reason == 143 )
+        goto ssl_alert;
+  }
+
+  state ssl_error2 {
+      if (.ssl_error.module  == "mod_ssl" &&
+          .ssl_error.severity == "error" &&
+          .ssl_error.message == "SSL handshake failed" &&
+          .ssl_error.cli_addr == $attacker)
+        goto ssl_alert;
+  }
+
+  state ssl_alert {
+    dump_stack();
+    report();
+  }
+}

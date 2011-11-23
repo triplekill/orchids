@@ -63,7 +63,7 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS
 
-%token RULE STATE IF ELSE EXPECT GOTO /* Special keywords */
+%token RULE STATE IF GOTO WAITFOR /* Special keywords */
 %token O_BRACE C_BRACE O_PARENT C_PARENT EQ /* Punctuation */
 %token SEMICOLUMN COMMA SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_TIMEVAL KW_COUNTER KW_REGEX
@@ -79,12 +79,12 @@ static rule_compiler_t *compiler_ctx_g = NULL;
 
 %type <node_paramlist> params paramlist
 %type <node_expr> param var regsplit
-%type <node_expr> expr
+%type <node_expr> expr condexpr
 %type <node_state> firststate state statedefs
 %type <node_statelist> states statelist
 %type <node_rule> rule
-%type <node_actionlist> actionlist actionblock
-%type <node_action> action ifstatement
+%type <node_actionlist> actionlist
+%type <node_action> action
 %type <node_translist> transitionlist
 %type <node_trans> transition
 %type <node_varlist> var_list
@@ -189,6 +189,10 @@ statedefs:
     { $$ = build_state(NULL, $1); }
 | actionlist transitionlist /* actionlist and transisionlist */
     { $$ = build_state($1, $2); }
+| WAITFOR O_PARENT condexpr C_PARENT SEMICOLUMN statedefs
+    { $$ = NULL; /* XXX not used */ }
+| actionlist WAITFOR O_PARENT condexpr C_PARENT SEMICOLUMN statedefs
+    { $$ = NULL; /* XXX not used */ }
 ;
 
 
@@ -225,47 +229,22 @@ action:
     { $$ = $1; }
 | O_DIV var O_DIV regsplit var_list SEMICOLUMN
     { $$ = build_string_split($2, $4, $5); }
-| ifstatement
-    { $$ = $1; }
 ;
 
 
 expr:
   O_PARENT expr C_PARENT
     { $$ = $2; }
-| VARIABLE EQ expr
-    { $$ = build_assoc(compiler_ctx_g, $1, $3); }
 | expr O_PLUS expr
-  { $$ = build_expr_binop(OP_ADD, $1, $3); }
+  { $$ = build_expr(OP_ADD, $1, $3); }
 | expr O_MINUS expr
-  { $$ = build_expr_binop(OP_SUB, $1, $3); }
+  { $$ = build_expr(OP_SUB, $1, $3); }
 | expr O_TIMES expr
-  { $$ = build_expr_binop(OP_MUL, $1, $3); }
+  { $$ = build_expr(OP_MUL, $1, $3); }
 | expr O_DIV expr
-  { $$ = build_expr_binop(OP_DIV, $1, $3); }
+  { $$ = build_expr(OP_DIV, $1, $3); }
 | expr O_MOD expr
-  { $$ = build_expr_binop(OP_MOD, $1, $3); }
-| expr ANDAND expr
-  { $$ = build_expr_cond(ANDAND, $1, $3); }
-| expr OROR expr
-  { $$ = build_expr_cond(OROR, $1, $3); }
-| expr EQCOMPARE expr
-  { $$ = build_expr_cond(OP_CEQ, $1, $3); }
-| expr NOTEQUAL expr
-  { $$ = build_expr_cond(OP_CNEQ, $1, $3); }
-| expr REGEX_MATCH expr
-  { $$ = build_expr_cond(OP_CRM, $1, $3); }
-| expr REGEX_NOTMATCH expr
-  { $$ = build_expr_cond(OP_CNRM, $1, $3); }
-| expr GREATER expr
-  { $$ = build_expr_cond(OP_CGT, $1, $3); }
-| expr LESS expr
-  { $$ = build_expr_cond(OP_CLT, $1, $3); }
-| expr GREATER_EQ expr
-  { $$ = build_expr_cond(OP_CGE, $1, $3); }
-| expr LESS_EQ expr
-  { $$ = build_expr_cond(OP_CLE, $1, $3); }
-
+  { $$ = build_expr(OP_MOD, $1, $3); }
 | string /* Constant string */
     { $$ = build_string(compiler_ctx_g, $1); }
 | NUMBER /* Constant integer */
@@ -292,6 +271,8 @@ expr:
     { $$ = build_regex(compiler_ctx_g, $3); }
 | SYMNAME O_PARENT params C_PARENT
     { $$ = build_function_call(compiler_ctx_g, &($1), $3); }
+| VARIABLE EQ expr
+    { $$ = build_assoc(compiler_ctx_g, $1, $3); }
 ;
 
 
@@ -330,26 +311,62 @@ transitionlist:
     { $$ = build_transitionlist($1); }
 ;
 
-actionblock:
-O_BRACE actionlist C_BRACE
- { $$ = $2; }
-| action
- {  $$ = build_actionlist($1); }
-
-ifstatement:
- IF O_PARENT expr C_PARENT actionblock
- { $$ = build_expr_ifstmt($3, $5, NULL); }
-| IF O_PARENT expr C_PARENT actionblock ELSE actionblock
- { $$ = build_expr_ifstmt($3, $5, $7); }
-
 
 transition:
-  EXPECT O_PARENT expr C_PARENT GOTO SYMNAME SEMICOLUMN
+  IF O_PARENT condexpr C_PARENT GOTO SYMNAME SEMICOLUMN
     { $$ = build_direct_transition($3, $6.name); }
-| EXPECT O_PARENT expr C_PARENT O_BRACE statedefs C_BRACE
+| IF O_PARENT condexpr C_PARENT O_BRACE statedefs C_BRACE
     { $$ = build_indirect_transition($3, $6); }
 | GOTO SYMNAME SEMICOLUMN
     { $$ = build_unconditional_transition_test($2.name); }
+;
+
+
+condexpr:
+  NUMBER
+  { $$ = build_integer(compiler_ctx_g, $1); }
+| string
+  { $$ = build_string(compiler_ctx_g, $1); }
+| VARIABLE
+  { $$ = build_varname(compiler_ctx_g, $1); }
+| FIELD
+  { $$ = build_fieldname(compiler_ctx_g, $1); }
+| KW_IPV4 O_PARENT string C_PARENT
+    { $$ = build_ipv4(compiler_ctx_g, $3); }
+| KW_REGEX O_PARENT string C_PARENT
+    { $$ = build_regex(compiler_ctx_g, $3); }
+| O_PARENT condexpr C_PARENT
+  { $$ = $2; }
+| condexpr O_PLUS condexpr
+  { $$ = build_expr(OP_ADD, $1, $3); }
+| condexpr O_MINUS condexpr
+  { $$ = build_expr(OP_SUB, $1, $3); }
+| condexpr O_TIMES condexpr
+  { $$ = build_expr(OP_MUL, $1, $3); }
+| condexpr O_DIV condexpr
+  { $$ = build_expr(OP_DIV, $1, $3); }
+| condexpr O_MOD condexpr
+  { $$ = build_expr(OP_MOD, $1, $3); }
+| condexpr ANDAND condexpr
+  { $$ = build_expr(ANDAND, $1, $3); }
+| condexpr OROR condexpr
+  { $$ = build_expr(OROR, $1, $3); }
+| condexpr EQCOMPARE condexpr
+  { $$ = build_expr(OP_CEQ, $1, $3); }
+| condexpr NOTEQUAL condexpr
+  { $$ = build_expr(OP_CNEQ, $1, $3); }
+| condexpr REGEX_MATCH condexpr
+  { $$ = build_expr(OP_CRM, $1, $3); }
+| condexpr REGEX_NOTMATCH condexpr
+  { $$ = build_expr(OP_CNRM, $1, $3); }
+| condexpr GREATER condexpr
+  { $$ = build_expr(OP_CGT, $1, $3); }
+| condexpr LESS condexpr
+  { $$ = build_expr(OP_CLT, $1, $3); }
+| condexpr GREATER_EQ condexpr
+  { $$ = build_expr(OP_CGE, $1, $3); }
+| condexpr LESS_EQ condexpr
+  { $$ = build_expr(OP_CLE, $1, $3); }
 ;
 
 %%

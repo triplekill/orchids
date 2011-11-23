@@ -647,7 +647,7 @@ struct rulefile_s
 
 /**
  ** @struct rule_compiler_s
- ** The main rule compiler context.
+ ** The main rule compiler context.                                          
  **/
 /**   @var rule_compiler_s::currfile
  **     Current file in compilation.
@@ -698,24 +698,9 @@ struct rulefile_s
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
-/**   @var rule_compiler_s::static_1_res_id
- **     Ressource id for const int 1 (used for boolean)
- **/
-/**   @var rule_compiler_s::static_0_res_id
- **     Ressource id for const int 0 (used for boolean)
- **/
-/**   @var rule_compiler_s::static_null_res_id
- **     Ressource id for const null (used for undefined vars / fields)
- **/
-/**   @var rule_compiler_s::static_param_error_res_id
- **     Ressource id for const null (with errno set to param error)
- **/
-/**   @var rule_compiler_s::static_regex_error_res_id
- **     Ressource id for const null (with errno set to regex error)
- **/
 struct rule_compiler_s
 {
-  char             *currfile;
+  char             *currfile;        
   int32_t           rules;
   strhash_t        *functions_hash;
   strhash_t        *fields_hash;
@@ -730,12 +715,6 @@ struct rule_compiler_s
   int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
-
-  int		static_1_res_id;
-  int		static_0_res_id;
-  int		static_null_res_id;
-  int		static_param_error_res_id;
-  int		static_regex_error_res_id;
 };
 
 
@@ -900,35 +879,6 @@ struct preproc_cmd_s {
   char *cmd;
 };
 
-
-typedef void (*report_cb_t)(orchids_t *ctx, mod_entry_t *mod, void *data, state_instance_t *state);
-
-typedef struct reportmod_s reportmod_t;
-
-/**
- ** @struct reportmod_s
- ** Report module structure, used to dispatch a report event
- **/
-/**   @var reportmod_s::cb
- **     The callback to execute.
- **/
-/**   @var reportmod_s::mod
- **     The module entry who registered this callback.
- **/
-/**   @var reportmod_s::data
- **     Arbitraty data that may be used by the callback.
- **/
-/**   @var reportmod_s::list
- **     The list elements.
- **/
-struct reportmod_s {
-  report_cb_t cb;
-  mod_entry_t *mod;
-  void *data;
-  SLIST_ENTRY(reportmod_t) list;
-};
-
-
 /**
  ** @struct orchids_s
  **   Main program context structure.
@@ -960,7 +910,7 @@ struct reportmod_s {
  **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::fds
- **     Descriptor set, for the select() call in
+ **     Descriptor set, for the select() call in 
  **     event_dispatcher_main_loop().
  **/
 /**   @var orchids_s::cfg_tree
@@ -1084,6 +1034,15 @@ struct reportmod_s {
  **     The user in which Orchids will drop its privileges, after its
  **     configuration complete (and if it was started as root).
  **/
+/**   @var orchids_s::report_dir
+ **     The directory where report will be written.
+ **/
+/**   @var orchids_s::report_prefix
+ **     The prefix of the report file name.
+ **/
+/**   @var orchids_s::report_ext
+ **     The extension of the report file name.
+ **/
 /**   @var orchids_s::reports
  **     Total number of report generated since startup.
  **/
@@ -1165,6 +1124,15 @@ struct orchids_s
   timeval_t  compil_time;
   timeval_t  postcompil_time;
 
+  /* IDMEF parameters */
+  char *idmef_dtd;
+  char *idmef_analyzer_id;
+  char *idmef_analyzer_loc;
+  char *idmef_sensor_hostname;
+
+  /* HTML Output Config (dir/css/mode/etc...) XXX: move to module */
+  char *html_output_dir;
+
   FILE *evt_fb_fp;
 
   /* global temporal information container */
@@ -1174,6 +1142,10 @@ struct orchids_s
   char *runtime_user;
 
   rusage_t ru;
+
+  char *report_dir;
+  char *report_prefix;
+  char *report_ext;
 
   pid_t pid;
 
@@ -1196,9 +1168,7 @@ struct orchids_s
   char *modules_dir;
   char *lockfile;
 
-  SLIST_HEAD(preevthooklist, hook_list_elmt_t) pre_evt_hook_list;
   SLIST_HEAD(postevthooklist, hook_list_elmt_t) post_evt_hook_list;
-  SLIST_HEAD(list, reportmod_t) reportmod_list;
 };
 
 
@@ -1277,10 +1247,10 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **/
 /**   @var input_module_s::pre_config
  **     Generic function for module initialisation/post-registration.
- **     should allocate some memory for 'config' ptr,
- **     should register hooks ans callbacks,
- **     allocate some memory if needed,
- **     pre-compute some stuffs...
+ **     should allocate some memory for 'config' ptr, 
+ **     should register hooks ans callbacks, 
+ **     allocate some memory if needed, 
+ **     pre-compute some stuffs... 
  **     and finally, return the module configuration structure.
  **/
 /**   @var input_module_s::post_config
@@ -1570,6 +1540,73 @@ fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode);
  **/
 void
 fprintf_bytecode_dump(FILE *fp, bytecode_t *code);
+
+
+/**
+ ** Create HTML pages reflecting the internal state of Orchids.
+ ** @param ctx  A pointer to the Orchids application context.
+ **/
+void
+html_output(orchids_t *ctx);
+
+
+/**
+ ** @typedef mod_htmloutput_t
+ **   Module HTML Output function pointer type.
+ **   These function should be implemented by modules which want to produce
+ **   output with the mod_htmlstate module.
+ **/
+typedef int (*mod_htmloutput_t)(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
+
+typedef struct htmloutput_list_s htmloutput_list_t;
+
+
+/**
+ ** @struct htmloutput_list_s
+ **   Structure for managing html output callback functions of modules.
+ **/
+/** @var htmloutput_list_s::mod_htmloutput_t
+ **   A pointer to the html output function.
+ **/
+/** @var htmloutput_list_s::mod
+ **   A pointer to the module which requested the registration.
+ **/
+/** @var htmloutput_list_s::next
+ **   A pointer to the next element of the list.
+ **/
+struct htmloutput_list_s {
+  mod_htmloutput_t output;
+  mod_entry_t *mod;
+  htmloutput_list_t *next;
+};
+
+void
+html_output_preconfig(orchids_t *ctx);
+
+
+void
+html_output_add_menu_entry(orchids_t *ctx,
+                           mod_entry_t *mod,
+                           mod_htmloutput_t outputfunc);
+
+void
+fprintf_html_header(FILE *fp, char *title);
+void
+fprintf_html_trailer(FILE *fp);
+
+FILE *
+create_html_file(orchids_t *ctx, char *file, int cache);
+
+void
+html_output_cache_flush(orchids_t *ctx);
+void
+html_output_cache_cleanup(orchids_t *ctx);
+int
+cached_html_file(orchids_t *ctx, char *file);
+void
+generate_htmlfile_hardlink(orchids_t *ctx, char *file, char *link);
+
+
 
 
 /*

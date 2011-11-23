@@ -1,5 +1,5 @@
 #
-# Configuration for the pcap module
+# COnfiguration for the pcap module
 #
 
 <module pcap>

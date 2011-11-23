@@ -31,19 +31,6 @@
 #define NODE_CALL     4
 #define NODE_BINOP    5
 #define NODE_REGSPLIT 6
-#define NODE_IFSTMT   7
-#define NODE_ASSOC    8
-#define NODE_COND     9
-
-#define LABELS_MAX	2048
-
-
-#define EXIT_IF_BYTECODE_BUFF_FULL(x)		\
-  do { \
-  if (code->pos >= BYTECODE_BUF_SZ - (x)) {		       \
-        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n"); \
-        exit(EXIT_FAILURE); }				       \
-  } while (0); \
 
 /*
 ** node_* structure represents nodes in the abstract syntax tree (AST)
@@ -64,7 +51,6 @@ typedef struct node_paramlist_s node_paramlist_t;
 typedef struct symbol_token_s symbol_token_t;
 typedef struct node_varlist_s node_varlist_t;
 typedef struct node_syncvarlist_s node_syncvarlist_t;
-typedef struct node_expr_if_s node_expr_if_t;
 
 
 /**
@@ -146,7 +132,7 @@ struct node_expr_symbol_s
  **   Terminal node (in our case, static values, integers and strings).
  **/
 /**   @var node_expr_term_s::type
- **     Expression type: NODE_TERM
+ **     Expression type: NODE_TERM                                                
  **/
 /**   @var node_expr_term_s::res_id
  **     Resource id in the current static rule environment.
@@ -188,35 +174,13 @@ struct node_expr_regsplit_s
   node_varlist_t *dest_vars;
 };
 
-/**
- ** @struct node_expr_if_s
- ** If statement
- **/
-/**   @var node_expr_if_s::cond
- **     Transition condition (NULL if it is an unconditional transition).
- **/
-/**   @var node_expr_if_s::cond
- **     Statement condition
- **/
-/**   @var node_expr_if_s::then
- **     Code to execute if cond true
- **/
-/**   @var node_expr_if_s::els
- **     Code to exectute if cond false (can be NULL) if no "else" in the statement
- **/
-struct node_expr_if_s
-{
-  int          type;
-  node_expr_t  *cond;
-  node_actionlist_t *then;
-  node_actionlist_t *els;
-};
 
 /**
  ** @union node_expr_u
  **   Generic expression node
  **/
-/**   FIXME BACK TYPE
+/**   @var node_expr_u::type
+ **     Expression type.
  **/
 /**   @var node_expr_u::bin
  **     Binary expression node.
@@ -235,14 +199,12 @@ struct node_expr_if_s
  **/
 union node_expr_u
 {
-  int   type;
+  int                type;
   node_expr_bin_t    bin;
-  node_expr_bin_t    cond;
   node_expr_call_t   call;
   node_expr_symbol_t sym;
   node_expr_term_t   term;
   node_expr_regsplit_t regsplit;
-  node_expr_if_t      	ifstmt;
 };
 
 /**
@@ -296,6 +258,15 @@ struct node_state_s
   node_actionlist_t *actionlist;
   node_translist_t  *translist;
   unsigned long      flags;
+};
+
+/**
+ ** @struct node_action_s
+ **   An action IS an expression :-)
+ **/
+struct node_action_s
+{
+  node_expr_t *expr;
 };
 
 /**
@@ -493,87 +464,6 @@ struct symbol_token_s
 };
 
 /**
- ** @struct label_s
- **   Labels are used during test expression compilation
- **   During compilation, each jump operator has a label to jump to
- **   The jumps value are resolved after the complete code compilation.
- **/
-/**   @var label_s::nb
- **     Number of labels created
- **/
-/**   @var label_s::labels
- **     Array of all labels positions
- **/
-/**   @var label_s::toset_nb
- **     Number of jump offsets to resolve
- **/
-/**   @var label_s::toset
- **     Array of code position where a jump offset has to be resolved
- **/
-typedef struct	labels_s {
-    unsigned int	labels_nb;
-    unsigned int	*labels;
-    unsigned int	labels_sz;
-    unsigned int	toset_nb;
-    unsigned int	*toset;
-    unsigned int	toset_sz;
-}		labels_t;
-
-#define LABEL_GROW	256
-
-/**
- ** @def NEW_LABEL(labels)
- **   Return a new label id
- **/
-#define NEW_LABEL(l)  l.labels_nb++;
-
-/**
- ** @def SET_LABEL(labels, code, label)
- **   Set the label position at the current code position
- **/
-#define SET_LABEL(l, pos, label)					\
-  do {									\
-    if (l.labels_nb >= l.labels_sz)					\
-    {									\
-      l.labels = Xrealloc(l.labels, (l.labels_sz + LABEL_GROW) * sizeof (unsigned int));	\
-      memset(&(l.labels[l.labels_sz]), 0, LABEL_GROW * sizeof (unsigned int)); \
-      l.labels_sz += LABEL_GROW;					\
-    }									\
-    l.labels[label] = pos;} while (0);					\
-
-/**
- ** @def PUT_LABEL(l, code, label)
- **   Add a label after a jmp operator. The jump offset will be
- **   resolved after compitation
- **/
-#define PUT_LABEL(l, code, label)			\
-  do {							\
-    if (l.toset_nb >= l.toset_sz)					\
-    {									\
-      l.toset = Xrealloc(l.toset, (l.toset_sz + LABEL_GROW) * sizeof (unsigned int)); \
-      memset(&(l.toset[l.toset_sz]), 0, LABEL_GROW * sizeof (unsigned int)); \
-      l.toset_sz += LABEL_GROW;					\
-    }									\
-    l.toset[l.toset_nb++] = code->pos;	\
-    code->bytecode[code->pos++] = label;			\
-  } while(0);
-
-/**
- ** @def INIT_LABELS(l)
- **   Initialize the labels_t structure
- **/
-#define INIT_LABELS(l)							\
-  memset(&l, 0, sizeof (labels_t));				\
-  l.labels = Xzmalloc(LABEL_GROW * sizeof (unsigned int));		\
-  l.toset = Xzmalloc(LABEL_GROW * sizeof (unsigned int));		\
-  l.labels_sz = LABEL_GROW;						\
-  l.toset_sz = LABEL_GROW;						\
-  /* LABEL 0 => JMP (0) */						\
-  NEW_LABEL(l);
-
-
-
-/**
  ** @struct bytecode_buffer_s
  ** Used for converting list of actions into an OVM byte code sequence
  **/
@@ -600,8 +490,6 @@ struct bytecode_buffer_s
   size_t used_fields_pos;
   int used_fields[MAX_FIELDS];
   unsigned long flags;
-  labels_t	labels;
-    rule_compiler_t *ctx;
 };
 
 
@@ -748,17 +636,6 @@ build_transitionlist(node_trans_t *trans);
 node_trans_t *
 build_direct_transition(node_expr_t *cond, char *dest);
 
-/**
- * Build a if statement node.
- * @param cond The condition expression.
- * @param then Action code to execute if cond true
- * @param els Action code to execute if cond false
- * @return The new if statement node.
- **/
-node_expr_t *
-build_expr_ifstmt(node_expr_t *cond, node_actionlist_t *then,
-		  node_actionlist_t *els);
-
 
 /**
  * Build indirect transition.
@@ -799,17 +676,7 @@ node_trans_t *build_unconditional_transition_test(char *dest);
  * @return A new allocated expression node.
  **/
 node_expr_t *
-build_expr_binop(int op, node_expr_t *left_node, node_expr_t *right_node);
-
-/**
- * Build a logic expression node.
- * @param op The operator identifier.
- * @param left_node The left part of the binary expression.
- * @param right_node The right part of the binary expression.
- * @return A new allocated expression node.
- **/
-node_expr_t *
-build_expr_cond(int op, node_expr_t *left_node, node_expr_t *right_node);
+build_expr(int op, node_expr_t *left_node, node_expr_t *right_node);
 
 
 /**

@@ -20,7 +20,7 @@ rule demo {
 
   state event_0_start {
   /* no  action */
-    expect ( .snare.syscall == "ptrace"  )
+    if ( .snare.syscall == "ptrace"  )
       goto event_0_end;
   }
 
@@ -36,9 +36,9 @@ rule demo {
   }
 
   state repeat_6_loop {
-    expect ( $repeat_6_count >= 3 )
+    if ( $repeat_6_count >= 3 )
       goto repeat_6_end;
-    expect ( $repeat_6_count < 3 )
+    if ( $repeat_6_count < 3 )
       goto repeat_6_begin;
   }
 
@@ -58,7 +58,7 @@ rule demo {
 
   state event_1_start {
   /* no  action */
-    expect ( .snare.syscall == "poketext"  )
+    if ( .snare.syscall == "poketext"  )
       goto event_1_end;
   }
 
@@ -78,7 +78,7 @@ rule demo {
 
   state event_3_start {
   /* no  action */
-    expect ( .snare.syscall == "modprobe"  )
+    if ( .snare.syscall == "modprobe"  )
       goto event_3_end;
   }
 
@@ -89,7 +89,7 @@ rule demo {
 
   state event_2_start {
   /* no  action */
-    expect ( .snare.syscall == "getregs"  )
+    if ( .snare.syscall == "getregs"  )
       goto event_2_end;
   }
 

@@ -1,0 +1,42 @@
+/*
+  static regexp:
+  regexp are compiled *only* at rule compilation time.
+*/
+rule regmatch_static {
+  state init {
+    if (.syslog.prog !~ _REGEX("^(snort|ntpd)") )
+      goto q1;
+
+    if (.syslog.prog =~ _REGEX("^(httpd|sshd)") )
+      goto q2;
+
+  }
+
+  state q1 {
+    print("Reached sta:q1");
+  }
+
+  state q2 {
+    print("Reached sta:q2");
+  }
+}
+
+/*
+  when static regexp are not sufficient, it is possible to
+  compile dynamically a string into a regexp.
+  this should be used with care, since it may introduce some performance penalties.
+*/
+rule regmatch_dynamic {
+  state init {
+    $prog = .syslog.prog;
+    $regexstr = "^[0-9]+ Message from " + $prog + " blah blah";
+    $regex = regex_from_str($regexstr);
+
+    if (.syslog.msg =~ $regex)
+      goto q1;
+  }
+
+  state q1 {
+    print("Reached dyn:q1");
+  }
+}

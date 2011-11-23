@@ -1,0 +1,26 @@
+/*
+** Test rule for timeouts.
+*/
+
+
+rule timeout_test {
+
+  state init {
+
+    if (.pcap.interface == "eth0")
+      goto create_timeout;
+
+    if (.timeout.name == "a_test_timeout")
+      goto got_timeout;
+  }
+
+  state create_timeout {
+    /* install a timeout 10 seconds after a reception of an event */
+    timeout("a_test_timeout", 10);
+  }
+
+  state got_timeout {
+    print("Got Timeout !");
+  }
+
+}

@@ -38,8 +38,6 @@ struct htmlstatecfg_s
   int rule_instence_state_limit;
   int thread_limit;
   int event_limit;
-
-  char*	HTML_output_dir;
 };
 
 static void *

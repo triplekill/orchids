@@ -6,7 +6,7 @@
  **
  ** @version 0.1
  ** @ingroup modules
- **
+ ** 
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
  **/
@@ -24,7 +24,7 @@
 #include "period.h"
 #include "strhash.h"
 #include "orchids.h"
-#include "html_output.h"
+
 
 typedef struct modperiod_ctx_s modperiod_ctx_t;
 struct modperiod_ctx_s
@@ -47,7 +47,7 @@ qsort_strcmp(const void *a, const void *b);
 
 
 static int
-period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
+period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp);
 
 
 static void

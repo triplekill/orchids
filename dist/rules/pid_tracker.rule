@@ -10,10 +10,10 @@ rule pidtrack
 
   state init
   {
-    expect (.rawsnare.syscall == "(2) SYS_fork")
+    if (.rawsnare.syscall == "(2) SYS_fork")
       goto newpid;
 
-    expect (.rawsnare.syscall == "(190) SYS_vfork")
+   if (.rawsnare.syscall == "(190) SYS_vfork")
       goto newpid;
   }
 
@@ -30,45 +30,45 @@ rule pidtrack
     $str = str_from_int($pid) + " started by " + $user;
     print($str); */
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(11) SYS_execve" &&
         .rawsnare.path != "/bin/sh" &&
         .rawsnare.euid != $uid)
       goto update_uid;
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(208) SYS_setresuid32")
       goto update_setuid;
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(203) SYS_setreuid32")
       goto update_setuid;
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(214) SYS_setgid32")
       goto update_setuid;
 
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(11) SYS_execve" &&
         .rawsnare.path != "/bin/sh" &&
         .rawsnare.egid != $gid)
       goto update_gid;
 
     /* should exclude set*id and execve+setuid here */
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.euid != $uid)
       goto alert;
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.egid != $gid)
       goto alert;
 
-    expect (.rawsnare.pid == $pid &&
+    if (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(1) SYS_exit")
       goto end;
 
-    expect (.rawsnare.syscall == "(37) SYS_kill" &&
+    if (.rawsnare.syscall == "(37) SYS_kill" &&
         .rawsnare.kill_sig == "(9) SIGKILL" &&
         .rawsnare.kill_pid == $pid)
       goto end;
@@ -77,6 +77,7 @@ rule pidtrack
   state update_uid
   {
     cut("newpid");
+    /* print("newuid"); */
     $uid = .rawsnare.euid;
     goto newpid;
   }
@@ -84,6 +85,8 @@ rule pidtrack
   state update_setuid
   {
     cut("newpid");
+    /* print("setuid");
+    print_event(); */
     $uid = .rawsnare.target_id;
     goto newpid;
   }
@@ -91,6 +94,7 @@ rule pidtrack
   state update_gid
   {
     cut("newpid");
+    /* print("newgid"); */
     $gid = .rawsnare.egid;
     goto newpid;
   }
@@ -100,10 +104,13 @@ rule pidtrack
     print("Alert report :");
     dump_stack();
     report();
+    /* shutdown(); */
   }
 
   state end
   {
-    kill_threads();
+    /* do nothing */
+    /* $str2 = "end pid: " + str_from_int($pid);
+    print($str2); */
   }
 }

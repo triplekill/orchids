@@ -30,14 +30,8 @@
 #include <unistd.h>
 #include <glob.h> /* glob() */
 #include <errno.h>
-#include <ctype.h>
-#include <dlfcn.h> /* dlsym */
-#include <sys/socket.h> /* inet_addr */
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 
-#include "orchids_api.h"
 #include "safelib.h"
 #include "mod_mgr.h"
 #include "lang.h"
@@ -64,6 +58,7 @@ extern input_module_t mod_snmptrap;
 extern input_module_t mod_sunbsm;
 extern input_module_t mod_win32evt;
 extern input_module_t mod_consoles;
+extern input_module_t mod_autohtml;
 extern input_module_t mod_sockunix;
 #endif
 
@@ -270,6 +265,17 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 static void
 config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
+
+/**
+ ** Handler for the HTMLOutputDir configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
 /**
  ** Handler for the RuntimeUser configuration directive.
  ** @param ctx  A pointer to the Orchids application context.
@@ -278,6 +284,37 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  **/
 static void
 set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportDir configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportPrefix configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
+
+/**
+ ** Handler for the ReportExt configuration directive.
+ ** @param ctx  A pointer to the Orchids application context.
+ ** @param mod  A pointer to the current module being configured.
+ ** @param dir  A pointer to the configuration directive record.
+ **/
+static void
+set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+
 
 /**
  ** Handler for the SetDefaultPreprocessorCmd configuration directive.
@@ -869,6 +906,7 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     &mod_sunbsm,
     &mod_win32evt,
     &mod_consoles,
+    &mod_autohtml,
     &mod_sockunix,
     NULL
   };
@@ -899,6 +937,60 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 }
 
+/* XXX move this to mod_htmlstate */
+static void
+set_html_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  struct stat stat_buf;
+
+  DebugLog(DF_CORE, DS_INFO, "setting HTML output directory to '%s'\n", dir->args);
+
+  ctx->html_output_dir = dir->args;
+
+  /* check if the output directory exists */
+  Xstat(ctx->html_output_dir, &stat_buf);
+}
+
+
+static void
+set_idmef_dtd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting IMDEF-DTD file to '%s'\n", dir->args);
+
+  ctx->idmef_dtd = dir->args;
+}
+
+
+static void
+set_idmef_analyzer_id(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO,
+           "setting IMDEF analyzed identifier to '%s'\n", dir->args);
+
+  ctx->idmef_analyzer_id = dir->args;
+}
+
+
+static void
+set_idmef_analyzer_loc(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO,
+           "setting IMDEF analyzed location to '%s'\n", dir->args);
+
+  ctx->idmef_analyzer_loc = dir->args;
+}
+
+
+static void
+set_idmef_sensor_hostname(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO,
+           "setting IMDEF sensor hostname to '%s'\n", dir->args);
+
+  ctx->idmef_sensor_hostname = dir->args;
+}
+
+
 static void
 set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -906,6 +998,39 @@ set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
            "setting RuntimeUser to '%s'\n", dir->args);
 
   ctx->runtime_user = dir->args;
+}
+
+
+static void
+set_report_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  struct stat stat_buf;
+
+  DebugLog(DF_CORE, DS_INFO, "setting report output directory to '%s'\n",
+           dir->args);
+
+  ctx->report_dir = dir->args;
+
+  /* check if the directory exists */
+  Xstat(ctx->report_dir, &stat_buf);
+}
+
+
+static void
+set_report_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting report prefix to '%s'\n", dir->args);
+
+  ctx->report_prefix = dir->args;
+}
+
+
+static void
+set_report_ext(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting report extension to '%s'\n", dir->args);
+
+  ctx->report_ext = dir->args;
 }
 
 
@@ -1045,136 +1170,8 @@ set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   }
 }
 
-static void
-add_input_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  char	*mod_name;
-  mod_entry_t *m;
-  mod_cfg_cmd_t *c;
-  int i;
 
-  mod_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
-    dir->args++;
-
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
-
-  if (!*dir->args)
-    return;
-
-  DebugLog(DF_CORE, DS_DEBUG,
-	   "INPUT (%s) (%s)\n",
-	   mod_name, dir->args);
-
-  m = find_module_entry(ctx, mod_name);
-  if (!m)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "INPUT : unknown module (%s)\n",
-	     mod_name);
-    return;
-  }
-  c = m->mod->cfg_cmds;
-  i = 0;
-  while (c[i].name && strcmp(c[i].name, dir->directive))
-    i++;
-  if (c[i].cmd) {
-    c[i].cmd(ctx, m, dir);
-  }
-  else {
-    DebugLog(DF_CORE, DS_WARN,
-	     "no handler defined in module [%s] for [%s] directive\n",
-	     m->mod->name, dir->directive);
-  }
-}
-
-static void
-add_cond_dissector(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  char	*mod_source_name;
-  char	*mod_dissect_name;
-  char	*cond_param_str;
-  mod_entry_t *m_source;
-  mod_entry_t *m_dissect;
-  void	*cond_param;
-  int	cond_param_size;
-  void	*dissect_func;
-
-  mod_dissect_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
-    dir->args++;
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
-
-  mod_source_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
-    dir->args++;
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
-
-  cond_param_str = dir->args;
-  while (*dir->args && !isblank(*dir->args))
-    dir->args++;
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
-
-  if (!*mod_dissect_name || !*mod_source_name || !*cond_param_str)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : malformated directive \n");
-    return ;
-  }
-
-  if ((m_source = find_module_entry(ctx, mod_source_name)) == NULL)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : unknown module %s\n", mod_source_name);
-    return ;
-  }
-
-  if ((m_dissect = find_module_entry(ctx, mod_dissect_name)) == NULL)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : unknown module %s\n", mod_dissect_name);
-    return ;
-  }
-
-  switch (ctx->global_fields[m_source->first_field_pos + m_source->num_fields - 2].type)
-  {
-    case T_STR:
-    case T_VSTR:
-      cond_param = cond_param_str;
-      cond_param_size = strlen(cond_param_str);
-      break;
-    case T_INT:
-    case T_UINT:
-      cond_param = Xmalloc(sizeof (int));
-      *(int*)cond_param = atoi(cond_param_str);
-      cond_param_size = sizeof (int);
-      break;
-    case T_IPV4:
-      cond_param = Xmalloc(sizeof (in_addr_t));
-      *(int*)cond_param = inet_addr(cond_param_str);
-      cond_param_size = sizeof (in_addr_t);
-      break;
-    default:
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : cannot dissect type %i \n", ctx->global_fields[m_source->first_field_pos + m_source->num_fields - 2].type);
-      return;
-  }
-
-  if ((dissect_func = dlsym(m_dissect->dlhandle, "generic_dissect")) != NULL)
-    register_conditional_dissector(ctx, m_dissect, mod_source_name,
-				   cond_param, cond_param_size,
-				   dissect_func, NULL);
-  else
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : module %s has no generic dissector\n", mod_dissect_name);
-
-}
-
-static mod_cfg_cmd_t config_dir_g[] =
+static mod_cfg_cmd_t config_dir_g[] = 
 {
   { "PollPeriod", set_poll_period, "Set Poll Period (en Second)" },
 #ifdef ORCHIDS_STATIC
@@ -1184,7 +1181,15 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "<module"   , module_config  , "Configuration section for a module" },
   { "AddRuleFile", add_rule_file , "Add a rule file" },
   { "AddRuleFiles", add_rule_files , "Add a rule files with a pattern" },
+  { "HTMLOutputDir", set_html_output_dir , "Set the HTML output directory" },
+  { "IDMEFdtd", set_idmef_dtd, "Set the IDMEF dtd"},
+  { "IDMEFAnalyzerId", set_idmef_analyzer_id, "Set the IDMEF analyzer identifier"},
+  { "IDMEFAnalyzerLocation", set_idmef_analyzer_loc, "Set the IDMEF analyzer location"},
+  { "IDMEFSensorHostname", set_idmef_sensor_hostname, "Set the IDMEF sensor host name"},
   { "RuntimeUser", set_runtime_user, "Set the runtime user." },
+  { "ReportDir", set_report_output_dir, "Set the output directory" },
+  { "ReportPrefix", set_report_prefix, "Set the report prefix" },
+  { "ReportExt", set_report_ext, "Set the report extension" },
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
   { "AddPreprocessorCmd", add_preproc_cmd, "Add a preprocessor command for a file suffix" },
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
@@ -1192,8 +1197,6 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
   { "ResolveIP", set_resolve_ip, "Enable/Disable DNS name resolution" },
   { "Nice", set_nice, "Set the process priority"},
-  { "INPUT", add_input_source, "Add an input source module"},
-  { "DISSECT", add_cond_dissector, "Add a conditionnal dissector"},
   { NULL, NULL, NULL }
 };
 

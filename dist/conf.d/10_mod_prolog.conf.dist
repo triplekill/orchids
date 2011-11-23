@@ -5,6 +5,6 @@
 <module prolog>
 
   # Add prolog file acting as the Orchids Prolog library
-  Consult /home/orchids/dev/orchids/branches/baptiste/ticket-100-update-prolog-database/misc/demo-update.pl
-  Consult /home/orchids/dev/orchids/branches/baptiste/ticket-100-update-prolog-database/src/modules/mod_prolog.pl
+  Consult orchids.pl
+
 </module>

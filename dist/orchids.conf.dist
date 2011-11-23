@@ -19,6 +19,32 @@ MaxMemorySize 134217728
 
 SetModuleDir @@LIBDIR@@/orchids
 
+
+# Module section.
+# This is the place where modules are loaded.
+
+LoadModule htmlstate
+LoadModule remoteadm
+LoadModule textfile
+LoadModule sockunix
+LoadModule udp
+LoadModule syslog
+LoadModule rawsnare
+LoadModule snare
+LoadModule generic
+LoadModule netfilter
+LoadModule cisco
+LoadModule snmptrap
+LoadModule consoles
+LoadModule prolog
+LoadModule clocks
+LoadModule period
+LoadModule pcap
+LoadModule wifi
+LoadModule timeout
+LoadModule sharedvars
+LoadModule ruletrace
+
 # Define preprocessor command for each rule file suffix.
 
 AddPreprocessorCmd .cpp.rule  cpp
@@ -28,9 +54,32 @@ AddPreprocessorCmd  .m4.rule  m4
 # It is set here to cpp for convenience
 SetDefaultPreprocessorCmd     cpp
 
+# This directive is deprecated and should be moved
+# in the htmlstate module section.
+# This is the place where html pages will be generated.
+
+HTMLOutputDir @@VARDIR@@/orchids/htmlstate
+
+
+# These directives are deprecated and should be moved in
+# a specific idmef module.
+
+IDMEFdtd              @@VARDIR@@/orchids/xml/idmef-message.dtd
+IDMEFAnalyzerId       orchids-idmef
+IDMEFAnalyzerLocation orchids-analyzer
+IDMEFSensorHostname   orchids-sensor
+
 # This is the runtime user id in which Orchids will drop root provoleges.
 
 RuntimeUser @@RUNUSER@@
+
+
+# Configure reports generation paremeters.
+
+ReportDir     @@VARDIR@@/orchids/reports
+ReportPrefix  report-
+ReportExt     .rpt
+
 
 # Disable Network name resolution by default
 
@@ -40,19 +89,11 @@ ResolveIP  no
 # Remove this comment to set the process priority
 # Nice -10
 
-
-# Include the used module file.
-
-Include @@ETCDIR@@/orchids/orchids-modules.conf
-
 # Include module specific configurations files...
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
 
-# Include the rule definition file.
+
+# Include the rule rule definition file.
 
 Include @@ETCDIR@@/orchids/orchids-rules.conf
-
-# Include the inputs definition file
-
-Include @@ETCDIR@@/orchids/orchids-inputs.conf

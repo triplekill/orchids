@@ -21,11 +21,8 @@
 #include <sys/time.h>   /* for struct timeval */
 #include <netinet/in.h> /* for struct addr */
 
-# ifdef PCREPOSIX
-#  include <pcreposix.h>
-# else
-#  include <regex.h>
-#endif
+#include <regex.h>
+
 #include "hash.h"
 
 #include "orchids.h"
@@ -54,12 +51,11 @@
 #define T_FLOAT      18
 #define T_DOUBLE     19
 
-#define T_EXTERNAL	 20
-
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
 #define T_TCPPORT 0
-#define T_IPV4PEER 0#define T_IPV6ADDR 0
+#define T_IPV4PEER 0
+#define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
 /* types flags mask -- this allow 2^16 types and 16 bits for flags */
@@ -83,20 +79,12 @@
 #define CAN_FREE_VAR(x) ((x)->flags & TYPE_CANFREE)
 #define IS_NOT_BOUND(x) \
      (((x)->flags & (TYPE_CANFREE|TYPE_NOTBOUND)) == (TYPE_CANFREE|TYPE_NOTBOUND))
-
-#define FREE_VAR(x)			\
-  do {						\
-    if (x)			\
-   issdl_free(x);	\
-  } while (0)
-
 #define FREE_IF_NEEDED(x) \
   do { \
-    if (x && IS_NOT_BOUND(x)) { \
-      issdl_free(x); \
+    if (IS_NOT_BOUND(x)) { \
+      Xfree(x); \
      } \
   } while (0)
-
 
 #define STR_PAD_LEN 4
 
@@ -131,42 +119,11 @@
 #define    SNMPOID(var)  (((ovm_snmpoid_t *)(var))->objoid)
 #define      FLOAT(var)    (((ovm_float_t *)(var))->val)
 #define     DOUBLE(var)   (((ovm_double_t *)(var))->val)
-#define     EXTPTR(var)    (((ovm_extern_t *)(var))->ptr)
-#define    EXTDESC(var)    (((ovm_extern_t *)(var))->desc)
-#define    EXTFREE(var)    (((ovm_extern_t *)(var))->free)
-
-#define IS_NULL(x) (!x || (TYPE(x) == T_NULL))
-
-/* ERRNO values */
-#define ERRNO_UNDEFINED		1
-#define ERRNO_PARAMETER_ERROR	2
-#define ERRNO_REGEX_ERROR	3
-
-#define STATIC_VAR(ctx, si, var)			       \
-   ((si)->state->rule->static_env[	       \
-    (ctx)->rule_compiler->var				       \
-    ])
 
 
-#define ISSDL_RETURN_TRUE(ctx, si)			       \
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_1_res_id));	\
-  } while (0)
 
-#define ISSDL_RETURN_FALSE(ctx, si)		\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_0_res_id));	\
-  } while (0)
 
-#define ISSDL_RETURN_NULL(ctx, si)		\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_null_res_id));	\
-  } while (0)
 
-#define ISSDL_RETURN_PARAM_ERROR(ctx, si)	\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_param_error_res_id));	\
-  } while (0)
 
 /**
  ** @struct ovm_var_s
@@ -180,7 +137,7 @@
  **     TYPE_MONO, TYPE_ANTI, TYPE_CONST and TYPE_TEMP.
  **/
 /**   @var ovm_var_s::data
- **     Generic binary data.
+ **     Generic binary data. 
  **     It should be a zero-length array... but it use STR_PAD_LEN to be ISO-C
  **     compliant (ISO-C doesn't allow zero length arrays)
  **     and to keep alignment...
@@ -205,7 +162,6 @@ typedef ovm_var_t *(*var_mul_t)(ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_div_t)(ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_mod_t)(ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_clone_t)(ovm_var_t *var);
-typedef void	   (*var_destruct_t)(ovm_var_t *var);
 
 /**
  ** @struct issdl_type_s
@@ -244,9 +200,6 @@ typedef void	   (*var_destruct_t)(ovm_var_t *var);
 /**   @var issdl_type_s::clone
  **     Cloning function handler.
  **/
-/**   @var issdl_type_s::destruct
- **     Destructor function handler.
- **/
 /**   @var issdl_type_s::desc
  **     A shot text description of the type.
  **/
@@ -264,7 +217,6 @@ struct issdl_type_s
   var_div_t            div;
   var_mod_t            mod;
   var_clone_t          clone;
-  var_destruct_t       destruct;
   /* XXX add extension here */
   char                *desc;
 };
@@ -655,7 +607,7 @@ struct ovm_snmpoid_s
 
 /**
  ** @struct ovm_float_s
- **   ISSDL 32-bits floating point value.
+ **   ISSDL 32-bits floating point value. 
  **/
 /**   @var ovm_float_s::type
  **     Data type identifier: T_FLOAT.
@@ -695,32 +647,6 @@ struct ovm_double_s
   double    val;
 };
 
-/**
- ** @struct @ovm_extern_s
- **   ISSDL external data type. Contains a 'void * ptr',
- **   the data description, and the desctructor
- **/
-/**   @var ovm_extern_s::type
- **     Data type identifier: T_ADDRESS.
- **/
-/**   @var ovm_extern_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_extern_s::addr
- **     Address value.
- **/
-typedef void (*freefct)(void *ptr);
-typedef struct ovm_extern_s ovm_extern_t;
-struct ovm_extern_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  void     *ptr;
-  char	   *desc;
-  void (*free)(void *ptr);
-};
-
-
 
 /*----------------------------------------------------------------------------*
 ** function prototypes                                                       **
@@ -732,20 +658,6 @@ struct ovm_extern_s
  **/
 issdl_type_t *
 issdlgettypes(void);
-
-
-/**
- ** Test a variable
- ** @return Return TRUE or FALSE
- **/
-int
-issdl_test(ovm_var_t *var);
-
-/**
- ** Free a variable and its contents if needed.
- **/
-void
-issdl_free(ovm_var_t	*var);
 
 
 /**
@@ -938,11 +850,9 @@ ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
 ovm_var_t *
 ovm_uint_new(void);
 
-ovm_var_t *
-ovm_extern_new(void);
-
 void
 ovm_uint_fprintf(FILE *fp, ovm_uint_t *val);
+
 
 /**
  ** Print a variable on a stream.
@@ -951,16 +861,6 @@ ovm_uint_fprintf(FILE *fp, ovm_uint_t *val);
  **/
 void
 fprintf_ovm_var(FILE *fp, ovm_var_t *val);
-
-/**
- ** Print a variable in a buffer with a fixed size.
- ** @param buff	The buffer to fill.
- ** @param size The buffer size.
- ** @param val The variable to print.
- ** @return The number of printed characters in the buffer.
- **/
-int
-snprintf_ovm_var(char *buff, unsigned int size, ovm_var_t *val);
 
 
 ovm_var_t *

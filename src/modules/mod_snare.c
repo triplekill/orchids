@@ -115,11 +115,40 @@ snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
-int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+
+static void
+add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  return snare_dissect(ctx, mod, event, data);
+  int *p;
+  /* XXXXXX Rhaaa p is in the stack ! correct this rapidly !!! */
+
+  DebugLog(DF_MOD, DS_INFO, "Adding udp source port %s\n", dir->args);
+
+  p = Xmalloc(sizeof (int)); /* XXX: OUCH ! */
+  *p = atoi(dir->args);
+  register_conditional_dissector(ctx, mod, "udp",
+                                 (void *)p, sizeof(int),
+                                 snare_dissect, NULL);
 }
+
+
+static void
+add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  DebugLog(DF_MOD, DS_INFO, "Adding textfile source file %s\n", dir->args);
+
+  register_conditional_dissector(ctx, mod, "textfile",
+                                 (void *)dir->args, strlen(dir->args),
+                                 snare_dissect, NULL);
+}
+
+
+static mod_cfg_cmd_t snare_cfgcmds[] = {
+  { "AddTextfileSource", add_textfile_source, "Add text source file" },
+  { "AddUdpSource", add_udp_source, "Add udp port source" },
+  { NULL, NULL }
+};
+
 
 static char *snare_deps[] = {
   "udp",
@@ -134,7 +163,7 @@ input_module_t mod_snare = {
   "snare",
   "CeCILL2",
   snare_deps,
-  NULL,
+  snare_cfgcmds,
   snare_preconfig,
   NULL,
   NULL

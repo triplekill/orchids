@@ -1,0 +1,23 @@
+/*
+
+Orchids CPP demo rule
+
+*/
+
+#include "cpp.inc"
+
+rule cpp {
+
+  state init {
+#ifdef TITI
+    if (.syslog.prog == "titi")
+#else
+    if (.syslog.prog == "toto")
+#endif
+      goto state2;
+  }
+
+  state state2 {
+    print( MSG );
+  }
+}

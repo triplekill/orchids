@@ -18,6 +18,16 @@ Requires: cpp /usr/sbin/sendmail
 %description
 A real-time intrusion detection system.
 
+
+%package mod_autohtml
+Summary: Module mod_autohtml
+Group: System Environment/Daemons
+Requires: orchids
+
+%description mod_autohtml
+Module mod_autohtml.
+
+
 %package mod_cisco
 Summary: Module mod_cisco
 Group: System Environment/Daemons
@@ -157,6 +167,15 @@ Requires: orchids
 %description mod_snare
 Module mod_snare.
 
+
+#%package mod_snmp
+#Summary: Module mod_snmp
+#Group: System Environment/Daemons
+#
+#%description mod_snmp
+#Module mod_snmp.
+
+
 %package mod_snmptrap
 Summary: Module mod_snmptrap
 Group: System Environment/Daemons
@@ -200,6 +219,23 @@ Requires: orchids
 
 %description mod_syslog
 Module mod_syslog.
+
+
+#%package mod_test2
+#Summary: Module mod_test2
+#Group: System Environment/Daemons
+#
+#%description mod_test2
+#Module mod_test2.
+
+
+#%package mod_test
+#Summary: Module mod_test
+#Group: System Environment/Daemons
+#
+#%description mod_test
+#Module mod_test.
+
 
 %package mod_textfile
 Summary: Module mod_textfile
@@ -245,21 +281,7 @@ Requires: orchids
 %description mod_win32evt
 Module mod_win32evt.
 
-%package mod_auditd
-Summary: Module mod_auditd
-Group: System Environment/Daemons
-Requires: orchids
 
-%description mod_auditd
-Module mod_auditd.
-
-%package mod_prelude
-Summary: Module mod_prelude
-Group: System Environment/Daemons
-Requires: orchids
-
-%description mod_prelude
-Module mod_prelude.
 
 %prep
 
@@ -282,10 +304,12 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %config %{prefix}/etc/orchids/orchids-rules.conf
 %config %{prefix}/etc/orchids/rules/*
 %dir %{prefix}/etc/orchids/conf.d
-%attr(-,nobody,nobody) %{prefix}/var/run/orchids
 %attr(-,nobody,nobody) %{prefix}/var/orchids/log
 %attr(-,nobody,nobody)%{prefix}/var/orchids/reports
 %doc AUTHORS ChangeLog COPYING* NEWS README
+
+%files mod_autohtml
+%{prefix}/usr/lib/orchids/mod_autohtml.*
 
 %files mod_cisco
 %{prefix}/usr/lib/orchids/mod_cisco.*
@@ -345,6 +369,9 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %{prefix}/usr/lib/orchids/mod_snare.*
 %config %{prefix}/etc/orchids/conf.d/07_mod_snare.conf
 
+#%files mod_snmp
+#%{prefix}/usr/lib/orchids/mod_snmp.*
+
 %files mod_snmptrap
 %{prefix}/usr/lib/orchids/mod_snmptrap.*
 
@@ -361,6 +388,12 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %files mod_syslog
 %{prefix}/usr/lib/orchids/mod_syslog.*
 %config %{prefix}/etc/orchids/conf.d/02_mod_syslog.conf
+
+#%files mod_test
+#%{prefix}/usr/lib/orchids/mod_test.*
+
+#%files mod_test2
+#%{prefix}/usr/lib/orchids/mod_test2.*
 
 %files mod_textfile
 %{prefix}/usr/lib/orchids/mod_textfile.*
@@ -380,12 +413,6 @@ cp misc/orchids-sysv $RPM_BUILD_ROOT/etc/init.d/orchids
 %files mod_win32evt
 %{prefix}/usr/lib/orchids/mod_win32evt.*
 
-%files mod_auditd
-%{prefix}/usr/lib/orchids/mod_auditd.*
-
-%files mod_prelude
-%{prefix}/usr/lib/orchids/mod_prelude.*
-%config %{prefix}/etc/orchids/conf.d/17_mod_prelude.conf
 
 %clean
 rm -r $RPM_BUILD_ROOT

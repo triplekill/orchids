@@ -55,8 +55,8 @@ textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf)
   VSTR(attr[F_FILE]) = tf->filename;
   VSTRLEN(attr[F_FILE]) = strlen(tf->filename);
 
-  attr[F_LINE] = ovm_str_new(strlen(buf));
-  memcpy (STR(attr[F_LINE]), buf,STRLEN(attr[F_LINE]));
+  attr[F_LINE] = ovm_str_new(strlen(buf) - 1);
+  memcpy(STR(attr[F_LINE]), buf, STRLEN(attr[F_LINE]));
 
   event = NULL;
   add_fields_to_event(ctx, mod, &event, attr, TF_FIELDS);
@@ -66,117 +66,53 @@ textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf)
 
 
 static int
-proceed_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
-{
-  char s_buff[BUFF_SZ];
-  char* d_buff = NULL;
-  char* buff = NULL;
-  unsigned int buff_sz = BUFF_SZ;
-  int	eof = 0;
-  /* read and proceed new lines */
-
-  buff_sz = BUFF_SZ;
-  eof = (Xfgets(s_buff, BUFF_SZ, tf->fd) == NULL);
-  if (!eof)
-  {
-    if (s_buff[strlen (s_buff) - 1] != '\n')
-    {
-      d_buff = Xzmalloc (buff_sz);
-      do {
-	buff_sz += BUFF_SZ;
-	if (buff_sz < MAX_LINE_SZ)
-	{
-	  d_buff = Xrealloc(d_buff, buff_sz);
-	  strcat (d_buff, s_buff);
-	}
-	Xfgets(s_buff, BUFF_SZ, tf->fd);
-      } while (s_buff[strlen (s_buff) - 1] != '\n');
-
-      buff_sz += BUFF_SZ;
-      d_buff = Xrealloc(d_buff, buff_sz);
-      strcat (d_buff, s_buff);
-
-      buff = d_buff;
-    }
-    else
-      buff = s_buff;
-
-    if (buff_sz >= MAX_LINE_SZ)
-    {
-      DebugLog(DF_MOD, DS_WARN,
-	       "Line too long, dropping event (max line size : %i)",
-	       MAX_LINE_SZ);
-      if (buff == d_buff)
-	Xfree(buff);
-    }
-    else
-    {
-
-      /* update line # */
-      tf->line++;
-      /* update crc */
-      *(unsigned int *)&tf->hash =
-	crc32( *(unsigned int *)&tf->hash, buff, strlen(buff));
-      DebugLog(DF_MOD, DS_DEBUG,
-	       "read line %i crc(0x%08X) %s",
-	       tf->line, *(unsigned int *)&tf->hash, buff);
-
-      textfile_buildevent(ctx, mod, tf, buff);
-      if (buff == d_buff)
-	Xfree(buff);
-    }
-  }
-
-  tf->eof = eof;
-
-  return eof;
-}
-
-static int
 textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 {
   textfile_config_t *cfg;
   textfile_t *tf;
   struct stat st;
-  char		eof = 1;
+  char buff[1024];
 
   DebugLog(DF_MOD, DS_TRACE, "textfile_callback();\n");
 
   cfg = (textfile_config_t *)mod->config;
   for (tf = cfg->file_list; tf; tf = tf->next) {
-    if (tf->eof)
-    {
-      /* Checks if mtime has changed for each file... */
-      Xfstat(fileno(tf->fd), &st);
-      if (tf->file_stat.st_size > st.st_size) {
-	DebugLog(DF_MOD, DS_NOTICE,
-		 "File [%s] has been truncated (%lu->%lu) rewind()ing\n",
-		 tf->filename, tf->file_stat.st_size, st.st_size);
-	rewind(tf->fd);
-      }
-      if (st.st_mtime > tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "mtime updated for [%s]\n", tf->filename);
-	/* Update file stat */
-	tf->file_stat = st;
-	/* read and proceed new lines */
-	eof &= proceed_new_lines(ctx, mod, tf);
-      }
-#ifdef ORCHIDS_DEBUG
-      else if (st.st_mtime < tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "mtime older for [%s] ?.\n", tf->filename);
-      } else if (st.st_mtime == tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "no changes for [%s]\n", tf->filename);
-      }
-#endif
+    /* Checks if mtime has changed for each file... */
+    Xfstat(fileno(tf->fd), &st);
+    if (tf->file_stat.st_size > st.st_size) {
+      DebugLog(DF_MOD, DS_NOTICE,
+               "File [%s] has been truncated (%lu->%lu) rewind()ing\n",
+                tf->filename, tf->file_stat.st_size, st.st_size);
+      rewind(tf->fd);
     }
-    else
-      eof &= proceed_new_lines(ctx, mod, tf);
+    if (st.st_mtime > tf->file_stat.st_mtime) {
+      DebugLog(DF_MOD, DS_DEBUG, "mtime updated for [%s]\n", tf->filename);
+      /* Update file stat */
+      tf->file_stat = st;
+      /* read and proceed new lines */
+      while ( Xfgets(buff, 1024, tf->fd) != NULL ) {
+        /* update line # */
+        tf->line++;
+        /* update crc */
+        *(unsigned int *)&tf->hash =
+          crc32( *(unsigned int *)&tf->hash, buff, strlen(buff));
+        DebugLog(DF_MOD, DS_DEBUG,
+                 "read line %i crc(0x%08X) %s",
+                 tf->line, *(unsigned int *)&tf->hash, buff);
+
+        textfile_buildevent(ctx, mod, tf, buff);
+      }
+    }
+#ifdef ORCHIDS_DEBUG
+    else if (st.st_mtime < tf->file_stat.st_mtime) {
+      DebugLog(DF_MOD, DS_DEBUG, "mtime older for [%s] ?.\n", tf->filename);
+    } else if (st.st_mtime == tf->file_stat.st_mtime) {
+      DebugLog(DF_MOD, DS_DEBUG, "no changes for [%s]\n", tf->filename);
+    }
+#endif
   }
 
-  if (cfg->exit_proceed_all_data && eof)
-    exit(EXIT_SUCCESS);
-
-  return (eof);
+  return (0);
 }
 
 static field_t tf_fields[] = {
@@ -213,11 +149,13 @@ textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
   cfg = (textfile_config_t *)mod->config;
 
   /* register real-time action for file polling, if requested. */
-  DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
-  register_rtcallback(ctx,
-		      rtaction_read_files,
-		      mod,
-		      INITIAL_MODTEXT_POLL_DELAY);
+  if (cfg->poll_period > 0) {
+    DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
+    register_rtcallback(ctx,
+			rtaction_read_files,
+			mod,
+			INITIAL_MODTEXT_POLL_DEFAY);
+  }
 }
 
 
@@ -226,6 +164,7 @@ textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   textfile_config_t *cfg;
   textfile_t *tf;
+  char buff[1024];
 
   DebugLog(DF_MOD, DS_TRACE,
            "textfile_postcompil() -- reading initial file content...\n");
@@ -235,8 +174,16 @@ textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
   /* if we don't have to compute hashes, just fseek to the end-of-file */
   for (tf = cfg->file_list; tf; tf = tf->next) {
     DebugLog(DF_MOD, DS_DEBUG, "proceed file : %s\n", tf->filename);
-    /* read and proceed new lines */
-    proceed_new_lines(ctx, mod, tf);
+    while ( Xfgets(buff, 1024, tf->fd) != NULL ) {
+      tf->line++;
+      *(unsigned int *)&tf->hash = 
+        crc32( *(unsigned int *)&tf->hash, buff, strlen(buff));
+      DebugLog(DF_MOD, DS_DEBUG,
+               "read line %i crc(0x%08X) %s",
+               tf->line, *(unsigned int *)&tf->hash, buff);
+      if (cfg->proceed_all_data)
+        textfile_buildevent(ctx, mod, tf, buff);
+    }
   }
 }
 
@@ -286,18 +233,6 @@ set_proceed_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     ((textfile_config_t *)mod->config)->proceed_all_data = 1;
 }
 
-static void
-set_exit_proceed_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  int flag;
-
-  DebugLog(DF_MOD, DS_INFO, "setting ExitAfterProoceedAll to %s\n", dir->args);
-
-  flag = atoi(dir->args);
-  if (flag)
-    ((textfile_config_t *)mod->config)->exit_proceed_all_data = 1;
-}
-
 
 static void
 set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
@@ -320,7 +255,6 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
 {
   mod_entry_t *mod;
   textfile_config_t *cfg;
-  char	      eof;
 
   DebugLog(DF_MOD, DS_TRACE,
            "Real-time action: Checking files...\n");
@@ -328,24 +262,21 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
   mod = (mod_entry_t *)(e->data);
   cfg = (textfile_config_t *)(mod->config);
 
-  eof = textfile_callback(ctx, mod, NULL);
+  textfile_callback(ctx, mod, NULL);
 
-  e->date = ctx->cur_loop_time;
-  if (eof)
-    e->date.tv_sec = cfg->poll_period;
+  e->date.tv_sec += cfg->poll_period;
+
   register_rtaction(ctx, e);
 
   return (0);
 }
 
 
-static mod_cfg_cmd_t textfile_dir[] =
+static mod_cfg_cmd_t textfile_dir[] = 
 {
   { "AddInputFile", add_input_file, "Add a file as input source" },
   { "ProceedAll", set_proceed_all, "Proceed all lines from start" },
-  { "ExitAfterProceedAll", set_exit_proceed_all, "Exit after proceeding all files" },
   { "SetPollPeriod", set_poll_period, "Set poll period in second for files" },
-  { "INPUT", add_input_file, "Add a file as input source" },
   { NULL, NULL }
 };
 

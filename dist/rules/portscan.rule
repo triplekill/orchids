@@ -1,10 +1,10 @@
-/*
- * Quick and dirty portscan detector, through snort.
- */
+
+/* Quick and dirty portscan detector, through snort.
+*/
 
 rule portscan {
   state init {
-    expect (.snort.message == "PORTSCAN DETECTED")
+    if (.snort.message == "PORTSCAN DETECTED")
       goto portscan_begin;
   }
 
@@ -21,17 +21,17 @@ rule portscan {
   state portscan_status {
     cut ("portscan_begin");
 
-    expect (.snort.message == "portscan status" &&
+    if (.snort.message == "portscan status" &&
 	.snort.sip == $sip)
       goto portscan_status;
 
     /* log all firewall activity corresponding to this scan */
-    expect (.netfilter.src == $sip)
+    if (.netfilter.src == $sip)
       goto portscan_status;
-    expect (.netfilter.dst == $sip)
+    if (.netfilter.dst == $sip)
       goto portscan_status;
 
-    expect (.snort.message == "End of portscan" &&
+    if (.snort.message == "End of portscan" &&
 	.snort.sip == $sip)
       goto portscan_alert;
   }

@@ -1,0 +1,108 @@
+/*
+** Exemple d'Eric Totel
+*/
+
+rule totel
+{
+  state init {
+    if (.syslog.prog == "e0")
+      goto have_e0;
+  }
+
+  state have_e0 {
+    $counter = 0;
+    if (.syslog.prog == "f0")
+      goto have_f0_1;
+
+    /* if (.syslog.prog == "f") */
+      goto f_loop_2;
+
+    if (.syslog.prog == "e1")
+      goto have_e1;
+  }
+
+  state have_f0_1 {
+    if (.syslog.prog == "g0")
+      goto have_g0_1;
+  }
+
+  state have_g0_1 {
+    /* if (.syslog.prog == "f") */
+      goto f_loop_1;
+  }
+
+  state f_loop_1 onlyonce {
+    $counter = $counter + 1;
+    if (.syslog.prog == "f" && $counter <= 10)
+      goto f_loop_1;
+    if ($counter > 10)
+      goto alarm;
+  }
+
+  state f_loop_2 onlyonce {
+    $counter = $counter + 1;
+    /* print($counter); */
+    if (.syslog.prog == "f" && $counter <= 10)
+      goto f_loop_2;
+    if ($counter > 10)
+      goto have_10_f;
+  }
+
+  state have_10_f {
+    if (.syslog.prog == "f0")
+      goto have_f0_2;
+  }
+
+  state have_f0_2 {
+    if (.syslog.prog == "g0")
+      goto alarm;
+  }
+
+  state have_e1 {
+    if (.syslog.prog == "e2")
+      goto have_e2;
+
+    if (.syslog.prog == "f1")
+      goto have_f1;
+  }
+
+  state have_e2 {
+    if (.syslog.prog == "e3")
+      goto alarm;
+    if (.syslog.prog == "f1")
+      goto have_f1;
+  }
+
+  state have_f1 {
+    /* if (.syslog.prog == "f2") */
+      goto f2_loop;
+  }
+
+  state f2_loop onlyonce {
+    $counter = $counter + 1;
+    if (.syslog.prog == "f2" && $counter <= 20)
+      goto f2_loop;
+    if ($counter > 20)
+      goto have_20_f2;
+  }
+
+  state have_20_f2 {
+    if (.syslog.prog == "f3")
+      goto reject;
+  }
+
+  state reject {
+    print("reject\n");
+    dump_stack();
+    dump_dot_pathtree();
+    shutdown();
+  }
+
+  state alarm {
+    print("alarm\n");
+    dump_stack();
+    /* dump_dot_pathtree(); */
+    shutdown();
+  }
+
+}

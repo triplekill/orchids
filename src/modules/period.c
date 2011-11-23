@@ -21,12 +21,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
 #include <math.h>
 
-#include "orchids_types.h"
 #include "period.h"
 
 /*

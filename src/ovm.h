@@ -21,14 +21,6 @@
 #ifndef OVM_H
 #define OVM_H
 
-#define PUSH_RETURN_TRUE(ctx,state)					\
-    stack_push(ctx->ovm_stack,						\
-	       state->state->rule->static_env[ ctx->rule_compiler->static_1_res_id]);
-
-#define PUSH_RETURN_FALSE(ctx,state)					\
-    stack_push(ctx->ovm_stack,					\
-	       state->state->rule->static_env[ ctx->rule_compiler->static_0_res_id]);
-
 /*
 ** Orchids VM Op Codes Definition
 */
@@ -97,14 +89,24 @@
 #define OP_PUSHFIELD 5
 
 /**
- * Trash the value on the top of the stack (free it if necessary)
+ * Array Load : Load an array element on the stack.
  **/
-#define OP_TRASH 6
+#define OP_ALOAD 6
+
+/**
+ * Array Store : Put the value on the stack in an array element.
+ **/
+#define OP_ASTORE 7
+
+/**
+ * Array Length : Put the length of an array on the stack.
+ **/
+#define OP_ALENGTH 8
 
 /**
  * Call an ISSDL built-in function.
  **/
-#define OP_CALL 7
+#define OP_CALL 9
 
 
 
@@ -117,62 +119,62 @@
 /**
  * Addition.
  **/
-#define OP_ADD 8
+#define OP_ADD 10
 
 /**
  * Subtraction
  **/
-#define OP_SUB 9
+#define OP_SUB 11
 
 /**
  * Multiplication
  **/
-#define OP_MUL 10
+#define OP_MUL 12
 
 /**
  * Division
  **/
-#define OP_DIV 11
+#define OP_DIV 13
 
 /**
  * Modulo
  **/
-#define OP_MOD 12
+#define OP_MOD 14
 
 /**
  * Increase
  **/
-#define OP_INC 13
+#define OP_INC 15
 
 /**
  * Decrease
  **/
-#define OP_DEC 14
+#define OP_DEC 16
 
 /**
  * Logical AND
  **/
-#define OP_AND 15
+#define OP_AND 17
 
 /**
  * Logical OR
  **/
-#define OP_OR 16
+#define OP_OR 18
 
 /**
  * Logical XOR
  **/
-#define OP_XOR 17
+#define OP_XOR 19
 
 /**
  * Logical NEG
  **/
-#define OP_NEG 18
+#define OP_NEG 20
 
 /**
  * Logical NOT
  **/
-#define OP_NOT 19
+#define OP_NOT 21
 
 
 
@@ -185,12 +187,48 @@
 /**
  * JuMP
  **/
-#define OP_JMP 20
+#define OP_JMP 22
 
 /**
- * POP the last value and jump if this one is true
+ * Jump if Equal
  **/
-#define OP_POPCJMP 21
+#define OP_JE 23
+
+/**
+ * Jump if Not Equal
+ **/
+#define OP_JNE 24
+
+/**
+ * Jump if Regexp Mathe
+ **/
+#define OP_JRM 25
+
+/**
+ * Jump if Not Regexp Match
+ **/
+#define OP_JNRM 26
+
+/**
+ * Jump if Less Than
+ **/
+#define OP_JLT 27
+
+/**
+ * Jump if Great Than
+ **/
+#define OP_JGT 28
+
+/**
+ * Jump if Less or Equal
+ **/
+#define OP_JLE 29
+
+/**
+ * Jump if Greater or Equal
+ **/
+#define OP_JGE 30
+
 
 
 /* fast real-time evaluation for transition condition
@@ -203,42 +241,42 @@
 /**
  * Continue if EQual
  **/
-#define OP_CEQ 22
+#define OP_CEQ 31
 
 /**
  * Continue if Not EQual
  **/
-#define OP_CNEQ 23
+#define OP_CNEQ 32
 
 /**
  * Continue if Regexp Match
  **/
-#define OP_CRM 24
+#define OP_CRM 33
 
 /**
  * Continue if Not Regexp Match
  **/
-#define OP_CNRM 25
+#define OP_CNRM 34
 
 /**
  * Continue if Less Than
  **/
-#define OP_CLT 26
+#define OP_CLT 35
 
 /**
  * Continue if Greater Than
  **/
-#define OP_CGT 27
+#define OP_CGT 36
 
 /**
  * Continue if Less or Equal
  **/
-#define OP_CLE 28
+#define OP_CLE 37
 
 /**
  * Continue if Greater or Equal
  **/
-#define OP_CGE 29
+#define OP_CGE 38
 
 /**
  * Split a string into substrings using a regular expression.
@@ -254,7 +292,7 @@
  * POP $a
  * POP $b
  **/
-#define OP_REGSPLIT 30
+#define OP_REGSPLIT 39
 
 
 /**
@@ -269,7 +307,7 @@
  * set [idx] to val
  * endif
  **/
-#define OP_CESV 31
+#define OP_CESV 40
 
 /* XXX Add Past Instruction */
 

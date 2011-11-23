@@ -201,9 +201,6 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
 [
    dnl default action (if no --with-xxx)
    AC_PATH_PROG(SWIPL, pl)
-   if test "$SWIPL" == "" ; then
-      AC_PATH_PROG(SWIPL, swipl)
-   fi
    AC_PATH_PROG(SWIPLLD, plld)
    if test "$SWIPL" != "" -a "$SWIPLLD" != ""; then
       AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])

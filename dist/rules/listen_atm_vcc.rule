@@ -10,22 +10,21 @@
 rule listen_atm_vcc
 {
   state init
-  {
-    expect (.auditd.syscall == SYSCALL &&
-	    .auditd.varzero == "4")
-      goto start;
+ {  
+    $attack_pid = .auditd.pid;
+    if (.auditd.syscall == SYSCALL &&
+        .auditd.varzero == "4")
+       goto start;
   }
 
   state start
-  {
-
-    $counter = 1 ;
-    $attack_pid = .auditd.pid;
-
-    expect (.auditd.pid == $attack_pid &&
-	    .auditd.syscall == SYSCALL &&
-	    .auditd.varzero == "4")
-      goto listen_loop;
+  { 
+    
+   $counter = 1 ;
+   if (.auditd.pid == $attack_pid &&
+       .auditd.syscall == SYSCALL &&
+       .auditd.varzero == "4")
+       goto listen_loop;
   }
 
   state listen_loop
@@ -33,28 +32,27 @@ rule listen_atm_vcc
     print($counter);
     $counter = $counter + 1;
 
-    expect ($counter == MAX_CALLS)
-      goto alert;
+    if ($counter == MAX_CALLS)
+       goto alert;
 
-    expect ( .auditd.pid == $attack_pid &&
-	     .auditd.syscall == SYSCALL &&
-	     .auditd.varzero == "4" &&
-	     $counter < MAX_CALLS)
-      goto listen_loop;
+    if ( .auditd.pid == $attack_pid &&
+         .auditd.syscall == SYSCALL &&
+         .auditd.varzero == "4" && 
+         $counter < MAX_CALLS)
+       goto listen_loop;
   }
 
-
+ 
   state alert
   {
     print(" Linux kernel double-listen Local Denial of Service detected !!!");
 
     $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
     system( $reaction );
-    $msg= "Orchids is reacting :killing attack process !! ";
+    $msg= "Orchids is reacting :killing attack process !! ";  
     print($msg);
     print( $reaction );
-
-    report();
+    
   }
 
 }/* end rule listen_atm_vcc*/

@@ -1,0 +1,50 @@
+/*
+** demu Rule
+*/
+
+rule demoRule
+{
+  state init
+  {
+    if ( .rawsnare.syscall == $rawsnare.SYS_EXECVE &&
+    (.rawsnare.cmdline =~ "^cp /bin/*sh") && $toto == 2)
+      goto shell_copy;
+  }
+
+  state shell_copy
+  {
+    regsplit(.rawsnare.cmdline, "^cp /bin/*sh \(.*\)$", $dest);
+
+    if (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
+        .rawsnare.createmode > 2048) /* 4000 in octal */
+    {
+      print("shell copy: ", $dest);
+
+      goto change_perms;
+    }
+  }
+
+  state change_perms
+  {
+    print("Alert !\n");
+    dump_stack();
+
+    /* no transitions -- end of automata */
+  }
+}
+
+rule myScenar
+{
+  state init
+  {
+    waitfor ( .rawsnare.syscall == $rawsnare.SYS_EXECVE &&
+              .rawsnare.cmdline =~ "^cp /bin/*sh" && $toto == 2);
+    regsplit(.rawsnare.cmdline, "^cp /bin/*sh \(.*\)$", $dest);
+    waitfor (.rawsnare.syscall == $rawsnare.SYS_CHMOD &&
+             .rawsnare.createmode > 2048); /* 4000 in octal */
+    $abc = "blabla";
+    $toto = 123 * 456 + 564 - 654 * 456 % ( 231 * 654 ) + $titi;
+    print("alert: shell copy: ", $dest);
+    dump_stack();
+  }
+}

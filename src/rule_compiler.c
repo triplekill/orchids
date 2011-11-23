@@ -66,26 +66,14 @@ compile_transitions_ast(rule_compiler_t *ctx,
                         state_t *state,
                         node_translist_t *translist);
 
-static void
-compile_actions_bytecode(node_expr_t **expr, int n, bytecode_buffer_t *code);
+static bytecode_t *
+compile_actions_bytecode(node_expr_t **expr, int n, state_t *state);
 
 static bytecode_t *
-compile_trans_bytecode(rule_compiler_t  *ctx,
-		       node_expr_t	*expr,
-		       transition_t	*trans);
+compile_bytecode(node_expr_t *expr, transition_t *trans);
 
 static void
-compile_bytecode_stmt(node_expr_t *expr, bytecode_buffer_t *code);
-
-static void
-compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code);
-
-static void
-compile_bytecode_cond(node_expr_t *expr, bytecode_buffer_t *code,
-		      int	label_then,
-		      int	label_else,
-		      int	label_end);
-
+compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code);
 
 static void
 statics_add(rule_compiler_t *ctx, ovm_var_t *data);
@@ -104,7 +92,6 @@ rule_compiler_t *
 new_rule_compiler_ctx(void)
 {
   rule_compiler_t *ctx;
-  ovm_var_t    *var;
 
   ctx = Xzmalloc(sizeof (rule_compiler_t));
 
@@ -116,37 +103,6 @@ new_rule_compiler_ctx(void)
   ctx->rule_env        = new_strhash(251);
   ctx->statics = Xzmalloc(STATICS_SZ * sizeof (ovm_var_t *));
   ctx->dyn_var_name = Xzmalloc(DYNVARNAME_SZ * sizeof (char *));
-
-  /* Create to static integers 1 and 0 used for boolean values */
-  var = ovm_int_new();
-  var->flags |= TYPE_CONST;
-  INT(var) = 1;
-  ctx->static_1_res_id = ctx->statics_nb;
-  statics_add(ctx, var);
-
-  var = ovm_int_new();
-  var->flags |= TYPE_CONST;
-  INT(var) = 0;
-  ctx->static_0_res_id = ctx->statics_nb;
-  statics_add(ctx, var);
-
-  var = ovm_null_new();
-  var->flags |= TYPE_CONST;
-  ctx->static_null_res_id = ctx->statics_nb;
-  statics_add(ctx, var);
-
-  var = ovm_null_new();
-  var->flags |= TYPE_CONST;
-  ERRNO(var) = ERRNO_PARAMETER_ERROR;
-  ctx->static_param_error_res_id = ctx->statics_nb;
-  statics_add(ctx, var);
-
-  var = ovm_null_new();
-  var->flags |= TYPE_CONST;
-  ERRNO(var) = ERRNO_REGEX_ERROR;
-  ctx->static_regex_error_res_id = ctx->statics_nb;
-  statics_add(ctx, var);
-
 
   return (ctx);
 }
@@ -539,6 +495,7 @@ transitionlist_add(node_translist_t *list, node_trans_t *trans)
   list->trans[ list->trans_nb++ ] = trans;
 }
 
+
 node_actionlist_t *
 build_actionlist(node_action_t *first_action)
 {
@@ -615,7 +572,7 @@ build_string_split(node_expr_t *source,
 
 
 node_expr_t *
-build_expr_binop(int op, node_expr_t *left_node, node_expr_t *right_node)
+build_expr(int op, node_expr_t *left_node, node_expr_t *right_node)
 {
   node_expr_t *n;
 
@@ -630,26 +587,12 @@ build_expr_binop(int op, node_expr_t *left_node, node_expr_t *right_node)
 
 
 node_expr_t *
-build_expr_cond(int op, node_expr_t *left_node, node_expr_t *right_node)
-{
-  node_expr_t *n;
-
-  n = Xmalloc(sizeof (node_expr_t));
-  n->type = NODE_COND;
-  n->bin.op = op;
-  n->bin.lval = left_node;
-  n->bin.rval = right_node;
-
-  return (n);
-}
-
-node_expr_t *
 build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr)
 {
   node_expr_t *n;
 
   n = Xmalloc(sizeof (node_expr_t));
-  n->type = NODE_ASSOC;
+  n->type = NODE_BINOP;
   n->bin.op = EQ;
   n->bin.lval = build_varname(ctx, var);
   n->bin.rval = expr;
@@ -681,22 +624,6 @@ build_function_call(rule_compiler_t  *ctx,
 
   return (call_node);
 }
-
-node_expr_t *
-build_expr_ifstmt(node_expr_t *cond, node_actionlist_t *then,
-		  node_actionlist_t *els)
-{
-  node_expr_t *i;
-
-  i = Xmalloc(sizeof (node_expr_t));
-  i->type = NODE_IFSTMT;
-  i->ifstmt.cond = cond;
-  i->ifstmt.then = then;
-  i->ifstmt.els = els;
-
-  return (i);
-}
-
 
 
 node_expr_t *
@@ -1002,7 +929,7 @@ build_regex(rule_compiler_t *ctx, char *regex_str)
   /* compile regex */
   ret = regcomp(&(REGEX(regex)), regex_str, REG_EXTENDED | REG_NOSUB);
   if (ret) {
-    DebugLog(DF_OLC, DS_ERROR, "REGEX compilation error (%s)\n", regex_str);
+    DPRINTF( ("REGEX compilation error (%s)\n", regex_str) );
     exit(EXIT_FAILURE);
   }
 
@@ -1329,20 +1256,6 @@ compile_state_ast(rule_compiler_t *ctx,
 }
 
 
-static void
-compile_set_labels(bytecode_buffer_t *code)
-{
-  int	i;
-
-  for (i = 0; i < code->labels.toset_nb; i++)
-  {
-    int code_pos = code->labels.toset[i];
-    int	lbl_pos = code->labels.labels[code->bytecode[code_pos]];
-    code->bytecode[code_pos] =
-      lbl_pos - code_pos - 1;
-  }
-}
-
 /**
  ** Compile an action list node abstract syntax tree.
  ** @param ctx Rule compiler context.
@@ -1356,47 +1269,20 @@ compile_actions_ast(rule_compiler_t   *ctx,
                     state_t           *state,
                     node_actionlist_t *actionlist)
 {
-  bytecode_buffer_t code;
-  bytecode_t *bytecode;
-
-
   DebugLog(DF_OLC, DS_DEBUG,
            "compiling actions in state \"%s\" in rule \"%s\"\n",
            state->name, rule->name);
 
   if (actionlist) {
-    DebugLog(DF_OLC, DS_DEBUG, "compiling actions bytecode\n");
-
-    code.bytecode[0] = '\0';
-    code.pos = 0;
-    code.used_fields_pos = 0;
-    code.flags = 0;
-    code.ctx = ctx;
-
-    INIT_LABELS(code.labels);
-
-    compile_actions_bytecode(actionlist->actions,
-			     actionlist->actions_nb,
-			     &code);
-    code.bytecode[ code.pos++ ] = OP_END;
-
-    compile_set_labels(&code);
-
-    DebugLog(DF_OLC, DS_DEBUG, "bytecode size: %i\n", code.pos);
-
-    bytecode = Xzmalloc(code.pos * sizeof (bytecode_t));
-    memcpy(bytecode, code.bytecode, code.pos * sizeof (bytecode_t));
-
-    if (code.flags & BYTECODE_HAVE_PUSHFIELD) {
-      state->flags |= BYTECODE_HAVE_PUSHFIELD;
-    }
-
-    state->action = bytecode;
+    state->action = compile_actions_bytecode(actionlist->actions,
+                                             actionlist->actions_nb,
+                                             state);
   }
   else {
     DebugLog(DF_OLC, DS_INFO, "state \"%s\" have no action\n", state->name);
   }
 }
+
 
 /**
  * Compile a list of action expressions into byte code.
@@ -1405,31 +1291,49 @@ compile_actions_ast(rule_compiler_t   *ctx,
  * @param state State to compile.
  * @return An allocated byte code buffer.
  **/
-static void
-compile_actions_bytecode(node_expr_t **expr, int n, bytecode_buffer_t *code)
+static bytecode_t *
+compile_actions_bytecode(node_expr_t **expr, int n, state_t *state)
 {
+  bytecode_buffer_t code;
+  bytecode_t *bytecode;
   int a;
 
+  DebugLog(DF_OLC, DS_DEBUG, "compiling actions bytecode\n");
+
+  code.bytecode[0] = '\0';
+  code.pos = 0;
+  code.used_fields_pos = 0;
+  code.flags = 0;
+
   for (a = 0; a < n; a++)
-    compile_bytecode_stmt(expr[a], code);
-  if (code->pos >= BYTECODE_BUF_SZ - 2) {
+    compile_bytecode_sub(expr[a], &code);
+  if (code.pos >= BYTECODE_BUF_SZ - 2) {
     DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
     exit(EXIT_FAILURE);
   }
+  code.bytecode[ code.pos++ ] = OP_END;
+
+  DebugLog(DF_OLC, DS_DEBUG, "bytecode size: %i\n", code.pos);
+
+  bytecode = Xzmalloc(code.pos * sizeof (bytecode_t));
+  memcpy(bytecode, code.bytecode, code.pos * sizeof (bytecode_t));
+
+  if (code.flags & BYTECODE_HAVE_PUSHFIELD) {
+    state->flags |= BYTECODE_HAVE_PUSHFIELD;
+  }
+
+  return (bytecode);
 }
 
 
 /**
  * Compile an evaluation expression into bytecode.
- *   @param ctx Rule compiler context.
  *   @param expr  An evaluation expression.
  *   @param trans Transition to compile.
  *   @return An allocated byte code buffer.
  **/
 static bytecode_t *
-compile_trans_bytecode(rule_compiler_t  *ctx,
-		       node_expr_t	*expr,
-		       transition_t	*trans)
+compile_bytecode(node_expr_t *expr, transition_t *trans)
 {
   bytecode_buffer_t code;
 
@@ -1438,15 +1342,8 @@ compile_trans_bytecode(rule_compiler_t  *ctx,
   code.bytecode[0] = '\0';
   code.pos = 0;
   code.used_fields_pos = 0;
-  code.ctx = ctx;
 
-
-  INIT_LABELS(code.labels);
-
-  compile_bytecode_expr(expr, &code);
-
-  compile_set_labels(&code);
-
+  compile_bytecode_sub(expr, &code);
 
   if (code.pos >= BYTECODE_BUF_SZ - 2) {
     DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
@@ -1470,49 +1367,110 @@ compile_trans_bytecode(rule_compiler_t  *ctx,
 
 
 /**
- * Byte code compiler : compile statement
+ * Byte code compiler recursive sub-routine.
  * @param expr An expression to compile.
  * @param code An internal byte code buffer structure.
  **/
 static void
-compile_bytecode_stmt(node_expr_t *expr, bytecode_buffer_t *code)
+compile_bytecode_sub(node_expr_t *expr, bytecode_buffer_t *code)
 {
-  switch (expr->type)
-  {
-    case NODE_ASSOC:
-      compile_bytecode_expr(expr->bin.rval, code);
+  if (expr->type == NODE_BINOP) {
+    /* binary operator */
+    if (expr->bin.op == EQ) {
+      /* assoc is a special case, we must handle rval before lval */
+      compile_bytecode_sub(expr->bin.rval, code);
       code->bytecode[ code->pos++ ] = OP_POP;
       code->bytecode[ code->pos++ ] = expr->bin.lval->sym.res_id;
+      return ;
+    }
+
+    compile_bytecode_sub(expr->bin.lval, code);
+    compile_bytecode_sub(expr->bin.rval, code);
+
+    if (expr->bin.op == ANDAND) 
+      return ;
+
+    if (expr->bin.op == OROR) {
+      DebugLog(DF_OLC, DS_ERROR, "or || not yet implemented (use parallel if instead)\n");
+      return ;
+    }
+    code->bytecode[ code->pos++ ] = expr->bin.op;
+  } else { /* (rval) terminal expression */
+    int i;
+
+    switch (expr->type) {
+
+    case NODE_FIELD:
+      if (code->pos >= BYTECODE_BUF_SZ - 3) {
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
+        exit(EXIT_FAILURE);
+      }
+      code->bytecode[ code->pos++ ] = OP_PUSHFIELD;
+      code->bytecode[ code->pos++ ] = expr->sym.res_id;
+      /* XXX UGLY HACK */
+      code->used_fields[ code->used_fields_pos++ ] = expr->sym.res_id;
+      code->flags |= BYTECODE_HAVE_PUSHFIELD;
       break;
 
-    case NODE_BINOP:
-      compile_bytecode_stmt(expr->bin.lval, code);
-      compile_bytecode_stmt(expr->bin.rval, code);
-      code->bytecode[ code->pos++ ] = expr->bin.op;
+    case NODE_VARIABLE:
+      if (code->pos >= BYTECODE_BUF_SZ - 3) {
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
+        exit(EXIT_FAILURE);
+      }
+      code->bytecode[ code->pos++ ] = OP_PUSH;
+      code->bytecode[ code->pos++ ] = expr->sym.res_id;
+      break;
+
+    case NODE_CONST:
+      if (code->pos >= BYTECODE_BUF_SZ - 3) {
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
+        exit(EXIT_FAILURE);
+      }
+      code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
+      code->bytecode[ code->pos++ ] = expr->sym.res_id;
       break;
 
     case NODE_CALL:
-      compile_bytecode_expr(expr, code);
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      /* Trash the function result */
-      code->bytecode[ code->pos++ ] = OP_TRASH;
-      break;
-
-    case NODE_COND:
-      compile_bytecode_stmt(expr->cond.lval, code);
-      compile_bytecode_stmt(expr->cond.rval, code);
-      code->bytecode[ code->pos++ ] = expr->bin.op;
+      if (expr->call.paramlist)
+        if (expr->call.paramlist->params_nb)
+          for (i = expr->call.paramlist->params_nb - 1; i >= 0; --i)
+            compile_bytecode_sub(expr->call.paramlist->params[i], code);
+      if (code->pos >= BYTECODE_BUF_SZ - 2) {
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
+        exit(EXIT_FAILURE);
+      }
+      code->bytecode[ code->pos++ ] = OP_CALL;
+      code->bytecode[ code->pos++ ] = expr->call.res_id;
       break;
 
     case NODE_REGSPLIT:
-    {
-      int i;
-
       /* size of a regsplit compiled code: 2 PUSH 1 REGSPLIT n POPs
        * = 5 + 2n */
-      EXIT_IF_BYTECODE_BUFF_FULL(5 + 2 * expr->regsplit.dest_vars->vars_nb);
+      if (code->pos >= (BYTECODE_BUF_SZ -
+                        (5 + 2 * expr->regsplit.dest_vars->vars_nb))) {
+        DebugLog(DF_OLC, DS_FATAL, "Byte code buffer full\n");
+        exit(EXIT_FAILURE);
+      }
 
-      compile_bytecode_expr(expr->regsplit.string, code);
+      /* push right string (CONT, VAR or FIELD) */
+      switch (expr->regsplit.string->type) {
+      case NODE_CONST:
+        code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
+        break;
+
+      case NODE_VARIABLE:
+        code->bytecode[ code->pos++ ] = OP_PUSH;
+        break;
+
+      case NODE_FIELD:
+        code->bytecode[ code->pos++ ] = OP_PUSHFIELD;
+        code->flags |= BYTECODE_HAVE_PUSHFIELD;
+        break;
+
+      default:
+        DPRINTF( ("OUCH\n") );
+      }
+      code->bytecode[ code->pos++ ] = expr->regsplit.string->sym.res_id;
 
       /* XXX actually, split string can only be in static env */
       code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
@@ -1527,247 +1485,11 @@ compile_bytecode_stmt(node_expr_t *expr, bytecode_buffer_t *code)
         code->bytecode[ code->pos++ ] = expr->regsplit.dest_vars->vars[i]->sym.res_id;
       }
       break;
-    }
 
-    case NODE_IFSTMT:
-    {
-      int label_then = NEW_LABEL(code->labels);
-      int label_else = NEW_LABEL(code->labels);
-      int label_end = NEW_LABEL(code->labels);
-
-      compile_bytecode_cond(expr->ifstmt.cond, code,
-			    label_then, label_else, label_end);
-      SET_LABEL (code->labels,  code->pos, label_then);
-      compile_actions_bytecode(expr->ifstmt.then->actions,
-			       expr->ifstmt.then->actions_nb, code);
-      code->bytecode[ code->pos++ ] = OP_JMP;
-      PUT_LABEL (code->labels, code, label_end);
-
-      SET_LABEL (code->labels, code->pos, label_else);
-      if (expr->ifstmt.els)
-	compile_actions_bytecode(expr->ifstmt.els->actions,
-				 expr->ifstmt.els->actions_nb, code);
-      SET_LABEL (code->labels, code->pos, label_end);
-      break;
-    }
-    case NODE_UNKNOWN:
-    case NODE_FIELD:
-    case NODE_VARIABLE:
-    case NODE_CONST:
-      // XXX Should discard expression with no border effects
-      DPRINTF( ("Rule compiler expr : should be discarded %i\n", expr->type) );
-      compile_bytecode_expr(expr, code);
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      /* Trash the result */
-      code->bytecode[ code->pos++ ] = OP_TRASH;
-      break;
-      break;
     default:
       DPRINTF( ("unknown node type (%i)\n", expr->type) );
-      /* No border effect, discard stmt */
-      break;
-  }
-}
-
-/**
- * Byte code compiler recursive sub-routine.
- * @param expr An expression to compile.
- * @param code An internal byte code buffer structure.
- **/
-static void
-compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
-{
-  int i;
-
-  switch (expr->type)
-  {
-    case NODE_ASSOC:
-      compile_bytecode_expr(expr->bin.rval, code);
-      code->bytecode[ code->pos++ ] = OP_POP;
-      code->bytecode[ code->pos++ ] = expr->bin.lval->sym.res_id;
-      code->bytecode[ code->pos++ ] = OP_PUSH;
-      code->bytecode[ code->pos++ ] = expr->bin.lval->sym.res_id;
-      break;
-
-    /* binary operator */
-    case NODE_BINOP:
-      compile_bytecode_expr(expr->bin.lval, code);
-      compile_bytecode_expr(expr->bin.rval, code);
-      code->bytecode[ code->pos++ ] = expr->bin.op;
-      break;
-
-    case NODE_COND:
-    {
-      unsigned int	label_i = NEW_LABEL(code->labels);
-      unsigned int	label_then = NEW_LABEL(code->labels);
-      unsigned int	label_else = NEW_LABEL(code->labels);
-      unsigned int	label_end = NEW_LABEL(code->labels);
-
-      switch (expr->cond.op)
-      {
-
-	case ANDAND:
-	  compile_bytecode_cond(expr->cond.lval, code, label_i, label_else, label_end);
-	  SET_LABEL (code->labels, code->pos, label_i);
-	  compile_bytecode_cond(expr->cond.rval, code, label_then, label_else, label_end);
-	  SET_LABEL (code->labels, code->pos, label_then);
-
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_1_res_id;
-
-	  code->bytecode[ code->pos++ ] = OP_JMP;
-	  PUT_LABEL (code->labels, code, label_end);
-
-	  SET_LABEL (code->labels, code->pos, label_else);
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_0_res_id;
-	  SET_LABEL (code->labels, code->pos, label_end);
-
-	  break;
-	case OROR:
-	  compile_bytecode_cond(expr->cond.lval, code, label_then, label_i, label_end);
-	  SET_LABEL (code->labels, code->pos, label_i);
-	  compile_bytecode_cond(expr->cond.rval, code, label_then, label_else, label_end);
-	  SET_LABEL (code->labels, code->pos, label_then);
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_1_res_id;
-
-	  code->bytecode[ code->pos++ ] = OP_JMP;
-	  PUT_LABEL (code->labels, code, label_end);
-
-	  SET_LABEL (code->labels, code->pos, label_else);
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_0_res_id;
-	  SET_LABEL (code->labels, code->pos, label_end);
-	  break;
-
-	case OP_CEQ:
-	case OP_CNEQ:
-	case OP_CRM:
-	case OP_CNRM:
-	case OP_CGT:
-	case OP_CLT:
-	case OP_CGE:
-	case OP_CLE:
-	  compile_bytecode_cond(expr, code, label_then, label_else, label_end);
-	  SET_LABEL (code->labels, code->pos, label_then);
-
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_1_res_id;
-
-	  code->bytecode[ code->pos++ ] = OP_JMP;
-	  PUT_LABEL (code->labels, code, label_end);
-
-	  SET_LABEL (code->labels, code->pos, label_else);
-
-	  code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-	  code->bytecode[ code->pos++ ] = code->ctx->static_0_res_id;
-
-	  SET_LABEL (code->labels, code->pos, label_end);
-      }
     }
-    break;
-
-    case NODE_FIELD:
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      code->bytecode[ code->pos++ ] = OP_PUSHFIELD;
-      code->bytecode[ code->pos++ ] = expr->sym.res_id;
-      /* XXX UGLY HACK */
-      code->used_fields[ code->used_fields_pos++ ] = expr->sym.res_id;
-      code->flags |= BYTECODE_HAVE_PUSHFIELD;
-      break;
-
-    case NODE_VARIABLE:
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      code->bytecode[ code->pos++ ] = OP_PUSH;
-      code->bytecode[ code->pos++ ] = expr->sym.res_id;
-      break;
-
-    case NODE_CONST:
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
-      code->bytecode[ code->pos++ ] = expr->sym.res_id;
-      break;
-
-    case NODE_CALL:
-      if (expr->call.paramlist)
-        if (expr->call.paramlist->params_nb)
-          for (i = expr->call.paramlist->params_nb - 1; i >= 0; --i)
-            compile_bytecode_expr(expr->call.paramlist->params[i], code);
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      code->bytecode[ code->pos++ ] = OP_CALL;
-      code->bytecode[ code->pos++ ] = expr->call.res_id;
-      break;
-
-    case NODE_REGSPLIT:
-    case NODE_IFSTMT:
-      DPRINTF( ("Rule compiler expr : should be here (%i)\n", expr->type) );
-      break;
-    default:
-      DPRINTF( ("unknown node type (%i)\n", expr->type) );
   }
-}
-
-
-/**
- * Byte code compiler recursive sub-routine.
- * @param expr An expression to compile.
- * @param code An internal byte code buffer structure.
- **/
-static void
-compile_bytecode_cond(node_expr_t *expr,
-		      bytecode_buffer_t *code,
-		      int label_then, int label_else, int label_end)
-{
-  switch (expr->type)
-  {
-    case NODE_COND:
-      switch (expr->cond.op)
-      {
-	case OP_CEQ:
-	case OP_CNEQ:
-	case OP_CRM:
-	case OP_CNRM:
-	case OP_CGT:
-	case OP_CLT:
-	case OP_CGE:
-	case OP_CLE:
-	  // XXX Optimization : Create Op code CEQJMP, CNEQJMP ...
-	  // remove a push + pop
-	  compile_bytecode_expr(expr->cond.lval, code);
-	  compile_bytecode_expr(expr->cond.rval, code);
-	  code->bytecode[ code->pos++ ] = expr->cond.op;
-	  code->bytecode[ code->pos++ ] = OP_POPCJMP;
-	  PUT_LABEL (code->labels, code, label_then);
-	  code->bytecode[ code->pos++ ] = OP_JMP;
-	  PUT_LABEL (code->labels, code, label_else);
-	  return;
-      }
-    case NODE_ASSOC:
-    case NODE_BINOP:
-    case NODE_CALL:
-    case NODE_REGSPLIT:
-    case NODE_FIELD:
-    case NODE_VARIABLE:
-    case NODE_CONST:
-      // XXX Optimization : test const value at compilation time
-      compile_bytecode_expr(expr, code);
-      code->bytecode[ code->pos++ ] = OP_POPCJMP;
-      PUT_LABEL (code->labels, code, label_then);
-      code->bytecode[ code->pos++ ] = OP_JMP;
-      PUT_LABEL (code->labels, code, label_else);
-
-      return;
-    case NODE_IFSTMT:
-    case NODE_UNKNOWN:
-      DPRINTF( ("Rule compiler cond : should be here (%i)\n", expr->type) );
-    default:
-      DPRINTF( ("unknown node type (%i)\n", expr->type) );
-      return ;
-  }
-
-
-
 }
 
 
@@ -1822,7 +1544,7 @@ compile_transitions_ast(rule_compiler_t  *ctx,
           }
         }
 
-        compile_trans_bytecode(ctx, translist->trans[i]->cond, &state->trans[i]);
+        compile_bytecode(translist->trans[i]->cond, &state->trans[i]);
 
       }
       else {
@@ -1864,8 +1586,7 @@ compiler_reset(rule_compiler_t *ctx)
 
   clear_strhash(ctx->statenames_hash, NULL);
   clear_strhash(ctx->rule_env, NULL);
-  // Need to keep the two boolean values and the null variables
-  ctx->statics_nb = 5;
+  ctx->statics_nb = 0;
   ctx->dyn_var_name_nb = 0;
 }
 

@@ -1,12 +1,12 @@
 /**
  ** @file mod_clocks.c
  ** A module for handling clock uncertainty.
- **
+ ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- **
+ ** 
  ** @version 0.1.0
  ** @ingroup modules
- **
+ ** 
  ** @date  Started on: Mon Dec 01 00:57:32 2003
  **/
 
@@ -30,7 +30,6 @@
 #include "safelib.h"
 #include "strhash.h"
 #include "file_cache.h"
-#include "html_output.h"
 
 #include "mod_clocks.h"
 
@@ -301,7 +300,7 @@ qsort_clockcmp(const void *a, const void *b)
 
 
 static int
-clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
+clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp)
 {
   FILE *fp;
 /*   strhash_elmt_t *helmt; */
@@ -314,7 +313,7 @@ clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
 
   modcfg = mod->config;
 
-  fp = create_html_file(htmlcfg, "orchids-clocks.html", NO_CACHE);
+  fp = create_html_file(ctx, "orchids-clocks.html", NO_CACHE);
   fprintf_html_header(fp, "Orchids statistics");
 
   fprintf(fp, "<center><h1>Clocks<h1></center>\n");
@@ -387,7 +386,7 @@ clocks_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (modcfg);
 }
 
-static mod_cfg_cmd_t clocks_config_commands[] =
+static mod_cfg_cmd_t clocks_config_commands[] = 
 {
   { "<clock", add_clock, "Add a new clock definition" },
   { NULL, NULL, NULL }

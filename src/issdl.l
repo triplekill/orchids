@@ -85,9 +85,8 @@ static size_t qstr_sz_g;
   return (INIT);
 }
 "goto"     { return (GOTO);     }
+"waitfor"  { return (WAITFOR);  }
 "if"       { return (IF);       }
-"else"     { return (ELSE);     }
-"expect"   { return (EXPECT);   }
 "{"        { return (O_BRACE);  }
 "}"        { return (C_BRACE);  }
 "("        { return (O_PARENT); }
