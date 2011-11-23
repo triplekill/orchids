@@ -208,9 +208,7 @@ mod_xml_la_CFLAGS = $(XML2_CFLAGS)
 mod_xml_la_LDFLAGS = -module -avoid-version
 mod_xml_la_LIBADD = $(XML2_LDFLAGS)
 
-pkglib_LTLIBRARIES += mod_idmef.la \
-					mod_iodef.la \
-		  mod_xml.la
+pkglib_LTLIBRARIES += mod_idmef.la mod_iodef.la mod_xml.la
 endif
 
 mod_metaevent_la_SOURCES = mod_metaevent.c mod_metaevent.h
@@ -219,5 +217,10 @@ mod_metaevent_la_LDFLAGS = -module -avoid-version
 mod_mark_la_SOURCES = mod_mark.c mod_mark.h
 mod_mark_la_LDFLAGS = -module -avoid-version
 
+if USE_NETSNMP
+mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
+mod_snmptrap_la_LDFLAGS = -module -avoid-version
+pkglib_LTLIBRARIES += mod_snmptrap.la
+endif
 
 # End-of-file
