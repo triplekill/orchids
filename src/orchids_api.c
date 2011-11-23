@@ -194,7 +194,7 @@ del_input_descriptor(orchids_t *ctx, int fd)
 
 
 void
-add_input_descriptor(orchids_t *ctx,
+add_input_descriptor(orchids_t *ctx, 
                      mod_entry_t *mod,
 		     realtime_callback_t cb,
                      int fd,
@@ -300,25 +300,6 @@ register_conditional_dissector(orchids_t *ctx,
 
 
 void
-register_pre_inject_hook(orchids_t *ctx,
-			 mod_entry_t *mod,
-			 hook_cb_t cb,
-			 void *data)
-{
-  hook_list_elmt_t *e;
-
-  DebugLog(DF_CORE, DS_INFO, "register pre event injection hook...\n");
-
-  e = Xzmalloc( sizeof (hook_list_elmt_t) );
-  e->cb = cb;
-  e->mod = mod;
-  e->data = data;
-
-  SLIST_INSERT_HEAD(&ctx->pre_evt_hook_list, e, hooklist);
-}
-
-
-void
 register_post_inject_hook(orchids_t *ctx,
                           mod_entry_t *mod,
                           hook_cb_t cb,
@@ -349,16 +330,6 @@ register_report_output(orchids_t *ctx, mod_entry_t *mod_entry, report_cb_t cb, v
   SLIST_INSERT_HEAD(&(ctx->reportmod_list), mod, list);
 
   return (mod);
-}
-
-void
-execute_pre_inject_hooks(orchids_t *ctx, event_t *event)
-{
-  hook_list_elmt_t *e;
-
-  SLIST_FOREACH(e, &ctx->pre_evt_hook_list, hooklist) {
-    e->cb(ctx, e->mod, e->data, event);
-  }
 }
 
 void
@@ -483,7 +454,7 @@ free_event(event_t *event)
 
   while (event) {
     e = event->next;
-    FREE_VAR(event->value);
+    Xfree(event->value);
     Xfree(event);
     event = e;
   }

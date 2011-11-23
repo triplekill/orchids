@@ -1,0 +1,96 @@
+/*
+** JuJu Rule
+*/
+
+rule blablaRule
+{
+  state init
+  {
+    expect (.test.eventtype == 1)
+      goto blabla;
+  }
+
+  state blabla
+  {
+    print("fin blablaRule");
+    dump_stack();
+  }
+}
+
+rule complex
+{
+  state init {
+    $a = 0;
+    expect (.test.eventtype == 0)
+      goto state_0;
+  }
+
+  state state_0 {
+    expect (.test.eventtype == 1)
+      goto state_1;
+    expect (.test.eventtype == 2)
+      goto state_2;
+  }
+
+  state state_1 {
+    $a = $a + 1;
+    expect (.test.eventtype == 3)
+      goto state_0;
+    expect (.test.eventtype == 4)
+      goto state_1;
+    expect (.test.eventtype == 5)
+      goto state_2;
+  }
+
+  state state_2 {
+    expect (.test.eventtype == 6)
+      goto state_3;
+  }
+
+  state state_3 {
+    expect (.test.eventtype == 7)
+      goto state_0;
+    expect (.test.eventtype == 8)
+      goto fin;
+  }
+
+  state fin {
+    print("fin complex.");
+  }
+
+}
+
+rule jujuRule
+{
+  state init
+  {
+    print("Hello World ! (jujuRule start)");
+
+    expect (.test.eventtype == 0)
+      goto step_1;
+  }
+
+  state step_1
+  {
+    print("Hello World (jujuRule step_1 code)");
+
+    expect (.test.eventtype == 2)
+      goto step_2;
+    expect (.test.eventtype == 3)
+      goto step_3;
+  }
+
+  state step_2
+  {
+    print("Alert ! (step_2 code, final state)");
+  }
+
+  state step_3
+  {
+    expect (.test.eventtype == 4)
+      goto step_1;
+    expect (.test.eventtype == 5)
+      goto step_2;
+  }
+}
+

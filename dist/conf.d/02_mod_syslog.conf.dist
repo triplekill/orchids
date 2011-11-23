@@ -4,4 +4,18 @@
 
 <module syslog>
 
+  # The module can read files from the mod_textfile module
+  AddTextfileSource /var/log/messages
+
+  # Hook the udp module on the port 514 (standard syslog udp)
+  AddUdpSource 514
+
+  # Hook the udp module on the port 10514
+  # (user-defined syslog udp, for testing without being root)
+  AddUdpSource 10514
+
+  # Hook the sockeunix module, on the socket source "/dev/log"
+  # for acting as a syslogd.
+  AddUnixSocketSource /dev/log
+
 </module>

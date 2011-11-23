@@ -22,11 +22,6 @@
 #define F_FILE     1
 #define F_LINE     2
 
-// Static buffer size
-#define BUFF_SZ	   1024
-// Maximum line size
-#define MAX_LINE_SZ 10000
-
 /*
 ** module flags:
 ** the two LSBs identify integrity check method
@@ -41,7 +36,7 @@
 #define HASH_SIZE 32
 
 #define DEFAULT_MODTEXT_POLL_PERIOD 10
-#define INITIAL_MODTEXT_POLL_DELAY  0
+#define INITIAL_MODTEXT_POLL_DEFAY  10
 
 typedef struct textfile_s textfile_t;
 struct textfile_s
@@ -52,7 +47,6 @@ struct textfile_s
   struct stat file_stat;
   unsigned int line;
   unsigned char hash[HASH_SIZE];
-  unsigned char eof;
 };
 
 typedef struct textfile_config_s textfile_config_t;
@@ -60,7 +54,6 @@ struct textfile_config_s
 {
   int flags;
   int proceed_all_data;
-  int exit_proceed_all_data;
   int poll_period;
   struct textfile_s *file_list;
 };

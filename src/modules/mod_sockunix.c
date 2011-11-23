@@ -144,10 +144,9 @@ add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   add_input_descriptor(ctx, mod, sockunix_callback, sd, (void *)dir->args);
 }
 
-static mod_cfg_cmd_t sockunix_dir[] =
+static mod_cfg_cmd_t sockunix_dir[] = 
 {
   { "AddUnixSocket", add_unix_socket, "Add a unix socket" },
-  { "INPUT", add_unix_socket, "Add a unix socket" },
   { NULL, NULL }
 };
 

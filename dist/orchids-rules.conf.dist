@@ -2,12 +2,10 @@
 # Rule files for Orchids
 #
 
-AddRuleFile @@ETCDIR@@/orchids/rules/lin24_ptrace.rule
+AddRuleFile @@ETCDIR@@/orchids/rules/lin24_ptrace_audit.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/pid_tracker.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/apachessl.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/portscan.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/dhcp_lease_check.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/password_sniff.rule
 AddRuleFile @@ETCDIR@@/orchids/rules/anti_ssh_scan.rule
-AddRuleFile @@ETCDIR@@/orchids/rules/ssh_failed_burst.rule
-AddRuleFile @@ETCDIR@@/orchids/rules/ssh_failed_long_window.rule

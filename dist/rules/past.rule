@@ -1,0 +1,49 @@
+
+/* Quick and dirty portscan detector, through snort.
+*/
+
+rule pastval {
+  state init {
+    expect (.snort.message == "PORTSCAN DETECTED")
+      goto portscan_begin;
+  }
+
+  state portscan_begin {
+    $sip = .snort.sip;
+    $threshold = .snort.threshold;
+    $msg = "portscan detected from " + str_from_ipv4($sip);
+    $count = 0;
+
+    print ($msg);
+    goto portscan_status;
+  }
+
+#if 1
+  state portscan_status {
+    $count = $count + 1;
+    $tmp = pastval("count", 2);
+    print($tmp);
+    cut ("portscan_begin");
+
+    expect (.snort.message == "portscan status" &&
+	.snort.sip == $sip)
+      goto portscan_status;
+
+    /* log all firewall activity corresponding to this scan */
+    expect (.netfilter.src == $sip)
+      goto portscan_status;
+    expect (.netfilter.dst == $sip)
+      goto portscan_status;
+
+    expect (.snort.message == "End of portscan" &&
+	.snort.sip == $sip)
+      goto portscan_alert;
+  }
+#endif
+
+  state portscan_alert {
+    print ("portscan completed!");
+    /* report(); */
+    shutdown();
+  }
+}

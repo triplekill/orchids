@@ -22,13 +22,11 @@ LoadModule cisco
 LoadModule snmptrap
 LoadModule consoles
 LoadModule prolog
-#LoadModule prolog_history
 LoadModule clocks
 LoadModule period
 LoadModule pcap
 LoadModule wifi
 LoadModule timeout
 LoadModule sharedvars
-LoadModule mark
-#LoadModule ruletrace
-#LoadModule prelude
+LoadModule ruletrace
+LoadModule prelude

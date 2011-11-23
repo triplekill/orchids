@@ -1,0 +1,31 @@
+
+rule goto_test
+{
+  state init
+  {
+    goto state2;
+    goto state3;
+  }
+
+  state state2
+  {
+    print("state2\n");
+
+    expect (.syslog.prog == "blah")
+      goto fin;
+  }
+
+  state state3
+  {
+    print("state3\n");
+
+    expect (.syslog.prog == "bloh")
+      goto fin;
+  }
+
+  state fin
+  {
+    print("alarm\n");
+  }
+
+}

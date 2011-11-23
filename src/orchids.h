@@ -704,15 +704,6 @@ struct rulefile_s
 /**   @var rule_compiler_s::static_0_res_id
  **     Ressource id for const int 0 (used for boolean)
  **/
-/**   @var rule_compiler_s::static_null_res_id
- **     Ressource id for const null (used for undefined vars / fields)
- **/
-/**   @var rule_compiler_s::static_param_error_res_id
- **     Ressource id for const null (with errno set to param error)
- **/
-/**   @var rule_compiler_s::static_regex_error_res_id
- **     Ressource id for const null (with errno set to regex error)
- **/
 struct rule_compiler_s
 {
   char             *currfile;
@@ -733,9 +724,6 @@ struct rule_compiler_s
 
   int		static_1_res_id;
   int		static_0_res_id;
-  int		static_null_res_id;
-  int		static_param_error_res_id;
-  int		static_regex_error_res_id;
 };
 
 
@@ -1165,6 +1153,12 @@ struct orchids_s
   timeval_t  compil_time;
   timeval_t  postcompil_time;
 
+  /* IDMEF parameters */
+  char *idmef_dtd;
+  char *idmef_analyzer_id;
+  char *idmef_analyzer_loc;
+  char *idmef_sensor_hostname;
+
   FILE *evt_fb_fp;
 
   /* global temporal information container */
@@ -1196,7 +1190,6 @@ struct orchids_s
   char *modules_dir;
   char *lockfile;
 
-  SLIST_HEAD(preevthooklist, hook_list_elmt_t) pre_evt_hook_list;
   SLIST_HEAD(postevthooklist, hook_list_elmt_t) post_evt_hook_list;
   SLIST_HEAD(list, reportmod_t) reportmod_list;
 };

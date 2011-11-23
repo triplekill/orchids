@@ -28,6 +28,14 @@ AddPreprocessorCmd  .m4.rule  m4
 # It is set here to cpp for convenience
 SetDefaultPreprocessorCmd     cpp
 
+# These directives are deprecated and should be moved in
+# a specific idmef module.
+
+IDMEFdtd              @@VARDIR@@/orchids/xml/idmef-message.dtd
+IDMEFAnalyzerId       orchids-idmef
+IDMEFAnalyzerLocation orchids-analyzer
+IDMEFSensorHostname   orchids-sensor
+
 # This is the runtime user id in which Orchids will drop root provoleges.
 
 RuntimeUser @@RUNUSER@@
@@ -49,10 +57,7 @@ Include @@ETCDIR@@/orchids/orchids-modules.conf
 
 Include @@ETCDIR@@/orchids/conf.d/*.conf
 
+
 # Include the rule definition file.
 
 Include @@ETCDIR@@/orchids/orchids-rules.conf
-
-# Include the inputs definition file
-
-Include @@ETCDIR@@/orchids/orchids-inputs.conf

@@ -1,0 +1,29 @@
+/*
+  distance operator test/demo
+*/
+
+rule distances {
+  state init {
+    $var1 = "pouet1";
+    $var2 = "pouet2";
+    $var3 = "truc00";
+
+    $bitdist1  =  bitdist($var1, $var2);
+    $bytedist1 = bytedist($var1, $var2);
+    $bitdist2  =  bitdist($var1, $var3);
+    $bytedist2 = bytedist($var1, $var3);
+
+    $str = "bitdist(" + $var1 + "," + $var2 + ") = " + str_from_int($bitdist1);
+    print($str);
+
+    $str = "bytedist(" + $var1 + "," + $var2 + ") = " + str_from_int($bytedist1);
+    print($str);
+
+    $str = "bitdist(" + $var1 + "," + $var3 + ") = " + str_from_int($bitdist2);
+    print($str);
+
+    $str = "bytedist(" + $var1 + "," + $var3 + ") = " + str_from_int($bytedist2);
+    print($str);
+  }
+}
+

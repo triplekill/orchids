@@ -12,6 +12,9 @@ rule deauth_flood synchronize($addr_src, $addr_dst) {
 
   state init {
 
+    $addr_src = .wifi.sa ;
+    $addr_dst = .wifi.da ;
+
     expect ( .wifi.subtype == "deauth" )
       goto start;
 
@@ -23,8 +26,6 @@ rule deauth_flood synchronize($addr_src, $addr_dst) {
     $counter = 1 ;
     $start_time = .wifi.time ;
     $end_time = .wifi.time + DELAY ;
-    $addr_src = .wifi.sa ;
-    $addr_dst = .wifi.da ;
 
     expect ( .wifi.subtype == "deauth" )
       goto deauth_loop;

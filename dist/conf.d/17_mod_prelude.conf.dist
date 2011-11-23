@@ -3,38 +3,19 @@
 #
 
 <module prelude>
-	#mode = sensor / analyzer / prewikka
-	## sensor   : send idmef events to prelude manager
-	## analyzer : retreive idmef events from prelude manager, process,
-	##            send back new alerts to prelude manager
-	## prewikka  : Send idmef alerts to prelude database for future display with prewikka
-	Mode prewikka
+	#mode = sensor / analyzer
+	Mode analyzer
+	Profile orchids
 
-	## Profile needed for sensor or analyzer modes
-	# Profile orchids
-
-	## Settings for analyzer mode to convert IDMEF messages in orchids fields
-	## str_field <Field name>::<XPath>
-	##  Only simple string query is available
-	##  Will call idmef_message_get_string from libprelude
-	# str_field alertid alert.messageid
-	# str_field classification_text alert.classification.text
-	# str_field classification_ident alert.classification.ident
-	# str_field assessment_severity alert.assessment.impact.severity
-	# str_field assessment_completion alert.assessment.impact.completion
-	# str_field assessment_type alert.assessment.impact.type
-	# str_field first_source_addr alert.source(0).node.address(0).address
-	# str_field first_target_addr alert.target(0).node.address(0).address
-
-	# Setting for preludeDB
-	## Database arguments:
-	##   host	: Host where the database engine listen (default:localhost).
-	##   port	: Port where the database engine listen.
-	##   type	: Type of database (mysql/pgsql/sqlite).
-	##   name	: Name of the database.
-	##   file	: file where the database is stored (sqlite).
-	##   user	: User to access the database.
-	##   pass	: Password to access the database.
-	## Example :  type=mysql name=prelude user=prelude pass=prelude
-	PreludeDBSettings type=mysql name=prelude user=prelude pass=prelude
+	#str_field <Field name>::<XPath>
+	# Only simple string query is available
+	# Will call idmef_message_get_string from libprelude
+	str_field alertid alert.messageid
+	str_field classification_text alert.classification.text
+	str_field classification_ident alert.classification.ident
+	str_field assessment_severity alert.assessment.impact.severity
+	str_field assessment_completion alert.assessment.impact.completion
+	str_field assessment_type alert.assessment.impact.type
+	str_field first_source_addr alert.source(0).node.address(0).address
+	str_field first_target_addr alert.target(0).node.address(0).address
 </module>

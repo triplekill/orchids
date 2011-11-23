@@ -1,0 +1,31 @@
+/*
+** demu Rule
+*/
+
+rule demoRule2
+{
+  state init
+  {
+    goto shell_copy;
+  }
+
+  state shell_copy
+  {
+    regsplit(.rawsnare.cmdline, "^cp /bin/*sh \(.*\)$", $dest);
+
+    goto change_perms;
+  }
+
+  state change_perms
+  {
+    print("Alert !\n");
+    dump_stack();
+
+    /* no transitions -- end of automata */
+  }
+
+  state nil
+  {
+    $toto = 0;
+  }
+}

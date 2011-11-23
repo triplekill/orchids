@@ -1,0 +1,134 @@
+/*
+** Linux-2.4.x SYS_ptrace attack on modprobe
+*/
+
+rule ptrace
+{
+  state init
+  {
+    expect (.rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(16) PTRACE_ATTACH" &&
+        .rawsnare.euid != 0 &&
+        .rawsnare.egid != 0)
+       goto ptrace_attach;
+  }
+
+  state ptrace_attach
+  {
+    $attack_pid = .rawsnare.pid;
+    $target_pid = .rawsnare.ptrace_pid;
+    $attacker_uid = .rawsnare.euid;
+    $counter = 0;
+
+    expect (.rawsnare.syscall == "(11) SYS_execve" &&
+        .rawsnare.path == "/sbin/modprobe" &&
+        .rawsnare.pid == $target_pid)
+      goto exec_modprobe;
+  }
+
+  state exec_modprobe
+  {
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(24) PTRACE_SYSCALL" &&
+        .rawsnare.ptrace_pid == $target_pid)
+      goto ptrace_syscall;
+  }
+
+  state ptrace_syscall
+  {
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(12) PTRACE_GETREGS" &&
+        .rawsnare.ptrace_pid == $target_pid)
+      goto ptrace_getregs;
+
+    /* if regs are guessed, attacker don't use GETREGS */
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_pid == $target_pid)
+      goto ptrace_poketext;
+
+  }
+
+  state ptrace_getregs
+  {
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_pid == $target_pid)
+      goto ptrace_poketext;
+  }
+
+  state ptrace_poketext
+  {
+    $counter = $counter + 1;
+
+    /* get all repetitions of poketext */
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_pid == $target_pid &&
+        $counter < 10)
+      goto ptrace_poketext;
+
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(26) SYS_ptrace" &&
+        .rawsnare.ptrace_req == "(17) PTRACE_DETACH" &&
+        .rawsnare.ptrace_pid == $target_pid)
+      goto ptrace_detach;
+  }
+
+  state ptrace_detach
+  {
+    print("Preliminary report :");
+
+    $str = "ssh root@10.0.0.100 'echo You have been kicked by OrchIDS... | write user ; kill -9 $(ps -u " +
+           str_from_int($attacker_uid) +
+           " -o pid= | xargs) ; chsh -s /sbin/nologin user ' >/dev/null 2>/dev/null &";
+    /* system($str); */
+    dump_dot_pathtree();
+    /* kill_threads(); */
+    cut("ptrace_attach");
+    dump_stack();
+
+    /* continue audit while we are trying to kill attacker */
+
+    /* audit all events made by the target program */
+    expect (.rawsnare.pid == $target_pid)
+      goto audit_loop;
+  }
+
+  state audit_loop
+  {
+    expect (.rawsnare.pid == $target_pid)
+      goto audit_loop;
+
+    expect (.rawsnare.pid == $target_pid &&
+        .rawsnare.syscall == "(1) SYS_exit")
+      goto make_report;
+
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(1) SYS_exit")
+      goto make_report;
+
+    expect (.rawsnare.pid == $target_pid &&
+        .rawsnare.syscall == "(37) SYS_kill")
+      goto make_report;
+
+    expect (.rawsnare.pid == $attack_pid &&
+        .rawsnare.syscall == "(37) SYS_kill")
+      goto make_report;
+  }
+
+  state make_report
+  {
+    print("Final report :");
+    dump_stack();
+    report();
+/*    dump_dot_pathtree(); */
+/*    show_stats(); */
+/*    shutdown(); */
+  }
+}

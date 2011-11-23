@@ -77,6 +77,7 @@ rule pidtrack
   state update_uid
   {
     cut("newpid");
+    /* print("newuid"); */
     $uid = .rawsnare.euid;
     goto newpid;
   }
@@ -84,6 +85,8 @@ rule pidtrack
   state update_setuid
   {
     cut("newpid");
+    /* print("setuid");
+    print_event(); */
     $uid = .rawsnare.target_id;
     goto newpid;
   }
@@ -91,6 +94,7 @@ rule pidtrack
   state update_gid
   {
     cut("newpid");
+    /* print("newgid"); */
     $gid = .rawsnare.egid;
     goto newpid;
   }
@@ -100,10 +104,13 @@ rule pidtrack
     print("Alert report :");
     dump_stack();
     report();
+    /* shutdown(); */
   }
 
   state end
   {
-    kill_threads();
+    /* do nothing */
+    /* $str2 = "end pid: " + str_from_int($pid);
+    print($str2); */
   }
 }

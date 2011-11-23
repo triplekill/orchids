@@ -42,7 +42,7 @@ input_module_t mod_prelude;
   } while(0)
 
 field_t prelude_fields[MAX_PRELUDE_FIELDS] = {
-{ "prelude.ptr",		    T_EXTERNAL,"prelude alert ptr"           }
+{ "prelude.ptr",		    T_PTR32,"prelude alert ptr"           }
 };
 
 static ovm_var_t*
@@ -158,8 +158,8 @@ process_idmef_alert(orchids_t *ctx,
 
   memset(attr, 0, sizeof(attr));
 
-  attr[F_PTR] = ovm_extern_new();
-  EXTPTR(attr[F_PTR]) = message;
+  attr[F_PTR] = ovm_ptr32_new();
+  PTR32(attr[F_PTR]) = message;
 
   for (c = 1; c < prelude_data->nb_fields; c++)
   {
@@ -222,12 +222,11 @@ issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
   ret = idmef_message_new(&idmef);
   if ( ret < 0 ) {
     prelude_perror(ret, "Unable to create the IDMEF message");
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return;
   }
 
-  message = ovm_extern_new();
-  EXTPTR(message) = idmef;
+  message = ovm_ptr32_new();
+  PTR32(message) = idmef;
   stack_push(ctx->ovm_stack, message);
 }
 
@@ -240,54 +239,42 @@ issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
   int		ret = 0;
 
   idmef = stack_pop(ctx->ovm_stack);
-  path = stack_pop(ctx->ovm_stack);
-  value = stack_pop(ctx->ovm_stack);
-
-  if ((TYPE(idmef) != T_EXTERNAL) || (TYPE(path) != T_STR) ||
-      (TYPE(value) == T_NULL)) {
+  if (TYPE(idmef) != T_PTR32) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
     return ;
   }
+
+  path = stack_pop(ctx->ovm_stack);
+  if (TYPE(path) != T_STR) {
+    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    return ;
+  }
+
+  printf("BLA 1\n");
+
+  value = stack_pop(ctx->ovm_stack);
+  printf("BLA 2\n");
+
+  if (!value)
+    return;
+  printf("BLA 3\n");
+
+
 
   switch (TYPE(value))
   {
     case T_INT:
-      ret = idmef_message_set_number(EXTPTR(idmef), STR(path), INT(value));
+      ret = idmef_message_set_number(PTR32(idmef), STR(path), INT(value));
       break;
     case T_UINT:
-      ret = idmef_message_set_number(EXTPTR(idmef), STR(path), UINT(value));
+      ret = idmef_message_set_number(PTR32(idmef), STR(path), UINT(value));
       break;
     case T_DOUBLE:
-      ret = idmef_message_set_number(EXTPTR(idmef), STR(path), DOUBLE(value));
+      ret = idmef_message_set_number(PTR32(idmef), STR(path), DOUBLE(value));
       break;
     case T_STR:
-      ret = idmef_message_set_string(EXTPTR(idmef), STR(path), STR(value));
+      ret = idmef_message_set_string(PTR32(idmef), STR(path), STR(value));
       break;
-    case T_VSTR:
-      ret = idmef_message_set_string(EXTPTR(idmef), STR(path), VSTR(value));
-      break;
-    case T_CTIME:
-    {
-      char		buff[128];
-      struct tm time = *localtime (&(CTIME(value)));
-      int len;
-
-      len = strftime(buff, 128 * sizeof (char), "%Y-%m-%dT%H:%M:%S%z", &time);
-
-      if ((buff[len - 5] == '+') ||
-	  (buff[len - 5] == '-'))
-      {
-	buff[len + 1] = 0;
-	buff[len] = buff[len - 1];
-	buff[len - 1] = buff[len - 2];
-	buff[len - 2] = ':';
-      }
-
-      idmef_message_set_string(EXTPTR(idmef), STR(path), buff);
-      break;
-    }
-
     default:
       DebugLog(DF_ENG, DS_ERROR, "issdl_idmef_message_set not implemented for type (%i)\n",
 	       TYPE(value));
@@ -302,76 +289,54 @@ static void
 issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *idmef;
-  int	    ret;
 
   idmef = stack_pop(ctx->ovm_stack);
-  if ((TYPE(idmef) != T_EXTERNAL) || (EXTPTR(idmef) == NULL)) {
+  if (TYPE(idmef) != T_PTR32) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
+    return ;
   }
 
-  if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
-  {
-    ret = preludedb_insert_message(prelude_data->db, EXTPTR(idmef));
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_ERROR, "could not insert message into database %s\n", preludedb_strerror(ret));
-      ISSDL_RETURN_FALSE(ctx, state);
-    }
-    ISSDL_RETURN_TRUE(ctx, state);
-  }
-  else
-  {
-    prelude_client_send_idmef(prelude_data->client, EXTPTR(idmef));
-    ISSDL_RETURN_TRUE(ctx, state);
-  }
-  idmef_message_destroy(EXTPTR(idmef));
+  idmef_message_print(PTR32(idmef), prelude_data->prelude_io);
+
+  prelude_client_send_idmef(prelude_data->client, (PTR32(idmef)));
 }
 
-static void
-issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state)
-{
-  ovm_var_t *idmef;
-
-  idmef = stack_pop(ctx->ovm_stack);
-  if ((TYPE(idmef) != T_EXTERNAL) || (EXTPTR(idmef) == NULL)) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-  }
-
-  idmef_message_print(EXTPTR(idmef), prelude_data->prelude_io);
-  ISSDL_RETURN_TRUE(ctx, state);
-}
 
 static void
 issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*idmef;
   ovm_var_t	*path;
-  char		*str;
   size_t	str_len;
+  char	*str;
   ovm_var_t	*res;
 
   idmef = stack_pop(ctx->ovm_stack);
-  path = stack_pop(ctx->ovm_stack);
-
-  if ((TYPE(idmef) != T_EXTERNAL) || (TYPE(path) != T_STR))
-  {
+  if (TYPE(idmef) != T_PTR32) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
     return ;
   }
 
-  if (idmef_message_get_string(EXTPTR(idmef), STR(path), &str)
-      < 0)
-     ISSDL_RETURN_FALSE(ctx, state);
-  else
-  {
-    str_len = strlen(str);
-    res = ovm_str_new(str_len);
-    memcpy (STR(res), str, str_len);
-    stack_push(ctx->ovm_stack, res);
+  path = stack_pop(ctx->ovm_stack);
+  if (TYPE(path) != T_STR) {
+    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    return ;
   }
+
+  if (idmef_message_get_string(PTR32(idmef), STR(path), &str)
+      < 0)
+  {
+    stack_push(ctx->ovm_stack, NULL);
+    return ;
+  }
+
+  str_len = strlen(str);
+  res = ovm_str_new(str_len);
+  memcpy (STR(res), str, str_len);
+  stack_push(ctx->ovm_stack, res);
 }
+
+
 
 static void *
 mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -403,74 +368,33 @@ mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
     exit(EXIT_FAILURE);;
   }
 
-  if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
-  {
-    // configure database
-    preludedb_sql_t *sql;
-    preludedb_sql_settings_t *sql_settings;
-
-    ret = preludedb_init();
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_FATAL, "error initializing libpreludedb");
-      exit(EXIT_FAILURE);
-    }
-
-    ret = preludedb_sql_settings_new_from_string(&sql_settings,
-      prelude_data->prelude_db_settings);
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_FATAL, "Error loading database settings: %s.\n", preludedb_strerror(ret));
-      exit(EXIT_FAILURE);
-    }
-
-    ret = preludedb_sql_new(&sql, NULL, sql_settings);
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_FATAL, "Error creating database interface: %s.\n", preludedb_strerror(ret));
-      preludedb_sql_settings_destroy(sql_settings);
-      exit(EXIT_FAILURE);
-    }
-
-    ret = preludedb_new(&(prelude_data->db), sql, NULL, NULL, 0);
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_FATAL, "could not initialize database '%s': %s\n", prelude_data->prelude_db_settings, preludedb_strerror(ret));
-      preludedb_sql_destroy(sql);
-      exit(EXIT_FAILURE);
-    }
+  ret = prelude_client_new(&client, prelude_data->profile);
+  if ( ! client ) {
+    DebugLog(DF_MOD, DS_FATAL,  "Unable to create a prelude client object");
+    exit(EXIT_FAILURE);
   }
+
+  // May need to call prelude_client_set_config_filename()
+
+  if (prelude_data->mode == PRELUDE_MODE_SENSOR)
+    prelude_client_set_required_permission(client, PRELUDE_CONNECTION_PERMISSION_IDMEF_WRITE);
   else
-  {
-    // configure prelude client
+    prelude_client_set_required_permission(client, PRELUDE_CONNECTION_PERMISSION_IDMEF_READ|PRELUDE_CONNECTION_PERMISSION_IDMEF_WRITE);
 
-    ret = prelude_client_new(&client, prelude_data->profile);
-    if ( ! client ) {
-      DebugLog(DF_MOD, DS_FATAL,  "Unable to create a prelude client object");
-      exit(EXIT_FAILURE);
-    }
-
-    // May need to call prelude_client_set_config_filename()
-
-    if (prelude_data->mode == PRELUDE_MODE_SENSOR)
-      prelude_client_set_required_permission(client, PRELUDE_CONNECTION_PERMISSION_IDMEF_WRITE);
-    else
-      prelude_client_set_required_permission(client, PRELUDE_CONNECTION_PERMISSION_IDMEF_READ|PRELUDE_CONNECTION_PERMISSION_IDMEF_WRITE);
-
-    ret = prelude_client_start(client);
-    if ( ret < 0 ) {
-      prelude_perror(ret, "unable to initialize the prelude library");
-      DebugLog(DF_MOD, DS_FATAL,  "Unable to start prelude client");
-      exit(EXIT_FAILURE);
-    }
-
-    ret = prelude_client_set_flags(client, PRELUDE_CLIENT_FLAGS_ASYNC_SEND|PRELUDE_CLIENT_FLAGS_ASYNC_TIMER);
-    if ( ret < 0 ) {
-      DebugLog(DF_MOD, DS_FATAL, "Unable to set asynchronous send and timer.\n");
-      exit(EXIT_FAILURE);
-    }
-
-    prelude_data->client = client;
-    prelude_data->poll_period = DEFAULT_MODPRELUDE_POLL_PERIOD;
-
+  ret = prelude_client_start(client);
+  if ( ret < 0 ) {
+    prelude_perror(ret, "unable to initialize the prelude library");
+    DebugLog(DF_MOD, DS_FATAL,  "Unable to start prelude client");
+    exit(EXIT_FAILURE);
   }
 
+  ret = prelude_client_set_flags(client, PRELUDE_CLIENT_FLAGS_ASYNC_SEND|PRELUDE_CLIENT_FLAGS_ASYNC_TIMER);
+  if ( ret < 0 ) {
+    DebugLog(DF_MOD, DS_FATAL, "Unable to set asynchronous send and timer.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  prelude_data->client = client;
   ret = prelude_io_new(&(prelude_data->prelude_io));
   if ( ret < 0 ) {
     prelude_perror(ret, "no prelude_io");
@@ -479,15 +403,15 @@ mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
   }
   prelude_io_set_file_io(prelude_data->prelude_io, stdout);
 
+  prelude_data->poll_period = DEFAULT_MODPRELUDE_POLL_PERIOD;
 
   if (prelude_data->mode == PRELUDE_MODE_ANALYZER)
   {
     register_rtcallback(ctx,
-			rtaction_recv_idmef,
-			mod,
-			INITIAL_MODPRELUDE_POLL_DELAY);
+  		      rtaction_recv_idmef,
+  		      mod,
+  		      INITIAL_MODPRELUDE_POLL_DELAY);
   }
-
   register_lang_function(ctx,
                          issdl_idmef_message_new,
                          "idmef_message_new", 0,
@@ -507,12 +431,6 @@ mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_idmef_message_get_string,
                          "idmef_message_get_string", 2,
                          "get a string from an idmef message using an xpath request");
-
-  register_lang_function(ctx,
-                         issdl_idmef_message_print,
-                         "idmef_message_print", 2,
-                         "Debug function : print the idmef alert on stderr");
-
 }
 
 
@@ -528,11 +446,6 @@ dir_set_prelude_mode(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   {
     DebugLog(DF_MOD, DS_INFO, "setting prelude mode to analyzer\n");
     prelude_data->mode = PRELUDE_MODE_ANALYZER;
-  }
-  else if (!strcmp(dir->args, "prewikka"))
-  {
-    DebugLog(DF_MOD, DS_INFO, "setting prelude mode to prewikka\n");
-    prelude_data->mode = PRELUDE_MODE_PREWIKKA;
   }
   else
     DebugLog(DF_MOD, DS_ERROR, "unknown prelude mode, setting sensor \n");
@@ -584,6 +497,7 @@ add_field(char* field_name, char* xpath)
   prelude_data->field_xpath[prelude_data->nb_fields++] = xpath;
 }
 
+
 static void
 dir_add_prelude_field(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
@@ -598,25 +512,17 @@ dir_add_prelude_field(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   *pos = '\0';
 
   add_field(dir->args, pos + 1);
+
+
+
 }
-
-
-static void
-dir_set_prelude_db_settings(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  DebugLog(DF_MOD, DS_INFO, "setting PreludeDBSettings to %s\n", dir->args);
-
-  prelude_data->prelude_db_settings = dir->args;
-}
-
 
 static mod_cfg_cmd_t prelude_dir[] =
 {
-  { "Mode", dir_set_prelude_mode, "Set prelude mode : sensor (default) / analyzer / display"},
+  { "Mode", dir_set_prelude_mode, "Set prelude mode : sensor (default) / analyzer"},
   { "Profile", dir_set_prelude_profile, "Set prelude profile : orchids by default"},
   { "PollPeriod", dir_set_prelude_poll_period, "Set poll period for analyzer mode."},
   { "str_field", dir_add_prelude_field, "Add a new field corresponding to a XPath query."},
-  { "PreludeDBSettings", dir_set_prelude_db_settings, "Setup configuration for prelude database connection"},
   { NULL, NULL }
 };
 
