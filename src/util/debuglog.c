@@ -260,7 +260,7 @@ libdebug_setopt(char *optstr)
     fac = get_fac_id(tok, pos - tok);
 
     if (*pos++ != ':') {
-      fprintf(stderr, "syntax error on char %i (missing ':')\n", pos - optstr);
+      fprintf(stderr, "syntax error on char %td (missing ':')\n", pos - optstr);
       libdebug_show_info(stderr);
       exit(EXIT_FAILURE);
     }
@@ -281,7 +281,7 @@ libdebug_setopt(char *optstr)
     if (pos == (optstr + str_sz)) {
       return ;
     } else if (*pos++ != ',') {
-      fprintf(stderr, "syntax error on char %i (missing ',')\n", pos - optstr);
+      fprintf(stderr, "syntax error on char %td (missing ',')\n", pos - optstr);
       libdebug_show_info(stderr);
       exit(EXIT_FAILURE);
     }

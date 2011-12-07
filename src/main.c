@@ -30,12 +30,14 @@
 
 #include <pwd.h>
 #include <sys/types.h> /* for stat() */
+#include <sys/syslimits.h> /* for PATH_MAX */
 
 #include "orchids.h"
 
 #include "hash.h"
 #include "evt_mgr.h"
 #include "orchids_api.h"
+#include "rule_compiler.h"
 
 #include "main_priv.h"
 

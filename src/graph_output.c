@@ -72,7 +72,7 @@ fprintf_state_instance_dot_sub(FILE *fp, state_instance_t *state, int options, i
   if (*limit == 0)
     return ;
   else
-    *limit--;
+    (void) *limit--;
 
   /* If the state has a parent, display transitions */
   if (state->parent) {
