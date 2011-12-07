@@ -116,28 +116,37 @@ struct win32evt_config_s
 };
 
 
+#ifdef UNUSED
 static void
 fprintf_event_log_header(FILE *fp, event_log_header_t *hdr);
+#endif
 
-
+#ifdef UNUSED
 static void
 fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer);
+#endif
 
-
+#ifdef UNUSED
 static void
 fprintf_event_log_record(FILE *fp, event_log_record_t *event);
+#endif
 
 
+#ifdef UNUSED
 static int
 get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen);
+#endif
 
 
+#ifdef UNUSED
 static event_log_record_t *
 get_next_event_log_record(FILE *fp);
+#endif
 
-
+#ifdef UNUSED
 static void
 read_record(const char *file);
+#endif
 
 
 static void *

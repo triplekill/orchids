@@ -44,25 +44,25 @@ static char *cache_gc_dir_g = NULL;
 
 
 static int
-cache_gc_select(const struct dirent *d)
+cache_gc_select(/*const*/ struct dirent *d)
 {
   return (!strncmp(cache_gc_prefix_g, d->d_name, strlen(cache_gc_prefix_g)));
 }
 
 
 static int
-cache_gc_compar(const struct dirent **a, const struct dirent **b)
+cache_gc_compar(const void *a, const void *b)
 {
   struct stat stat_a;
   struct stat stat_b;
   char path[PATH_MAX];
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*a)->d_name);
+	   cache_gc_dir_g, (*(const struct dirent **)a)->d_name);
   Xstat(path, &stat_a);
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*b)->d_name);
+	   cache_gc_dir_g, (*(const struct dirent **)b)->d_name);
   Xstat(path, &stat_b);
 
   return (stat_b.st_mtime - stat_a.st_mtime);

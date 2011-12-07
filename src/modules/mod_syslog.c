@@ -276,11 +276,13 @@ syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
+#ifdef UNUSED
 static char *syslog_deps[] = {
   "udp",
   "textfile",
   NULL
 };
+#endif
 
 input_module_t mod_syslog = {
   MOD_MAGIC,

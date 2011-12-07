@@ -20,10 +20,10 @@
 #include <dirent.h>
 
 static int
-cache_gc_select(const struct dirent *d);
+cache_gc_select(/*const*/ struct dirent *d);
 
 static int
-cache_gc_compar(const struct dirent **a, const struct dirent **b);
+cache_gc_compar(const void *a, const void *b);
 
 #endif /* FILE_CACHE_PRIV_H */
 

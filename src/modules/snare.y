@@ -74,11 +74,18 @@
 
 #include "orchids.h"
 
-/* from  /usr/include/bits/fcntl.h */
-#define O_DIRECT        040000 /* Direct disk access.  */
+/* from  /usr/include/bits/fcntl.h or /usr/include/sys/fcntl.h, should be
+ included automatically from fcntl.h */
+//#define O_DIRECT        040000 /* Direct disk access.  */  UNUSED
+#ifndef O_DIRECTORY
 #define O_DIRECTORY    0200000 /* Must be a directory.  */
+#endif
+#ifndef O_NOFOLLOW
 #define O_NOFOLLOW     0400000 /* Do not follow links.  */
+#endif
+#ifndef O_LARGEFILE
 #define O_LARGEFILE    0100000
+#endif
 
 static ovm_var_t **fields_g;
 static char *linux24_syscall_name_g[256];

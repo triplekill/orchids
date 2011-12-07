@@ -41,10 +41,14 @@
  * BSD/Linux compatibility shims.  These are used mainly to
  * minimize differences when importing necesary BSD code.
  */
+#ifndef NBBY
 #define	NBBY	8			/* number of bits/byte */
+#endif
 
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
+#ifndef howmany
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
+#endif
 
 /* Bit map related macros. */
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
@@ -53,9 +57,13 @@
 #define	isclr(a,i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
 
 #define	__packed	__attribute__((__packed__))
+#ifndef __printflike
 #define	__printflike(_a,_b) \
 	__attribute__ ((__format__ (__printf__, _a, _b)))
+#endif
+#ifndef __offsetof
 #define	__offsetof(t,m)	offsetof(t,m)
+#endif
 
 #ifndef ALIGNED_POINTER
 /*

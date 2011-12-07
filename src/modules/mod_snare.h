@@ -70,12 +70,13 @@ static void *
 snare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
-static void
-add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+//static void
+//add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+// not defined in mod_snare.c
 
-
-static void
-add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+//static void
+//add_textfile_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+// not defined in mod_snare.c
 
 
 

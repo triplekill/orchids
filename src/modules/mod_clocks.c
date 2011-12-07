@@ -34,7 +34,7 @@
 
 #include "mod_clocks.h"
 
-
+#ifdef UNUSED
 static void
 clock_add(clockctx_t *ctx,
           char *name,
@@ -49,6 +49,7 @@ clock_add(clockctx_t *ctx,
 
   clock_add_float(ctx, name, fprec, fsync);
 }
+#endif
 
 
 static void
@@ -144,11 +145,13 @@ prob_is_before(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 }
 
 
+#ifdef UNUSED
 static prob_t
 prob_is_after(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 {
   return ( prob_is_before(ctx, t2, t1) );
 }
+#endif
 
 
 static prob_t
@@ -176,14 +179,16 @@ prob_is_before_fast(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
   return (p);
 }
 
-
+#ifdef UNUSED
 static prob_t
 prob_is_after_fast(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 {
   return ( prob_is_before_fast(ctx, t2, t1) );
 }
+#endif
 
 
+#ifdef UNUSED
 static int
 make_clocktime(clockctx_t *ctx,
                clocktime_t *clocktime,
@@ -202,8 +207,9 @@ make_clocktime(clockctx_t *ctx,
 
   return (0);
 }
+#endif
 
-
+#ifdef UNUSED
 static int
 make_clocktime_float(clockctx_t *ctx,
                      clocktime_t *clocktime,
@@ -222,8 +228,9 @@ make_clocktime_float(clockctx_t *ctx,
 
   return (0);
 }
+#endif
 
-
+#ifdef UNUSED
 static clockctx_t *
 new_clocks_ctx(void)
 {
@@ -234,7 +241,7 @@ new_clocks_ctx(void)
 
   return (ctx);
 }
-
+#endif
 
 static void
 add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)

@@ -35,6 +35,7 @@
 input_module_t mod_win32evt;
 
 
+#ifdef UNUSED
 static void
 fprintf_event_log_header(FILE *fp, event_log_header_t *hdr)
 {
@@ -62,8 +63,10 @@ fprintf_event_log_header(FILE *fp, event_log_header_t *hdr)
   fprintf(fp, "           length_end: 0x%08lx (%lu)\n",
           hdr->length_end, hdr->length_end);
 }
+#endif
 
 
+#ifdef UNUSED
 static void
 fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer)
 {
@@ -89,10 +92,11 @@ fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer)
   fprintf(fp, "               length_end: 0x%08lx (%lu)\n",
           trailer->length_end, trailer->length_end);
 }
+#endif
 
 
-
-void
+#ifdef UNUSED
+static void
 fprintf_event_log_record(FILE *fp, event_log_record_t *event)
 {
   char asc_time[32];
@@ -202,8 +206,10 @@ fprintf_event_log_record(FILE *fp, event_log_record_t *event)
   
   fprintf(fp, "\n");
 }
+#endif
 
 
+#ifdef UNUSED
 static int
 get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 {
@@ -239,8 +245,9 @@ get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 
   return (0);
 }
+#endif
 
-
+#ifdef UNUSED
 static event_log_record_t *
 get_next_event_log_record(FILE *fp)
 {
@@ -251,8 +258,9 @@ get_next_event_log_record(FILE *fp)
 
   return (NULL);
 }
+#endif
 
-
+#ifdef UNUSED
 static void
 read_record(const char *file)
 {
@@ -387,6 +395,7 @@ read_record(const char *file)
   printf("\n");
   fprintf_event_log_trailer(stdout, &trailer);
 }
+#endif
 
 
 #if WIN32EVT

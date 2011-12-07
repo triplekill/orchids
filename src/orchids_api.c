@@ -577,9 +577,9 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
           curr_time.tv_sec - ctx->start_time.tv_sec,
           uptime_buf);
   fprintf(fp, "          User time : %li.%03li s\n",
-          ru.ru_utime.tv_sec, ru.ru_utime.tv_usec / 1000);
+          ru.ru_utime.tv_sec, ru.ru_utime.tv_usec / 1000L);
   fprintf(fp, "        System time : %li.%03li s\n",
-          ru.ru_stime.tv_sec, ru.ru_stime.tv_usec / 1000);
+          ru.ru_stime.tv_sec, ru.ru_stime.tv_usec / 1000L);
   usage = (float)(ru.ru_stime.tv_sec + ru.ru_utime.tv_sec);
   usage += (float)((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) / 1000000);
   usage +=((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) % 1000000) / 1000000.0;
@@ -591,22 +591,22 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   Timer_Sub(&diff_time, &ctx->preconfig_time, &ctx->start_time);
   fprintf(fp, "   Pre-config. time : %li.%03li ms\n",
           diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
   fprintf(fp, "  Post-config. time : %li.%03li ms\n",
           diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->compil_time, &ctx->postconfig_time);
   fprintf(fp, " Rules compil. time : %li.%03li ms\n",
           diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
   fprintf(fp, "  Post-compil. time : %li.%03li ms\n",
           diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_usec % 1000L);
 
 
 #ifdef linux
@@ -630,7 +630,7 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "     rule instances : %u\n", ctx->rule_instances);
   fprintf(fp, "    state instances : %u\n", ctx->state_instances);
   fprintf(fp, "     active threads : %u\n", ctx->threads);
-  fprintf(fp, "     ovm stack size : %u\n", ctx->ovm_stack->size);
+  fprintf(fp, "     ovm stack size : %zd\n", ctx->ovm_stack->size);
   fprintf(fp, "            reports : %u\n", ctx->reports);
   fprintf(fp,
           "--------------------+"

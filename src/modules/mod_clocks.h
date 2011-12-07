@@ -95,13 +95,13 @@ do { \
                                                 \
   } while (0)
 
-
+#ifdef UNUSED
 static void
 clock_add(clockctx_t *ctx,
           char *name,
           timeval_t *prec,
           timeval_t *sync);
-
+#endif
 
 static void
 clock_add_float(clockctx_t *ctx,
@@ -110,37 +110,43 @@ clock_add_float(clockctx_t *ctx,
                 timefloat_t sync);
 
 
+#ifdef UNUSED
 static prob_t
 prob_is_before(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2);
+#endif
 
-
+#ifdef UNUSED
 static prob_t
 prob_is_after(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2);
+#endif
 
-
+#ifdef UNUSED
 static prob_t
 prob_is_before_fast(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2);
+#endif
 
-
+#ifdef UNUSED
 static int
 make_clocktime(clockctx_t *ctx,
                clocktime_t *clocktime,
                timeval_t *time,
                sequence_t seq,
                char *clock_name);
+#endif
 
-
+#ifdef UNUSED
 static int
 make_clocktime_float(clockctx_t *ctx,
                      clocktime_t *clocktime,
                      timefloat_t time,
                      sequence_t seq,
                      char *clock_name);
+#endif
 
-
+#ifdef UNUSED
 static clockctx_t *
 new_clocks_ctx(void);
-
+#endif
 
 static void
 add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);

@@ -116,13 +116,20 @@ static phasespec_t phasespec_g[] = {
 
 
 static void fprintf_phase_plot(FILE *fp, phasectx_t *ctx, flags_t flags);
+#ifdef UNUSED
 static void fprintf_period_plot(FILE *fp, periodctx_t *ctx, flags_t flags);
+#endif
+#ifdef UNUSED
 static void fprintf_period_data(FILE *fp, periodctx_t *ctx);
+#endif
+#ifdef UNUSED
 static void fprintf_period_data_nowin(FILE *fp, periodctx_t *ctx);
+#endif
 static double get_phase_loops(phasespec_t *spec, struct timeval *first, struct timeval *last);
 static int get_phase_slice(phasespec_t *spec, struct timeval *tv);
+#ifdef UNUSED
 static void fprintf_period_data_timewin(FILE *fp, periodctx_t *ctx);
-
+#endif
 
 double kullback_leibler(periodctx_t *ctx);
 double kullback_leibler_time(periodctx_t *ctx);
@@ -169,6 +176,7 @@ tvdiff(struct timeval *dst, const struct timeval *ref1, const struct timeval *re
   }
 }
 
+#ifdef UNUSED
 static void
 write_period_snapshot(periodctx_t *ctx)
 {
@@ -181,13 +189,14 @@ write_period_snapshot(periodctx_t *ctx)
   fclose(fp);
 
   snprintf(filename, sizeof (filename), "%s-period-snapshot-%lu-%06lu.dat",
-           ctx->name, ctx->last.tv_sec, ctx->last.tv_usec);
+           ctx->name, ctx->last.tv_sec, (unsigned long)ctx->last.tv_usec);
   fp = fopen(filename, "w");
   fprintf_period_data_timewin(fp, ctx);
   fclose(fp);
 }
+#endif
 
-
+#ifdef UNUSED
 static void
 write_period_file(periodctx_t *ctx)
 {
@@ -204,7 +213,9 @@ write_period_file(periodctx_t *ctx)
   fprintf_period_data(fp, ctx);
   fclose(fp);
 }
+#endif
 
+#ifdef UNUSED
 static void
 fprintf_period_plot(FILE *fp, periodctx_t *ctx, flags_t flags)
 {
@@ -219,7 +230,7 @@ fprintf_period_plot(FILE *fp, periodctx_t *ctx, flags_t flags)
 
   if (flags & O_SNAPSHOT) {
     snprintf(basename, sizeof (basename), "%s-period-snapshot-%lu-%06lu",
-             ctx->name, ctx->last.tv_sec, ctx->last.tv_usec);
+             ctx->name, ctx->last.tv_sec, (unsigned long)ctx->last.tv_usec);
   }
   else {
     snprintf(basename, sizeof (basename), "%s-period", ctx->name);
@@ -382,7 +393,9 @@ fprintf_period_plot(FILE *fp, periodctx_t *ctx, flags_t flags)
                 "notitle with line smooth bezier\n\n\n", basename);
   }
 }
+#endif
 
+#ifdef UNUSED
 static void
 fprintf_period_data_nowin(FILE *fp, periodctx_t *ctx)
 {
@@ -431,8 +444,10 @@ fprintf_period_data_nowin(FILE *fp, periodctx_t *ctx)
     }
   }
 }
+#endif
 
 
+#ifdef UNUSED
 static void
 fprintf_period_data_timewin(FILE *fp, periodctx_t *ctx)
 {
@@ -492,8 +507,10 @@ fprintf_period_data_timewin(FILE *fp, periodctx_t *ctx)
     }
   }
 }
+#endif
 
 
+#ifdef UNUSED
 static void
 fprintf_period_data(FILE *fp, periodctx_t *ctx)
 {
@@ -542,6 +559,7 @@ fprintf_period_data(FILE *fp, periodctx_t *ctx)
     }
   }
 }
+#endif
 
 
 static void
@@ -881,6 +899,7 @@ get_phase_slice(phasespec_t *spec, struct timeval *tv)
   return (div);
 }
 
+#ifdef UNUSED
 static void
 phase(phasectx_t *phase_ctx, struct timeval *tv)
 {
@@ -963,6 +982,7 @@ phase(phasectx_t *phase_ctx, struct timeval *tv)
 
 /*   fprintf(stderr, "]"); */
 }
+#endif
 
 void
 fprintf_phases(FILE *fp, phasectx_t *ctx)
@@ -982,6 +1002,7 @@ fprintf_phases(FILE *fp, phasectx_t *ctx)
   }
 }
 
+#ifdef UNUSED
 static int
 period_scroll_win(periodctx_t *ctx, struct timeval *t)
 {
@@ -1006,7 +1027,9 @@ period_scroll_win(periodctx_t *ctx, struct timeval *t)
 
   return (removed_events);
 }
+#endif
 
+#ifdef UNUSED
 static void
 period_add_to_win(periodctx_t *ctx, struct timeval *t, struct timeval *l, int p)
 {
@@ -1053,8 +1076,9 @@ period_add_to_win(periodctx_t *ctx, struct timeval *t, struct timeval *l, int p)
     //fprintf(stderr, "event speed: %lu.%06lu %f\n", t->tv_sec, t->tv_usec, ctx->evt_in_win / timer_float(&d) );
   } while (0);
 }
+#endif
 
-
+#ifdef UNUSED
 static void
 period(periodctx_t *ctx, struct timeval *tv)
 {
@@ -1117,6 +1141,7 @@ period(periodctx_t *ctx, struct timeval *tv)
 /*     ctx->count_mtime[i] += (ddiff - ctx->count_mtime[i]) / (double) ctx->count_total[i]; */
   }
 }
+#endif
 
 periodctx_t *
 new_periodctx(periodspec_t *spec, char *name)
@@ -1182,7 +1207,7 @@ write_period_kullback_plot(periodctx_t *ctx)
   fprintf(fp, "set grid\n");
   fprintf(fp, "set xlabel \"Event number\"\n");
   fprintf(fp, "set ylabel \"Kullback-Leibler distance\"\n");
-  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %i\"\n",
+  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %li\"\n",
           ctx->name, ctx->backlog_end - ctx->backlog);
   fprintf(fp, "print \"Rendering \'%s-period-kullback\'\"\n", ctx->name);
   fprintf(fp, "set term png font Vera 7\n");
