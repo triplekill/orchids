@@ -59,7 +59,8 @@
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
 #define T_TCPPORT 0
-#define T_IPV4PEER 0#define T_IPV6ADDR 0
+#define T_IPV4PEER 0
+#define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
 /* types flags mask -- this allow 2^16 types and 16 bits for flags */

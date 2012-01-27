@@ -402,7 +402,7 @@ auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 
         if (e->hdr.type != 1300) goto leave;	
 
-printf("%d",e->hdr.type);
+	// printf("%d",e->hdr.type); removed by jgl 21 jan 2012
 	if (rc > 0) {
         //Sanity check 
 		if (e->hdr.ver != AUDISP_PROTOCOL_VER ||
@@ -418,7 +418,7 @@ printf("%d",e->hdr.type);
 
 	if (rc > 0)  
 		{ 	
-			printf("===== Msg From auditd ==========\n%s",e->data);
+		  //printf("===== Msg From auditd ==========\n%s",e->data); removed by jgl 21 jan 2012
 			action_init (actx);	
 			action_parse_event (actx, e->data, auditd_data);
 		}
