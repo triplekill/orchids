@@ -61,9 +61,17 @@
 #define F_BSM_ATTR_DEV 26
 #define F_BSM_FILE_TIME 27
 #define F_BSM_FILE_NAME 28
+#define F_BSM_TEXT 29
+#define F_BSM_INADDR 30
+#define F_BSM_IPORT 31
+#define F_BSM_SOCK_TYPE 33
+#define F_BSM_SOCK_LPORT 33
+#define F_BSM_SOCK_LADDR 34
+#define F_BSM_SOCK_LPORT 35
+#define F_BSM_SOCK_LADDR 36
 
-#define F_BSM_ARG_START 29
-#define F_BSM_MAX_ARGS 16
+#define F_BSM_ARG_START 37
+#define F_BSM_MAX_ARGS 4
 // arguments have entries from F_BSM_ARG_START (arg1)
 // through F_BSM_ARG_START+F_BSM_MAX_ARGS-1 (arg<F_BSM_MAX_ARGS>)
 // no F_BSM field should be added after these

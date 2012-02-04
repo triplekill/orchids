@@ -182,6 +182,14 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  // value anyway.
 	}
 	break;
+      case AUT_TEXT: // I don't know what this is used for
+	attr[F_BSM_TEXT] = ovm_vstr_new();
+	{
+	  ovm_vstr_t *s = &VSTR(attr[F_BSM_TEXT]);
+	  s->len = tok.tt.text.len;
+	  s->str = tok.tt.text.path;
+	}
+	break;
       case AUT_SUBJECT: /* = case AUT_SUBJECT32: */
 	attr[F_BSM_SUBJ_AUID] = new_ovm_int();
 	INT(attr[F_BSM_SUBJ_AUID]) = tok.tt.subj32.auid;
@@ -282,10 +290,53 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  s->str = tok.tt.file.name;
 	}
 	break;
+      case AUT_IN_ADDR:
+	attr[F_BSM_INADDR] = new_ovm_ipv4();
+	IPV4(attr[F_BSM_INADDR])->s_addr = tok.tt.inaddr.addr;
+	break;
+      case AUT_IPORT:
+	attr[F_BSM_IPORT] = new_ovm_int();
+	INT(attr[F_BSM_IPORT]) = tok.tt.iport.port;
+	break;
+      case AUT_SOCKET:
+	attr[F_BSM_SOCK_TYPE] = new_ovm_int();
+	INT(attr[F_BSM_SOCK_TYPE]) = tok.tt.socket.type;
+	attr[F_BSM_SOCK_LPORT] = new_ovm_int();
+	INT(attr[F_BSM_SOCK_LPORT]) = tok.tt.socket.l_port;
+	attr[F_BSM_SOCK_LADDR] = new_ovm_ipv4();
+	IPV4(attr[F_BSM_SOCK_LADDR])->s_addr = tok.tt.socket.l_addr;
+	attr[F_BSM_SOCK_RPORT] = new_ovm_int();
+	INT(attr[F_BSM_SOCK_RPORT]) = tok.tt.socket.r_port;
+	attr[F_BSM_SOCK_RADDR] = new_ovm_ipv4();
+	IPV4(attr[F_BSM_SOCK_RADDR])->s_addr = tok.tt.socket.r_addr;
+	break;
+	// !!! Stopped at AUT_EXEC_ARGS (0x3c)
+	// The following are ignored
+	// First, those that are ignored because I don't know
+	// what they are for, or which subfields of tok.tt should be used
       case AUT_DATA:
-	// What is this exactly?
-	//!!!
-
+      case AUT_IPC:
+      case AUT_XATPATH: /* maybe some extra (X) path argument? or is it
+			 an X-Window related event? */
+      case AUT_OPAQUE: /* seems to be some form of unusable, catch-all type */
+      case AUT_ACL:
+      case AUT_IPC_PERM:
+      case AUT_LABEL:
+      case AUT_GROUPS: /* [au_groups_t] list of integers? */
+      case AUT_ACE:
+      case AUT_PRIV:
+      case AUT_UPRIV:
+      case AUT_LIAISON:
+      case AUT_NEWGROUPS:
+	// Then, those I am not sure of
+      case AUT_PROCESS32: /* something that describes a process: what is
+			     the difference with AUT_ATTR32? */
+      case AUT_ATTR: /* duplicate of AUT_ATTR32? */
+	// Then, those I fear are out of scope
+      case AUT_IP: /* apparently meant to monitor IP packets
+		      I only want to do system monitoring here */
+      case AUT_SEQ: /* sequence number */
+	// Then, those that are obsolete
       case AUT_OHEADER: // for "old header"
       default:
 	DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): unknown token id.\n");
@@ -293,7 +344,13 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       }
   } while (buf < bufend);
 
-  //!!!
+  /*  fill in orchids event */
+  event_t *event;
+  event = NULL;
+  add_fields_to_event(ctx, mod, &event, attr, AUDITD_FIELDS);
+
+  /* then, post the Orchids event */
+  post_event(ctx, mod, event);
   free(buf0);
   return 0;
 }
@@ -328,7 +385,15 @@ static field_t bsm_fields[] = {
   { "bsm.attr.dev", T_INT, "bsm attribute: device number" },
   { "bsm.file.time", T_TIMEVAL, "bsm file: time" },
   { "bsm.file.name", T_VSTR, "bsm file name" },
-  // The following are written assuming F_BSM_MAX_ARGS==16
+  { "bsm.text", T_VSTR, "bsm text argument" },
+  { "bsm.inaddr", T_IPV4, "bsm internet address" },
+  { "bsm.iport", T_INT, "bsm internet port" },
+  { "bsm.socket.type", T_INT, "bsm socket: type" },
+  { "bsm.socket.lport", T_INT, "bsm socket: local port" },
+  { "bsm.socket.laddr", T_IPV4, "bsm socket: local internet address" },
+  { "bsm.socket.rport", T_INT, "bsm socket: remote port" },
+  { "bsm.socket.raddr", T_IPV4, "bsm socket: remote internet address" },
+  // The following are written assuming F_BSM_MAX_ARGS==4
   // Do not add new fields after this line
   // unless they are bsm.arg<i> fields;
   // in which case please update F_BSM_MAX_ARGS
@@ -336,6 +401,7 @@ static field_t bsm_fields[] = {
   { "bsm.arg2", T_INT, "bsm argument 2" },
   { "bsm.arg3", T_INT, "bsm argument 3" },
   { "bsm.arg4", T_INT, "bsm argument 4" },
+#ifdef F_BSM_NEED_MORE
   { "bsm.arg5", T_INT, "bsm argument 5" },
   { "bsm.arg6", T_INT, "bsm argument 6" },
   { "bsm.arg7", T_INT, "bsm argument 7" },
@@ -348,6 +414,9 @@ static field_t bsm_fields[] = {
   { "bsm.arg14", T_INT, "bsm argument 14" },
   { "bsm.arg15", T_INT, "bsm argument 15" },
   { "bsm.arg16", T_INT, "bsm argument 16" },
+#endif
+  // do not add any new field names here, except of the form bsm.arg<x>
+  // and change F_BSM_MAX_ARGS accordingly
 };
 
 #endif /* HAVE_BSM_H */
