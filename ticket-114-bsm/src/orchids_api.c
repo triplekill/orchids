@@ -423,14 +423,16 @@ free_fields(ovm_var_t **tbl_event, size_t s)
 
 
 void
-add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
-                    event_t **event, ovm_var_t **tbl_event, size_t sz)
+add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
+			   event_t **event, ovm_var_t **tbl_event,
+			   size_t from, size_t to)
 {
-  int i;
+  int i, j;
 
-  for (i = 0; i < sz; ++i) {
+  for (i = from; i < to; ++i) {
     /* Handle filled fields */
-    if ((tbl_event[i] != NULL) && (tbl_event[i] != F_NOT_NEEDED)) {
+    j = i - from;
+    if ((tbl_event[j] != NULL) && (tbl_event[j] != F_NOT_NEEDED)) {
       /* This field is activated, so add it to current event */
       /* XXX: add checks here ??? (if module is well coded
          no need to check) */
@@ -439,15 +441,22 @@ add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
 
         new_evt = Xmalloc(sizeof (event_t));
         new_evt->field_id = mod->first_field_pos + i;
-        new_evt->value = tbl_event[i];
+        new_evt->value = tbl_event[j];
         new_evt->next = *event;
         *event = new_evt;
       } else { /* drop data */
         DebugLog(DF_CORE, DS_TRACE, "free disabled attribute.\n");
-        Xfree(tbl_event[i]);
+        Xfree(tbl_event[j]);
       }
     }
   }
+}
+
+void
+add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
+                    event_t **event, ovm_var_t **tbl_event, size_t sz)
+{
+  add_fields_to_event_stride(ctx,mod,event,tbl_event,0,sz);
 }
 
 

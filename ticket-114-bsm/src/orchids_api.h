@@ -290,6 +290,28 @@ free_fields(ovm_var_t **tbl_event, size_t s);
 
 
 /**
+ ** Append part of an event with a given property table filled
+ ** by a dissection module.
+ **
+ ** @param ctx        Orchids application context.
+ ** @param mod        The module entry which want this event construction.
+ **   This is used by the rule compiler which proceed to a statical analysis
+ **   of rules, and mark as `disabled' field that are unused in rules.
+ **   This can speed-up dissection, when a module can skip a sub-dissection.
+ ** @param event      The destination event to append.
+ ** @param tbl_event  The property table.
+ ** @param from       The first index in the property table (index 0 in tbl_event)
+ ** @param to         The last index+1 in the property table
+ **/
+void
+add_fields_to_event_stride(orchids_t *ctx,
+			   mod_entry_t *mod,
+			   event_t **event,
+			   ovm_var_t **tbl_event,
+			   size_t from,
+			   size_t to);
+
+/**
  ** Append an event with a given property table filled by a dissection module.
  **
  ** @param ctx        Orchids application context.
