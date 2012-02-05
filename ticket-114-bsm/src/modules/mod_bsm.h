@@ -165,22 +165,35 @@
 #define F_BSM_SEQ_END (F_BSM_SEQ_START+F_BSM_SEQ_SIZE)
 
 #define F_BSM_GROUPS_START F_BSM_SEQ_END
+# define F_BSM_GROUPS_LEN 0
 #define F_BSM_GROUPS_SIZE (AUDIT_MAX_GROUPS+1)
 // AUDIT_MAX_GROUPS defined in bsm/audit_record.h
 #define F_BSM_GROUPS_END (F_BSM_GROUPS_START+F_BSM_GROUPS_SIZE)
 
 #define F_BSM_NEWGROUPS_START F_BSM_GROUPS_END
+# define F_BSM_NEWGROUPS_LEN 0
 #define F_BSM_NEWGROUPS_SIZE (AUDIT_MAX_GROUPS+1)
 // AUDIT_MAX_GROUPS defined in bsm/audit_record.h
 #define F_BSM_NEWGROUPS_END (F_BSM_NEWGROUPS_START+F_BSM_NEWGROUPS_SIZE)
 
-#define F_BSM_ARG_START F_BSM_NEWGROUPS_END
-#define F_BSM_MAX_ARGS 16
+#define F_BSM_EXECARGS_START F_BSM_NEWGROUPS_END
+# define F_BSM_EXECARGS_LEN 0
+#define F_BSM_EXECARGS_SIZE (AUDIT_MAX_ARGS+1)
+#define F_BSM_EXECARGS_END (F_BSM_EXECARGS_START+F_BSM_EXECARGS_SIZE)
+
+#define F_BSM_EXECENV_START F_BSM_EXECARGS_END
+# define F_BSM_EXECENV_LEN 0
+#define F_BSM_EXECENV_SIZE (AUDIT_MAX_ENV+1)
+#define F_BSM_EXECENV_END (F_BSM_EXECENV_START+F_BSM_EXECENV_SIZE)
+
+#define F_BSM_ARG_START F_BSM_EXECENV_END
+#define F_BSM_MAX_ARGS AUDIT_MAX_ARGS
 // arguments have entries from F_BSM_ARG_START (arg1)
 // through F_BSM_ARG_START+F_BSM_MAX_ARGS-1 (arg<F_BSM_MAX_ARGS>)
 // no F_BSM field should be added after these
-// If F_BSM_MAX_ARGS is changed, one should also update the last lines
-// of the bsm_fields[] array in mod_bsm.c
+// F_BSM_MAX_ARGS should not be changed
+// If really necessary, then the last loop in gen_mod_bsm.c should
+// go from 0 to F_BSM_MAX_ARGS, always.
 
 #define BSM_FIELDS (F_BSM_ARG_START+F_BSM_MAX_ARGS)
 

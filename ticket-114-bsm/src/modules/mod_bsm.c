@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include "orchids.h"
 #include "orchids_api.h"
+#include <bsm/libbsm.h>
 #include "mod_bsm.h"
 
 input_module_t mod_bsm;
@@ -113,6 +114,10 @@ static struct s_ls s_bsm_event_low_types[] = {
     }								\
   }
 
+#define F_WRAP(type) add_fields_to_event_stride(ctx, mod, &event, attr, \
+						F_BSM_ ## type ## _START, \
+						F_BSM_ ## type ## _END);
+
 static int
 bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 {
@@ -166,9 +171,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  // and the AUE_ macros.
 	  // e.g., 43050 is fsctl() (this one is Darwin-specific)
 	  F_INT(HDR_MODIFIER,hdr32.e_mod);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_HDR_START,
-				     F_BSM_HDR_END);
+	  F_WRAP(HDR);
 	  break;
 	}
       case AUT_HEADER32_EX: // almost the same as AUT_HEADER32
@@ -190,9 +193,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  // extra fields, compared to AUT_HEADER32:
 	  F_INT(HDR_ADTYPE,hdr32_ex.ad_type);
 	  F_IPV6(HDR_IP,hdr32_ex.addr);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_HDR_START,
-				     F_BSM_HDR_END);
+	  F_WRAP(HDR);
 	  break;
 	}
       case AUT_PATH:
@@ -208,9 +209,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  // warning: apparently, a path field may be given twice in a row.
 	  // I do not know why.  When it happens, it seems to be the same
 	  // value anyway.
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_PATH_START,
-				     F_BSM_PATH_END);
+	  F_WRAP(PATH);
 	  break;
 	}
       case AUT_XATPATH: /* maybe some extra (X) path argument? or is it
@@ -221,9 +220,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t *attr[F_BSM_XATPATH_SIZE];
 
 	  F_VSTR(XATPATH,path);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_XATPATH_START,
-				     F_BSM_XATPATH_END);
+	  F_WRAP(XATPATH);
 	  break;
 	}
       case AUT_TEXT: // I don't know what this is used for
@@ -231,9 +228,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t *attr[F_BSM_TEXT_SIZE];
 
 	  F_VSTR(TEXT,text);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_TEXT_START,
-				     F_BSM_TEXT_END);
+	  F_WRAP(TEXT);
 	  break;
 	}
       case AUT_SUBJECT: /* = case AUT_SUBJECT32: */
@@ -249,9 +244,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(SUBJ_SID,subj32.sid);
 	  F_INT(SUBJ_PORT,subj32.tid.port);
 	  F_IPV4(SUBJ_ADDR,subj32.tid.addr);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_SUBJ_START,
-				     F_BSM_SUBJ_END);
+	  F_WRAP(SUBJ);
 	  break;
 	}
       case AUT_RETURN32:
@@ -260,9 +253,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 
 	  F_INT(RET_VAL,exit.ret);
 	  F_INT(RET_STATUS,exit.status);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_RET_START,
-				     F_BSM_RET_END);
+	  F_WRAP(RET);
 	  break;
 	}
       case AUT_ATTR32:
@@ -276,9 +267,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(ATTR_FSID,attr32.fsid);
 	  F_INT(ATTR_NID,attr32.nid);
 	  F_INT(ATTR_DEV,attr32.dev);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_ATTR_START,
-				     F_BSM_ATTR_SIZE);
+	  F_WRAP(ATTR);
 	  break;
 	}
       case AUT_ARG32:
@@ -344,9 +333,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_TIME_S_MS(FILE_TIME,file);
 	  // file only provides milliseconds, but tv requires microseconds
 	  F_VSTR(FILE_NAME,file);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_FILE_START,
-				     F_BSM_FILE_END);
+	  F_WRAP(FILE);
 	  break;
 	}
       case AUT_IN_ADDR:
@@ -354,9 +341,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t *attr[F_BSM_INADDR_SIZE];
 
 	  F_IPV4(INADDR,inaddr.addr);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_INADDR_START,
-				     F_BSM_INADDR_END);
+	  F_WRAP(INADDR);
 	  break;
 	}
       case AUT_IPORT:
@@ -364,9 +349,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t * attr[F_BSM_IPORT_SIZE];
 
 	  F_INT(IPORT,iport.port);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_IPORT_START,
-				     F_BSM_IPORT_END);
+	  F_WRAP(IPORT);
 	  break;
 	}
       case AUT_SOCKET:
@@ -378,9 +361,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(SOCK_LADDR,socket.l_addr);
 	  F_INT(SOCK_RPORT,socket.r_port);
 	  F_INT(SOCK_RADDR,socket.r_addr);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_SOCK_START,
-				     F_BSM_SOCK_END);
+	  F_WRAP(SOCK);
 	  break;
 	}
       case AUT_IPC:
@@ -389,9 +370,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 
 	  F_INT(IPC_TYPE,ipc.type);
 	  F_INT(IPC_ID,ipc.id);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_IPC_START,
-				     F_BSM_IPC_END);
+	  F_WRAP(IPC);
 	  break;
 	}
       case AUT_IPC_PERM:
@@ -405,9 +384,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(IPCPERM_MOD,ipcperm.mod);
 	  F_INT(IPCPERM_SEQ,ipcperm.seq);
 	  F_INT(IPCPERM_KEY,ipcperm.key);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_IPCPERM_START,
-				     F_BSM_IPCPERM_END);
+	  F_WRAP(IPCPERM);
 	}
       case AUT_GROUPS: /* [au_groups_t] list of integers */
 	// We compile this list as a null-terminated list
@@ -422,14 +399,16 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): too many groups.\n");
 	      n = MAX_AUDIT_GROUPS;
 	    }
+	  attr[F_BSM_GROUPS_LEN] = ovm_int_new();
+	  INT(attr[F_BSM_GROUPS_LEN]) = n;
 	  for (i=0; i<n; i++)
 	    {
-	      attr[i] = new_ovm_int();
-	      INT(attr[i]) = tok.tt.groups.list[i];
+	      attr[i+1] = new_ovm_int();
+	      INT(attr[i+1]) = tok.tt.groups.list[i];
 	    }
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_GROUPS_START,
-				     F_BSM_GROUPS_END+n);
+				     F_BSM_GROUPS_END+n+1);
 	  break;
 	}
       case AUT_NEWGROUPS: // I'm assuming this works as AUT_GROUPS */
@@ -443,14 +422,16 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): too many groups.\n");
 	      n = MAX_AUDIT_GROUPS;
 	    }
+	  attr[F_BSM_NEWGROUPS_LEN] = ovm_int_new();
+	  INT(attr[F_BSM_NEWGROUPS_LEN]) = n;
 	  for (i=0; i<n; i++)
 	    {
-	      attr[i] = new_ovm_int();
-	      INT(attr[i]) = tok.tt.groups.list[i];
+	      attr[i+1] = new_ovm_int();
+	      INT(attr[i+1]) = tok.tt.groups.list[i];
 	    }
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_NEWGROUPS_START,
-				     F_BSM_NEWGROUPS_END+n);
+				     F_BSM_NEWGROUPS_END+n+1);
 	  break;
 	}
       case AUT_PROCESS32:
@@ -467,9 +448,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(PROC_SID,proc32.sid);
 	  F_INT(PROC_PORT,proc32.tid.port);
 	  F_IPV4(PROC_IP,proc32.tid.addr);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_PROC_START,
-				     F_BSM_PROC_END);
+	  F_WRAP(PROC);
 	  break;
 	}
       case AUT_IP:
@@ -487,9 +466,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(IP_CHKSM,ip.chksm);
 	  F_IPV4(IP_SRC,ip.src);
 	  F_IPV4(IP_DEST,ip.dest);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_IP_START,
-				     F_BSM_IP_END);
+	  F_WRAP(IP);
 	  break;
 	}
       case AUT_SEQ: /* sequence number */
@@ -497,12 +474,58 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t *attr[F_BSM_SEQ_SIZE];
 
 	  F_INT(SEQ,seq.seqno);
-	  add_fields_to_event_stride(ctx, mod, &event, attr,
-				     F_BSM_SEQ_START,
-				     F_BSM_SEQ_END);
+	  F_WRAP(SEQ);
 	  break;
 	}
-	// !!! Stopped at AUT_EXEC_ARGS (0x3c)
+      case AUT_EXEC_ARGS:
+	{
+	  ovm_var_t *attr[F_BSM_EXECARGS_SIZE];
+	  memset(attr, 0, sizeof(attr));
+	  int i, n;
+	  n = tok.tt.execarg.count;
+	  if (n>MAX_AUDIT_ARGS)
+	    {
+	      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): too many args in exec.\n");
+	      n = MAX_AUDIT_ARGS;
+	    }
+	  attr[F_BSM_EXECARGS_LEN] = ovm_int_new();
+	  INT(attr[F_BSM_EXECARGS_LEN]) = n;
+	  for (i=0; i<n; i++)
+	    {
+	      attr[i+1] = new_ovm_vstr();
+	      ovm_vstr_t *s = &VSTR(attr[i+1]);
+	      s->len = strlen(s->str = tok.tt.execarg.text[i]);
+	    }
+	  add_fields_to_event_stride(ctx, mod, &event, attr,
+				     F_BSM_EXECARGS_START,
+				     F_BSM_EXECARGS_END+n+1);
+	  break;
+	}
+      case AUT_EXEC_ENV:
+	{
+	  ovm_var_t *attr[F_BSM_EXECENV_SIZE];
+	  memset(attr, 0, sizeof(attr));
+	  int i, n;
+	  n = tok.tt.execenv.count;
+	  if (n>MAX_AUDIT_ENV)
+	    {
+	      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): too many elements in exec environment.\n");
+	      n = MAX_AUDIT_ENV;
+	    }
+	  attr[F_BSM_EXECENV_LEN] = ovm_int_new();
+	  INT(attr[F_BSM_EXECENV_LEN]) = n;
+	  for (i=0; i<n; i++)
+	    {
+	      attr[i+1] = new_ovm_vstr();
+	      ovm_vstr_t *s = &VSTR(attr[i+1]);
+	      s->len = strlen(s->str = tok.tt.execenv.text[i]);
+	    }
+	  add_fields_to_event_stride(ctx, mod, &event, attr,
+				     F_BSM_EXECENV_START,
+				     F_BSM_EXECENV_END+n+1);
+	  break;
+	}
+	// !!! Stopped at AUT_UNAUTH (0x3f)
 	// The following are ignored
 	// First, those that are ignored because I don't know
 	// what they are for, or which subfields of tok.tt should be used
@@ -591,130 +614,11 @@ static field_t bsm_fields[] = {
   { "bsm.ip.src", T_IPV4, "bsm ip packet: source ip address" },
   { "bsm.ip.dest", T_INT, "bsm ip packet: destination ip address" },
   { "bsm.seq", T_INT, "bsm sequence number" },
-#if AUDIT_MAX_GROUPS>=1
-  { "bsm.groups.elt1", T_INT, "bsm groups: 1st element" },
-#endif
-#if AUDIT_MAX_GROUPS>=2
-  { "bsm.groups.elt2", T_INT, "bsm groups: 2nd element" },
-#endif
-#if AUDIT_MAX_GROUPS>=3
-  { "bsm.groups.elt3", T_INT, "bsm groups: 3rd element" },
-#endif
-#if AUDIT_MAX_GROUPS>=4
-  { "bsm.groups.elt4", T_INT, "bsm groups: 4th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=5
-  { "bsm.groups.elt5", T_INT, "bsm groups: 5th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=6
-  { "bsm.groups.elt6", T_INT, "bsm groups: 6th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=7
-  { "bsm.groups.elt7", T_INT, "bsm groups: 7th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=8
-  { "bsm.groups.elt8", T_INT, "bsm groups: 8th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=9
-  { "bsm.groups.elt9", T_INT, "bsm groups: 9th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=10
-  { "bsm.groups.elt10", T_INT, "bsm groups: 10th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=11
-  { "bsm.groups.elt11", T_INT, "bsm groups: 11th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=12
-  { "bsm.groups.elt12", T_INT, "bsm groups: 12th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=13
-  { "bsm.groups.elt13", T_INT, "bsm groups: 13th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=14
-  { "bsm.groups.elt14", T_INT, "bsm groups: 14th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=15
-  { "bsm.groups.elt15", T_INT, "bsm groups: 15th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=16
-  { "bsm.groups.elt16", T_INT, "bsm groups: 16th element" },
-#endif
-#if AUDIT_MAX_GROUPS>16
-  Error: AUDIT_MAX_GROUPS too large (add a few more lines above)
-#endif
-#if AUDIT_MAX_GROUPS>=1
-  { "bsm.newgroups.elt1", T_INT, "bsm newgroups: 1st element" },
-#endif
-#if AUDIT_MAX_GROUPS>=2
-  { "bsm.newgroups.elt2", T_INT, "bsm newgroups: 2nd element" },
-#endif
-#if AUDIT_MAX_GROUPS>=3
-  { "bsm.newgroups.elt3", T_INT, "bsm newgroups: 3rd element" },
-#endif
-#if AUDIT_MAX_GROUPS>=4
-  { "bsm.newgroups.elt4", T_INT, "bsm newgroups: 4th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=5
-  { "bsm.newgroups.elt5", T_INT, "bsm newgroups: 5th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=6
-  { "bsm.newgroups.elt6", T_INT, "bsm newgroups: 6th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=7
-  { "bsm.newgroups.elt7", T_INT, "bsm newgroups: 7th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=8
-  { "bsm.newgroups.elt8", T_INT, "bsm newgroups: 8th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=9
-  { "bsm.newgroups.elt9", T_INT, "bsm newgroups: 9th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=10
-  { "bsm.newgroups.elt10", T_INT, "bsm newgroups: 10th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=11
-  { "bsm.newgroups.elt11", T_INT, "bsm newgroups: 11th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=12
-  { "bsm.newgroups.elt12", T_INT, "bsm newgroups: 12th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=13
-  { "bsm.newgroups.elt13", T_INT, "bsm newgroups: 13th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=14
-  { "bsm.newgroups.elt14", T_INT, "bsm newgroups: 14th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=15
-  { "bsm.newgroups.elt15", T_INT, "bsm newgroups: 15th element" },
-#endif
-#if AUDIT_MAX_GROUPS>=16
-  { "bsm.newgroups.elt16", T_INT, "bsm newgroups: 16th element" },
-#endif
-#if AUDIT_MAX_GROUPS>16
-  Error: AUDIT_MAX_GROUPS too large (add a few more lines above)
-#endif
-  // The following are written assuming F_BSM_MAX_ARGS==16
+  // The following file generated automatically by gen_mod_bsm.c
+  // handles the bsm.groups.elt<i>, bsm.newgroups.elt<i>
+  // fields
+#include "defs_bsm.c"
   // Do not add new fields after this line
-  // unless they are bsm.arg<i> fields;
-  // in which case please update F_BSM_MAX_ARGS
-  { "bsm.arg1", T_INT, "bsm argument 1" },
-  { "bsm.arg2", T_INT, "bsm argument 2" },
-  { "bsm.arg3", T_INT, "bsm argument 3" },
-  { "bsm.arg4", T_INT, "bsm argument 4" },
-  { "bsm.arg5", T_INT, "bsm argument 5" },
-  { "bsm.arg6", T_INT, "bsm argument 6" },
-  { "bsm.arg7", T_INT, "bsm argument 7" },
-  { "bsm.arg8", T_INT, "bsm argument 8" },
-  { "bsm.arg9", T_INT, "bsm argument 9" },
-  { "bsm.arg10", T_INT, "bsm argument 10" },
-  { "bsm.arg11", T_INT, "bsm argument 11" },
-  { "bsm.arg12", T_INT, "bsm argument 12" },
-  { "bsm.arg13", T_INT, "bsm argument 13" },
-  { "bsm.arg14", T_INT, "bsm argument 14" },
-  { "bsm.arg15", T_INT, "bsm argument 15" },
-  { "bsm.arg16", T_INT, "bsm argument 16" },
-  // do not add any new field names here, except of the form bsm.arg<x>
-  // and change F_BSM_MAX_ARGS accordingly
 };
 
 #endif /* HAVE_BSM_H */
