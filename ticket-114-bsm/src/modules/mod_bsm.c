@@ -80,6 +80,39 @@ static struct s_ls s_bsm_event_low_types[] = {
 };
 #endif
 
+#define F_INT(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_int_new();	\
+    INT(attr[F_BSM_ ## fname]) = tok.tt.bsmname; }
+#define F_VSTR(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_vstr_new(); \
+  {									\
+    ovm_vstr_t *s = &VSTR(attr[F_BSM_ ## fname]);			\
+    s->len = tok.tt.bsmname.len;					\
+    s->str = tok.tt.bsmname.path;					\
+  }
+#define F_IPV4(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_ipv4_new(); \
+    IPV4(attr[F_BSM_ ## fname])->s_addr = tok.tt.bsnname; }
+#define F_IPV6(fname,bsmname) {	  \
+    F_IPV4(fname ## 0, bsmname[0]);		\
+    F_IPV4(fname ## 1, bsmname[1]);		\
+    F_IPV4(fname ## 2, bsmname[2]);		\
+    F_IPV4(fname ## 3, bsmname[3]);		\
+  }
+#define F_TIME_S_MS(fname,bsmname) {	     \
+    attr[F_BSM_ ## fname] = ovm_timeval_new();		\
+    {							\
+      struct timeval *tv = &TIMEVAL(attr[F_BSM_ ## fname]);	\
+      tv->tv_sec = tok.tt.bsmname.s;				\
+      tv->tv_usec = tok.tt.bsmname.ms*1000;			\
+    }								\
+  }
+#define F_TIME_S_NS(fname,bsmname) {	     \
+    attr[F_BSM_ ## fname] = ovm_timeval_new();		\
+    {							\
+      struct timeval *tv = &TIMEVAL(attr[F_BSM_ ## fname]);	\
+      tv->tv_sec = tok.tt.bsmname.s;				\
+      tv->tv_usec = tok.tt.bsmname.ms/1000;			\
+    }								\
+  }
+
 static int
 bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 {
@@ -124,23 +157,15 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_HDR_SIZE];
 	  memset(attr, 0, sizeof(attr));
-	  
-	  attr[F_BSM_HDR_VERSION] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_VERSION]) = tok.tt.hdr32.version;
-	  attr[F_BSM_HDR_TIME] = ovm_timeval_new();
-	  {
-	    struct timeval *tv = &TIMEVAL(attr[F_BSM_HDR_TIME]);
-	    tv->tv_sec = tok.tt.hdr32.s;
-	    tv->tv_usec = tok.tt.hdr32.ms*1000;
-	    // hdr32 only provides milliseconds, but tv requires microseconds
-	  }
-	  attr[F_BSM_HDR_TYPE] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_TYPE]) = tok.tt.hdr32.e_type;
+
+	  F_INT(HDR_VERSION,hdr32.version);
+	  F_TIME_S_MS(HDR_TIME,hdr32);
+	  // hdr32 only provides milliseconds, but tv requires microseconds
+	  F_INT(HDR_TYPE,hdr32.e_type);
 	  // type denotes what this event is, see <bsm/audit_kevents.h>,
 	  // and the AUE_ macros.
 	  // e.g., 43050 is fsctl() (this one is Darwin-specific)
-	  attr[F_BSM_HDR_MODIFIER] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_MODIFIER]) = tok.tt.hdr32.e_mod;
+	  F_INT(HDR_MODIFIER,hdr32.e_mod);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_HDR_START,
 				     F_BSM_HDR_END);
@@ -150,36 +175,21 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_HDR_SIZE];
 	  memset(attr, 0, sizeof(attr));
-	  
-	  attr[F_BSM_HDR_VERSION] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_VERSION]) = tok.tt.hdr32_ex.version;
-	  attr[F_BSM_HDR_TIME] = ovm_timeval_new();
-	  {
-	    struct timeval *tv = &TIMEVAL(attr[F_BSM_HDR_TIME]);
-	    tv->tv_sec = tok.tt.hdr32_ex.s;
-	    tv->tv_usec = tok.tt.hdr32_ex.ms/1000;
-	    // hdr32_ex provides a ms field, but it is documented (in libbsm.h)
-	    // as returning nanoseconds, not milliseconds (?)
-	    // I've not been able to test.
-	  }
-	  attr[F_BSM_HDR_TYPE] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_TYPE]) = tok.tt.hdr32_ex.e_type;
+
+	  F_INT(HDR_VERSION,hdr32_ex.version);
+	  F_TIME_S_NS(HDR_TIME,hdr32_ex);
+	  // hdr32_ex provides a ms field, but it is documented (in libbsm.h)
+	  // as returning nanoseconds, not milliseconds (?)
+	  // I've not been able to test.  Sounds like a bug.
+	  // More likely: use F_TIME_S_MS, not F_TIME_S_NS
+	  F_INT(HDR_TYPE,hdr32_ex.e_type);
 	  // type denotes what this event is, see <bsm/audit_kevents.h>,
 	  // and the AUE_ macros.
 	  // e.g., 43050 is fsctl() (this one is Darwin-specific)
-	  attr[F_BSM_HDR_MODIFIER] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_MODIFIER]) = tok.tt.hdr32.e_mod;
+	  F_INT(HDR_MODIFIER,hdr32_ex.e_mod);
 	  // extra fields, compared to AUT_HEADER32:
-	  attr[F_BSM_HDR_ADTYPE] = ovm_int_new();
-	  INT(attr[F_BSM_HDR_ADTYPE]) = tok.tt.hdr32_ex.ad_type;
-	  attr[F_BSM_HDR_IP0] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_HDR_IP0])->s_addr = tok.tt.hdr32_ex.addr[0];
-	  attr[F_BSM_HDR_IP1] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_HDR_IP1])->s_addr = tok.tt.hdr32_ex.addr[1];
-	  attr[F_BSM_HDR_IP2] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_HDR_IP2])->s_addr = tok.tt.hdr32_ex.addr[2];
-	  attr[F_BSM_HDR_IP3] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_HDR_IP3])->s_addr = tok.tt.hdr32_ex.addr[3];
+	  F_INT(HDR_ADTYPE,hdr32_ex.ad_type);
+	  F_IPV6(HDR_IP,hdr32_ex.addr);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_HDR_START,
 				     F_BSM_HDR_END);
@@ -194,15 +204,10 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_PATH_SIZE];
 
-	  attr[F_BSM_PATH] = ovm_vstr_new();
-	  {
-	    ovm_vstr_t *s = &VSTR(attr[F_BSM_PATH]);
-	    s->len = tok.tt.path.len;
-	    s->str = tok.tt.path.path;
-	    // warning: apparently, a path field may be given twice in a row.
-	    // I do not know why.  When it happens, it seems to be the same
-	    // value anyway.
-	  }
+	  F_VSTR(PATH,path);
+	  // warning: apparently, a path field may be given twice in a row.
+	  // I do not know why.  When it happens, it seems to be the same
+	  // value anyway.
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_PATH_START,
 				     F_BSM_PATH_END);
@@ -215,15 +220,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_XATPATH_SIZE];
 
-	  attr[F_BSM_XATPATH] = ovm_vstr_new();
-	  {
-	    ovm_vstr_t *s = &VSTR(attr[F_BSM_XATPATH]);
-	    s->len = tok.tt.path.len;
-	    s->str = tok.tt.path.path;
-	    // warning: apparently, a path field may be given twice in a row.
-	    // I do not know why.  When it happens, it seems to be the same
-	    // value anyway.
-	  }
+	  F_VSTR(XATPATH,path);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_XATPATH_START,
 				     F_BSM_XATPATH_END);
@@ -232,12 +229,8 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_TEXT: // I don't know what this is used for
 	{
 	  ovm_var_t *attr[F_BSM_TEXT_SIZE];
-	  attr[F_BSM_TEXT] = ovm_vstr_new();
-	  {
-	    ovm_vstr_t *s = &VSTR(attr[F_BSM_TEXT]);
-	    s->len = tok.tt.text.len;
-	    s->str = tok.tt.text.path;
-	  }
+
+	  F_VSTR(TEXT,text);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_TEXT_START,
 				     F_BSM_TEXT_END);
@@ -247,24 +240,15 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_SUBJ_SIZE];
 
-	  attr[F_BSM_SUBJ_AUID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_AUID]) = tok.tt.subj32.auid;
-	  attr[F_BSM_SUBJ_EUID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_EUID]) = tok.tt.subj32.euid;
-	  attr[F_BSM_SUBJ_EGID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_EGID]) = tok.tt.subj32.egid;
-	  attr[F_BSM_SUBJ_RUID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_RUID]) = tok.tt.subj32.ruid;
-	  attr[F_BSM_SUBJ_RGID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_RGID]) = tok.tt.subj32.rgid;
-	  attr[F_BSM_SUBJ_PID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_PID]) = tok.tt.subj32.pid;
-	  attr[F_BSM_SUBJ_SID] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_SID]) = tok.tt.subj32.sid;
-	  attr[F_BSM_SUBJ_PORT] = new_ovm_int();
-	  INT(attr[F_BSM_SUBJ_PORT]) = tok.tt.subj32.tid.port;
-	  attr[F_BSM_SUBJ_ADDR] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_SUBJ_ADDR])->s_addr = tok.tt.subj32.tid.addr;
+	  F_INT(SUBJ_AUID,subj32.auid);
+	  F_INT(SUBJ_EUID,subj32.euid);
+	  F_INT(SUBJ_EGID,subj32.egid);
+	  F_INT(SUBJ_RUID,subj32.ruid);
+	  F_INT(SUBJ_RGID,subj32.rgid);
+	  F_INT(SUBJ_PID,subj32.pid);
+	  F_INT(SUBJ_SID,subj32.sid);
+	  F_INT(SUBJ_PORT,subj32.tid.port);
+	  F_IPV4(SUBJ_ADDR,subj32.tid.addr);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_SUBJ_START,
 				     F_BSM_SUBJ_END);
@@ -274,10 +258,8 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_RET_SIZE];
 
-	  attr[F_BSM_RET_VAL] = new_ovm_int();
-	  INT(attr[F_BSM_RET_VAL]) = tok.tt.exit.ret;
-	  attr[F_BSM_RET_STATUS] = new_ovm_int();
-	  INT(attr[F_BSM_RET_STATUS]) = tok.tt.exit.status;
+	  F_INT(RET_VAL,exit.ret);
+	  F_INT(RET_STATUS,exit.status);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_RET_START,
 				     F_BSM_RET_END);
@@ -288,18 +270,12 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_ATTR_SIZE];
 
-	  attr[F_BSM_ATTR_MODE] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_MODE]) = tok.tt.attr32.mode;
-	  attr[F_BSM_ATTR_UID] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_UID]) = tok.tt.attr32.uid;
-	  attr[F_BSM_ATTR_GID] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_GID]) = tok.tt.attr32.gid;
-	  attr[F_BSM_ATTR_FSID] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_FSID]) = tok.tt.attr32.fsid;
-	  attr[F_BSM_ATTR_NID] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_NID]) = tok.tt.attr32.nid;
-	  attr[F_BSM_ATTR_DEV] = new_ovm_int();
-	  INT(attr[F_BSM_ATTR_DEV]) = tok.tt.attr32.dev;
+	  F_INT(ATTR_MODE,attr32.mode);
+	  F_INT(ATTR_UID,attr32.uid);
+	  F_INT(ATTR_GID,attr32.gid);
+	  F_INT(ATTR_FSID,attr32.fsid);
+	  F_INT(ATTR_NID,attr32.nid);
+	  F_INT(ATTR_DEV,attr32.dev);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_ATTR_START,
 				     F_BSM_ATTR_SIZE);
@@ -364,18 +340,10 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	// this should really parse some (inexistent) au_file64_t structure.
 	{
 	  ovm_var_t *attr[F_BSM_FILE_SIZE];
-	  attr[F_BSM_FILE_TIME] = ovm_timeval_new();
-	  {
-	    struct timeval *tv = &TIMEVAL(attr[F_BSM_FILE_TIME]);
-	    tv->tv_sec = tok.tt.file.s;
-	    tv->tv_usec = tok.tt.file.ms*1000;
-	    // file only provides milliseconds, but tv requires microseconds
-	  }
-	  {
-	    ovm_vstr_t *s = &VSTR(attr[F_BSM_FILE_NAME]);
-	    s->len = tok.tt.file.len;
-	    s->str = tok.tt.file.name;
-	  }
+
+	  F_TIME_S_MS(FILE_TIME,file);
+	  // file only provides milliseconds, but tv requires microseconds
+	  F_VSTR(FILE_NAME,file);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_FILE_START,
 				     F_BSM_FILE_END);
@@ -384,8 +352,8 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_IN_ADDR:
 	{
 	  ovm_var_t *attr[F_BSM_INADDR_SIZE];
-	  attr[F_BSM_INADDR] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_INADDR])->s_addr = tok.tt.inaddr.addr;
+
+	  F_IPV4(INADDR,inaddr.addr);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_INADDR_START,
 				     F_BSM_INADDR_END);
@@ -394,8 +362,8 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_IPORT:
 	{
 	  ovm_var_t * attr[F_BSM_IPORT_SIZE];
-	  attr[F_BSM_IPORT] = new_ovm_int();
-	  INT(attr[F_BSM_IPORT]) = tok.tt.iport.port;
+
+	  F_INT(IPORT,iport.port);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_IPORT_START,
 				     F_BSM_IPORT_END);
@@ -404,16 +372,12 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_SOCKET:
 	{
 	  ovm_var_t *attr[F_BSM_SOCK_SIZE];
-	  attr[F_BSM_SOCK_TYPE] = new_ovm_int();
-	  INT(attr[F_BSM_SOCK_TYPE]) = tok.tt.socket.type;
-	  attr[F_BSM_SOCK_LPORT] = new_ovm_int();
-	  INT(attr[F_BSM_SOCK_LPORT]) = tok.tt.socket.l_port;
-	  attr[F_BSM_SOCK_LADDR] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_SOCK_LADDR])->s_addr = tok.tt.socket.l_addr;
-	  attr[F_BSM_SOCK_RPORT] = new_ovm_int();
-	  INT(attr[F_BSM_SOCK_RPORT]) = tok.tt.socket.r_port;
-	  attr[F_BSM_SOCK_RADDR] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_SOCK_RADDR])->s_addr = tok.tt.socket.r_addr;
+
+	  F_INT(SOCK_TYPE,socket.type);
+	  F_INT(SOCK_LPORT,socket.l_port);
+	  F_INT(SOCK_LADDR,socket.l_addr);
+	  F_INT(SOCK_RPORT,socket.r_port);
+	  F_INT(SOCK_RADDR,socket.r_addr);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_SOCK_START,
 				     F_BSM_SOCK_END);
@@ -422,10 +386,9 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_IPC:
 	{
 	  ovm_var_t *attr[F_BSM_IPC_SIZE];
-	  attr[F_BSM_IPC_TYPE] = new_ovm_int();
-	  INT(attr[F_BSM_IPC_TYPE]) = tok.tt.ipc.type;
-	  attr[F_BSM_IPC_ID] = new_ovm_int();
-	  INT(attr[F_BSM_IPC_ID]) = tok.tt.ipc.id;
+
+	  F_INT(IPC_TYPE,ipc.type);
+	  F_INT(IPC_ID,ipc.id);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_IPC_START,
 				     F_BSM_IPC_END);
@@ -434,20 +397,14 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_IPC_PERM:
 	{
 	  ovm_var_t *attr[F_BSM_IPCPERM_SIZE];
-	  attr[F_BSM_IPCPERM_UID] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_UID]) = tok.tt.ipcperm.uid;
-	  attr[F_BSM_IPCPERM_GID] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_GID]) = tok.tt.ipcperm.gid;
-	  attr[F_BSM_IPCPERM_PUID] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_PUID]) = tok.tt.ipcperm.puid;
-	  attr[F_BSM_IPCPERM_PGID] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_PGID]) = tok.tt.ipcperm.pgid;
-	  attr[F_BSM_IPCPERM_MOD] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_MOD]) = tok.tt.ipcperm.mod;
-	  attr[F_BSM_IPCPERM_SEQ] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_SEQ]) = tok.tt.ipcperm.seq;
-	  attr[F_BSM_IPCPERM_KEY] = new_ovm_int();
-	  INT(attr[F_BSM_IPCPERM_KEY]) = tok.tt.ipcperm.key;
+
+	  F_INT(IPCPERM_UID,ipcperm.uid);
+	  F_INT(IPCPERM_GID,ipcperm.gid);
+	  F_INT(IPCPERM_PUID,ipcperm.puid);
+	  F_INT(IPCPERM_PGID,ipcperm.pgid);
+	  F_INT(IPCPERM_MOD,ipcperm.mod);
+	  F_INT(IPCPERM_SEQ,ipcperm.seq);
+	  F_INT(IPCPERM_KEY,ipcperm.key);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_IPCPERM_START,
 				     F_BSM_IPCPERM_END);
@@ -500,24 +457,16 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_PROC_SIZE];
 	  memset(attr, 0, sizeof(attr));
-	  attr[F_BSM_PROC_AUID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_AUID]) = tok.tt.proc32.auid;
-	  attr[F_BSM_PROC_EUID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_EUID]) = tok.tt.proc32.euid;
-	  attr[F_BSM_PROC_EGID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_EGID]) = tok.tt.proc32.egid;
-	  attr[F_BSM_PROC_RUID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_RUID]) = tok.tt.proc32.ruid;
-	  attr[F_BSM_PROC_RGID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_RGID]) = tok.tt.proc32.rgid;
-	  attr[F_BSM_PROC_PID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_PID]) = tok.tt.proc32.pid;
-	  attr[F_BSM_PROC_SID] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_SID]) = tok.tt.proc32.sid;
-	  attr[F_BSM_PROC_PORT] = new_ovm_int();
-	  INT(attr[F_BSM_PROC_PORT]) = tok.tt.proc32.tid.port;
-	  attr[F_BSM_PROC_IP] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_PROC_IP])->s_addr = tok.tt.proc32.tid.addr;
+
+	  F_INT(PROC_AUID,proc32.auid);
+	  F_INT(PROC_EUID,proc32.euid);
+	  F_INT(PROC_EGID,proc32.egid);
+	  F_INT(PROC_RUID,proc32.ruid);
+	  F_INT(PROC_RGID,proc32.rgid);
+	  F_INT(PROC_PID,proc32.pid);
+	  F_INT(PROC_SID,proc32.sid);
+	  F_INT(PROC_PORT,proc32.tid.port);
+	  F_IPV4(PROC_IP,proc32.tid.addr);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_PROC_START,
 				     F_BSM_PROC_END);
@@ -527,26 +476,17 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	{
 	  ovm_var_t *attr[F_BSM_IP_SIZE];
 	  memset(attr, 0, sizeof(attr));
-	  attr[F_BSM_IP_VERSION] = new_ovm_int();
-	  INT(attr[F_BSM_IP_VERSION]) = tok.tt.ip.version;
-	  attr[F_BSM_IP_TOS] = new_ovm_int();
-	  INT(attr[F_BSM_IP_TOS]) = tok.tt.ip.tos;
-	  attr[F_BSM_IP_LEN] = new_ovm_int();
-	  INT(attr[F_BSM_IP_LEN]) = tok.tt.ip.len;
-	  attr[F_BSM_IP_ID] = new_ovm_int();
-	  INT(attr[F_BSM_IP_ID]) = tok.tt.ip.id;
-	  attr[F_BSM_IP_OFFSET] = new_ovm_int();
-	  INT(attr[F_BSM_IP_OFFSET]) = tok.tt.ip.offset;
-	  attr[F_BSM_IP_TTL] = new_ovm_int();
-	  INT(attr[F_BSM_IP_TTL]) = tok.tt.ip.ttl;
-	  attr[F_BSM_IP_PROT] = new_ovm_int();
-	  INT(attr[F_BSM_IP_PROT]) = tok.tt.ip.prot;
-	  attr[F_BSM_IP_CHKSM] = new_ovm_int();
-	  INT(attr[F_BSM_IP_CHKSM]) = tok.tt.ip.chksm;
-	  attr[F_BSM_IP_SRC] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_IP_SRC])->s_addr = tok.tt.ip.src;
-	  attr[F_BSM_IP_DEST] = new_ovm_ipv4();
-	  IPV4(attr[F_BSM_IP_DEST])->s_addr = tok.tt.ip.dest;
+
+	  F_INT(IP_VERSION,ip.version);
+	  F_INT(IP_TOS,ip.tos);
+	  F_INT(IP_LEN,ip.len);
+	  F_INT(IP_ID,ip.id);
+	  F_INT(IP_OFFSET,ip.offset);
+	  F_INT(IP_TTL,ip.ttl);
+	  F_INT(IP_PROT,ip.prot);
+	  F_INT(IP_CHKSM,ip.chksm);
+	  F_IPV4(IP_SRC,ip.src);
+	  F_IPV4(IP_DEST,ip.dest);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_IP_START,
 				     F_BSM_IP_END);
@@ -555,8 +495,8 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_SEQ: /* sequence number */
 	{
 	  ovm_var_t *attr[F_BSM_SEQ_SIZE];
-	  attr[F_BSM_SEQ] = new_ovm_int();
-	  INT(attr[F_BSM_SEQ]) = tok.tt.seq.seqno;
+
+	  F_INT(SEQ,seq.seqno);
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_SEQ_START,
 				     F_BSM_SEQ_END);
