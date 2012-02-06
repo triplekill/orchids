@@ -83,12 +83,13 @@ static struct s_ls s_bsm_event_low_types[] = {
 
 #define F_INT(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_int_new();	\
     INT(attr[F_BSM_ ## fname]) = tok.tt.bsmname; }
-#define F_VSTR(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_vstr_new(); \
+#define F_VSTR1(fname,bsmname,strname) { attr[F_BSM_ ## fname] = ovm_vstr_new(); \
   {									\
     ovm_vstr_t *s = &VSTR(attr[F_BSM_ ## fname]);			\
     s->len = tok.tt.bsmname.len;					\
-    s->str = tok.tt.bsmname.path;					\
+    s->str = tok.tt.bsmname.strname;					\
   }
+#define F_VSTR(fname,bsmname) F_VSTR1(fname,bsmname,path)
 #define F_IPV4(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_ipv4_new(); \
     IPV4(attr[F_BSM_ ## fname])->s_addr = tok.tt.bsnname; }
 #define F_IPV6(fname,bsmname) {	  \
@@ -155,9 +156,6 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
     buf += tok.len;
     switch (tok.id)
       {
-      case AUT_INVALID:
-	DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): token is invalid.\n");
-	break;
       case AUT_HEADER: /* = case AUT_HEADER32: */
 	{
 	  ovm_var_t *attr[F_BSM_HDR_SIZE];
@@ -525,7 +523,24 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 				     F_BSM_EXECENV_END+n+1);
 	  break;
 	}
-	// !!! Stopped at AUT_UNAUTH (0x3f)
+      case AUT_INVALID:
+	{
+	  ovm_var_t *attr[F_BSM_INVALID_SIZE];
+
+	  F_VSTR1(INVALID,path,data);
+	  F_WRAP(INVALID);
+	  break;
+	}
+      case AUT_EXIT:
+	{
+	  ovm_var_t *attr[F_BSM_EXIT_SIZE];
+
+	  F_INT(EXIT_STATUS,exit.status);
+	  F_INT(EXIT_RET,exit.ret);
+	  F_WRAP(EXIT);
+	  break;
+	}
+       	// !!! Stopped at AUT_ZONENAME (0x60)
 	// The following are ignored
 	// First, those that are ignored because I don't know
 	// what they are for, or which subfields of tok.tt should be used
@@ -537,6 +552,20 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_PRIV:
       case AUT_UPRIV:
       case AUT_LIAISON:
+      case AUT_UNAUTH:
+      case AUT_XATOM:
+      case AUT_XOBJ:
+      case AUT_XPROTO:
+      case AUT_XSELECT:
+      case AUT_XCOLORMAP:
+      case AUT_XCURSOR:
+      case AUT_XFONT:
+      case AUT_XGC:
+      case AUT_XPIXMAP:
+      case AUT_XPROPERTY:
+      case AUT_XWINDOW:
+      case AUT_XCLIENT:
+      case AUT_CMD:
 	// Then, those I am not sure of
 	// Then, those I fear are out of scope
 	// Then, those that are obsolete
@@ -614,6 +643,7 @@ static field_t bsm_fields[] = {
   { "bsm.ip.src", T_IPV4, "bsm ip packet: source ip address" },
   { "bsm.ip.dest", T_INT, "bsm ip packet: destination ip address" },
   { "bsm.seq", T_INT, "bsm sequence number" },
+  { "bsm.invalid", T_VSTR, "bsm invalid token" },
   // The following file generated automatically by gen_mod_bsm.c
   // handles the bsm.groups.elt<i>, bsm.newgroups.elt<i>
   // fields
