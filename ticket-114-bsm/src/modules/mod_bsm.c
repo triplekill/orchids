@@ -14,6 +14,11 @@
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
+// A few things below are only compiled if HAS_INT64 is set
+// This would need some extensions of Orchids to 64 bit integers
+// Once they are done, uncomment the following line
+// #define HAS_INT64
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -83,11 +88,12 @@ static struct s_ls s_bsm_event_low_types[] = {
 
 #define F_INT(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_int_new();	\
     INT(attr[F_BSM_ ## fname]) = tok.tt.bsmname; }
-#define F_VSTR1(fname,bsmname,strname) { attr[F_BSM_ ## fname] = ovm_vstr_new(); \
+// #define F_INT64 ... if HAS_INT64
+#define F_VSTR1(fname,bsmname,strname) { ovm_vstr_t *s;			\
+  attr[F_BSM_ ## fname] = s = ovm_vstr_new();				\
   {									\
-    ovm_vstr_t *s = &VSTR(attr[F_BSM_ ## fname]);			\
-    s->len = tok.tt.bsmname.len;					\
-    s->str = tok.tt.bsmname.strname;					\
+    VSTRLEN(s) = tok.tt.bsmname.len;					\
+    VSTR(s) = tok.tt.bsmname.strname;					\
   }
 #define F_VSTR(fname,bsmname) F_VSTR1(fname,bsmname,path)
 #define F_IPV4(fname,bsmname) { attr[F_BSM_ ## fname] = ovm_ipv4_new(); \
@@ -106,6 +112,7 @@ static struct s_ls s_bsm_event_low_types[] = {
       tv->tv_usec = tok.tt.bsmname.ms*1000;			\
     }								\
   }
+// #define F_TIME_S_MS64 ... if HAS_INT64
 #define F_TIME_S_NS(fname,bsmname) {	     \
     attr[F_BSM_ ## fname] = ovm_timeval_new();		\
     {							\
@@ -172,6 +179,21 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_WRAP(HDR);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_HEADER64:
+	{
+	  ovm_var_t *attr[F_BSM_HDR_SIZE];
+	  memset(attr, 0, sizeof(attr));
+
+	  F_INT(HDR_VERSION,hdr64.version);
+	  F_TIME_S_MS64(HDR_TIME,hdr64); // both s and ms are u_int64_t
+	  // hdr64 only provides milliseconds, but tv requires microseconds
+	  F_INT(HDR_TYPE,hdr64.e_type);
+	  F_INT(HDR_MODIFIER,hdr64.e_mod);
+	  F_WRAP(HDR);
+	  break;
+	}
+#endif
       case AUT_HEADER32_EX: // almost the same as AUT_HEADER32
 	{
 	  ovm_var_t *attr[F_BSM_HDR_SIZE];
@@ -194,6 +216,24 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_WRAP(HDR);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_HEADER64_EX:
+	{
+	  ovm_var_t *attr[F_BSM_HDR_SIZE];
+	  memset(attr, 0, sizeof(attr));
+
+	  F_INT(HDR_VERSION,hdr64_ex.version);
+	  F_TIME_S_MS64(HDR_TIME,hdr64_ex);
+	  // I am assuming ms, not ns here.
+	  F_INT(HDR_TYPE,hdr64_ex.e_type);
+	  F_INT(HDR_MODIFIER,hdr64_ex.e_mod);
+	  // extra fields, compared to AUT_HEADER64:
+	  F_INT(HDR_ADTYPE,hdr64_ex.ad_type);
+	  F_IPV6(HDR_IP,hdr64_ex.addr);
+	  F_WRAP(HDR);
+	  break;
+	}
+#endif
       case AUT_PATH:
 	// used if syscall has a path argument.
 	// E.g., in fsctl():
@@ -241,19 +281,92 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(SUBJ_PID,subj32.pid);
 	  F_INT(SUBJ_SID,subj32.sid);
 	  F_INT(SUBJ_PORT,subj32.tid.port);
-	  F_IPV4(SUBJ_ADDR,subj32.tid.addr);
+	  F_IPV4(SUBJ_IP0,subj32.tid.addr);
+	  attr[F_BSM_SUBJ_IP1] = NULL;
+	  attr[F_BSM_SUBJ_IP2] = NULL;
+	  attr[F_BSM_SUBJ_IP3] = NULL;
+	  attr[F_BSM_SUBJ_TYPE] = NULL;
 	  F_WRAP(SUBJ);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_SUBJECT64:
+	{
+	  ovm_var_t *attr[F_BSM_SUBJ_SIZE];
+
+	  F_INT(SUBJ_AUID,subj64.auid);
+	  F_INT(SUBJ_EUID,subj64.euid);
+	  F_INT(SUBJ_EGID,subj64.egid);
+	  F_INT(SUBJ_RUID,subj64.ruid);
+	  F_INT(SUBJ_RGID,subj64.rgid);
+	  F_INT(SUBJ_PID,subj64.pid);
+	  F_INT(SUBJ_SID,subj64.sid);
+	  F_INT64(SUBJ_PORT,subj64.tid.port);
+	  F_IPV4(SUBJ_IP0,subj64.tid.addr);
+	  attr[F_BSM_SUBJ_IP1] = NULL;
+	  attr[F_BSM_SUBJ_IP2] = NULL;
+	  attr[F_BSM_SUBJ_IP3] = NULL;
+	  attr[F_BSM_SUBJ_TYPE] = NULL;
+	  F_WRAP(SUBJ);
+	  break;
+	}
+#endif
+      case AUT_SUBJECT64_EX:
+	{
+	  ovm_var_t *attr[F_BSM_SUBJ_SIZE];
+
+	  F_INT(SUBJ_AUID,subj64_ex.auid);
+	  F_INT(SUBJ_EUID,subj64_ex.euid);
+	  F_INT(SUBJ_EGID,subj64_ex.egid);
+	  F_INT(SUBJ_RUID,subj64_ex.ruid);
+	  F_INT(SUBJ_RGID,subj64_ex.rgid);
+	  F_INT(SUBJ_PID,subj64_ex.pid);
+	  F_INT(SUBJ_SID,subj64_ex.sid);
+	  F_INT64(SUBJ_PORT,subj64_ex.tid.port);
+	  F_INT(SUBJ_TYPE,subj64_ex.tid.type);
+	  F_IPV6(SUBJ_IP,subj64_ex.tid.addr);
+	  F_WRAP(SUBJ);
+	  break;
+	}
+#ifdef HAS_INT64
+      case AUT_SUBJECT32_EX:
+	{
+	  ovm_var_t *attr[F_BSM_SUBJ_SIZE];
+
+	  F_INT(SUBJ_AUID,subj32_ex.auid);
+	  F_INT(SUBJ_EUID,subj32_ex.euid);
+	  F_INT(SUBJ_EGID,subj32_ex.egid);
+	  F_INT(SUBJ_RUID,subj32_ex.ruid);
+	  F_INT(SUBJ_RGID,subj32_ex.rgid);
+	  F_INT(SUBJ_PID,subj32_ex.pid);
+	  F_INT(SUBJ_SID,subj32_ex.sid);
+	  F_INT(SUBJ_PORT,subj32_ex.tid.port);
+	  F_INT(SUBJ_TYPE,subj32_ex.tid.type);
+	  F_IPV6(SUBJ_IP,subj32_ex.tid.addr);
+	  F_WRAP(SUBJ);
+	  break;
+	}
+#endif
       case AUT_RETURN32:
 	{
 	  ovm_var_t *attr[F_BSM_RET_SIZE];
 
-	  F_INT(RET_VAL,exit.ret);
-	  F_INT(RET_STATUS,exit.status);
+	  F_INT(RET_VAL,ret32.ret);
+	  F_INT(RET_STATUS,ret32.status);
 	  F_WRAP(RET);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_RETURN64:
+	{
+	  ovm_var_t *attr[F_BSM_RET_SIZE];
+
+	  F_INT64(RET_VAL,ret64.val);
+	  F_INT(RET_STATUS,ret64.err);
+	  F_WRAP(RET);
+	  break;
+	}
+#endif
       case AUT_ATTR32:
       case AUT_ATTR: /* duplicate of AUT_ATTR32? */
 	{
@@ -268,6 +381,21 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_WRAP(ATTR);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_ATTR64:
+	{
+	  ovm_var_t *attr[F_BSM_ATTR_SIZE];
+
+	  F_INT(ATTR_MODE,attr64.mode);
+	  F_INT(ATTR_UID,attr64.uid);
+	  F_INT(ATTR_GID,attr64.gid);
+	  F_INT(ATTR_FSID,attr64.fsid);
+	  F_INT64(ATTR_NID,attr64.nid);
+	  F_INT64(ATTR_DEV,attr64.dev);
+	  F_WRAP(ATTR);
+	  break;
+	}
+#endif
       case AUT_ARG32:
 	if (tok.tt.arg32.no>F_BSM_MAX_ARGS || tok.tt.arg32.no<1)
 	  {
@@ -323,8 +451,6 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	 * And now for some other tok.ids that I've not experimented with:
 	 */
       case AUT_OTHER_FILE: /* = case AUT_OTHER_FILE32: */
-      case AUT_OTHER_FILE64: // dealt with here as well, but beware:
-	// this should really parse some (inexistent) au_file64_t structure.
 	{
 	  ovm_var_t *attr[F_BSM_FILE_SIZE];
 
@@ -334,11 +460,29 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_WRAP(FILE);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_OTHER_FILE64:
+	// this should really parse some (inexistent) au_file64_t structure.
+	break;
+#endif
       case AUT_IN_ADDR:
 	{
-	  ovm_var_t *attr[F_BSM_INADDR_SIZE];
+	  ovm_var_t *attr[1];
 
-	  F_IPV4(INADDR,inaddr.addr);
+	  attr[0] = ovm_ipv4_new();
+	  IPV4(attr[0])->s_addr = tok.tt.inaddr.addr;
+	  add_fields_to_event_stride(ctx, mod, &event,
+				     &attr[F_BSM_INADDR_IP0],
+				     F_BSM_INADDR_IP0,
+				     F_BSM_INADDR_IP0+1);
+	  break;
+	}
+      case AUT_INADDR_EX:
+	{
+	  ovm_var_t *attr[F_INADDR_SIZE];
+
+	  F_INT(F_BSM_INADDR_TYPE,inaddr_ex.type);
+	  F_IPV6(F_BSM_INADDR_IP,inaddr_ex.addr);
 	  F_WRAP(INADDR);
 	  break;
 	}
@@ -355,11 +499,66 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  ovm_var_t *attr[F_BSM_SOCK_SIZE];
 
 	  F_INT(SOCK_TYPE,socket.type);
+	  attr[F_BSM_SOCK_DOMAIN] = NULL;
+	  attr[F_BSM_SOCK_ATYPE] = NULL;
 	  F_INT(SOCK_LPORT,socket.l_port);
-	  F_INT(SOCK_LADDR,socket.l_addr);
+	  F_IPV4(SOCK_LIP0,socket.l_addr);
+	  attr[F_BSM_SOCK_LIP1] = NULL;
+	  attr[F_BSM_SOCK_LIP2] = NULL;
+	  attr[F_BSM_SOCK_LIP3] = NULL;
 	  F_INT(SOCK_RPORT,socket.r_port);
-	  F_INT(SOCK_RADDR,socket.r_addr);
+	  F_IPV4(SOCK_RIP0,socket.r_addr);
 	  F_WRAP(SOCK);
+	  break;
+	}
+      case AUT_SOCKET_EX:
+	{
+	  ovm_var_t *attr[F_BSM_SOCK_SIZE];
+
+	  F_INT(SOCK_TYPE,socket_ex.type);
+	  F_INT(SOCK_DOMAIN,socket_ex.domain);
+	  F_INT(SOCK_ATYPE,socket_ex.atype);
+	  F_INT(SOCK_LPORT,socket_ex.l_port);
+	  F_IPV6(SOCK_LIP,socket_ex.l_addr);
+	  F_INT(SOCK_RPORT,socket_ex.r_port);
+	  F_IPV6(SOCK_RIP,socket_ex.r_addr);
+	  F_WRAP(SOCK);
+	  break;
+	}
+      case AUT_SOCKINET32: // from Apple, apparently
+	{
+	  ovm_var_t *attr[F_BSM_SOCKINET_SIZE];
+
+	  F_INT(SOCKINET_FAMILY,sockinet32.family);
+	  F_INT(SOCKINET_PORT,sockinet32.port);
+	  F_IPV4(SOCKINET_IP0,sockinet32.addr);
+	  attr[F_BSM_SOCKINET_IP1] = NULL;
+	  attr[F_BSM_SOCKINET_IP2] = NULL;
+	  attr[F_BSM_SOCKINET_IP3] = NULL;
+	  F_WRAP(SOCKINET);
+	  break;
+	}
+      case AUT_SOCKINET128: // from Apple, apparently; this should
+	// really have been called AUT_SOCKINET_EX32
+	{
+	  ovm_var_t *attr[F_BSM_SOCKINET_SIZE];
+
+	  F_INT(SOCKINET_FAMILY,sockinet_ex32.family);
+	  F_INT(SOCKINET_PORT,sockinet_ex32.port);
+	  F_IPV6(SOCKINET_IP,sockinet_ex32.addr);
+	  F_WRAP(SOCKINET);
+	  break;
+	}
+      case AUT_SOCKUNIX: // from Apple, apparently
+	{
+	  ovm_var_t *attr[F_BSM_SOCKUNIX_SIZE];
+	  ovm_vstr_t *s;
+
+	  F_IT(SOCKUNIX_FAMILY,sockunix.family);
+	  attr[F_BSM_SOCKUNIX_PATH] = s = new_ovm_vstr();
+	  VSTRLEN(s) = strlen(tok.tt.sockunix.path);
+	  VSTR(s) = tok.tt.sockunix.strname;
+	  F_WRAP(SOCKUNIX);
 	  break;
 	}
       case AUT_IPC:
@@ -445,10 +644,75 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_INT(PROC_PID,proc32.pid);
 	  F_INT(PROC_SID,proc32.sid);
 	  F_INT(PROC_PORT,proc32.tid.port);
-	  F_IPV4(PROC_IP,proc32.tid.addr);
+	  F_IPV4(PROC_IP0,proc32.tid.addr);
+	  attr[F_BSM_PROC_TYPE] = NULL;
+	  attr[F_BSM_PROC_IP1] = NULL;
+	  attr[F_BSM_PROC_IP2] = NULL;
+	  attr[F_BSM_PROC_IP3] = NULL;
 	  F_WRAP(PROC);
 	  break;
 	}
+#ifdef HAS_INT64
+      case AUT_PROCESS64:
+	{
+	  ovm_var_t *attr[F_BSM_PROC_SIZE];
+	  memset(attr, 0, sizeof(attr));
+
+	  F_INT(PROC_AUID,proc64.auid);
+	  F_INT(PROC_EUID,proc64.euid);
+	  F_INT(PROC_EGID,proc64.egid);
+	  F_INT(PROC_RUID,proc64.ruid);
+	  F_INT(PROC_RGID,proc64.rgid);
+	  F_INT(PROC_PID,proc64.pid);
+	  F_INT(PROC_SID,proc64.sid);
+	  F_INT64(PROC_PORT,proc64.tid.port);
+	  F_IPV4(PROC_IP0,proc64.tid.addr);
+	  attr[F_BSM_PROC_TYPE] = NULL;
+	  attr[F_BSM_PROC_IP1] = NULL;
+	  attr[F_BSM_PROC_IP2] = NULL;
+	  attr[F_BSM_PROC_IP3] = NULL;
+	  F_WRAP(PROC);
+	  break;
+	}
+#endif
+      case AUT_PROCESS32_EX:
+	{
+	  ovm_var_t *attr[F_BSM_PROC_SIZE];
+	  memset(attr, 0, sizeof(attr));
+
+	  F_INT(PROC_AUID,proc32_ex.auid);
+	  F_INT(PROC_EUID,proc32_ex.euid);
+	  F_INT(PROC_EGID,proc32_ex.egid);
+	  F_INT(PROC_RUID,proc32_ex.ruid);
+	  F_INT(PROC_RGID,proc32_ex.rgid);
+	  F_INT(PROC_PID,proc32_ex.pid);
+	  F_INT(PROC_SID,proc32_ex.sid);
+	  F_INT(PROC_PORT,proc32_ex.tid.port);
+	  F_INT(PROC_TYPE,proc32_ex.tid.type);
+	  F_IPV6(PROC_IP,proc32_ex.tid.addr);
+	  F_WRAP(PROC);
+	  break;
+	}
+#ifdef HAS_INT64
+      case AUT_PROCESS64_EX:
+	{
+	  ovm_var_t *attr[F_BSM_PROC_SIZE];
+	  memset(attr, 0, sizeof(attr));
+
+	  F_INT(PROC_AUID,proc64_ex.auid);
+	  F_INT(PROC_EUID,proc64_ex.euid);
+	  F_INT(PROC_EGID,proc64_ex.egid);
+	  F_INT(PROC_RUID,proc64_ex.ruid);
+	  F_INT(PROC_RGID,proc64_ex.rgid);
+	  F_INT(PROC_PID,proc64_ex.pid);
+	  F_INT(PROC_SID,proc64_ex.sid);
+	  F_INT64(PROC_PORT,proc64_ex.tid.port);
+	  F_INT(PROC_TYPE,proc64_ex.tid.type);
+	  F_IPV6(PROC_IP,proc64_ex.tid.addr);
+	  F_WRAP(PROC);
+	  break;
+	}
+#endif
       case AUT_IP:
 	{
 	  ovm_var_t *attr[F_BSM_IP_SIZE];
@@ -490,9 +754,10 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  INT(attr[F_BSM_EXECARGS_LEN]) = n;
 	  for (i=0; i<n; i++)
 	    {
-	      attr[i+1] = new_ovm_vstr();
-	      ovm_vstr_t *s = &VSTR(attr[i+1]);
-	      s->len = strlen(s->str = tok.tt.execarg.text[i]);
+	      ovm_vstr_t *s;
+	      attr[i+1] = s = new_ovm_vstr();
+	      VSTR(s) = tok.tt.execarg.text[i];
+	      VSTRLEN(s) = strlen(VSTR(s));
 	    }
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_EXECARGS_START,
@@ -514,9 +779,11 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  INT(attr[F_BSM_EXECENV_LEN]) = n;
 	  for (i=0; i<n; i++)
 	    {
-	      attr[i+1] = new_ovm_vstr();
-	      ovm_vstr_t *s = &VSTR(attr[i+1]);
-	      s->len = strlen(s->str = tok.tt.execenv.text[i]);
+	      ovm_vstr_t *s;
+
+	      attr[i+1] = s = new_ovm_vstr();
+	      VSTR(s) = tok.tt.execenv.text[i];
+	      VSTRLEN(s) = strlen(VSTR(s));
 	    }
 	  add_fields_to_event_stride(ctx, mod, &event, attr,
 				     F_BSM_EXECENV_START,
@@ -540,7 +807,14 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 	  F_WRAP(EXIT);
 	  break;
 	}
-       	// !!! Stopped at AUT_ZONENAME (0x60)
+      case AUT_ZONENAME:
+	{
+	  ovm_var_t *attr[F_BSM_ZONENAME_SIZE];
+
+	  F_VSTR1(ZONENAME_ZONENAME,zonename,zonename);
+	  F_WRAP(ZONENAME);
+	  break;
+	}
 	// The following are ignored
 	// First, those that are ignored because I don't know
 	// what they are for, or which subfields of tok.tt should be used
@@ -567,6 +841,7 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
       case AUT_XCLIENT:
       case AUT_CMD:
 	// Then, those I am not sure of
+      case AUT_HOST: // an inaddr_t?
 	// Then, those I fear are out of scope
 	// Then, those that are obsolete
       case AUT_OHEADER: // for "old header"
@@ -589,7 +864,7 @@ static field_t bsm_fields[] = {
   { "bsm.header.modifier", T_INT, "bsm header: modifier" },
   { "bsm.header.ad_type", T_INT, "bsm header (extended): IP address type" },
   { "bsm.header.ip0", T_IPV4, "bsm header (extended): IPv4 address, or first part of IPv6 address" },
-  { "bsm.header.ip1", T_IPV4, "bsm header (extended): second part of IPv6 address" },
+  { "bsm.header.ip1", T_IPV 4, "bsm header (extended): second part of IPv6 address" },
   { "bsm.header.ip2", T_IPV4, "bsm header (extended): third part of IPv6 address" },
   { "bsm.header.ip3", T_IPV4, "bsm header (extended): fourth part of IPv6 address" },
   { "bsm.path", T_VSTR, "bsm path argument (whatever its position in the argument list)" },
@@ -601,7 +876,11 @@ static field_t bsm_fields[] = {
   { "bsm.subject.pid", T_INT, "bsm subject: process ID" },
   { "bsm.subject.sid", T_INT, "bsm subject: session ID" },
   { "bsm.subject.port", T_INT, "bsm subject: port ID" },
-  { "bsm.subject.addr", T_IPV4, "bsm subject: ip v4 address" },
+  { "bsm.subject.type", T_INT, "bsm subject (extended): address type (if undefined, i.e., non-extended subject) address is IPv4)" },
+  { "bsm.subject.ip0", T_IPV4, "bsm subject: IPv4 address, or (extended) first part of IPv6 address" },
+  { "bsm.subject.ip1", T_IPV4, "bsm subject (extended): second part of IPv6 address" },
+  { "bsm.subject.ip2", T_IPV4, "bsm subject (extended): third part of IPv6 address" },
+  { "bsm.subject.ip3", T_IPV4, "bsm subject (extended): fourth part of IPv6 address" },
   { "bsm.return.val", T_INT, "bsm return value" },
   { "bsm.return.status", T_INT, "bsm return status (256 if success)" },
   { "bsm.attr.mode", T_INT, "bsm attribute: file access mode" },
@@ -613,13 +892,33 @@ static field_t bsm_fields[] = {
   { "bsm.file.time", T_TIMEVAL, "bsm file: time" },
   { "bsm.file.name", T_VSTR, "bsm file name" },
   { "bsm.text", T_VSTR, "bsm text argument" },
-  { "bsm.inaddr", T_IPV4, "bsm internet address" },
+  { "bsm.inaddr.type", T_INT, "bsm internet address (extended): type, if IPv6" },
+  { "bsm.inaddr.ip0", T_IPV4, "bsm internet address: IPv4 address, or (extended) first part of IPv6 address" },
+  { "bsm.inaddr.ip1", T_IPV4, "bsm internet address (extended): second part of IPv6 address" },
+  { "bsm.inaddr.ip2", T_IPV4, "bsm internet address (extended): third part of IPv6 address" },
+  { "bsm.inaddr.ip3", T_IPV4, "bsm internet address (extended): fourth part of IPv6 address" },
   { "bsm.iport", T_INT, "bsm internet port" },
   { "bsm.socket.type", T_INT, "bsm socket: type" },
-  { "bsm.socket.lport", T_INT, "bsm socket: local port" },
-  { "bsm.socket.laddr", T_IPV4, "bsm socket: local internet address" },
-  { "bsm.socket.rport", T_INT, "bsm socket: remote port" },
-  { "bsm.socket.raddr", T_IPV4, "bsm socket: remote internet address" },
+  { "bsm.socket.domain", T_INT, "bsm socket (extended): domain" },
+  { "bsm.socket.atype", T_INT, "bsm socket (extended): address type and length" },
+  { "bsm.socket.local.port", T_INT, "bsm socket: local port" },
+  { "bsm.socket.local.ip0", T_IPV4, "bsm socket: local IPv4 address, or (extended) first part of local IPv6 address" },
+  { "bsm.socket.local.ip1", T_IPV4, "bsm socket (extended): second part of local IPv6 address" },
+  { "bsm.socket.local.ip2", T_IPV4, "bsm socket (extended): third part of local IPv6 address" },
+  { "bsm.socket.local.ip3", T_IPV4, "bsm socket (extended): fourth part of local IPv6 address" },
+  { "bsm.socket.remote.port", T_INT, "bsm socket: remote port" },
+  { "bsm.socket.remote.ip0", T_IPV4, "bsm socket: remote IPv4 address, or (extended) first part of remote IPv6 address" },
+  { "bsm.socket.remote.ip1", T_IPV4, "bsm socket (extended): second part of remote IPv6 address" },
+  { "bsm.socket.remote.ip2", T_IPV4, "bsm socket (extended): third part of remote IPv6 address" },
+  { "bsm.socket.remote.ip3", T_IPV4, "bsm socket (extended): fourth part of remote IPv6 address" },
+  { "bsm.sockinet.domain", T_INT, "bsm sockinet: domain" },
+  { "bsm.sockinet.port", T_INT, "bsm sockinet: port" },
+  { "bsm.sockinet.ip0", T_IPV4, "bsm sockinet: IPv4 address, or (extended) first part of  IPv6 address" },
+  { "bsm.sockinet.ip1", T_IPV4, "bsm sockinet (extended): second part of IPv6 address" },
+  { "bsm.sockinet.ip2", T_IPV4, "bsm sockinet (extended): third part of IPv6 address" },
+  { "bsm.sockinet.ip3", T_IPV4, "bsm sockinet (extended): fourth part of IPv6 address" },
+  { "bsm.sockunix.family", T_INT, "bsm sockunix: family" },
+  { "bsm.sockunix.path", T_VSTR, "bsm sockunix: path" },
   { "bsm.ipc.type", T_INT, "bsm ipc: type" },
   { "bsm.ipc.id", T_INT, "bsm ipc: id" },
   { "bsm.xatpath", T_VSTR, "bsm xatpath" },
@@ -630,8 +929,12 @@ static field_t bsm_fields[] = {
   { "bsm.process.rgid", T_INT, "bsm process: real group id" },
   { "bsm.process.pid", T_INT, "bsm process: process id" },
   { "bsm.process.sid", T_INT, "bsm process: session id" },
-  { "bsm.process.tid.port", T_INT, "bsm process: terminal id: port" },
-  { "bsm.process.tid.ip", T_INT, "bsm process: terminal id: ip address" },
+  { "bsm.process.port", T_INT, "bsm process: terminal id: port" },
+  { "bsm.process.type", T_INT, "bsm process (extended):  address type (if undefined, i.e., non-extended subject) address is IPv4)" },
+  { "bsm.process.ip0", T_IPV4, "bsm process: IPv4 address, or (extended) first part of IPv6 address" },
+  { "bsm.process.ip1", T_IPV4, "bsm process (extended): second part of IPv6 address" },
+  { "bsm.process.ip2", T_IPV4, "bsm process (extended): third part of IPv6 address" },
+  { "bsm.process.ip3", T_IPV4, "bsm process (extended): fourth part of IPv6 address" },
   { "bsm.ip.version", T_INT, "bsm ip packet: version" },
   { "bsm.ip.tos", T_INT, "bsm ip packet: type of service" },
   { "bsm.ip.len", T_INT, "bsm ip packet: length" },
