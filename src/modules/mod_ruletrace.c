@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/syslimits.h>
+#include <limits.h>
 #include <string.h>
 #include <errno.h>
 

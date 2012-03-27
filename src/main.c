@@ -30,7 +30,7 @@
 
 #include <pwd.h>
 #include <sys/types.h> /* for stat() */
-#include <sys/syslimits.h> /* for PATH_MAX */
+#include <limits.h> /* for PATH_MAX */
 
 #include "orchids.h"
 

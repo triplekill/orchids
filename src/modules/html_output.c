@@ -25,7 +25,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
-#include <sys/syslimits.h>
+#include <limits.h>
 
 #include <fcntl.h>
 #include <errno.h>

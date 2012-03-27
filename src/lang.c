@@ -30,7 +30,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <sys/syslimits.h> // for PATH_MAX
+#include <limits.h> // for PATH_MAX
 
 #include "orchids.h"
 #include "hash.h"
