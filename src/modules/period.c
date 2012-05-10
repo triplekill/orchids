@@ -1207,7 +1207,7 @@ write_period_kullback_plot(periodctx_t *ctx)
   fprintf(fp, "set grid\n");
   fprintf(fp, "set xlabel \"Event number\"\n");
   fprintf(fp, "set ylabel \"Kullback-Leibler distance\"\n");
-  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %li\"\n",
+  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %ti\"\n",
           ctx->name, ctx->backlog_end - ctx->backlog);
   fprintf(fp, "print \"Rendering \'%s-period-kullback\'\"\n", ctx->name);
   fprintf(fp, "set term png font Vera 7\n");

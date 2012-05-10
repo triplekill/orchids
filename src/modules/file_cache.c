@@ -44,28 +44,44 @@ static char *cache_gc_dir_g = NULL;
 
 
 static int
-cache_gc_select(/*const*/ struct dirent *d)
+cache_gc_select(
+#ifndef BSD_SCANDIR
+	const
+#endif
+	 struct dirent *d)
 {
   return (!strncmp(cache_gc_prefix_g, d->d_name, strlen(cache_gc_prefix_g)));
 }
 
 
 static int
-cache_gc_compar(const void *a, const void *b)
+cache_gc_compar(
+#ifndef BSD_SCANDIR
+	const struct dirent **a, const struct dirent **b
+#define REPA (*a)
+#define REPB (*b)
+#else
+	const void *ap, const void *bp
+#define REPA (*(const struct dirent **)ap)
+#define REPB (*(const struct dirent **)ap)
+#endif
+	)
 {
   struct stat stat_a;
   struct stat stat_b;
   char path[PATH_MAX];
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*(const struct dirent **)a)->d_name);
+	   cache_gc_dir_g, REPA->d_name);
   Xstat(path, &stat_a);
 
   snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, (*(const struct dirent **)b)->d_name);
+	   cache_gc_dir_g, REPB->d_name);
   Xstat(path, &stat_b);
 
   return (stat_b.st_mtime - stat_a.st_mtime);
+#undef REPA
+#undef REPB
 }
 
 

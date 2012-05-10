@@ -18,6 +18,7 @@
 #define DEBUGLOG_H
 
 #ifdef ENABLE_DEBUGLOG
+#include <stdarg.h>
 
 #define DEBUGLOG_BASENAME 1
 

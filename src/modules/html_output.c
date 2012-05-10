@@ -736,7 +736,7 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> ovm stack size </td> "
-          "<td class=\"v0\"> %lu </td> "
+          "<td class=\"v0\"> %zu </td> "
           "</tr>\n",
           ctx->ovm_stack->size);
   fprintf(fp,
@@ -1501,7 +1501,11 @@ generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
 
 
 static int
-select_report(struct dirent *d)
+select_report(
+#ifndef BSD_SCANDIR
+	const
+#endif
+	 struct dirent *d)
 {
   return (!strncmp(report_prefix_g,
                    d->d_name,
@@ -1512,10 +1516,22 @@ select_report(struct dirent *d)
 
 
 static int
-compar_report(const void *a, const void *b)
+compar_report(
+#ifndef BSD_SCANDIR
+	const struct dirent **a, const struct dirent **b
+#define REPA (*a)
+#define REPB (*b)
+#else
+	const void *ap, const void *bp
+#define REPA (*(const struct dirent **)ap)
+#define REPB (*(const struct dirent **)ap)
+#endif
+	)
 {
-  return (-strcmp((*(const struct dirent **)a)->d_name,
-                  (*(const struct dirent **)b)->d_name));
+  return (-strcmp(REPA->d_name,
+                  REPB->d_name));
+#undef REPA
+#undef REPB
 }
 
 
@@ -1692,11 +1708,11 @@ generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
       fprintf(fp,
               "  <tr> "
               "<td class=\"e%i\"> <a href=\"reports/%s\"> %s </a> </td> "
-              "<td class=\"v%i\"> %lld </td> "
+              "<td class=\"v%i\"> %jd </td> "
               "<td class=\"v%i\"> %s </td> "
               "</tr>\n",
               i % 2, namelist[i]->d_name, namelist[i]->d_name,
-              i % 2, s.st_size,
+              i % 2, (intmax_t)s.st_size,
               i % 2, asc_time);
 
       free(namelist[i]);
