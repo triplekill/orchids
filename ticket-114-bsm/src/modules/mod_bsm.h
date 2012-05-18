@@ -31,6 +31,18 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include "hash.h"
+
+typedef struct bsm_cfg_t
+{
+  hash_t *bsm_source_table; /* map fildes to struct bsm_cfg_source */
+};
+
+typedef struct bsm_cfg_source_s {
+  char *auditpipe; /* location of the auditpipe device */
+  FILE *auditfile; /* corresponding file */
+} bsm_cfg_source_t;
+
 /*****************************************/
 #define F_BSM_HDR_START 0
 # define F_BSM_HDR_VERSION 0

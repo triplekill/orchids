@@ -23,6 +23,7 @@
 #include <time.h> /* for strftime() and localtime() */
 #include <ctype.h>
 #include <string.h>
+#include <limits.h>
 #include <errno.h>
 
 #include <sys/types.h>
@@ -478,7 +479,7 @@ ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *str)
       return ;
     }
 
-  fprintf(fp, "binstr[%i] : \"", str->len);
+  fprintf(fp, "binstr[%zu] : \"", str->len);
   for (i = 0; i < str->len; i++)
     {
       if (isprint(str->str[i]))
@@ -544,7 +545,7 @@ ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str)
     return ;
   }
 
-  fprintf(fp, "vbinstr[%i] : \"", str->len);
+  fprintf(fp, "vbinstr[%zu] : \"", str->len);
   for (i = 0; i < str->len; i++) {
     if (isprint(str->str[i]))
       fprintf(fp, "%c", str->str[i]);
@@ -654,7 +655,7 @@ ovm_str_fprintf(FILE *fp, ovm_str_t *str)
       return ;
     }
 
-  fprintf(fp, "str[%i] : \"", str->len);
+  fprintf(fp, "str[%zu] : \"", str->len);
   for (i = 0; i < str->len; i++)
     fprintf(fp, "%c", str->str[i]);
   fprintf(fp, "\"\n");
@@ -760,7 +761,7 @@ ovm_vstr_fprintf(FILE *fp, ovm_vstr_t *vstr)
       return ;
     }
 
-  fprintf(fp, "vstr[%i] : \"", vstr->len);
+  fprintf(fp, "vstr[%zu] : \"", vstr->len);
   for (i = 0; i < vstr->len; i++)
     fprintf(fp, "%c", vstr->str[i]);
   fprintf(fp, "\"\n");
@@ -1254,8 +1255,8 @@ ovm_timeval_fprintf(FILE *fp, ovm_timeval_t *time)
   strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
            localtime(&time->time.tv_sec));
   fprintf(fp, "timeval : (%li.%06li) = %s (+%li us)\n",
-          time->time.tv_sec, time->time.tv_usec,
-          asc_time, time->time.tv_usec);
+          time->time.tv_sec, (unsigned long)time->time.tv_usec,
+          asc_time, (unsigned long)time->time.tv_usec);
 }
 
 /*
@@ -1300,7 +1301,7 @@ ovm_regex_fprintf(FILE *fp, ovm_regex_t *regex)
       return ;
     }
 
-  fprintf(fp, "regex[%i] : \"%s\"\n",
+  fprintf(fp, "regex[%zu] : \"%s\"\n",
           strlen(REGEXSTR(regex)), REGEXSTR(regex));
 }
 
@@ -1896,8 +1897,8 @@ snprintf_ovm_var(char *buff, unsigned int buff_length, ovm_var_t *val)
     strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
              localtime(&TIMEVAL(val).tv_sec));
     return snprintf(buff, buff_length, "%s +%li us (%li.%06li)",
-            asc_time, TIMEVAL(val).tv_usec,
-            TIMEVAL(val).tv_sec, TIMEVAL(val).tv_usec);
+		    asc_time, (unsigned long)TIMEVAL(val).tv_usec,
+		    TIMEVAL(val).tv_sec, (unsigned long)TIMEVAL(val).tv_usec);
 
   case T_COUNTER:
     return snprintf(buff, buff_length, "%lu", COUNTER(val));
@@ -1984,8 +1985,8 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
     strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
              localtime(&TIMEVAL(val).tv_sec));
     fprintf(fp, "%s +%li us (%li.%06li)",
-            asc_time, TIMEVAL(val).tv_usec,
-            TIMEVAL(val).tv_sec, TIMEVAL(val).tv_usec);
+            asc_time, (unsigned long)TIMEVAL(val).tv_usec,
+            TIMEVAL(val).tv_sec, (unsigned long)TIMEVAL(val).tv_usec);
     break;
 
   case T_COUNTER:
@@ -2065,7 +2066,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       break;
 
     case T_BSTR:
-      fprintf(fp, "bstr[%i]: \"", BSTRLEN(val));
+      fprintf(fp, "bstr[%zu]: \"", BSTRLEN(val));
       for (i = 0; i < BSTRLEN(val); i++) {
         if (isprint(BSTR(val)[i]))
           fputc(BSTR(val)[i], fp);
@@ -2076,7 +2077,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       break;
 
     case T_VBSTR:
-      fprintf(fp, "vbstr[%i]: \"", VBSTRLEN(val));
+      fprintf(fp, "vbstr[%zu]: \"", VBSTRLEN(val));
       for (i = 0; i < VBSTRLEN(val); i++) {
         if (isprint(VBSTR(val)[i]))
           fputc(VBSTR(val)[i], fp);
@@ -2087,14 +2088,14 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
     break;
 
     case T_STR:
-      fprintf(fp, "str[%i]: \"", STRLEN(val));
+      fprintf(fp, "str[%zu]: \"", STRLEN(val));
       for (i = 0; i < STRLEN(val); i++)
         fputc(STR(val)[i], fp);
       fputs("\"\n", fp);
       break;
 
     case T_VSTR:
-      fprintf(fp, "vstr[%i]: \"", VSTRLEN(val));
+      fprintf(fp, "vstr[%zu]: \"", VSTRLEN(val));
       for (i = 0; i < VSTRLEN(val); i++)
         fputc(VSTR(val)[i], fp);
       fprintf(fp, "\"\n");
@@ -2134,8 +2135,8 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
                localtime(&TIMEVAL(val).tv_sec));
       fprintf(fp, "timeval: (%li.%06li) = %s (+%li us)\n",
-              TIMEVAL(val).tv_sec, TIMEVAL(val).tv_usec,
-              asc_time, TIMEVAL(val).tv_usec);
+              TIMEVAL(val).tv_sec, (unsigned long)TIMEVAL(val).tv_usec,
+              asc_time, (unsigned long)TIMEVAL(val).tv_usec);
       break;
 
     case T_COUNTER:
@@ -2143,12 +2144,12 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       break;
 
     case T_REGEX:
-      fprintf(fp, "regex[%i]: \"%s\"\n",
+      fprintf(fp, "regex[%zu]: \"%s\"\n",
               strlen(REGEXSTR(val)), REGEXSTR(val));
       break;
 
     case T_SREGEX:
-      fprintf(fp, "sregex[%i]: \"%s\"\n",
+      fprintf(fp, "sregex[%zu]: \"%s\"\n",
               strlen(SREGEXSTR(val)), SREGEXSTR(val));
       break;
 
@@ -2161,7 +2162,7 @@ fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       break;
 
     case T_SNMPOID:
-      fprintf(fp, "snmpoid[%i]: ", SNMPOIDLEN(val));
+      fprintf(fp, "snmpoid[%zu]: ", SNMPOIDLEN(val));
       for (i=0; i < SNMPOIDLEN(val); i++) {
         fprintf(fp, "%lu.", (SNMPOID(val))[i]);
       }

@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 #include <time.h>
 
 #include <signal.h>
@@ -36,6 +37,7 @@
 #include "hash.h"
 #include "evt_mgr.h"
 #include "orchids_api.h"
+#include "rule_compiler.h"
 
 #include "main_priv.h"
 

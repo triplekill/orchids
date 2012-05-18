@@ -54,13 +54,13 @@ __safelib_xzmalloc(const char *file, const int line, size_t size)
     __safelib_allocated++;
     ptr = malloc(size);
     if (!ptr) {
-      fprintf(stderr, "%s:%i:malloc(size=%i): errno=%i: %s\n",
+      fprintf(stderr, "%s:%i:malloc(size=%zu): errno=%i: %s\n",
               file, line, size, errno, strerror(errno));
       exit(EXIT_FAILURE);
     }
     memset(ptr, 0, size);
   } else {
-    fprintf(stderr, "warning: malloc(size=%i)\n", size);
+    fprintf(stderr, "warning: malloc(size=%zu)\n", size);
     return (NULL);
   }
 
@@ -74,7 +74,7 @@ __safelib_xcalloc(const char *file, const int line, size_t n, size_t size)
 
   __safelib_allocated++;
   if ((ptr = calloc(n, size)) == NULL) {
-    fprintf(stderr, "%s:%i:calloc(blocks=%i,size=%i): errno=%i: %s\n",
+    fprintf(stderr, "%s:%i:calloc(blocks=%zu,size=%zu): errno=%i: %s\n",
             file, line, n, size, errno, strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -92,12 +92,12 @@ __safelib_xmalloc(const char *file, const int line, size_t size)
     __safelib_allocated++;
     ptr = malloc(size);
     if (!ptr) {
-      fprintf(stderr, "%s:%i:malloc(size=%i): errno=%i: %s\n",
+      fprintf(stderr, "%s:%i:malloc(size=%zu): errno=%i: %s\n",
               file, line, size, errno, strerror(errno));
       exit(EXIT_FAILURE);
     }
   } else {
-    fprintf(stderr, "warning: malloc(size=%i)\n", size);
+    fprintf(stderr, "warning: malloc(size=%zu)\n", size);
     return (NULL);
   }
 

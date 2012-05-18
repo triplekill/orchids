@@ -7,7 +7,7 @@
  ** @ingroup modules
  ** 
  **
- ** @date  Started on: Dim  5 fÃ©v 2012 19:39:49
+ ** @date  Started on: Dim  5 fév 2012 19:39:49
  **/
 
 #include <stdlib.h>
@@ -22,32 +22,32 @@ main (int argc, char *argv[])
   printf("// Generated automatically by gen_mod_bsm.c: do not touch!\n");
   printf("// Copyright, license: see file gen_mod.bsm.c.\n");
   printf("  { \"bsm.groups.len\", T_INT,"
-	 "\"bsm groups: number of groups\" },\n",);
+	 " \"bsm groups: number of groups\" },\n");
   for (i=0; ++i<=AUDIT_MAX_GROUPS; )
     printf("  { \"bsm.groups.elt%d\", T_INT,"
-	   "\"bsm groups: element no. %d\" },\n",
+	   " \"bsm groups: element no. %d\" },\n",
 	   i, i);
   printf("  { \"bsm.newgroups.len\", T_INT,"
-	 "\"bsm newgroups: number of groups\" },\n",);
+	 " \"bsm newgroups: number of groups\" },\n");
   for (i=0; ++i<=AUDIT_MAX_GROUPS; )
     printf("  { \"bsm.newgroups.elt%d\", T_INT,"
-	   "\"bsm newgroups: element no. %d\" },\n",
+	   " \"bsm newgroups: element no. %d\" },\n",
 	   i, i);
   printf("  { \"bsm.execargs.len\", T_INT,"
-	 "\"bsm execargs: number of arguments\" },\n",);
+	 " \"bsm execargs: number of arguments\" },\n");
   for (i=0; ++i<=AUDIT_MAX_ARGS; )
     printf("  { \"bsm.execargs.elt%d\", T_VSTR,"
-	   "\"bsm execargs: element no. %d\" },\n",
+	   " \"bsm execargs: element no. %d\" },\n",
 	   i, i);
   printf("  { \"bsm.execenv.len\", T_INT,"
-	 "\"bsm execenv: number of environment variables\" },\n",);
+	 " \"bsm execenv: number of environment variables\" },\n");
   for (i=0; ++i<=AUDIT_MAX_ENV; )
     printf("  { \"bsm.execenv.elt%d\", T_VSTR,"
-	   "\"bsm execenv: element no. %d\" },\n",
+	   " \"bsm execenv: element no. %d\" },\n",
 	   i, i);
   for (i=0; ++i<=AUDIT_MAX_ARGS; )
     printf("  { \"bsm.arg%d\", T_INT,"
-	   "\"bsm argument %d\" },\n",
+	   " \"bsm argument %d\" },\n",
 	   i, i);
   fflush(stdout);
   return 0;

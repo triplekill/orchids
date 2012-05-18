@@ -293,6 +293,31 @@ else
 fi
 
 
+AC_ARG_ENABLE(bsm,
+AS_HELP_STRING([--enable-bsm], [enable bsm module (default is on)]),
+[case "${enableval}" in
+    yes) orchids_bsm=true ;;
+    no)  orchids_bsm=false ;;
+    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-bsm) ;;
+esac],
+[orchids_bsm=true]
+)
+if test "$orchids_bsm" = "true" ; then
+   AC_CHECK_HEADERS([bsm/libbsm.h])
+   AC_CHECK_LIB(bsm, au_read_rec, [], [])
+   if test "$ac_cv_header_bsm_libbsm_h" = "yes" \
+        -a "$ac_cv_lib_bsm_au_read_rec" = "yes" ; then
+      AC_DEFINE([HAVE_BSM], 1, [Set to 1 if libbsm is present])
+      AM_CONDITIONAL(HAVE_BSM, true)
+      AC_PROG_CC
+      sh "src/modules/gen_mod_bsm.sh" "$cc"
+   else
+      AM_CONDITIONAL(HAVE_BSM, false)
+   fi
+else
+   AM_CONDITIONAL(HAVE_BSM, false)
+fi
+
 dnl Activate Debug log library
 AC_DEFINE([ENABLE_DEBUGLOG], 1, [Set to 1 if DEBUG is requested])
 

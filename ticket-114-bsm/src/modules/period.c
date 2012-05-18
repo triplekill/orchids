@@ -181,7 +181,7 @@ write_period_snapshot(periodctx_t *ctx)
   fclose(fp);
 
   snprintf(filename, sizeof (filename), "%s-period-snapshot-%lu-%06lu.dat",
-           ctx->name, ctx->last.tv_sec, ctx->last.tv_usec);
+           ctx->name, ctx->last.tv_sec, (unsigned long)ctx->last.tv_usec);
   fp = fopen(filename, "w");
   fprintf_period_data_timewin(fp, ctx);
   fclose(fp);
@@ -219,7 +219,7 @@ fprintf_period_plot(FILE *fp, periodctx_t *ctx, flags_t flags)
 
   if (flags & O_SNAPSHOT) {
     snprintf(basename, sizeof (basename), "%s-period-snapshot-%lu-%06lu",
-             ctx->name, ctx->last.tv_sec, ctx->last.tv_usec);
+             ctx->name, ctx->last.tv_sec, (unsigned long)ctx->last.tv_usec);
   }
   else {
     snprintf(basename, sizeof (basename), "%s-period", ctx->name);
@@ -1182,7 +1182,7 @@ write_period_kullback_plot(periodctx_t *ctx)
   fprintf(fp, "set grid\n");
   fprintf(fp, "set xlabel \"Event number\"\n");
   fprintf(fp, "set ylabel \"Kullback-Leibler distance\"\n");
-  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %i\"\n",
+  fprintf(fp, "set title \"Periodogram variation for \\\"%s\\\" event\\nWindow size = %li\"\n",
           ctx->name, ctx->backlog_end - ctx->backlog);
   fprintf(fp, "print \"Rendering \'%s-period-kullback\'\"\n", ctx->name);
   fprintf(fp, "set term png font Vera 7\n");

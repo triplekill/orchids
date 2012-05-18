@@ -29,7 +29,6 @@
 #include <arpa/inet.h>
 
 #include "orchids.h"
-
 #include "orchids_api.h"
 
 #include "mod_udp.h"
@@ -90,7 +89,7 @@ udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   IPV4(attr[F_SRC_ADDR]) = from.sin_addr;
 
   attr[F_DST_PORT] = ovm_int_new();
-  INT(attr[F_DST_PORT]) = (int) data;
+  INT(attr[F_DST_PORT]) = *(int *)data;
 
   attr[F_MSG] = ovm_bstr_new(sz);
   memcpy(BSTR(attr[F_MSG]), buf, sz);
@@ -131,6 +130,7 @@ add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int sd;
   int port;
+  int *data;
 
   port = atoi(dir->args);
   DebugLog(DF_MOD, DS_INFO, "Add udp listen port %i\n", port);
@@ -140,8 +140,10 @@ add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     return ;
   }
 
+  data = Xzmalloc(sizeof(int));
+  *data = port;
   sd = create_udp_socket(port);
-  add_input_descriptor(ctx, mod, udp_callback, sd, (void *)port);
+  add_input_descriptor(ctx, mod, udp_callback, sd, data);
 }
 
 

@@ -90,7 +90,7 @@ add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
 
     for (d = mod->dependencies; *d; d++)
       if (find_module(ctx, *d) == NULL) {
-        DPRINTF( ("failed module dependencie '%s' for module '%s'\n",
+        DPRINTF( ("failed module dependency '%s' for module '%s'\n",
                   *d, mod->name) );
         exit(EXIT_FAILURE); /* XXX: Keep This ??? */
         return (-1);
@@ -122,7 +122,7 @@ dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir)
 
   c = mod->cfg_cmds;
   if (c == NULL) {
-    DPRINTF( ("Module %s have no directive table.\n", mod->name) );
+    DPRINTF( ("Module %s has no directive table.\n", mod->name) );
     return (NULL);
   }
 

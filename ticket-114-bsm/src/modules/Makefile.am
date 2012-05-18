@@ -28,6 +28,7 @@ pkglib_LTLIBRARIES = \
   mod_timeout.la \
   mod_ruletrace.la\
   mod_auditd.la \
+  mod_bsm.la \
   mod_htmlstate.la \
   mod_metaevent.la \
   mod_mark.la
@@ -134,7 +135,7 @@ mod_rawsnare_la_LDFLAGS = -module -avoid-version
 mod_remoteadm_la_SOURCES = mod_remoteadm.c mod_remoteadm.h
 mod_remoteadm_la_LDFLAGS = -module -avoid-version
 
-mod_snare_la_SOURCES = mod_snare.c mod_snare.h snare.tab.c snare.tab.h snare.yy.c
+mod_snare_la_SOURCES = mod_snare.c mod_snare.h snare.tab.c snare.tab.h snare.yy.c linux_syscall.h
 mod_snare_la_LDFLAGS = -module -avoid-version
 
 $(srcdir)/snare.tab.c $(srcdir)/snare.tab.h: $(srcdir)/snare.y
@@ -150,6 +151,11 @@ mod_sockunix_la_LDFLAGS = -module -avoid-version
 
 mod_auditd_la_SOURCES = mod_auditd.c mod_auditd.h auditd_queue.h
 mod_auditd_la_LDFLAGS = -module -avoid-version
+
+if HAVE_BSM
+mod_bsm_la_SOURCES = mod_bsm.c mod_bsm.h defs_bsm.h
+mod_bsm_la_LDFLAGS = -module -avoid-version
+endif
 
 # mod_stats_la_SOURCES = mod_stats.c
 # mod_stats_la_LDFLAGS = -module -avoid-version

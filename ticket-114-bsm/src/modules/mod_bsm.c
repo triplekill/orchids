@@ -138,15 +138,22 @@ bsm_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 
   u_char *buf, *buf0, *bufend;
   int n;
-  n = au_read_rec ((FILE *)data, &buf);
-  // !!! au_read_rec() requires a FILE *, but we only have a fildes sd;
-  // should make data = fdopen(sd, "r")
-  if (n<0)
-    {
-      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): cannot read bsm record.\n");
+  bsm_cfg_source_t *source;
+  FILE *f;
+
+  source = hash_get(mod->config->bsm_source_table, &sd, sizeof(int));
+  if (source==NULL)
+    DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): cannot find fildes %d in bsm hash table.\n", sd);
     error:
       free_event(event);
       return -1;
+    }
+
+  n = au_read_rec (source->auditfile, &buf);
+  if (n<0)
+    {
+      DebugLog(DF_MOD, DS_TRACE, "bsm_callback(): cannot read bsm record.\n");
+      goto error;
     }
   buf0 = buf;
   bufend = buf+n;
@@ -950,15 +957,104 @@ static field_t bsm_fields[] = {
   // The following file generated automatically by gen_mod_bsm.c
   // handles the bsm.groups.elt<i>, bsm.newgroups.elt<i>
   // fields
-#include "defs_bsm.c"
+#include "defs_bsm.h"
   // Do not add new fields after this line
+};
+
+static void *
+bsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
+{
+  bsm_cfg_t *cfg;
+
+  DebugLog(DF_MOD, DS_INFO, "load() bsm@%p\n", &mod_bsm);
+
+  cfg = Xzmalloc(sizeof(bsm_cfg_t));
+  cfg->bsm_source_table = new_hash(1);
+
+  register_fields(ctx, mod, bsm_fields, BSM_FIELDS);
+  return cfg;
+}
+
+/*
+static int 
+connect_sock_bsm()
+{
+  int sock_fd,len;
+  struct sockaddr_un remote;
+
+  sock_fd = Xsocket(AF_UNIX, SOCK_STREAM, 0);
+  remote.sun_family = AF_UNIX;
+  strcpy(remote.sun_path, SOCK_PATH);
+  len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+  Xconnect(sock_fd, (struct sockaddr *)&remote, len);
+
+  return sock_fd;
+}
+
+
+static void
+auditd_postconfig(orchids_t *ctx, mod_entry_t *mod)
+{
+  int sd;
+  sd = connect_sock_auditd();
+  add_input_descriptor(ctx, mod, auditd_callback, sd, NULL);
+
+}
+*/
+
+
+static void
+bsm_set_auditpipe (orchids_t *ctx, mod_entry_t * mod, config_directive_t *dir)
+{
+  bsm_cfg_t *cfg = mod->config;
+  FILE *f;
+  int fd;
+  bsm_cfg_source_t *source;
+
+  f = fopen (dir->args, "r");
+  if (f==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Cannot open AuditPipe %s\n", dir->args);
+      return;
+    }
+  source = Xzmalloc(sizeof(bsm_cfg_source_t));
+  source->auditpipe = dir->args;
+  source->auditfile = f;
+  DebugLog(DF_MOD, DS_INFO, "AuditPipe set to %s\n", dir->args);
+  fd = fileno(f);
+  hash_add(cfg->bsm_source_table, source, &fd, sizeof(int));
+
+  add_input_descriptor(ctx, mod, bsm_callback, fd, NULL);
+}
+
+static mod_cfg_cmd_t bsm_dir[] =
+{
+  { "AuditPipe", bsm_set_auditpipe, "Set audit pipe device name, or audit file name." },
+  { NULL, NULL, NULL }
+};
+
+static void bsm_postconfig (orchids_t *ctx, mod_entry_t *mod)
+{
+  return;
+}
+
+input_module_t mod_bsm = {
+  MOD_MAGIC,                /* Magic number */
+  ORCHIDS_VERSION,          /* Module version */
+  "bsm",                 /* module name */
+  "CeCILL2",                /* module license */
+  NULL,
+  bsm_dir,               /* configuration commands */
+  bsm_preconfig,         /* called just after module registration */
+  bsm_postconfig,        /* postconfig */
+  NULL
 };
 
 #endif /* HAVE_BSM_H */
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire SpÃ©cification
-** et VÃ©rification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **

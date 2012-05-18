@@ -18,19 +18,28 @@
 # include "config.h"
 #endif
 
+  // The snare module is meant to work on Linux 32 bit distributions.
+  // To keep it happy on other platforms (which might be given a snare
+  // feed over the network), we redefine the missing macros
+#include "linux_syscall.h"
+  // linux_syscall.h is obtained from a Linux <asm/unitstd_32.h> file
+  // This is bad practice, as is the linux24_syscall_name_g[]
+  // as well.
+
 /* #define _GNU_SOURCE */ /* for O_LARGEFILE O_DIRECTORY */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <fcntl.h>
-#include <sys/syscall.h>
+  // #include <fcntl.h>
+  //#include <sys/syscall.h>
 #include <sys/stat.h>
 
 #include <netinet/in.h>
 
 // On a 64 bit architecture, the following syscall are not present
+/*
 #if __WORDSIZE == 64
 # define SYS_truncate64	 -1
 # define SYS_ftruncate64 -1
@@ -45,15 +54,23 @@
 # define SYS_setresuid32 -1
 # define SYS_setresgid32 -1
 #endif
-
+*/
 
 #include "orchids.h"
 
 /* from  /usr/include/bits/fcntl.h */
+#ifndef O_DIRECT
 #define O_DIRECT        040000 /* Direct disk access.  */
+#endif
+#ifndef O_DIRECTORY
 #define O_DIRECTORY    0200000 /* Must be a directory.  */
+#endif
+#ifndef O_NOFOLLOW
 #define O_NOFOLLOW     0400000 /* Do not follow links.  */
+#endif
+#ifndef O_LARGEFILE
 #define O_LARGEFILE    0100000
+#endif
 
 static ovm_var_t **fields_g;
 static char *linux24_syscall_name_g[256];
@@ -199,8 +216,8 @@ io_event:
       fields_g[F_MODE] = ovm_int_new();
       INT(fields_g[F_MODE]) = $3 | $4;
       fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_open ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_open ] );
+      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ LINUX_SYS_open ];
+      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ LINUX_SYS_open ] );
     }
 | perm_io_syscall '(' ')' ',' date '\t'
   field_user field_process field_path perm_attributes
@@ -214,8 +231,8 @@ io_event:
     {
       DPRINTF( ("set io_event mknod()\n") );
       fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_mknod ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_mknod ] );
+      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ LINUX_SYS_mknod ];
+      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ LINUX_SYS_mknod ] );
       /* XXX set mknod opts */
     }
 | trunc_syscall '(' sys_mknod_opts ')' ',' date '\t'
@@ -241,22 +258,22 @@ io_event:
 
 perm_io_syscall:
   SYS_MKDIR
-    { $$ = SYS_mkdir;  }
+    { $$ = LINUX_SYS_mkdir;  }
 | SYS_CHMOD
-    { $$ = SYS_chmod;  }
+    { $$ = LINUX_SYS_chmod;  }
 | SYS_FCHMOD
-    { $$ = SYS_fchmod; }
+    { $$ = LINUX_SYS_fchmod; }
 ;
 
 io_syscall:
   SYS_UNLINK
-    { $$ = SYS_unlink; }
+    { $$ = LINUX_SYS_unlink; }
 | SYS_CHROOT
-    { $$ = SYS_chroot; }
+    { $$ = LINUX_SYS_chroot; }
 | SYS_CREAT
-    { $$ = SYS_creat;  }
+     { $$ = LINUX_SYS_creat;  }
 | SYS_RMDIR
-    { $$ = SYS_rmdir;  }
+    { $$ = LINUX_SYS_rmdir;  }
 ;
 
 perm_attributes:
@@ -355,13 +372,13 @@ sys_mknod_opt:
 
 trunc_syscall:
   SYS_TRUNCATE
-    { $$ = SYS_truncate; }
+    { $$ = LINUX_SYS_truncate; }
 | SYS_TRUNCATE64
-    { $$ = SYS_truncate64; }
+    { $$ = LINUX_SYS_truncate64; }
 | SYS_FTRUNCATE
-    { $$ = SYS_ftruncate; }
+    { $$ = LINUX_SYS_ftruncate; }
 | SYS_FTRUNCATE64
-    { $$ = SYS_ftruncate64; }
+    { $$ = LINUX_SYS_ftruncate64; }
 ;
 
 chown_event:
@@ -381,15 +398,15 @@ chown_event:
 
 chown_syscall:
   SYS_CHOWN
-    { $$ = SYS_chown;    }
+    { $$ = LINUX_SYS_chown;    }
 | SYS_CHOWN32
-    { $$ = SYS_chown32;  }
+    { $$ = LINUX_SYS_chown32;  }
 | SYS_LCHOWN
-    { $$ = SYS_lchown;   }
+    { $$ = LINUX_SYS_lchown;   }
 | SYS_LCHOWN32
-    { $$ = SYS_lchown32; }
+    { $$ = LINUX_SYS_lchown32; }
 | SYS_FCHOWN
-    { $$ = SYS_fchown;   }
+    { $$ = LINUX_SYS_fchown;   }
 ;
 
 exec_event:
@@ -401,8 +418,8 @@ exec_event:
       memcpy( STR(fields_g[F_CMDLINE]), $12, strlen($12));
       free($12); /* XXX: compute offsets and sizes instead of dup()ing strings */
       fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_execve ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_execve ] );
+      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ LINUX_SYS_execve ];
+      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ LINUX_SYS_execve ] );
     }
 ;
 
@@ -418,9 +435,9 @@ proc_event:
 
 proc_syscall:
   SYS_EXIT
-    { $$ = SYS_exit;   }
+    { $$ = LINUX_SYS_exit;   }
 | SYS_REBOOT
-    { $$ = SYS_reboot; }
+    { $$ = LINUX_SYS_reboot; }
 ;
 
 net_event:
@@ -442,8 +459,8 @@ net_event:
       VSTRLEN( fields_g[F_SOCKCALL] ) = strlen( linux24_sockcall_name_g[ $3 ] );
 
       fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_socketcall ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_socketcall ] );
+      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ LINUX_SYS_socketcall ];
+      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ LINUX_SYS_socketcall ] );
     }
 ;
 
@@ -473,15 +490,15 @@ copy_event:
 
 copy_syscall:
   SYS_LINK
-    { $$ = SYS_link;    }
+    { $$ = LINUX_SYS_link;    }
 | SYS_MOUNT
-    { $$ = SYS_mount;   }
+    { $$ = LINUX_SYS_mount;   }
 | SYS_RENAME
-    { $$ = SYS_rename;  }
+    { $$ = LINUX_SYS_rename;  }
 | SYS_SYMLINK
-    { $$ = SYS_symlink; }
+    { $$ = LINUX_SYS_symlink; }
 | SYS_UMOUNT
-    { $$ = SYS_umount;  }
+    { $$ = LINUX_SYS_umount;  }
 ;
 
 setid_event:
@@ -544,35 +561,35 @@ opt_username:
 
 setid_syscall:
   SYS_SETUID
-    { $$ = SYS_setuid;   }
+    { $$ = LINUX_SYS_setuid;   }
 | SYS_SETUID32
-    { $$ = SYS_setuid32; }
+    { $$ = LINUX_SYS_setuid32; }
 | SYS_SETGID
-    { $$ = SYS_setgid;   }
+    { $$ = LINUX_SYS_setgid;   }
 | SYS_SETGID32
-    { $$ = SYS_setgid32; }
+    { $$ = LINUX_SYS_setgid32; }
 ;
 
 setreid_syscall:
   SYS_SETREUID
-    { $$ = SYS_setreuid;   }
+    { $$ = LINUX_SYS_setreuid;   }
 | SYS_SETREUID32
-    { $$ = SYS_setreuid32; }
+    { $$ = LINUX_SYS_setreuid32; }
 | SYS_SETREGID
-    { $$ = SYS_setregid;   }
+    { $$ = LINUX_SYS_setregid;   }
 | SYS_SETREGID32
-    { $$ = SYS_setregid32; }
+    { $$ = LINUX_SYS_setregid32; }
 ;
 
 setresid_syscall:
   SYS_SETRESUID
-    { $$ = SYS_setresuid;   }
+    { $$ = LINUX_SYS_setresuid;   }
 | SYS_SETRESUID32
-    { $$ = SYS_setresuid32; }
+    { $$ = LINUX_SYS_setresuid32; }
 | SYS_SETRESGID
-    { $$ = SYS_setresgid;   }
+    { $$ = LINUX_SYS_setresgid;   }
 | SYS_SETRESGID32
-    { $$ = SYS_setresgid32; }
+    { $$ = LINUX_SYS_setresgid32; }
 ;
 
 kern_event:
@@ -588,9 +605,9 @@ kern_event:
 
 kern_syscall:
   SYS_CREATEMODULE
-    { $$ = SYS_create_module; }
+    { $$ = LINUX_SYS_create_module; }
 | SYS_DELETEMODULE
-    { $$ = SYS_delete_module; }
+    { $$ = LINUX_SYS_delete_module; }
 ;
 
 field_path:

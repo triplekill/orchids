@@ -68,7 +68,7 @@ period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   }
   qsort(ctx_array, ctx_array_sz, sizeof (char *), qsort_strcmp);
 
-  fprintf(fp, "%i context%s<br/><br/><br/>\n",
+  fprintf(fp, "%zu context%s<br/><br/><br/>\n",
           ctx_array_sz, ctx_array_sz > 1 ? "s" : "");
 
   for (i = 0; i < ctx_array_sz; i++)

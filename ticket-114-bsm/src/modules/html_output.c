@@ -27,6 +27,7 @@
 #include <sys/utsname.h>
 
 #include <fcntl.h>
+#include <limits.h>
 #include <errno.h>
 
 #include <string.h>
@@ -595,14 +596,14 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<td class=\"e0\"> User time </td> "
           "<td class=\"v0\"> %li.%03li s </td> "
           "</tr>\n",
-          ctx->ru.ru_utime.tv_sec, ctx->ru.ru_utime.tv_usec / 1000);
+          ctx->ru.ru_utime.tv_sec, ctx->ru.ru_utime.tv_usec / 1000L);
 
   fprintf(fp,
           "  <tr> "
           "<td class=\"e1\"> System time </td> "
           "<td class=\"v1\"> %li.%03li s </td> "
           "</tr>\n",
-          ctx->ru.ru_stime.tv_sec, ctx->ru.ru_stime.tv_usec / 1000);
+          ctx->ru.ru_stime.tv_sec, ctx->ru.ru_stime.tv_usec / 1000L);
 
   usage = (float)(ctx->ru.ru_stime.tv_sec + ctx->ru.ru_utime.tv_sec);
   usage += (float)((ctx->ru.ru_stime.tv_usec + ctx->ru.ru_utime.tv_usec) / 1000000);
@@ -629,8 +630,8 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<td class=\"e0\"> Pre-configuration time </td> "
           "<td class=\"v0\"> %li.%03li ms </td> "
           "</tr>\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
   fprintf(fp,
@@ -638,8 +639,8 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<td class=\"e1\"> Post-configuration time </td> "
           "<td class=\"v1\"> %li.%03li ms </td> "
           "</tr>\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->compil_time, &ctx->postconfig_time);
   fprintf(fp,
@@ -647,8 +648,8 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<td class=\"e0\"> Rules compilation time </td> "
           "<td class=\"v0\"> %li.%03li ms </td> "
           "</tr>\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
   fprintf(fp,
@@ -656,8 +657,8 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<td class=\"e1\"> Post compilation time </td> "
           "<td class=\"v1\"> %li.%03li ms </td> "
           "</tr>\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
 #ifdef linux
   fprintf(fp,
@@ -735,7 +736,7 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> ovm stack size </td> "
-          "<td class=\"v0\"> %u </td> "
+          "<td class=\"v0\"> %zu </td> "
           "</tr>\n",
           ctx->ovm_stack->size);
   fprintf(fp,
@@ -1691,11 +1692,11 @@ generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
       fprintf(fp,
               "  <tr> "
               "<td class=\"e%i\"> <a href=\"reports/%s\"> %s </a> </td> "
-              "<td class=\"v%i\"> %li </td> "
+              "<td class=\"v%i\"> %jd </td> "
               "<td class=\"v%i\"> %s </td> "
               "</tr>\n",
               i % 2, namelist[i]->d_name, namelist[i]->d_name,
-              i % 2, s.st_size,
+              i % 2, (intmax_t)s.st_size,
               i % 2, asc_time);
 
       free(namelist[i]);
