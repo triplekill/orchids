@@ -164,8 +164,8 @@ AC_ARG_WITH(swiprolog,
 AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
 [
    if test "$withval" = yes ; then
-      AC_PATH_PROG(SWIPL, pl)
-      AC_PATH_PROG(SWIPLLD, plld)
+      AC_PATH_PROGS(SWIPL, [pl swipl prolog])
+      AC_PATH_PROGS(SWIPLLD, [plld swipl-ld])
       if test "$SWIPL" != "" -a "$SWIPLLD" != ""; then
          AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
       fi
@@ -179,14 +179,16 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
       else
          if test "$withval" != "" ; then
             AC_MSG_CHECKING([for pl])
-            SWIPL="$withval/bin/pl"
+            SWIPL="$ac_cv_path_SWIPL"
+		dnl "$withval/bin/pl"
             AC_MSG_RESULT([$SWIPL])
             if test ! -f "$SWIPL" ; then
                AC_MSG_WARN([SWI Prolog binary "$SWIPL" doesn't exist]);
             fi
 
             AC_MSG_CHECKING([for plld])
-            SWIPLLD="$withval/bin/plld"
+            SWIPLLD="$ac_cv_path_SWIPLLD"
+		dnl "$withval/bin/plld"
             AC_MSG_RESULT([$SWIPLLD])
             if test ! -f "$SWIPLLD" ; then
                AC_MSG_WARN([SWI Prolog linker binary "$SWIPLLD" doesn't exist]);
@@ -200,11 +202,11 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
 ],
 [
    dnl default action (if no --with-xxx)
-   AC_PATH_PROG(SWIPL, pl)
-   if test "$SWIPL" == "" ; then
-      AC_PATH_PROG(SWIPL, swipl)
-   fi
-   AC_PATH_PROG(SWIPLLD, plld)
+   AC_PATH_PROGS(SWIPL, [pl swipl prolog])
+dnl   if test "$SWIPL" == "" ; then
+dnl      AC_PATH_PROG(SWIPL, swipl)
+dnl   fi
+   AC_PATH_PROGS(SWIPLLD, [plld swipl-ld])
    if test "$SWIPL" != "" -a "$SWIPLLD" != ""; then
       AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
       eval `$SWIPL -dump-runtime-variables | sed 's/^CC/PLCC/'`
