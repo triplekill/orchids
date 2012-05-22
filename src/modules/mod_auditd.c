@@ -30,7 +30,6 @@
 
 #include "mod_auditd.h"
 
-
 input_module_t mod_auditd;
 
 /********************************************************************************************/
@@ -195,7 +194,11 @@ char *action_doer_audit (struct action_ctx *actx, char *s,
 
    evtp->time= time_convert(s);
 
-   t = strchrnul (s,':');
+   // t = strchrnul (s,':');  // This is a GNU extension.  Instead, it is as easy to write our own loop:
+   {
+      char c;
+      for (t=s; c = *t, c!=0 && c!=':'; t++);
+   }
    if (*t==':') /* found it */
      {
        t = action_atoi_unsigned (t+1, &evtp->serial);
@@ -594,7 +597,7 @@ connect_sock_auditd()
   sock_fd = Xsocket(AF_UNIX, SOCK_STREAM, 0);
   remote.sun_family = AF_UNIX;
   strcpy(remote.sun_path, SOCK_PATH);
-  len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+  len = SUN_LEN(&remote); // was strlen(remote.sun_path) + sizeof(remote.sun_family);
   Xconnect(sock_fd, (struct sockaddr *)&remote, len);
 
   return sock_fd;

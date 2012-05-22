@@ -219,7 +219,9 @@ mod_mark_la_LDFLAGS = -module -avoid-version
 
 if USE_NETSNMP
 mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h
+mod_snmptrap_la_CFLAGS = $(NETSNMP_CFLAGS)
 mod_snmptrap_la_LDFLAGS = -module -avoid-version
+mod_snmptrap_la_LIBADD = $(NETSNMP_LDFLAGS)
 pkglib_LTLIBRARIES += mod_snmptrap.la
 endif
 

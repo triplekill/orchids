@@ -332,7 +332,7 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
 
   e->date = ctx->cur_loop_time;
   if (eof)
-    e->date.tv_sec = cfg->poll_period;
+    e->date.tv_sec += cfg->poll_period;
   register_rtaction(ctx, e);
 
   return (0);
