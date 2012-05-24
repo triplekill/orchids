@@ -403,9 +403,14 @@ auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 
         rc = readv(sd, &vec, 1);
 
+	if (e->hdr.ver!=AUDISP_PROTOCOL_VER ||
+	    e->hdr.hlen!=sizeof(e->hdr) ||
+	    e->hdr.size!=MAX_AUDIT_MESSAGE_LENGTH)
+	  goto leave;
+
         if (e->hdr.type != 1300) goto leave;	
 
-printf("%d",e->hdr.type);
+//printf("%d",e->hdr.type);
 	if (rc > 0) {
         //Sanity check 
 		if (e->hdr.ver != AUDISP_PROTOCOL_VER ||
@@ -421,7 +426,7 @@ printf("%d",e->hdr.type);
 
 	if (rc > 0)  
 		{ 	
-			printf("===== Msg From auditd ==========\n%s",e->data);
+			//printf("===== Msg From auditd ==========\n%s",e->data);
 			action_init (actx);	
 			action_parse_event (actx, e->data, auditd_data);
 		}
@@ -443,37 +448,32 @@ printf("%d",e->hdr.type);
   INT( attr[F_SYSCALL] ) = auditd_data->syscall;
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_SUCCESS] = ovm_str_new();
+  attr[F_SUCCESS] = ovm_str_new(strlen(auditd_data->success));
   /* VSTR(attr[F_SUCCESS]) = auditd_data->success; */
-  STRLEN(attr[F_SUCCESS]) = strlen(auditd_data->success);
-  strcpy(attr[F_SUCCESS], auditd_data->success);
+  strcpy(STR(attr[F_SUCCESS]), auditd_data->success);
 
   attr[F_EXIT] = ovm_int_new();
   INT( attr[F_EXIT] ) = auditd_data->exit;
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_A0] = ovm_str_new();
+  attr[F_A0] = ovm_str_new(strlen(auditd_data->a0));
   /* VSTR(attr[F_A0]) = auditd_data->a0; */
-  STRLEN(attr[F_A0]) = strlen(auditd_data->a0);
-  strcpy(attr[F_A0], auditd_data->a0);
+  strcpy(STR(attr[F_A0]), auditd_data->a0);
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_A1] = ovm_str_new();
+  attr[F_A1] = ovm_str_new(strlen(auditd_data->a1));
   /* VSTR(attr[F_A1]) = auditd_data->a1; */
-  STRLEN(attr[F_A1]) = strlen(auditd_data->a1);
-  strcpy(attr[F_A1], auditd_data->a1);
+  strcpy(STR(attr[F_A1]), auditd_data->a1);
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_A2] = ovm_str_new();
+  attr[F_A2] = ovm_str_new(strlen(auditd_data->a2));
   /* R(attr[F_A2]) = auditd_data->a2; */
-  STRLEN(attr[F_A2]) = strlen(auditd_data->a2);
-  strcpy(attr[F_A2], auditd_data->a2);
+  strcpy(STR(attr[F_A2]), auditd_data->a2);
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_A3] = ovm_str_new();
+  attr[F_A3] = ovm_str_new(strlen(auditd_data->a3));
   /* VSTR(attr[F_A3]) = auditd_data->a3; */
-  STRLEN(attr[F_A3]) = strlen(auditd_data->a3);
-  strcpy(attr[F_A3], auditd_data->a3);
+  strcpy(STR(attr[F_A3]), auditd_data->a3);
 
   attr[F_ITEMS] = ovm_int_new();
   INT( attr[F_ITEMS] ) = auditd_data->items;
@@ -513,31 +513,33 @@ printf("%d",e->hdr.type);
   INT( attr[F_FSGID] ) = auditd_data->fsgid;
 
   /* Modif faite par NEY 23/05/2012 */
-  attr[F_TTY] = ovm_str_new();
+  attr[F_TTY] = ovm_str_new(strlen(auditd_data->tty));
   /* VSTR(attr[F_TTY]) = auditd_data->tty;*/
-  STRLEN(attr[F_TTY]) = strlen(auditd_data->tty);
   strcpy(STR(attr[F_TTY]), auditd_data->tty);
 
   attr[F_SES] = ovm_int_new();
   INT( attr[F_SES] ) = auditd_data->ses;
 
-/*
-    attr[F_COMM] = ovm_vstr_new();
-    VSTR(attr[F_COMM]) = auditd_data->comm;
-    VSTRLEN(attr[F_COMM]) = strlen(auditd_data->comm);
+  if (auditd_data->comm) {
+    attr[F_COMM] = ovm_str_new(strlen(auditd_data->comm));
+    strcpy(STR(attr[F_COMM]), auditd_data->comm);
+  }
 
-    attr[F_EXE] = ovm_vstr_new();
-    VSTR(attr[F_EXE]) = auditd_data->exe;
-    VSTRLEN(attr[F_EXE]) = strlen(auditd_data->exe);
- 
-   attr[F_SUBJ] = ovm_vstr_new();
-   VSTR(attr[F_SUBJ]) = auditd_data->subj; 
-   VSTRLEN(attr[F_SUBJ]) = strlen(auditd_data->subj);*/
+  if (auditd_data->exe) {
+    attr[F_EXE] = ovm_str_new(strlen(auditd_data->exe));
+    strcpy(STR(attr[F_EXE]), auditd_data->exe);
+  }
+
+  if (auditd_data->subj) {
+    attr[F_SUBJ] = ovm_str_new(strlen(auditd_data->subj));
+    strcpy(STR(attr[F_SUBJ]), auditd_data->subj); 
+  }
 
   /* Modif faite par Jean 23/05/2012 */
-  attr[F_KEY] = ovm_str_new();
-  STRLEN(attr[F_KEY]) = strlen(auditd_data->key);
-  strcpy(STR(attr[F_KEY]), auditd_data->key);
+  if (auditd_data->key) {
+    attr[F_KEY] = ovm_str_new(strlen(auditd_data->key));
+    strcpy(STR(attr[F_KEY]), auditd_data->key);
+  }
 
   /*  fill in orchids event */
   event = NULL;
@@ -579,9 +581,9 @@ static field_t auditd_fields[] = {
   {"auditd.fsgid",    T_INT,      "file system group id"                },	
   {"auditd.tty",      T_STR,     "tty interface"                       },
   {"auditd.ses",      T_INT,      "user's SE Linux user account"        },
-  {"auditd.comm",     T_VSTR,     "command line program name"           },
-  {"auditd.exe",      T_VSTR,     "executable name"                     },
-  {"auditd.subj",     T_VSTR,     "lspp subject's context string"       },
+  {"auditd.comm",     T_STR,     "command line program name"           },
+  {"auditd.exe",      T_STR,     "executable name"                     },
+  {"auditd.subj",     T_STR,     "lspp subject's context string"       },
   {"auditd.key",      T_STR,     "tty interface"                       },
 };
 

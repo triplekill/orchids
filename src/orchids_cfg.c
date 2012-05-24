@@ -1,5 +1,4 @@
 /**
- ** @file orchids_cfg.c
  ** Functions for configuring Orchids core and modules.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

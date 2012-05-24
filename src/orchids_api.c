@@ -526,7 +526,7 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
                                   cond_dissect->data);
       /* Free and optionally inject event if sub-dissector fail */
       if (ret) {
-        DebugLog(DF_CORE, DS_WARN, "dissection failed.\n");
+        DebugLog(DF_CORE, DS_DEBUG, "dissection failed.\n");
         inject_event(ctx, event);
       }
     } else {
