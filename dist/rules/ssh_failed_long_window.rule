@@ -96,6 +96,19 @@ rule ssh_failed_long_window
 
   state alert
   {
+    $m = "More than " + str_from_int(THRESH) + " events in less than " + str_from_int(WINDOW) + " seconds from " + $source ;
+
+    $str_source = str_from_ipv4($source);
+
+    $idmef = idmef_message_new();
+    idmef_message_set($idmef, "alert.classification.text", "ssh bruteforce");
+    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $str_source);
+    idmef_message_set($idmef, "alert.assessment.impact.description", "Brute force detected");
+    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
+    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
+    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
+    idmef_message_send($idmef);
+
     $m = "Alert : More than " + str_from_int(THRESH) + " events in less than " + str_from_int(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
     print ($m);
     kill_threads();

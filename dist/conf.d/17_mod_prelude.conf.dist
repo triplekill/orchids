@@ -8,8 +8,8 @@
 	## analyzer : retreive idmef events from prelude manager, process,
 	##            send back new alerts to prelude manager
 	## prewikka  : Send idmef alerts to prelude database for future display with prewikka
-	Mode prewikka
-
+	## Mode prewikka
+	Mode sensor
 	## Profile needed for sensor or analyzer modes
 	# Profile orchids
 

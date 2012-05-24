@@ -16,6 +16,7 @@ LoadModule udp
 LoadModule syslog
 LoadModule rawsnare
 LoadModule snare
+LoadModule auditd
 LoadModule generic
 LoadModule netfilter
 LoadModule cisco

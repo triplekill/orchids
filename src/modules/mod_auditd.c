@@ -439,33 +439,41 @@ printf("%d",e->hdr.type);
   attr[F_ARCH] = ovm_int_new();
   INT( attr[F_ARCH] ) = auditd_data->arch;
 
-
-  attr[F_SYSCALL] = ovm_int_new();
+   attr[F_SYSCALL] = ovm_int_new();
   INT( attr[F_SYSCALL] ) = auditd_data->syscall;
 
-  attr[F_SUCCESS] = ovm_vstr_new();
-  VSTR(attr[F_SUCCESS]) = auditd_data->success;
-  VSTRLEN(attr[F_SUCCESS]) = strlen(auditd_data->success);
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_SUCCESS] = ovm_str_new();
+  /* VSTR(attr[F_SUCCESS]) = auditd_data->success; */
+  STRLEN(attr[F_SUCCESS]) = strlen(auditd_data->success);
+  strcpy(attr[F_SUCCESS], auditd_data->success);
 
   attr[F_EXIT] = ovm_int_new();
   INT( attr[F_EXIT] ) = auditd_data->exit;
- 
-  attr[F_A0] = ovm_vstr_new();
-  VSTR(attr[F_A0]) = auditd_data->a0;
-  VSTRLEN(attr[F_A0]) = strlen(auditd_data->a0);
 
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_A0] = ovm_str_new();
+  /* VSTR(attr[F_A0]) = auditd_data->a0; */
+  STRLEN(attr[F_A0]) = strlen(auditd_data->a0);
+  strcpy(attr[F_A0], auditd_data->a0);
 
-  attr[F_A1] = ovm_vstr_new();
-  VSTR(attr[F_A1]) = auditd_data->a1;
-  VSTRLEN(attr[F_A1]) = strlen(auditd_data->a1);
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_A1] = ovm_str_new();
+  /* VSTR(attr[F_A1]) = auditd_data->a1; */
+  STRLEN(attr[F_A1]) = strlen(auditd_data->a1);
+  strcpy(attr[F_A1], auditd_data->a1);
 
-  attr[F_A2] = ovm_vstr_new();
-  VSTR(attr[F_A2]) = auditd_data->a2;
-  VSTRLEN(attr[F_A2]) = strlen(auditd_data->a2);
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_A2] = ovm_str_new();
+  /* R(attr[F_A2]) = auditd_data->a2; */
+  STRLEN(attr[F_A2]) = strlen(auditd_data->a2);
+  strcpy(attr[F_A2], auditd_data->a2);
 
-  attr[F_A3] = ovm_vstr_new();
-  VSTR(attr[F_A3]) = auditd_data->a3;
-  VSTRLEN(attr[F_A3]) = strlen(auditd_data->a3);
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_A3] = ovm_str_new();
+  /* VSTR(attr[F_A3]) = auditd_data->a3; */
+  STRLEN(attr[F_A3]) = strlen(auditd_data->a3);
+  strcpy(attr[F_A3], auditd_data->a3);
 
   attr[F_ITEMS] = ovm_int_new();
   INT( attr[F_ITEMS] ) = auditd_data->items;
@@ -504,9 +512,11 @@ printf("%d",e->hdr.type);
   attr[F_FSGID] = ovm_int_new();
   INT( attr[F_FSGID] ) = auditd_data->fsgid;
 
-  attr[F_TTY] = ovm_vstr_new();
-  VSTR(attr[F_TTY]) = auditd_data->tty;
-  VSTRLEN(attr[F_TTY]) = strlen(auditd_data->tty);
+  /* Modif faite par NEY 23/05/2012 */
+  attr[F_TTY] = ovm_str_new();
+  /* VSTR(attr[F_TTY]) = auditd_data->tty;*/
+  STRLEN(attr[F_TTY]) = strlen(auditd_data->tty);
+  strcpy(STR(attr[F_TTY]), auditd_data->tty);
 
   attr[F_SES] = ovm_int_new();
   INT( attr[F_SES] ) = auditd_data->ses;
@@ -524,10 +534,10 @@ printf("%d",e->hdr.type);
    VSTR(attr[F_SUBJ]) = auditd_data->subj; 
    VSTRLEN(attr[F_SUBJ]) = strlen(auditd_data->subj);*/
 
-  attr[F_KEY] = ovm_vstr_new();
-  VSTR(attr[F_KEY]) = auditd_data->key;
-  VSTRLEN(attr[F_KEY]) = strlen(auditd_data->key);
-
+  /* Modif faite par Jean 23/05/2012 */
+  attr[F_KEY] = ovm_str_new();
+  STRLEN(attr[F_KEY]) = strlen(auditd_data->key);
+  strcpy(STR(attr[F_KEY]), auditd_data->key);
 
   /*  fill in orchids event */
   event = NULL;
@@ -549,12 +559,12 @@ static field_t auditd_fields[] = {
   {"auditd.serial",   T_INT,      "event serial number"                 },
   {"auditd.arch",     T_INT,      "the elf architecture flags"          },
   {"auditd.syscall",  T_INT,      "syscall number"                      },
-  {"auditd.success",  T_VSTR,     "syscall success"                     },
+  {"auditd.success",  T_STR,     "syscall success"                     },
   {"auditd.exit",     T_INT,      "exit value"                          },
-  {"auditd.varzero",  T_VSTR,     "syscall argument"                    },
-  {"auditd.a1",       T_VSTR,     "syscall argument"                    },	
-  {"auditd.a2",       T_VSTR,     "syscall argument"                    },	
-  {"auditd.a3",       T_VSTR,     "syscall argument"                    },		
+  {"auditd.varzero",  T_STR,     "syscall argument"                    },
+  {"audtehitd.a1",    T_STR,     "syscall argument"                    },	
+  {"auditd.a2",       T_STR,     "syscall argument"                    },	
+  {"auditd.a3",       T_STR,     "syscall argument"                    },	
   {"auditd.items",    T_INT,      "number of path records in the event" },
   {"auditd.ppid",     T_INT,      "parent pid"                          },
   {"auditd.pid",      T_INT,      "process id"                          },
@@ -567,12 +577,12 @@ static field_t auditd_fields[] = {
   {"auditd.egid",     T_INT,      "effective group id"                  },	
   {"auditd.sgid",     T_INT,      "set group id"                        },	
   {"auditd.fsgid",    T_INT,      "file system group id"                },	
-  {"auditd.tty",      T_VSTR,     "tty interface"                       },
+  {"auditd.tty",      T_STR,     "tty interface"                       },
   {"auditd.ses",      T_INT,      "user's SE Linux user account"        },
   {"auditd.comm",     T_VSTR,     "command line program name"           },
   {"auditd.exe",      T_VSTR,     "executable name"                     },
   {"auditd.subj",     T_VSTR,     "lspp subject's context string"       },
-  {"auditd.key",      T_VSTR,     "tty interface"                       },
+  {"auditd.key",      T_STR,     "tty interface"                       },
 };
 
 
@@ -635,7 +645,7 @@ input_module_t mod_auditd = {
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **
-** This software is a computer program whose purpose is to detect intrusions
+vv** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.
 **
 ** This software is governed by the CeCILL license under French law and
