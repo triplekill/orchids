@@ -36,7 +36,8 @@
 typedef struct event
 {
 	struct audit_dispatcher_header hdr;
-	char data[MAX_AUDIT_MESSAGE_LENGTH];
+	char data[MAX_AUDIT_MESSAGE_LENGTH+1];
+	// +1 for NUL byte we shall add
 } event_t;
 
 /* removed for orchids inclusion

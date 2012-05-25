@@ -150,6 +150,7 @@ mod_sockunix_la_LDFLAGS = -module -avoid-version
 
 mod_auditd_la_SOURCES = mod_auditd.c mod_auditd.h auditd_queue.h
 mod_auditd_la_LDFLAGS = -module -avoid-version
+mod_auditd_la_LIBADD = -lm
 
 # mod_stats_la_SOURCES = mod_stats.c
 # mod_stats_la_LDFLAGS = -module -avoid-version

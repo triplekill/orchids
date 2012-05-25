@@ -81,9 +81,9 @@
 #define AUDITD_FIELDS 28
 
 /*****************************************/
-typedef struct syscall_event_s
+typedef struct auditd_syscall_event_s
 {
-	char     *time;
+	struct timeval time;
 	int      serial;
 	int      arch;
 	int      syscall;
@@ -112,8 +112,13 @@ typedef struct syscall_event_s
 	char     *subj;
 	char     *key;
 
-}syscall_event_t;
+} auditd_syscall_event_t;
 
+typedef struct auditd_cfg_s {
+  auditd_event_t *e; // the received event, through audispd
+  auditd_syscall_event_t *auditd_data;  // structure where we store auditd fields
+  struct action_ctx *actx; // internal context data used by auditd_callback()
+} auditd_cfg_t;
 
 /***********************************************/
 

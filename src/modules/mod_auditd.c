@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "orchids.h"
 
@@ -37,7 +38,7 @@ input_module_t mod_auditd;
 struct action {
   char *name;
   int offset; /* where to write the datum, in the
-		 syscall_event_t. */
+		 auditd_syscall_event_t. */
   int code;
 };
 
@@ -45,32 +46,32 @@ static struct action actions[] = {
   /* !!! Don't put any empty word here, or any word
      that is prefix of another one! */
   { "audit(", 0 /*unused*/, ACTION_AUDIT },
-  { "arch=", offsetof(syscall_event_t,arch), ACTION_INT },
-  { "syscall=", offsetof(syscall_event_t,syscall), ACTION_INT },
-  { "success=", offsetof(syscall_event_t,success), ACTION_STRING },
-  { "exit=", offsetof(syscall_event_t,exit), ACTION_INTREL },
-  { "a0=", offsetof(syscall_event_t,a0), ACTION_STRING },
-  { "a1=", offsetof(syscall_event_t,a1), ACTION_STRING },
-  { "a2=", offsetof(syscall_event_t,a2), ACTION_STRING },
-  { "a3=", offsetof(syscall_event_t,a3), ACTION_STRING },
-  { "items=", offsetof(syscall_event_t,items), ACTION_INT },
-  { "ppid=", offsetof(syscall_event_t,ppid), ACTION_INT },
-  { "pid=", offsetof(syscall_event_t,pid), ACTION_INT },
-  { "auid=", offsetof(syscall_event_t,auid), ACTION_INT },
-  { "uid=", offsetof(syscall_event_t,uid), ACTION_INT },
-  { "gid=", offsetof(syscall_event_t,gid), ACTION_INT },
-  { "euid=", offsetof(syscall_event_t,euid), ACTION_INT },
-  { "suid=", offsetof(syscall_event_t,suid), ACTION_INT },
-  { "fsuid=", offsetof(syscall_event_t,fsuid), ACTION_INT },
-  { "egid=", offsetof(syscall_event_t,egid), ACTION_INT },
-  { "sgid=", offsetof(syscall_event_t,sgid), ACTION_INT },
-  { "fsgid=", offsetof(syscall_event_t,fsgid), ACTION_INT },
-  { "tty=", offsetof(syscall_event_t,tty), ACTION_ID },
-  { "ses=", offsetof(syscall_event_t,ses), ACTION_INT },
-  { "comm=", offsetof(syscall_event_t,comm), ACTION_STRING },
-  { "exe=", offsetof(syscall_event_t,exe), ACTION_STRING },
-  { "subj=", offsetof(syscall_event_t,subj), ACTION_SUBJ },
-  { "key=", offsetof(syscall_event_t,key), ACTION_STRING},
+  { "arch=", offsetof(auditd_syscall_event_t,arch), ACTION_INT },
+  { "syscall=", offsetof(auditd_syscall_event_t,syscall), ACTION_INT },
+  { "success=", offsetof(auditd_syscall_event_t,success), ACTION_STRING },
+  { "exit=", offsetof(auditd_syscall_event_t,exit), ACTION_INTREL },
+  { "a0=", offsetof(auditd_syscall_event_t,a0), ACTION_STRING },
+  { "a1=", offsetof(auditd_syscall_event_t,a1), ACTION_STRING },
+  { "a2=", offsetof(auditd_syscall_event_t,a2), ACTION_STRING },
+  { "a3=", offsetof(auditd_syscall_event_t,a3), ACTION_STRING },
+  { "items=", offsetof(auditd_syscall_event_t,items), ACTION_INT },
+  { "ppid=", offsetof(auditd_syscall_event_t,ppid), ACTION_INT },
+  { "pid=", offsetof(auditd_syscall_event_t,pid), ACTION_INT },
+  { "auid=", offsetof(auditd_syscall_event_t,auid), ACTION_INT },
+  { "uid=", offsetof(auditd_syscall_event_t,uid), ACTION_INT },
+  { "gid=", offsetof(auditd_syscall_event_t,gid), ACTION_INT },
+  { "euid=", offsetof(auditd_syscall_event_t,euid), ACTION_INT },
+  { "suid=", offsetof(auditd_syscall_event_t,suid), ACTION_INT },
+  { "fsuid=", offsetof(auditd_syscall_event_t,fsuid), ACTION_INT },
+  { "egid=", offsetof(auditd_syscall_event_t,egid), ACTION_INT },
+  { "sgid=", offsetof(auditd_syscall_event_t,sgid), ACTION_INT },
+  { "fsgid=", offsetof(auditd_syscall_event_t,fsgid), ACTION_INT },
+  { "tty=", offsetof(auditd_syscall_event_t,tty), ACTION_ID },
+  { "ses=", offsetof(auditd_syscall_event_t,ses), ACTION_INT },
+  { "comm=", offsetof(auditd_syscall_event_t,comm), ACTION_STRING },
+  { "exe=", offsetof(auditd_syscall_event_t,exe), ACTION_STRING },
+  { "subj=", offsetof(auditd_syscall_event_t,subj), ACTION_SUBJ },
+  { "key=", offsetof(auditd_syscall_event_t,key), ACTION_STRING},
   { NULL, 0 }
 };
 
@@ -90,7 +91,7 @@ struct action_tree {
 struct action_ctx {
   struct action_tree *tree;
   char *(*action_doer[ACTION_LIMIT]) (struct action_ctx *actx, char *s,
-				      syscall_event_t *evtp, int offset);
+				      auditd_syscall_event_t *evtp, int offset);
 };
 
 static void 
@@ -171,20 +172,26 @@ char *action_atoi_hex (char *s, int *ip)
 
 
 
-char *time_convert(char *str)
+char *time_convert(char *str, struct timeval *tv)
 {
- char *cp;
- char *time;
+  char c, *s;
+  double secs, floor_part;
 
- cp = strdup (str);
- time = strtok(cp,":");
- free(cp);
-
-return time;
+  secs = strtod(str,&s);
+  c = *s;
+  if (c==':' || c==')')
+    {
+      *s++ = '\0';
+      floor_part = floor(secs);
+      tv->tv_sec = floor_part;
+      tv->tv_usec = 1000000.0 * (secs - floor_part);
+      return s;
+    }
+  else return s-1;
 }
 
 char *action_doer_audit (struct action_ctx *actx, char *s,
-			 syscall_event_t *evtp, int offset)
+			 auditd_syscall_event_t *evtp, int offset)
 {
   /* s is of the form 12345.678:1234 followed possibly
      by other characters, where 12345.678 is a time,
@@ -192,42 +199,35 @@ char *action_doer_audit (struct action_ctx *actx, char *s,
   */
  char *t;
 
-   evtp->time= time_convert(s);
-
-   // t = strchrnul (s,':');  // This is a GNU extension.  Instead, it is as easy to write our own loop:
+ t = time_convert(s, &evtp->time);
+ if (*t!='\0') /* found it */
    {
-      char c;
-      for (t=s; c = *t, c!=0 && c!=':'; t++);
+     t = action_atoi_unsigned (t+1, &evtp->serial);
+     if (*t==')') t++;
    }
-   if (*t==':') /* found it */
-     {
-       t = action_atoi_unsigned (t+1, &evtp->serial);
-       if (*t==')') t++;
-       if (*t==':') t++;
-     }
-   return t;
- };
+ return t;
+}
 
 char *action_doer_int (struct action_ctx *actx, char *s,
-		       syscall_event_t *evtp, int offset)
+		       auditd_syscall_event_t *evtp, int offset)
 {
   return action_atoi_unsigned (s, (int *) (((char *)evtp) + offset));
 }
 
 char *action_doer_intrel (struct action_ctx *actx, char *s,
-		       syscall_event_t *evtp, int offset)
+		       auditd_syscall_event_t *evtp, int offset)
 {
   return action_atoi_signed (s, (int *) (((char *)evtp) + offset));
 }
 
 char *action_doer_hex (struct action_ctx *actx, char *s,
-		       syscall_event_t *evtp, int offset)
+		       auditd_syscall_event_t *evtp, int offset)
 {
   return action_atoi_hex (s, (int *) (((char *)evtp) + offset));
 }
 
 char *action_doer_id (struct action_ctx *actx, char *s,
-		       syscall_event_t *evtp, int offset)
+		       auditd_syscall_event_t *evtp, int offset)
 {
   char c;
   *(char **)(((char *)evtp)+offset) = s;
@@ -239,7 +239,7 @@ char *action_doer_id (struct action_ctx *actx, char *s,
 }
 
 char *action_doer_string (struct action_ctx *actx, char *s,
-		       syscall_event_t *evtp, int offset)
+		       auditd_syscall_event_t *evtp, int offset)
 {
   char c;
   char *to;
@@ -248,6 +248,7 @@ char *action_doer_string (struct action_ctx *actx, char *s,
   if (*s != '"')
     return action_doer_id (actx, s, evtp, offset);
   to = s++;
+  *(char **)(((char *)evtp)+offset) = to;
   while (1)
     {
       switch (c = *s++)
@@ -330,7 +331,7 @@ action_init (struct action_ctx *actx)
 }
 
 void action_parse_event (struct action_ctx *actx, char *data,
-			 syscall_event_t *evtp)
+			 auditd_syscall_event_t *evtp)
 {
   char *s;
   char c;
@@ -374,111 +375,99 @@ void action_parse_event (struct action_ctx *actx, char *data,
 static int
 auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
 {
- 
-  event_t *event; //orchids event
-
+  auditd_cfg_t *cfg = (auditd_cfg_t *)data;
+  event_t *event; // orchids event, not an auditd event
   ovm_var_t *attr[AUDITD_FIELDS];
+
   DebugLog(DF_MOD, DS_TRACE, "auditd_callback()\n");
-  memset(attr, 0, sizeof(attr));
+  // memset(attr, 0, sizeof(attr));
 
-  syscall_event_t *auditd_data; //structure where to store auditd fields 
-  auditd_data = Xmalloc(MAX_AUDIT_MESSAGE_LENGTH); 
-  memset(auditd_data, 0, MAX_AUDIT_MESSAGE_LENGTH);
+  auditd_syscall_event_t *auditd_data = cfg->auditd_data; 
+  memset(auditd_data, 0, sizeof(auditd_syscall_event_t));
 
-  struct action_ctx *actx; //parsing context
-  actx = Xmalloc(sizeof(struct action_ctx));
-  memset(actx, 0, sizeof(struct action_ctx));
+  struct iovec vec;
+  int rc;
+  auditd_event_t *e = cfg->e;
+ 
+  //Get header first. It is fixed size 
+  vec.iov_base = &e->hdr;
+  vec.iov_len = sizeof(struct audit_dispatcher_header);
 
-
-   struct iovec vec;
-   int rc;
-
-   auditd_event_t *e = Xmalloc(sizeof(auditd_event_t)); //auditd event (see auditd_queue.h & queue.h :(
-   memset(e, 0, sizeof(auditd_event_t));
-
-
-        //Get header first. It is fixed size 
-        vec.iov_base = &e->hdr;
-        vec.iov_len = sizeof(struct audit_dispatcher_header);
-
-        rc = readv(sd, &vec, 1);
-
-	if (e->hdr.ver!=AUDISP_PROTOCOL_VER ||
-	    e->hdr.hlen!=sizeof(e->hdr) ||
-	    e->hdr.size!=MAX_AUDIT_MESSAGE_LENGTH)
+  rc = readv(sd, &vec, 1);
+  // Sanity check
+  if (e->hdr.ver!=AUDISP_PROTOCOL_VER ||
+      e->hdr.hlen!=sizeof(e->hdr))
 	  goto leave;
 
-        if (e->hdr.type != 1300) goto leave;	
+  if (e->hdr.type < AUDIT_FIRST_EVENT || e->hdr.type>AUDIT_LAST_EVENT)
+    goto leave;
+
+  if (e->hdr.size > MAX_AUDIT_MESSAGE_LENGTH)
+    e->hdr.size = MAX_AUDIT_MESSAGE_LENGTH;
 
 //printf("%d",e->hdr.type);
-	if (rc > 0) {
-        //Sanity check 
-		if (e->hdr.ver != AUDISP_PROTOCOL_VER ||
-				e->hdr.hlen != sizeof(e->hdr) ||
-				e->hdr.size > MAX_AUDIT_MESSAGE_LENGTH) {
-			DebugLog(DF_MOD, DS_TRACE, "auditd_callback() : Auditd dispatcher protocol mismatch !\n");
-		}
-
-	vec.iov_base = e->data;
-	vec.iov_len = e->hdr.size;
+  vec.iov_base = e->data;
+  vec.iov_len = e->hdr.size;
 	
-	rc = readv(sd, &vec, 1);
+  rc = readv(sd, &vec, 1);
 
-	if (rc > 0)  
-		{ 	
-			//printf("===== Msg From auditd ==========\n%s",e->data);
-			action_init (actx);	
-			action_parse_event (actx, e->data, auditd_data);
-		}
+  if (rc > 0)
+    {
+      e->data[rc] = '\0';
+//printf("===== Msg From auditd ==========\n%s\n",e->data); fflush(stdout);
+      action_parse_event (cfg->actx, e->data, auditd_data);
+    }
 
- 	}
-
-//   attr[F_TIME] = ovm_vstr_new();
-//   VSTR(attr[F_TIME]) = auditd_data->time;
-//   VSTRLEN(attr[F_TIME]) = strlen(auditd_data->time);
-
+  attr[F_TIME] = ovm_timeval_new();
+  TIMEVAL(attr[F_TIME]) = auditd_data->time;
+  attr[F_TIME]->flags = TYPE_MONO;
 
   attr[F_SERIAL] = ovm_int_new();
   INT( attr[F_SERIAL] ) = auditd_data->serial;
+  attr[F_SERIAL]->flags |= TYPE_MONO;
 
   attr[F_ARCH] = ovm_int_new();
   INT( attr[F_ARCH] ) = auditd_data->arch;
 
-   attr[F_SYSCALL] = ovm_int_new();
+  attr[F_SYSCALL] = ovm_int_new();
   INT( attr[F_SYSCALL] ) = auditd_data->syscall;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_SUCCESS] = ovm_str_new(strlen(auditd_data->success));
-  /* VSTR(attr[F_SUCCESS]) = auditd_data->success; */
-  strcpy(STR(attr[F_SUCCESS]), auditd_data->success);
+  if (auditd_data->success) {
+    attr[F_SUCCESS] = ovm_str_new(strlen(auditd_data->success));
+    strcpy(STR(attr[F_SUCCESS]), auditd_data->success);
+  }
+  else attr[F_SUCCESS] = NULL;
 
   attr[F_EXIT] = ovm_int_new();
   INT( attr[F_EXIT] ) = auditd_data->exit;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_A0] = ovm_str_new(strlen(auditd_data->a0));
-  /* VSTR(attr[F_A0]) = auditd_data->a0; */
-  strcpy(STR(attr[F_A0]), auditd_data->a0);
+  if (auditd_data->a0) {
+    attr[F_A0] = ovm_str_new(strlen(auditd_data->a0));
+    strcpy(STR(attr[F_A0]), auditd_data->a0);
+  }
+  else attr[F_A0] = NULL;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_A1] = ovm_str_new(strlen(auditd_data->a1));
-  /* VSTR(attr[F_A1]) = auditd_data->a1; */
-  strcpy(STR(attr[F_A1]), auditd_data->a1);
+  if (auditd_data->a1) {
+    attr[F_A1] = ovm_str_new(strlen(auditd_data->a1));
+    strcpy(STR(attr[F_A1]), auditd_data->a1);
+  }
+  else attr[F_A1] = NULL;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_A2] = ovm_str_new(strlen(auditd_data->a2));
-  /* R(attr[F_A2]) = auditd_data->a2; */
-  strcpy(STR(attr[F_A2]), auditd_data->a2);
+  if (auditd_data->a2) {
+    attr[F_A2] = ovm_str_new(strlen(auditd_data->a2));
+    strcpy(STR(attr[F_A2]), auditd_data->a2);
+  }
+  else attr[F_A2] = NULL;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_A3] = ovm_str_new(strlen(auditd_data->a3));
-  /* VSTR(attr[F_A3]) = auditd_data->a3; */
-  strcpy(STR(attr[F_A3]), auditd_data->a3);
+  if (auditd_data->a3) {
+    attr[F_A3] = ovm_str_new(strlen(auditd_data->a3));
+    strcpy(STR(attr[F_A3]), auditd_data->a3);
+  }
+  else attr[F_A3] = NULL;
 
   attr[F_ITEMS] = ovm_int_new();
   INT( attr[F_ITEMS] ) = auditd_data->items;
  
-
   attr[F_PPID] = ovm_int_new();
   INT( attr[F_PPID] ) = auditd_data->ppid;
 
@@ -512,10 +501,11 @@ auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
   attr[F_FSGID] = ovm_int_new();
   INT( attr[F_FSGID] ) = auditd_data->fsgid;
 
-  /* Modif faite par NEY 23/05/2012 */
-  attr[F_TTY] = ovm_str_new(strlen(auditd_data->tty));
-  /* VSTR(attr[F_TTY]) = auditd_data->tty;*/
-  strcpy(STR(attr[F_TTY]), auditd_data->tty);
+  if (auditd_data->tty) {
+    attr[F_TTY] = ovm_str_new(strlen(auditd_data->tty));
+    strcpy(STR(attr[F_TTY]), auditd_data->tty);
+  }
+  else attr[F_TTY] = NULL;
 
   attr[F_SES] = ovm_int_new();
   INT( attr[F_SES] ) = auditd_data->ses;
@@ -524,22 +514,25 @@ auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
     attr[F_COMM] = ovm_str_new(strlen(auditd_data->comm));
     strcpy(STR(attr[F_COMM]), auditd_data->comm);
   }
+  else attr[F_COMM] = NULL;
 
   if (auditd_data->exe) {
     attr[F_EXE] = ovm_str_new(strlen(auditd_data->exe));
     strcpy(STR(attr[F_EXE]), auditd_data->exe);
   }
+  else attr[F_EXE] = NULL;
 
   if (auditd_data->subj) {
     attr[F_SUBJ] = ovm_str_new(strlen(auditd_data->subj));
     strcpy(STR(attr[F_SUBJ]), auditd_data->subj); 
   }
+  else attr[F_SUBJ] = NULL;
 
-  /* Modif faite par Jean 23/05/2012 */
   if (auditd_data->key) {
     attr[F_KEY] = ovm_str_new(strlen(auditd_data->key));
     strcpy(STR(attr[F_KEY]), auditd_data->key);
   }
+  else attr[F_KEY] = NULL;
 
   /*  fill in orchids event */
   event = NULL;
@@ -549,15 +542,11 @@ auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data)
   post_event(ctx, mod, event);
 
 leave:
-  free(e);
-  free(auditd_data);
-  free(actx);
-
   return (0);
 }
 
 static field_t auditd_fields[] = {
-  {"auditd.time",     T_VSTR,     "auditd event time"                   },
+  {"auditd.time",     T_STR,     "auditd event time"                   },
   {"auditd.serial",   T_INT,      "event serial number"                 },
   {"auditd.arch",     T_INT,      "the elf architecture flags"          },
   {"auditd.syscall",  T_INT,      "syscall number"                      },
@@ -596,8 +585,16 @@ auditd_preconfig(orchids_t *ctx, mod_entry_t *mod)
  
   register_fields(ctx, mod, auditd_fields, AUDITD_FIELDS);
 
-  return (NULL);
+  auditd_cfg_t *cfg;
 
+  cfg = Xmalloc(sizeof(auditd_cfg_t));
+  cfg->e = Xmalloc(sizeof(auditd_event_t)); //auditd event (see auditd_queue.h & queue.h :(
+  memset(cfg->e, 0, sizeof(auditd_event_t));
+  cfg->auditd_data = Xmalloc(sizeof(auditd_syscall_event_t)); 
+  cfg->actx = Xmalloc(sizeof(struct action_ctx));
+  memset(cfg->actx, 0, sizeof(struct action_ctx));
+  action_init (cfg->actx);	
+  return cfg;
 }
 
 static int 
@@ -621,8 +618,7 @@ auditd_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   int sd;
   sd = connect_sock_auditd();
-  add_input_descriptor(ctx, mod, auditd_callback, sd, NULL);
-
+  add_input_descriptor(ctx, mod, auditd_callback, sd, mod->config);
 }
 
 

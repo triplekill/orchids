@@ -481,7 +481,7 @@ free_event(event_t *event)
 {
   event_t *e;
 
-  while (event) {
+  while (event) { 
     e = event->next;
     FREE_VAR(event->value);
     Xfree(event);
