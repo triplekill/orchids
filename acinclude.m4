@@ -170,35 +170,36 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
          AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
       fi
       AM_CONDITIONAL(USE_SWIPROLOG, true)
-      else if test "$withval" = no ; then
+   else if test "$withval" = no ; then
+      AC_MSG_CHECKING([for pl])
+      AC_MSG_RESULT(no)
+      AC_MSG_CHECKING([for plld])
+      AC_MSG_RESULT(no)
+      AM_CONDITIONAL(USE_SWIPROLOG, false)
+   else
+      if test "$withval" != "" ; then
          AC_MSG_CHECKING([for pl])
-         AC_MSG_RESULT(no)
-         AC_MSG_CHECKING([for plld])
-         AC_MSG_RESULT(no)
-         AM_CONDITIONAL(USE_SWIPROLOG, false)
-      else
-         if test "$withval" != "" ; then
-            AC_MSG_CHECKING([for pl])
-            SWIPL="$ac_cv_path_SWIPL"
-		dnl "$withval/bin/pl"
-            AC_MSG_RESULT([$SWIPL])
-            if test ! -f "$SWIPL" ; then
-               AC_MSG_WARN([SWI Prolog binary "$SWIPL" doesn't exist]);
-            fi
-
-            AC_MSG_CHECKING([for plld])
-            SWIPLLD="$ac_cv_path_SWIPLLD"
-		dnl "$withval/bin/plld"
-            AC_MSG_RESULT([$SWIPLLD])
-            if test ! -f "$SWIPLLD" ; then
-               AC_MSG_WARN([SWI Prolog linker binary "$SWIPLLD" doesn't exist]);
-            fi
-
-            AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
-            AM_CONDITIONAL(USE_SWIPROLOG, true)
+         SWIPL="$ac_cv_path_SWIPL"
+	 dnl "$withval/bin/pl"
+         AC_MSG_RESULT([$SWIPL])
+         if test ! -f "$SWIPL" ; then
+            AC_MSG_WARN([SWI Prolog binary "$SWIPL" doesn't exist]);
          fi
+
+         AC_MSG_CHECKING([for plld])
+         SWIPLLD="$ac_cv_path_SWIPLLD"
+	 dnl "$withval/bin/plld"
+         AC_MSG_RESULT([$SWIPLLD])
+         if test ! -f "$SWIPLLD" ; then
+            AC_MSG_WARN([SWI Prolog linker binary "$SWIPLLD" doesn't exist]);
+         fi
+         AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
+         AM_CONDITIONAL(USE_SWIPROLOG, true)
+      else
+         AM_CONDITIONAL(USE_SWIPROLOG, false)
       fi
    fi
+fi
 ],
 [
    dnl default action (if no --with-xxx)

@@ -100,14 +100,26 @@ rule ssh_failed_long_window
 
     $str_source = str_from_ipv4($source);
 
-    $idmef = idmef_message_new();
-    idmef_message_set($idmef, "alert.classification.text", "ssh bruteforce");
-    idmef_message_set($idmef, "alert.source(0).node.address(0).address", $str_source);
-    idmef_message_set($idmef, "alert.assessment.impact.description", "Brute force detected");
-    idmef_message_set($idmef, "alert.assessment.impact.severity", "medium");
-    idmef_message_set($idmef, "alert.assessment.impact.completion", "failed");
-    idmef_message_set($idmef, "alert.assessment.impact.type", "user");
-    idmef_message_send($idmef);
+    $idmef = idmef_new_alert();
+    xml_set_prop($idmef,
+	"/*/idmef:Alert/idmef:Classification", "text", "ssh bruteforce");
+    xml_set_prop($idmef,
+	"/*/idmef:Alert/idmef:Source/idmef:Node/idmef:Address",
+	"category", "ipv4addr");
+    xml_set_str($idmef,
+	"/*/idmef:Alert/idmef:Source/idmef:Node/idmef:Address/idmef:address",
+	$str_source);
+    xml_set_prop($idmef, "/*/idmef:Alert/idmef:Assessment/idmef:Impact",
+	"severity", "medium");
+    xml_set_prop($idmef, "/*/idmef:Alert/idmef:Assessment/idmef:Impact",
+	"completion", "failed");
+    xml_set_prop($idmef, "/*/idmef:Alert/idmef:Assessment/idmef:Impact",
+	"type", "user");
+    xml_set_str($idmef,
+	"/*/idmef:Alert/idmef:Assessment/idmef:Impact",
+	"Brute force detected");
+    idmef_write_alert($idmef);
+    xml_free($idmef);
 
     $m = "Alert : More than " + str_from_int(THRESH) + " events in less than " + str_from_int(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
     print ($m);

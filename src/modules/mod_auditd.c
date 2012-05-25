@@ -546,7 +546,7 @@ leave:
 }
 
 static field_t auditd_fields[] = {
-  {"auditd.time",     T_STR,     "auditd event time"                   },
+  {"auditd.time",     T_TIMEVAL,     "auditd event time"                   },
   {"auditd.serial",   T_INT,      "event serial number"                 },
   {"auditd.arch",     T_INT,      "the elf architecture flags"          },
   {"auditd.syscall",  T_INT,      "syscall number"                      },
