@@ -46,6 +46,7 @@ create_sockunix_socket(const char *path)
   struct sockaddr_un sunx;
   int fd;
   int ret;
+  size_t len;
 
   if (path[0] == '\0')
     return (-1);
@@ -58,16 +59,26 @@ create_sockunix_socket(const char *path)
       exit(EXIT_FAILURE);
   }
 
+  fd = Xsocket(AF_UNIX, SOCK_DGRAM, 0);
+
+  // The following added by jgl, 30 mai 2012
   memset(&sunx, 0, sizeof(sunx));
   sunx.sun_family = AF_UNIX;
   strncpy(sunx.sun_path, path, sizeof(sunx.sun_path));
+  sunx.sun_path[sizeof(sunx.sun_path)-1] = '\0';
+  len = SUN_LEN(&sunx);
+  // in replacement of:
+  /*
+  memset(&sunx, 0, sizeof(sunx));
+  sunx.sun_family = AF_UNIX;
+  strncpy(sunx.sun_path, path, sizeof(sunx.sun_path));
+  */
 
-  fd = Xsocket(AF_UNIX, SOCK_DGRAM, 0);
-
-  Xbind(fd, (struct sockaddr *) &sunx,
-        sizeof(sunx.sun_family) + strlen(sunx.sun_path));
+  Xbind(fd, (struct sockaddr *) &sunx, len);
+        // was: sizeof(sunx.sun_family) + strlen(sunx.sun_path)); // jgl, 30 mai 2012
 
   Xchmod(path, 0666);
+  // Xconnect(fd, (struct sockaddr *)&sunx, len); // was added by jgl, but does not seen necessary
 
   return (fd);
 }
@@ -148,7 +159,7 @@ static mod_cfg_cmd_t sockunix_dir[] =
 {
   { "AddUnixSocket", add_unix_socket, "Add a unix socket" },
   { "INPUT", add_unix_socket, "Add a unix socket" },
-  { NULL, NULL }
+  { NULL, NULL, NULL }
 };
 
 input_module_t mod_sockunix = {

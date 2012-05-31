@@ -803,6 +803,7 @@ generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
   for (r = ctx->rule_compiler->first_rule, i = 0; r; r = r->next, i++) {
 
     strncpy(rulefile, r->filename, sizeof (rulefile));
+    rulefile[sizeof(rulefile)-1] = '\0';
     convert_filename(rulefile);
     snprintf(basefile, PATH_MAX,
 	     "orchids-rule-%s-%s-%08lx",
@@ -877,6 +878,7 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
   for (r = ctx->rule_compiler->first_rule, i = 0; r; r = r->next, i++) {
     Xrealpath(cfg->html_output_dir, absolute_dir);
     strncpy(rulefile, r->filename, sizeof (rulefile));
+    rulefile[sizeof(rulefile)-1] = '\0';
     convert_filename(rulefile);
     snprintf(basefile, PATH_MAX,
              "orchids-rule-%s-%s-%08lx",
@@ -1306,6 +1308,7 @@ generate_html_rule_instance_list(orchids_t *ctx, html_output_cfg_t  *cfg)
       strcpy(asc_time, "Initial instance");
     }
     strncpy(rulefile, r->rule->filename, sizeof (rulefile));
+    rulefile[sizeof(rulefile)-1] = '\0';
     convert_filename(rulefile);
     snprintf(baserulefile, PATH_MAX,
 	     "orchids-rule-%s-%s-%08lx",

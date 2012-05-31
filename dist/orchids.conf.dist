@@ -7,9 +7,9 @@
 # ORCHIDS Configuration file
 #
 
-# Set a virtual memory limit.  This avoid memory explosion
+# Set a virtual memory limit.  This is meant to avoid memory explosion
 # when testing/writing new rules.
-# For starting, 128 MB should be enough
+# For a start, 128 MB should be enough
 
 MaxMemorySize 134217728
 

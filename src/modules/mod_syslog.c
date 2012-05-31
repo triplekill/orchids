@@ -298,7 +298,7 @@ input_module_t mod_syslog = {
 
 
 /*
-** date convertion
+** date conversion
 */
 
 struct tm *

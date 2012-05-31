@@ -610,7 +610,7 @@ inject_event(orchids_t *ctx, event_t *event)
 
   execute_post_inject_hooks(ctx, active_event->event);
 
-  /* Free unreferenced event here (if the current event didn't passed any
+  /* Free unreferenced event here (if the current event didn't pass any
      transition, Xfree() it) */
   if (active_event->refs == 0) {
     DebugLog(DF_ENG, DS_DEBUG,

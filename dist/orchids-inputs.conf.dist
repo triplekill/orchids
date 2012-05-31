@@ -31,3 +31,8 @@ DISSECT	syslog	udp		514
 # Rawsnare events
 #INPUT			udp		6262
 #DISSECT	rawsnare	udp		6262
+
+# Auditd events
+INPUT		textfile	/var/run/audispd_events
+DISSECT	auditd	textfile	/var/run/audispd_events
+

@@ -1121,7 +1121,7 @@ add_cond_dissector(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   if (!*mod_dissect_name || !*mod_source_name || !*cond_param_str)
   {
     DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : malformated directive \n");
+	     "DISSECT : ill-formed directive \n");
     return ;
   }
 

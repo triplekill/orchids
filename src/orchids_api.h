@@ -332,7 +332,7 @@ free_event(event_t *event);
 
 /**
  ** Post an event.
- ** If a module have registered a sub-dissector, the function will call it.
+ ** If module has registered a sub-dissector, the function will call it.
  ** If no more module can apply, the event will be injected into the
  ** analysis engine with inject_event().
  **
@@ -342,7 +342,6 @@ free_event(event_t *event);
  **/
 void
 post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event);
-
 
 /**
  ** Print the Orchids application statistics to a stdio stream.

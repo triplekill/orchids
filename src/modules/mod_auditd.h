@@ -4,8 +4,9 @@
  **
  **
  ** @author Hedi BENZINA <benzina@lsv.ens-cachan.fr>
+ ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
  **  
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  ** 
  **
@@ -21,22 +22,10 @@
 
 #include "orchids.h"
 
-
+#ifdef OBSOLETE
 #include "auditd_queue.h"
+#endif
 
-
-#include <sys/uio.h>  /*for iovec structure*/
-#include <libaudit.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/types.h>
-#include <stddef.h>
-#include <string.h>
-#include <ctype.h>
-#include <errno.h>
-
-
-#define SOCK_PATH "/var/run/audispd_events"
 
 #define ACTION_AUDIT 1
 #define ACTION_INT 2
@@ -49,40 +38,44 @@
 #define ACTION_LIMIT 6
 
 
-#define F_TIME      0
-#define F_SERIAL    1
-#define F_ARCH      2
-#define F_SYSCALL   3
-#define F_SUCCESS   4
-#define F_EXIT      5
-#define F_A0        6
-#define F_A1        7
-#define F_A2        8
-#define F_A3        9
-#define F_ITEMS     10
-#define F_PPID      11
-#define F_PID       12
-#define F_AUID      13
-#define F_UID       14
-#define F_GID       15
-#define F_EUID      16
-#define F_SUID      17
-#define F_FSUID     18
-#define F_EGID      19
-#define F_SGID      20
-#define F_FSGID     21
-#define F_TTY       22
-#define F_SES       23
-#define F_COMM      24
-#define F_EXE       25
-#define F_SUBJ      26
-#define F_KEY       27
+#define F_AUDITD_NODE      0
+#define F_AUDITD_TYPE      1
+#define F_AUDITD_TIME      2
+#define F_AUDITD_SERIAL    3
+#define F_AUDITD_ARCH      4
+#define F_AUDITD_SYSCALL   5
+#define F_AUDITD_SUCCESS   6
+#define F_AUDITD_EXIT      7
+#define F_AUDITD_A0        8
+#define F_AUDITD_A1        9
+#define F_AUDITD_A2        10
+#define F_AUDITD_A3        11
+#define F_AUDITD_ITEMS     12
+#define F_AUDITD_PPID      13
+#define F_AUDITD_PID       14
+#define F_AUDITD_AUID      15
+#define F_AUDITD_UID       16
+#define F_AUDITD_GID       17
+#define F_AUDITD_EUID      18
+#define F_AUDITD_SUID      19
+#define F_AUDITD_FSUID     20
+#define F_AUDITD_EGID      21
+#define F_AUDITD_SGID      22
+#define F_AUDITD_FSGID     23
+#define F_AUDITD_TTY       24
+#define F_AUDITD_SES       25
+#define F_AUDITD_COMM      26
+#define F_AUDITD_EXE       27
+#define F_AUDITD_SUBJ      28
+#define F_AUDITD_KEY       29
 
-#define AUDITD_FIELDS 28
+#define AUDITD_FIELDS 30
 
 /*****************************************/
 typedef struct auditd_syscall_event_s
 {
+	char *node;
+	char *type;
 	struct timeval time;
 	int      serial;
 	int      arch;
@@ -115,21 +108,24 @@ typedef struct auditd_syscall_event_s
 } auditd_syscall_event_t;
 
 typedef struct auditd_cfg_s {
-  auditd_event_t *e; // the received event, through audispd
   auditd_syscall_event_t *auditd_data;  // structure where we store auditd fields
   struct action_ctx *actx; // internal context data used by auditd_callback()
 } auditd_cfg_t;
 
 /***********************************************/
 
+#ifdef OBSOLETE
 static int
 auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data);
+#endif
 
 static void *
 auditd_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
+#ifdef OBSOLETE
 static void
 auditd_postconfig(orchids_t *ctx, mod_entry_t *mod);
+#endif
 
 
 #endif /* MOD_AUDITD_H */

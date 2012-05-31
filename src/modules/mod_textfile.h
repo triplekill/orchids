@@ -48,6 +48,7 @@ struct textfile_s
 {
   struct textfile_s *next;
   char *filename;
+  size_t filename_len;
   FILE *fd;
   struct stat file_stat;
   unsigned int line;
@@ -59,12 +60,25 @@ typedef struct textfile_config_s textfile_config_t;
 struct textfile_config_s
 {
   int flags;
-  int proceed_all_data;
-  int exit_proceed_all_data;
+  int process_all_data;
+  int exit_process_all_data;
   int poll_period;
   struct textfile_s *file_list;
 };
 
+
+typedef struct textsock_s textsock_t;
+struct textsock_s
+{
+  size_t buf_sz;
+  char *buf;
+#define TEXTSOCK_LINE_TOO_LONG 0x1
+  int flags;
+  unsigned int line;
+  off_t read_off, write_off;
+  char *filename;
+  size_t filename_len;
+};
 
 static void
 textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf);
@@ -95,7 +109,7 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 static void
-set_proceed_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 static void
