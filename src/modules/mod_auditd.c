@@ -401,7 +401,7 @@ dissect_auditd(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
   // memset(attr, 0, sizeof(attr));
 
   txt_line = STR(event->value);
-//printf("mod_auditd: %s\n", txt_line);
+printf("mod_auditd: %s\n", txt_line);
   txt_len = STRLEN(event->value);
 
   action_parse_event (cfg->actx, txt_line, auditd_data);

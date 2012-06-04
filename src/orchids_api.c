@@ -220,6 +220,24 @@ add_input_descriptor(orchids_t *ctx,
   FD_SET(fd, &ctx->fds);
 }
 
+void
+substitute_fd(orchids_t *ctx, int oldfd, int newfd)
+{
+  realtime_input_t *rti;
+
+  if (oldfd==newfd)
+    return;
+  for (rti = ctx->realtime_handler_list; rti!=NULL; rti = rti->next) {
+      if (rti->fd==oldfd)
+        rti->fd = newfd;
+    }
+}
+
+void reincarnate_fd(orchids_t *ctx, int oldfd, int newfd)
+{
+  substitute_fd(ctx,oldfd,newfd);
+  FD_SET(newfd, &ctx->fds);
+}
 
 void
 register_dissector(orchids_t *ctx,

@@ -73,11 +73,13 @@ struct textsock_s
   size_t buf_sz;
   char *buf;
 #define TEXTSOCK_LINE_TOO_LONG 0x1
+#define TEXTSOCK_ISSOCK 0x2
   int flags;
   unsigned int line;
   off_t read_off, write_off;
   char *filename;
   size_t filename_len;
+  int fd;
 };
 
 static void

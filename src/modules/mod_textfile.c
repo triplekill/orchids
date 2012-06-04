@@ -184,6 +184,45 @@ textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 }
 
 static int
+textsocket_try_reconnect(orchids_t *ctx, rtaction_t *e)
+{
+  textsock_t *f = (textsock_t *)e->data;
+#ifdef USELESS
+  struct sockaddr_un sunx;
+  int fd, n;
+
+  fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd<0)
+    { // cannot even (re)create socket
+      DebugLog(DF_MOD, DS_DEBUG, "textsocket_try_reconnect: cannot recreate socket, errno=%d.\n", errno);
+      e->date.tv_sec += 5; // XXX hard-coded: 5 seconds into the future
+      register_rtaction(ctx,e);
+      return 1;
+    }
+  memset(&sunx, 0, sizeof(sunx));
+  sunx.sun_family = AF_UNIX;
+  strncpy(sunx.sun_path, f->filename, f->filename_len);
+  sunx.sun_path[sizeof(sunx.sun_path)-1] = '\0';
+  n = connect(fd, (struct sockaddr *)&sunx, SUN_LEN(&sunx));
+  if (n)
+    {
+       close(fd);
+       DebugLog(DF_MOD, DS_DEBUG, "textsocket_try_reconnect: cannot connect, errno=%d.\n", errno);
+       e->date.tv_sec += 1; // XXX hard-coded: 1 second into the future
+       register_rtaction(ctx,e);
+       return 2;
+    }
+  reincarnate_fd(ctx,f->fd,fd);
+  f->fd = fd;
+  free(e);
+#endif
+
+  reincarnate_fd(ctx, f->fd, f->fd);
+  free(e);
+  return 0;
+}
+
+static int
 textsocket_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
 {
   textsock_t *f = (textsock_t *)data;
@@ -207,12 +246,34 @@ textsocket_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
       f->read_off = 0;
     }
   sz = read(fd,f->buf+f->write_off,f->buf_sz-f->write_off);
+  //sz = Xrecvfrom(fd,f->buf+f->write_off,f->buf_sz-f->write_off,0, NULL, NULL);
   if (sz<0)
     {
       DebugLog(DF_MOD, DS_ERROR, "read() failed, errno=%d.\n", errno);
-      return 1;
+      return -1;
     }
-  //sz = Xrecvfrom(fd,f->buf+f->write_off,f->buf_sz-f->write_off,0, NULL, NULL);
+  else if (sz==0) // connection lost
+    {
+      DebugLog(DF_MOD, DS_INFO, "mod_textfile: connection lost, trying to reconnect.\n");
+      //close(fd);
+      textfile_config_t *cfg = (textfile_config_t *)mod->config;
+
+      if (cfg->poll_period==0)
+	cfg->poll_period = DEFAULT_MODTEXT_POLL_PERIOD;
+
+      rtaction_t *e;
+
+      e = Xzmalloc(sizeof(struct rtaction_s));
+      e->date = ctx->cur_loop_time;
+      e->date.tv_sec += cfg->poll_period;
+	 // try to reconnect later
+      e->cb = textsocket_try_reconnect;
+      e->data = data;
+      register_rtaction(ctx,e);
+
+      return 1; // a positive return value will force the event manager
+	// to remove fd from the file descriptors watched by select().
+    }
 
   char *p, *pstart, *pend, c;
 
@@ -375,7 +436,7 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       f->buf_sz = 2*MAX_LINE_SZ+1; // should be at least 2*MAX_LINE_SZ
       f->buf = Xzmalloc(f->buf_sz);
       f->read_off = f->write_off = 0;
-      f->flags = 0;
+      f->flags = TEXTSOCK_ISSOCK;
       f->line = 0;
       f->filename = strdup(filepath);
       f->filename_len = strlen(filepath);
@@ -393,6 +454,28 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       len = SUN_LEN(&sunx);
       Xconnect(fd, (struct sockaddr *)&sunx, len);
 
+      f->fd = fd;
+      add_input_descriptor(ctx, mod, textsocket_callback, fd, (void *)f);
+    }
+  else if (S_ISFIFO(sbuf.st_mode))
+    {
+      DebugLog(DF_MOD, DS_INFO, "adding named pipe '%s' to selected inputs.\n", filepath);
+
+      int fd;
+      textsock_t *f;
+
+      f = Xzmalloc(sizeof (textsock_t));
+      f->buf_sz = 2*MAX_LINE_SZ+1; // should be at least 2*MAX_LINE_SZ
+      f->buf = Xzmalloc(f->buf_sz);
+      f->read_off = f->write_off = 0;
+      f->flags = 0;
+      f->line = 0;
+      f->filename = strdup(filepath);
+      f->filename_len = strlen(filepath);
+
+      fd = Xopen(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
+
+      f->fd = fd;
       add_input_descriptor(ctx, mod, textsocket_callback, fd, (void *)f);
     }
   else

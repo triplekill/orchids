@@ -183,7 +183,13 @@ event_dispatcher_main_loop(orchids_t *ctx)
         next = rti->next;
         if (FD_ISSET(rti->fd, &rfds)) {
           retval--;
-          (rti->cb)(ctx, &ctx->mods[rti->mod_id], rti->fd, rti->data);
+
+	  int n = (rti->cb)(ctx, &ctx->mods[rti->mod_id], rti->fd, rti->data);
+	  if (n>0) // then callback asked to be removed from select()ed fds
+	    { // this is typical of disconnections.  Reconnections should
+	      // be rescheduled using register_rtaction()
+	      FD_CLR(rti->fd, &ctx->fds);
+	    }
         }
         rti = next;
       }
@@ -191,6 +197,7 @@ event_dispatcher_main_loop(orchids_t *ctx)
     else {
       DebugLog(DF_CORE, DS_DEBUG, "Timeout... Calling real-time callback...\n");
       gettimeofday(&cur_time, NULL);
+      ctx->cur_loop_time = cur_time; // added, JGL Jun 03, 2012
 
       /* Force the callback execution here.
        * We assume the timeout was correct.

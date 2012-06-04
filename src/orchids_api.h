@@ -164,6 +164,31 @@ add_input_descriptor(orchids_t *ctx,
                      int fd,
                      void *data);
 
+/**
+ ** Replace old file descriptor by new one in list of descriptors added
+ ** by add_input_descriptor(), and watched by select().
+ ** See reincarnate_fd().
+ **
+ ** @param ctx   Orchids application context.
+ ** @param oldfd The file descriptor to replace.
+ ** @param newfd The new file descriptor.
+ **/
+void
+substitute_fd(orchids_t *ctx, int oldfd, int newfd);
+
+/**
+ ** Replace old file descriptor by new one in list of descriptors added
+ ** by add_input_descriptor(), and watched by select(), and add it to
+ ** list of watched file descriptors.
+ ** This should be use in case of lost connections, for example, and
+ ** preferrably to substitute_fd().
+ **
+ ** @param ctx   Orchids application context.
+ ** @param oldfd The file descriptor to replace.
+ ** @param newfd The new file descriptor.
+ **/
+void
+reincarnate_fd(orchids_t *ctx, int oldfd, int newfd);
 
 /**
  ** Remove a real-time input descriptor.
