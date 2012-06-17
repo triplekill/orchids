@@ -28,20 +28,22 @@
 
 
 #define ACTION_AUDIT 1
+// #define ACTION_UNSIGNED_INT 2
 #define ACTION_INT 2
-#define ACTION_INTREL 3
-#define ACTION_HEX 4
-#define ACTION_STRING 5
+#define ACTION_STRING 3
 #define ACTION_ID ACTION_STRING
 #define ACTION_SUBJ ACTION_STRING
+#define ACTION_DEV 4
 /* The last ACTION_* must always be the following (dummy) one: */
-#define ACTION_LIMIT 6
+#define ACTION_LIMIT 5
 
 
 #define F_AUDITD_NODE      0
 #define F_AUDITD_TYPE      1
+// The numbers F_AUDITD_TIME and F_AUDITD_SERIAL should be n and n+1,
+// due to the fact that they are handled in action_doer_audit()
 #define F_AUDITD_TIME      2
-#define F_AUDITD_SERIAL    3
+#define F_AUDITD_SERIAL    (F_AUDITD_TIME+1)
 #define F_AUDITD_ARCH      4
 #define F_AUDITD_SYSCALL   5
 #define F_AUDITD_SUCCESS   6
@@ -68,47 +70,19 @@
 #define F_AUDITD_EXE       27
 #define F_AUDITD_SUBJ      28
 #define F_AUDITD_KEY       29
+#define F_AUDITD_ITEM      30
+#define F_AUDITD_NAME      31
+#define F_AUDITD_INODE     32
+#define F_AUDITD_MODE      33
+#define F_AUDITD_DEV       34
+#define F_AUDITD_OUID      35
+#define F_AUDITD_OGID      36
+#define F_AUDITD_RDEV      37
+#define F_AUDITD_CWD       38
 
-#define AUDITD_FIELDS 30
-
-/*****************************************/
-typedef struct auditd_syscall_event_s
-{
-	char *node;
-	char *type;
-	struct timeval time;
-	int      serial;
-	int      arch;
-	int      syscall;
-	char     *success;
-	int      exit;
-	char     *a0;
-	char     *a1;
-	char     *a2;
-	char     *a3;
-	int      items;
-	int      ppid;
-	int      pid;
-	int      auid;
-	int      uid;
-	int      gid;
-	int      euid;
-	int      suid;
-	int      fsuid;
-	int      egid;
-	int      sgid;
-	int      fsgid;
-	char     *tty;
-	int      ses;
-	char     *comm;
-	char     *exe;
-	char     *subj;
-	char     *key;
-
-} auditd_syscall_event_t;
+#define AUDITD_FIELDS 39
 
 typedef struct auditd_cfg_s {
-  auditd_syscall_event_t *auditd_data;  // structure where we store auditd fields
   struct action_ctx *actx; // internal context data used by auditd_callback()
 } auditd_cfg_t;
 

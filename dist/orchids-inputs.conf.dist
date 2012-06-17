@@ -7,9 +7,10 @@
 # DISSECT <dissector> <module to dissect> <condition to dissect>
 # example :
 
-# Dummy source, meant to ensure that Orchids will have at least one pipe to select()
-INPUT		textfile	@@VARDIR@@/run/orchids/void_source
-# No dissector: no message should ever arriver on void_source
+## Dummy source, meant to ensure that Orchids will have at least one pipe to select()
+#INPUT		textfile	@@VARDIR@@/run/orchids/void_source
+## No dissector: no message should ever arriver on void_source
+# (Obsolete)
 
 # Syslog events
 INPUT			textfile	/var/log/messages
