@@ -8,6 +8,6 @@ install-data-hook:
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/log
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/ruletrace
 	mkdir -p $(DESTDIR)$(localstatedir)/run/orchids
-	-rm $(DESTDIR)$(localstatedir)/run/orchids/void_source
+#	-rm $(DESTDIR)$(localstatedir)/run/orchids/void_source
 #	-mknod $(DESTDIR)$(localstatedir)/run/orchids/void_source p
 	-chown -R $(ORCHIDS_RUNTIME_USER) $(DESTDIR)$(localstatedir)/orchids $(DESTDIR)$(localstatedir)/run/orchids
