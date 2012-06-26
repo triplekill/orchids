@@ -124,6 +124,7 @@ new_orchids_context(void)
   ctx->default_preproc_cmd = DEFAULT_PREPROC_CMD;
   ctx->config_file = DEFAULT_CONFIG_FILE;
   ctx->poll_period.tv_sec = DEFAULT_IN_PERIOD;
+  ctx->poll_period.tv_usec = 0;
   gettimeofday(&ctx->start_time, NULL);
   ctx->last_ruleinst_act = ctx->start_time;
   ctx->last_evt_act = ctx->start_time;

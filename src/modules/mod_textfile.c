@@ -144,7 +144,7 @@ textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
   struct stat st;
   char		eof = 1;
 
-  DebugLog(DF_MOD, DS_TRACE, "textfile_callback();\n");
+  /*  DebugLog(DF_MOD, DS_TRACE, "textfile_callback();\n"); */
 
   cfg = (textfile_config_t *)mod->config;
   for (tf = cfg->file_list; tf; tf = tf->next) {
@@ -438,8 +438,8 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       f->read_off = f->write_off = 0;
       f->flags = TEXTSOCK_ISSOCK;
       f->line = 0;
-      f->filename = strdup(filepath);
-      f->filename_len = strlen(filepath);
+      f->filename = strdup(dir->args);
+      f->filename_len = strlen(dir->args);
 
 
       fd = Xsocket(AF_UNIX, SOCK_STREAM, 0);
@@ -470,8 +470,8 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       f->read_off = f->write_off = 0;
       f->flags = 0;
       f->line = 0;
-      f->filename = strdup(filepath);
-      f->filename_len = strlen(filepath);
+      f->filename = strdup(dir->args);
+      f->filename_len = strlen(dir->args);
 
       fd = Xopen(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
 
@@ -483,8 +483,8 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       textfile_t *f;
 
       f = Xzmalloc(sizeof (textfile_t));
-      f->filename = strdup(filepath);
-      f->filename_len = strlen(filepath);
+      f->filename = strdup(dir->args);
+      f->filename_len = strlen(dir->args);
       f->fd = Xfopen(filepath, "r");
       Xfstat(fileno(f->fd), &f->file_stat);
 
@@ -556,8 +556,8 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
   textfile_config_t *cfg;
   char	      eof;
 
-  DebugLog(DF_MOD, DS_TRACE,
-           "Real-time action: Checking files...\n");
+  /* DebugLog(DF_MOD, DS_TRACE,
+	              "Real-time action: Checking files...\n"); */
 
   mod = (mod_entry_t *)(e->data);
   cfg = (textfile_config_t *)(mod->config);
