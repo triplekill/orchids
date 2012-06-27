@@ -546,6 +546,7 @@ build_config_tree_sub(FILE *fp,
         return (RETURN_SUCCESS);
       }
       else {
+          DebugLog(DF_CORE, DS_ERROR, "%s:%i error closing '%s', found '%s' instead\n", file, *lineno, parent->directive,  directive);
         return (ERR_CFG_SECT);
       }
     }
