@@ -392,8 +392,18 @@ inject_event(orchids_t *ctx, event_t *event)
 
   /* -0- resolve field value XXX: should be done with field checks */
   DebugLog(DF_ENG, DS_DEBUG, "STEP 0 - resolve field attribute values\n");
-  for (i = 0; i < ctx->num_fields; i++) /* clean field val refs */
-    ctx->global_fields[i].val = NULL;
+  /* jgl: the following resetting loop is too slow when ctx->num_fields
+	becomes large.  Instead, we will maintain the invariant that
+	ctx->global_fields[i].val==NULL between any two calls to inject_event()
+  */
+//  for (i = 0; i < ctx->num_fields; i++) /* clean field val refs */
+//    ctx->global_fields[i].val = NULL;
+
+#if ORCHIDS_DEBUG
+  for (i=0; i<ctx->num_fields; i++)
+    if (ctx->global_fields[i].val!=NULL)
+      abort();
+#endif
   for (e = event; e; e = e->next)
     ctx->global_fields[ e->field_id ].val = e->value;
 
@@ -451,7 +461,7 @@ inject_event(orchids_t *ctx, event_t *event)
     }
 
     DebugLog(DF_ENG, DS_DEBUG,
-             "  proceeding thread %p (r=%s s=%s d=%s)\n",
+             "  processing thread %p (r=%s s=%s d=%s)\n",
              (void *)t,
              t->state_instance->rule_instance->rule->name,
              t->state_instance->state->name,
@@ -609,6 +619,9 @@ inject_event(orchids_t *ctx, event_t *event)
   }
 
   execute_post_inject_hooks(ctx, active_event->event);
+
+  for (e = event; e; e = e->next)
+    ctx->global_fields[ e->field_id ].val = NULL;
 
   /* Free unreferenced event here (if the current event didn't pass any
      transition, Xfree() it) */
