@@ -511,7 +511,7 @@ static field_t auditd_fields[] = {
   {"auditd.success",  T_VSTR,     "syscall success"                     },
   {"auditd.exit",     T_INT,      "exit value"                          },
   {"auditd.varzero",  T_VSTR,     "syscall argument"                    },
-  {"audtehitd.a1",    T_VSTR,     "syscall argument"                    },	
+  {"auditd.a1",       T_VSTR,     "syscall argument"                    },	
   {"auditd.a2",       T_VSTR,     "syscall argument"                    },	
   {"auditd.a3",       T_VSTR,     "syscall argument"                    },	
   {"auditd.items",    T_INT,      "number of path records in the event" },
