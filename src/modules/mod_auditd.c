@@ -64,10 +64,10 @@ static struct action actions[] = {
   { "syscall=", F_AUDITD_SYSCALL, ACTION_INT },
   { "success=", F_AUDITD_SUCCESS, ACTION_STRING },
   { "exit=", F_AUDITD_EXIT, ACTION_INT },
-  { "a0=", F_AUDITD_A0, ACTION_STRING },
-  { "a1=", F_AUDITD_A1, ACTION_STRING },
-  { "a2=", F_AUDITD_A2, ACTION_STRING },
-  { "a3=", F_AUDITD_A3, ACTION_STRING },
+  { "a0=", F_AUDITD_A0, ACTION_HEX },
+  { "a1=", F_AUDITD_A1, ACTION_HEX },
+  { "a2=", F_AUDITD_A2, ACTION_HEX },
+  { "a3=", F_AUDITD_A3, ACTION_HEX },
   { "items=", F_AUDITD_ITEMS, ACTION_INT },
   { "ppid=", F_AUDITD_PPID, ACTION_INT },
   { "pid=", F_AUDITD_PID, ACTION_INT },
@@ -152,6 +152,24 @@ action_insert (struct action_ctx *actx, struct action* ap)
   atp->what.code.evtno = ap->evtno;
 }
 
+char *action_atoi_hex (char *s, int *ip)
+{
+  int i = 0;
+  int j;
+  char c;
+
+  while (c = *s, isxdigit (c))
+    {
+      if (isdigit (c))
+	j = ((int)c) - '0';
+      else j = (((int)c) - 'A' + 10) & 0x1f;
+      i = 16*i + j;
+      s++;
+    }
+  *ip = i;
+  return s;
+}
+
 char *action_atoi_unsigned (char *s, int *ip)
 {
   int i = 0;
@@ -171,7 +189,7 @@ char *action_atoi_unsigned (char *s, int *ip)
               if (isdigit (c))
         	j = ((int)c) - '0';
               else j = (((int)c) - 'A' + 10) & 0x1f;
-              i = 10*i + j;
+              i = 16*i + j;
               s++;
             }
         }
@@ -279,6 +297,20 @@ char *action_doer_unsigned_int (struct action_ctx *actx, char *s,
   char *t;
 
   t = action_atoi_unsigned (s, &i);
+  v = ovm_int_new();
+  INT(v) = i;
+  FILL_EVENT(octx, &v, n, 1);
+  return t;
+}
+
+char *action_doer_hex (struct action_ctx *actx, char *s,
+		       struct action_orchids_ctx *octx, int n)
+{
+  int i;
+  ovm_var_t *v;
+  char *t;
+
+  t = action_atoi_hex (s, &i);
   v = ovm_int_new();
   INT(v) = i;
   FILL_EVENT(octx, &v, n, 1);
@@ -423,6 +455,7 @@ action_init (struct action_ctx *actx)
   actx->action_doer[ACTION_AUDIT] = action_doer_audit;
   actx->action_doer[ACTION_INT] = action_doer_int;
   //actx->action_doer[ACTION_UNSIGNED_INT] = action_doer_unsigned_int;
+  actx->action_doer[ACTION_HEX] = action_doer_hex;
   actx->action_doer[ACTION_STRING] = action_doer_string;
   actx->action_doer[ACTION_DEV] = action_doer_dev;
 }
@@ -482,7 +515,7 @@ dissect_auditd(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
   // memset(attr, 0, sizeof(attr));
 
   txt_line = STR(event->value);
-printf("mod_auditd: %s\n", txt_line);
+  //printf("mod_auditd: %s\n", txt_line);
   txt_len = STRLEN(event->value);
 
   action_parse_event (cfg->actx, txt_line, &octx);
@@ -510,10 +543,10 @@ static field_t auditd_fields[] = {
   {"auditd.syscall",  T_INT,      "syscall number"                      },
   {"auditd.success",  T_VSTR,     "syscall success"                     },
   {"auditd.exit",     T_INT,      "exit value"                          },
-  {"auditd.varzero",  T_VSTR,     "syscall argument"                    },
-  {"auditd.varone",   T_VSTR,     "syscall argument"                    },	
-  {"auditd.vartwo",   T_VSTR,     "syscall argument"                    },	
-  {"auditd.varthree", T_VSTR,     "syscall argument"                    },	
+  {"auditd.varzero",  T_INT,      "syscall argument"                    },
+  {"auditd.varone",   T_INT,      "syscall argument"                    },	
+  {"auditd.vartwo",   T_INT,      "syscall argument"                    },	
+  {"auditd.varthree", T_INT,      "syscall argument"                    },	
   {"auditd.items",    T_INT,      "number of path records in the event" },
   {"auditd.ppid",     T_INT,      "parent pid"                          },
   {"auditd.pid",      T_INT,      "process id"                          },

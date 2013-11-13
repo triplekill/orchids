@@ -109,17 +109,25 @@ libdebug_log_va(int fac, int sev, const char *file,
 {
   if ( sev <= debug_facility_g[ fac ].level ) {
     if ( libdebug_config_g.log_to_stderr) {
+      va_list aq;
+
+      va_copy(aq,ap);
       fprintf(stderr, "%16s:%-4d:%-4s:%-7s: ",
               file, line, debug_facility_g[ fac ].name,
               debug_severity_g[ sev ] );
-      vfprintf(stderr, format, ap);
+      vfprintf(stderr, format, aq);
+      va_end(aq);
     }
 
     if (libdebug_config_g.logfile) {
+      va_list aq;
+
+      va_copy(aq,ap);
       fprintf(libdebug_config_g.logfile, "%16s:%-4d:%-4s:%-7s: ",
               file, line, debug_facility_g[ fac ].name,
               debug_severity_g[ sev ] );
-      vfprintf(libdebug_config_g.logfile, format, ap);
+      vfprintf(libdebug_config_g.logfile, format, aq);
+      va_end(aq);
     }
   }
   va_end(ap);

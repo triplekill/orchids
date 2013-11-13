@@ -30,12 +30,13 @@
 #define ACTION_AUDIT 1
 // #define ACTION_UNSIGNED_INT 2
 #define ACTION_INT 2
-#define ACTION_STRING 3
+#define ACTION_HEX 3
+#define ACTION_STRING 4
 #define ACTION_ID ACTION_STRING
 #define ACTION_SUBJ ACTION_STRING
-#define ACTION_DEV 4
+#define ACTION_DEV 5
 /* The last ACTION_* must always be the following (dummy) one: */
-#define ACTION_LIMIT 5
+#define ACTION_LIMIT 6
 
 
 #define F_AUDITD_NODE      0
