@@ -187,7 +187,6 @@ static int
 textsocket_try_reconnect(orchids_t *ctx, rtaction_t *e)
 {
   textsock_t *f = (textsock_t *)e->data;
-#ifdef USELESS
   struct sockaddr_un sunx;
   int fd, n;
 
@@ -215,10 +214,10 @@ textsocket_try_reconnect(orchids_t *ctx, rtaction_t *e)
   reincarnate_fd(ctx,f->fd,fd);
   f->fd = fd;
   free(e);
-#endif
-
+/*
   reincarnate_fd(ctx, f->fd, f->fd);
   free(e);
+*/
   return 0;
 }
 
