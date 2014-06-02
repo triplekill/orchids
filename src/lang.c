@@ -2197,7 +2197,10 @@ issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumpstack()\n");
 
   if (state->rule_instance == NULL)
-    return ;
+    {
+      PUSH_RETURN_FALSE(ctx,state);
+      return ;
+    }
 
   // push before state == NULL
   PUSH_RETURN_TRUE(ctx, state)
