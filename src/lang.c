@@ -2295,7 +2295,7 @@ issdl_stats(orchids_t *ctx, state_instance_t *state)
 static void
 issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
 {
-  char buff[12];
+  char buff[32];
   ovm_var_t *str;
   ovm_var_t *i;
 
@@ -2306,14 +2306,16 @@ issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
     FLAGS(str) |= TYPE_CANFREE | TYPE_NOTBOUND;
     memcpy(STR(str), buff, strlen(buff));
     stack_push(ctx->ovm_stack, str);
-    if ( IS_NOT_BOUND(i) ) {
-      DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): free temp var\n");
-      Xfree(i);
-    }
   }
   else {
     DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): param error\n");
-    PUSH_RETURN_FALSE(ctx, state)
+    str = ovm_str_new(0);
+    FLAGS(str) |= TYPE_CANFREE | TYPE_NOTBOUND;
+    stack_push(ctx->ovm_stack, str);
+  }
+  if ( IS_NOT_BOUND(i) ) {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): free temp var\n");
+    Xfree(i);
   }
 }
 
