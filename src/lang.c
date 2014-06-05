@@ -2467,7 +2467,10 @@ issdl_report(orchids_t *ctx, state_instance_t *state)
   DebugLog(DF_ENG, DS_INFO, "Generating report\n");
 
   if (state->rule_instance == NULL)
+  {
+    PUSH_RETURN_FALSE(ctx,state);
     return;
+  }
 
   SLIST_FOREACH(r, &ctx->reportmod_list, list) {
     r->cb(ctx, r->mod, r->data, state);
@@ -2699,6 +2702,7 @@ issdl_drop_event(orchids_t *ctx, state_instance_t *state)
 {
   if (state->event == NULL) {
     DebugLog(DF_ENG, DS_ERROR, "error: state instance does not have event reference\n");
+    PUSH_RETURN_FALSE(ctx, state);
     return ;
   }
 
@@ -2715,11 +2719,13 @@ issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
 
   if (state->event == NULL) {
     DebugLog(DF_ENG, DS_ERROR, "state instance does not have event reference\n");
+    PUSH_RETURN_FALSE(ctx,state);
     return ;
   }
 
   if (TYPE(level) != T_INT) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+    PUSH_RETURN_FALSE(ctx,state);
     return ;
   }
 
