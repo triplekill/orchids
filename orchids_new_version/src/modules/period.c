@@ -18,6 +18,8 @@
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+#define _XOPEN_SOURCE 600 /* (ugly) for strptime(), included from <time.h>
+			     on Linux/glibc2 only if this is defined */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1457,7 +1459,6 @@ period_snprintf_uptime(char *str, size_t size, time_t uptime)
   struct tm *tm_val;
   char tmp[128];
   char buf[128];
-  int ret;
 
   tm_val = gmtime(&uptime);
   tm_val->tm_year -= 70;
@@ -1526,10 +1527,7 @@ period_snprintf_uptime(char *str, size_t size, time_t uptime)
   else
     strcat(buf, "Uptime is null.");
 
-  ret = snprintf(str, size, "%s", buf);
-
-
-  return ;
+  snprintf(str, size, "%s", buf);
 }
 
 

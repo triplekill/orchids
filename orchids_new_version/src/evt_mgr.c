@@ -35,84 +35,227 @@ unsigned long dmalloc_orchids;
 #endif
 
 
-rtaction_t *
-register_rtcallback(orchids_t *ctx, rtaction_cb_t cb, void *data, time_t delay)
+static void heap_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
-  rtaction_t *event;
+  heap_t *h = (heap_t *)p;
 
-  event = Xzmalloc(sizeof (rtaction_t));
-  event->cb = cb;
-  event->data = data;
-  event->date = ctx->cur_loop_time;
-  event->date.tv_sec += delay;
-
-  register_rtaction(ctx, event);
-
-  return (event);
+  if (h->entry!=NULL)
+    GC_TOUCH (gc_ctx, h->entry->gc_data);
+  GC_TOUCH (gc_ctx, h->left);
+  GC_TOUCH (gc_ctx, h->right);
 }
 
-
-void
-register_rtaction(orchids_t *ctx, rtaction_t *e)
+static void heap_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  rtaction_t *event;
+  heap_t *h = (heap_t *)p;
 
-  if ( DLIST_IS_EMPTY(&(ctx->rtactionlist)) ) {
-    DLIST_INSERT_HEAD(&(ctx->rtactionlist), e, evtlist);
-    return ;
-  }
+  if (h->entry!=NULL)
+    gc_base_free (h->entry);
+}
 
-  DLIST_FOREACH(event, &ctx->rtactionlist, evtlist) {
-    if (timercmp(&e->date, &event->date, < )
-        || DLIST_NEXT(event, evtlist) == NULL) {
-      break ;
+static int heap_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			  void *data)
+{
+  heap_t *h = (heap_t *)p;
+  int err = 0;
+
+  if (h->entry!=NULL)
+    {
+      err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->entry->gc_data, data);
+      if (err)
+	return err;
     }
-  }
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->left, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->right, data);
+  return err;
+}
 
-  if (   (DLIST_NEXT(event, evtlist) == NULL) 
-      && (timercmp(&e->date, &event->date, > ))) {
-    DLIST_INSERT_AFTER(event, e, evtlist);
-  }
-  else {
-    DLIST_INSERT_BEFORE(event, e, evtlist);
-  }
+static gc_class_t heap_class = {
+  GC_ID('h','e','a','p'),
+  heap_mark_subfields,
+  heap_finalize,
+  heap_traverse
+};
+
+/* Priority queues, implemented as skew heaps */
+
+void register_rtaction (orchids_t *ctx, heap_entry_t *he)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  heap_t **rtp;
+  heap_t *rt;
+  heap_t *left;
+  struct heap_entry_s *he2;
+
+  rtp = &ctx->rtactionlist;
+  while ((rt = *rtp) != NULL)
+    {
+      /* Swap left and right.
+       In principle we should GC_TOUCH() after each of the following
+      two assignments, but this is not needed.  The only purpose of
+      GC_TOUCH() is to make sure no black object points to a white
+      object.  But if rt is black then neither rt->left nor rt->right
+      will be white before the swap, hence also, trivially, after
+      the swap. */
+      left = rt->left;
+      rt->left = rt->right;
+      rt->right = left;
+
+      if (timercmp(&he->date, &rt->entry->date, < ))
+	{ /* Store he into root, then insert the old
+	     value of rt->entry into rt->left subheap */
+	  he2 = rt->entry;
+	  rt->entry = he;
+	  GC_TOUCH (gc_ctx, he->gc_data);
+	  he = he2;
+	  rtp = &rt->left;
+	}
+      else
+	{ /* Else insert he into rt->left subheap */
+	  rtp = &rt->left;
+	}
+    }
+  rt = gc_alloc (gc_ctx, sizeof(heap_t), &heap_class);
+  rt->entry = he; // no need to GC_TOUCH he->gc_data since rt is white and will only become grey below, not black
+  rt->left = NULL;
+  rt->right = NULL;
+  GC_TOUCH (gc_ctx, *rtp = rt);
 }
 
 
-static rtaction_t *
-get_next_rtaction(orchids_t *ctx)
+heap_entry_t *register_rtcallback(orchids_t *ctx,
+				  rtaction_cb_t cb,
+				  gc_header_t *gc_data,
+				  void *data,
+				  time_t delay)
 {
-  rtaction_t *e;
+  heap_entry_t *he;
 
-  if (DLIST_IS_EMPTY(&ctx->rtactionlist)) {
-    fprintf(stderr, "error: event queue is empty !\n");
-    return (NULL);
-  }
+  he = gc_base_malloc (ctx->gc_ctx, sizeof (heap_entry_t));
+  he->cb = cb;
+  he->gc_data = gc_data;
+  he->data = data;
+  he->date = ctx->cur_loop_time;
+  he->date.tv_sec += delay;
+  register_rtaction(ctx, he);
+  return he;
+}
 
-  e = DLIST_FIRST(&ctx->rtactionlist);
-  DLIST_REMOVE(e, evtlist);
+static void heap_merge (gc_t *gc_ctx, heap_t *h1, heap_t *h2,
+			heap_t **res)
+{
+  heap_entry_t *he1, *he2;
+  heap_t *left;
 
-  return (e);
+  while (1)
+    {
+      if (h2==NULL)
+	{
+	  GC_TOUCH (gc_ctx, *res = h1);
+	  return;
+	}
+      if (h1==NULL)
+	{
+	  GC_TOUCH (gc_ctx, *res = h2);
+	  return;
+	}
+      he1 = h1->entry;
+      he2 = h2->entry;
+      if (timercmp (&he1->date, &he2->date, <))
+	{
+	  /* We shall return h1, which has the least date. */
+	  GC_TOUCH (gc_ctx, *res = h1);
+	  /* First exchange the left and right parts of h1.
+	   No need to GC_TOUCH() here, see 'Swap left and right' comment
+	   in register_rtaction(). */
+	  left = h1->right;
+	  h1->right = h1->left;
+	  h1->left = left;
+	  /* Next, merge the old right part (left now) with h2 */
+	  res = &h1->left;
+	  h1 = left;
+	  /* h2 unchanged; then loop */
+	}
+      else
+	{ /* In this other case, we shall instead return h2. */
+	  GC_TOUCH (gc_ctx, *res = h2);
+	  /* First (again) exchange its left and right parts.
+	   No need to GC_TOUCH() here, see 'Swap left and right' comment
+	   in register_rtaction(). */
+	  left = h2->right;
+	  h2->right = h2->left;
+	  h2->left = left;
+	  /* Next merge the old right part (left now) with h1...
+	     swapping the roles of h1 and h2 in the process. */
+	  res = &h2->left;
+	  h2 = h1;
+	  h1 = left;
+	}
+    }
 }
 
 #if 0
-static int
-rt_event_poll(orchids_t *ctx, rtaction_t *e)
+  /* This is the recursive version: */
+static heap_t *heap_merge (gc_t *gc_ctx, heap_t *h1, heap_t *h2)
 {
-  DebugLog(DF_CORE, DS_TRACE,
-           "Entering real time event... polling data...\n");
+  heap_entry_t *he1, *he2;
+  heap_t *left;
 
-  e->date.tv_sec += ctx->poll_period.tv_sec;
-
-  register_rtaction(ctx, e);
-
-  return (0);
+  if (h2==NULL)
+    return h1;
+  if (h1==NULL)
+    return h2;
+  he1 = h1->entry;
+  he2 = h2->entry;
+  if (timercmp (&he1->date, &he2->date, <))
+    {
+      /* We shall return he1, which has the least date.
+	 First exchange its left and right parts.
+      */
+      left = h1->right;
+      GC_TOUCH (gc_ctx, h1->right = h1->left);
+      GC_TOUCH (gc_ctx, h1->left = left);
+      /* Next, merge the old right part (left now) with h2 */
+      GC_TOUCH (gc_ctx, h1->left = heap_merge (gc_ctx, left, h2));
+      return h1;
+    }
+  else
+    { /* In this other case, we shall instead return he2.
+	 First (again) exchange its left and right parts.
+      */
+      left = h2->right;
+      GC_TOUCH (gc_ctx, h2->right = h2->left);
+      GC_TOUCH (gc_ctx, h2->left = left);
+      /* Next merge the old right part (left now) with h1 */
+      GC_TOUCH (gc_ctx, h2->left = heap_merge (gc_ctx, left, h1));
+      return h2;
+    }
 }
 #endif
 
 
-void
-event_dispatcher_main_loop(orchids_t *ctx)
+static heap_entry_t *get_next_rtaction(orchids_t *ctx)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  heap_t *h;
+  heap_entry_t *he;
+
+  h = ctx->rtactionlist;
+  if (h==NULL)
+    {
+      DebugLog(DF_EVT, DS_DEBUG, "Empty rtactionlist\n");
+      return NULL;
+    }
+  heap_merge (gc_ctx, h->left, h->right, &ctx->rtactionlist);
+  he = h->entry;
+  h->entry = NULL;
+  return he;
+}
+
+
+void event_dispatcher_main_loop(orchids_t *ctx)
 {
   fd_set rfds;
   time_t curr_time;
@@ -121,10 +264,10 @@ event_dispatcher_main_loop(orchids_t *ctx)
   struct timeval *wait_time_ptr;
   int retval;
   realtime_input_t *rti;
-  rtaction_t *e;
+  heap_entry_t *he;
   realtime_input_t *next;
 
-  if ((ctx->poll_handler_list == NULL) && (ctx->realtime_handler_list == NULL))
+  if (ctx->realtime_handler_list == NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
                "Nothing to do... No modules have requested input...\n");
@@ -146,26 +289,36 @@ event_dispatcher_main_loop(orchids_t *ctx)
   dmalloc_orchids = dmalloc_mark();
 #endif
 
-  e = get_next_rtaction(ctx);
+  he = get_next_rtaction(ctx);
 
   for (;;) {
+    gc (ctx->gc_ctx);
     gettimeofday(&cur_time, NULL);
     ctx->cur_loop_time = cur_time;
 
     /* Consume past event, if any */
-    while ( e && timercmp( &e->date, &cur_time, <= )) {
-      if (e->cb)
-        e->cb(ctx, e);
-      e = get_next_rtaction(ctx);
-    }
+    while (he!=NULL && timercmp (&he->date, &cur_time, <=))
+      {
+	if (he->cb!=NULL)
+	  {
+	    GC_START(ctx->gc_ctx, 1);
+	    GC_UPDATE(ctx->gc_ctx, 0, he->gc_data);
+	    (*he->cb) (ctx, he);
+	    GC_END(ctx->gc_ctx);
+	  }
+	else gc_base_free (he);
+	he = get_next_rtaction(ctx);
+      }
 
-    if (e) {
-      Timer_Sub( &wait_time, &e->date, &cur_time );
-      wait_time_ptr = &wait_time;
-    }
-    else {
-      wait_time_ptr = NULL;
-    }
+    if (he!=NULL)
+      {
+	Timer_Sub (&wait_time, &he->date, &cur_time);
+	wait_time_ptr = &wait_time;
+      }
+    else
+      {
+	wait_time_ptr = NULL;
+      }
 
     Monitor_Activity();
     memcpy(&rfds, &ctx->fds, sizeof(fd_set));
@@ -177,40 +330,52 @@ event_dispatcher_main_loop(orchids_t *ctx)
 
     retval = Xselect(ctx->maxfd + 1, &rfds, NULL, NULL, wait_time_ptr);
 
-    if (retval) {
-      DebugLog(DF_CORE, DS_INFO, "New real-time input data.... (%i)\n", retval);
-      for (rti = ctx->realtime_handler_list; rti && retval; ) {
-        next = rti->next;
-        if (FD_ISSET(rti->fd, &rfds)) {
-          retval--;
+    if (retval!=0)
+      {
+	DebugLog(DF_CORE, DS_INFO, "New real-time input data.... (%i)\n",
+		 retval);
+	for (rti = ctx->realtime_handler_list; rti!=NULL && retval!=0; )
+	  {
+	    next = rti->next;
+	    if (FD_ISSET(rti->fd, &rfds))
+	      {
+		retval--;
 
-	  int n = (rti->cb)(ctx, &ctx->mods[rti->mod_id], rti->fd, rti->data);
-	  if (n>0) // then callback asked to be removed from select()ed fds
-	    { // this is typical of disconnections.  Reconnections should
-	      // be rescheduled using register_rtaction()
-	      FD_CLR(rti->fd, &ctx->fds);
-	    }
-        }
-        rti = next;
+		int n = (*rti->cb) (ctx, &ctx->mods[rti->mod_id],
+				    rti->fd, rti->data);
+		if (n>0) // then callback asked to be removed from select()ed fds
+		  { // this is typical of disconnections.  Reconnections should
+		    // be rescheduled using register_rtaction()
+		    FD_CLR(rti->fd, &ctx->fds);
+		  }
+	      }
+	    rti = next;
+	  }
       }
-    }
-    else {
-      DebugLog(DF_CORE, DS_DEBUG, "Timeout... Calling real-time callback...\n");
-      gettimeofday(&cur_time, NULL);
-      ctx->cur_loop_time = cur_time; // added, JGL Jun 03, 2012
+    else
+      {
+	DebugLog(DF_CORE, DS_DEBUG, "Timeout... Calling real-time callback...\n");
+	gettimeofday(&cur_time, NULL);
+	ctx->cur_loop_time = cur_time; // added, JGL Jun 03, 2012
 
-      /* Force the callback execution here.
-       * We assume the timeout was correct.
-       * This corrects small imprecisions we may have here. */
-      do {
-        if (e->cb)
-          e->cb(ctx, e);
-        e = get_next_rtaction(ctx);
-      } while ( e && timercmp( &e->date, &cur_time, <= ));
-      /* Here, the do {} while construct is for handling the special case
-       * when action execution is longer than the delay
-       * to the next action. */
-    }
+	/* Force the callback execution here.
+	 * We assume the timeout was correct.
+	 * This corrects small imprecisions we may have here. */
+	do {
+	  if (he->cb!=NULL)
+	    {
+	      GC_START(ctx->gc_ctx, 1);
+	      GC_UPDATE(ctx->gc_ctx, 0, he->gc_data);
+	      (*he->cb) (ctx, he);
+	      GC_END(ctx->gc_ctx);
+	    }
+	  else gc_base_free (he);
+	  he = get_next_rtaction(ctx);
+	} while (he!=NULL && timercmp (&he->date, &cur_time, <=));
+	/* Here, the do {} while construct is for handling the special case
+	 * when action execution is longer than the delay
+	 * to the next action. */
+      }
   }
 }
 

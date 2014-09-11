@@ -46,9 +46,9 @@ struct meta_vmod_s
   int mod_id;
   input_module_t mod_entry;
   field_t *field_array;
-  ovm_var_t **field_values;
+  int nfields;
+  field_table_t *fields;
   strhash_t *field_hash;
-  int fields;
 };
 
 typedef struct eventlist_s eventlist_t;
@@ -64,23 +64,17 @@ struct metaevent_config_s
     STAILQ_HEAD(vmods, meta_vmod_t) vmod_list;
     strhash_t *mod_hash;
     int mods;
-
-    STAILQ_HEAD(events, eventlist_t) events;
 };
 
 
 
-static void *
-metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void * metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
-static void
-metaevent_postconfig(orchids_t *ctx, mod_entry_t *mod);
+static void metaevent_postconfig(orchids_t *ctx, mod_entry_t *mod);
 
-static void
-metaevent_postcompil(orchids_t *ctx, mod_entry_t *mod);
+static void metaevent_postcompil(orchids_t *ctx, mod_entry_t *mod);
 
-static int
-rtaction_inject_event(orchids_t *ctx, rtaction_t *e);
+static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he);
 
 #endif /* MOD_METAEVENT_H */
 

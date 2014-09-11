@@ -166,16 +166,13 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
    if test "$withval" = yes ; then
       AC_PATH_PROGS(SWIPL, [pl swipl prolog])
       AC_PATH_PROGS(SWIPLLD, [plld swipl-ld])
-      if test "$SWIPL" != "" -a "$SWIPLLD" != ""; then
-         AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
-      fi
-      AM_CONDITIONAL(USE_SWIPROLOG, true)
+      use_swiprolog=true
    else if test "$withval" = no ; then
       AC_MSG_CHECKING([for pl])
       AC_MSG_RESULT(no)
       AC_MSG_CHECKING([for plld])
       AC_MSG_RESULT(no)
-      AM_CONDITIONAL(USE_SWIPROLOG, false)
+      use_swiprolog=false
    else
       if test "$withval" != "" ; then
          AC_MSG_CHECKING([for pl])
@@ -185,7 +182,6 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
          if test ! -f "$SWIPL" ; then
             AC_MSG_WARN([SWI Prolog binary "$SWIPL" doesn't exist]);
          fi
-
          AC_MSG_CHECKING([for plld])
          SWIPLLD="$ac_cv_path_SWIPLLD"
 	 dnl "$withval/bin/plld"
@@ -193,10 +189,9 @@ AS_HELP_STRING([--with-swiprolog], [use SWI Prolog (default is yes)]),
          if test ! -f "$SWIPLLD" ; then
             AC_MSG_WARN([SWI Prolog linker binary "$SWIPLLD" doesn't exist]);
          fi
-         AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
-         AM_CONDITIONAL(USE_SWIPROLOG, true)
+	 use_swiprolog=true
       else
-         AM_CONDITIONAL(USE_SWIPROLOG, false)
+         use_swiprolog=false
       fi
    fi
 fi
@@ -204,11 +199,14 @@ fi
 [
    dnl default action (if no --with-xxx)
    AC_PATH_PROGS(SWIPL, [pl swipl prolog])
-dnl   if test "$SWIPL" == "" ; then
-dnl      AC_PATH_PROG(SWIPL, swipl)
-dnl   fi
    AC_PATH_PROGS(SWIPLLD, [plld swipl-ld])
-   if test "$SWIPL" != "" -a "$SWIPLLD" != ""; then
+   use_swiprolog=true
+])
+dnl if swipl and swiplld were found, set environment variables
+   if test -z "$SWIPL" -o -z "$SWIPLLD" ; then
+     use_swiprolog=false
+   fi
+   if test x$use_swiprolog = xtrue ; then
       AC_DEFINE([HAVE_SWIPROLOG], 1, [Set to 1 if SWI Prolog is present])
       eval `$SWIPL -dump-runtime-variables | sed 's/^CC/PLCC/'`
       SWIPL_LDFLAGS="$PLLDFLAGS"
@@ -221,12 +219,10 @@ dnl   fi
       AC_SUBST(SWIPL_LDADD)
       AC_SUBST(SWIPL_CFLAGS)
       AC_SUBST(SWIPL)
-      AM_CONDITIONAL(USE_SWIPROLOG, true)
-   else
-      AM_CONDITIONAL(USE_SWIPROLOG, false)
    fi
+   AM_CONDITIONAL(USE_SWIPROLOG, [test x$use_swiprolog = xtrue])
 ])
-])
+
 
 dnl doxygen
 AC_DEFUN([AC_CHECK_DOXYGEN],
@@ -303,13 +299,14 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
   no)
      AC_MSG_RESULT(no)
      AC_MSG_ERROR([libpcap not found.])
+     use_libpcap=false
      ;;
   *)
      if test -f $withval/pcap.h; then
         PCAPINC="-I$withval"
         PCAPLIB="-L$withval -lpcap"
         AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
-        AM_CONDITIONAL(HAVE_LIBPCAP, true)
+	use_libpcap=true
         AC_SUBST(PCAPINC)
         AC_SUBST(PCAPLIB)
         AC_MSG_RESULT($withval)
@@ -317,13 +314,14 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
         PCAPINC="-I$withval/include"
         PCAPLIB="-L$withval/lib -lpcap"
         AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
-        AM_CONDITIONAL(HAVE_LIBPCAP, true)
+        use_libpcap=true
         AC_SUBST(PCAPINC)
         AC_SUBST(PCAPLIB)
         AC_MSG_RESULT($withval)
      else
         AC_MSG_RESULT(no)
         AC_MSG_ERROR([pcap.h not found in $withval])
+	use_libpcap=false
      fi
      ;;
   esac ],
@@ -331,14 +329,14 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
      PCAPINC="-I/usr/include/pcap"
      PCAPLIB="-lpcap"
      AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
-     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     use_libpcap=true
      AC_SUBST(PCAPINC)
      AC_SUBST(PCAPLIB)
      AC_MSG_RESULT(yes)
   elif test -f /usr/include/pcap.h; then
      PCAPLIB="-lpcap"
      AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
-     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     use_libpcap=true
      AC_SUBST(PCAPINC)
      AC_SUBST(PCAPLIB)
      AC_MSG_RESULT(yes)
@@ -346,15 +344,16 @@ AC_ARG_WITH(libpcap, AS_HELP_STRING(--with-libpcap=DIR,use libpcap in DIR),
      PCAPINC="-I/usr/local/include"
      PCAPLIB="-lpcap"
      AC_DEFINE([HAVE_LIBPCAP], 1, [Set to 1 if libpcap is present])
-     AM_CONDITIONAL(HAVE_LIBPCAP, true)
+     use_libpcap=true
      AC_SUBST(PCAPINC)
      AC_SUBST(PCAPLIB)
      AC_MSG_RESULT(yes)
   else
-     AM_CONDITIONAL(HAVE_LIBPCAP, false)
+     use_libpcap=false
      AC_MSG_RESULT(no)
   fi ]
 )
+   AM_CONDITIONAL(HAVE_LIBPCAP, [test x$use_libpcap = xtrue])
 ])
 
 

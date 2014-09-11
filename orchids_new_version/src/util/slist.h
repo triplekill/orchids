@@ -13,7 +13,6 @@
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
-
 #ifndef SLIST_H
 #define SLIST_H
 

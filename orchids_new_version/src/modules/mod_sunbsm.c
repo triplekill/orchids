@@ -68,7 +68,7 @@ sunbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
-  cfg = Xzmalloc(sizeof (sunbsm_config_t));
+  cfg = gc_base_malloc(ctx->gc_ctx, sizeof (sunbsm_config_t));
   cfg->some_flag = DEFAULT_FLAG;
   cfg->some_option = DEFAULT_OPTION;
 
@@ -108,7 +108,7 @@ set_some_flag(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int someflag;
 
-  someflag = atoi(dir->args);
+  someflag = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO, "setting some_flag to %i\n", someflag);
 
   ((sunbsm_config_t *)mod->config)->some_flag = someflag;
@@ -119,7 +119,7 @@ set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int someoption;
 
-  someoption = atoi(dir->args);
+  someoption = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO, "setting some_option to %i\n", someoption);
 
   ((sunbsm_config_t *)mod->config)->some_option = someoption;

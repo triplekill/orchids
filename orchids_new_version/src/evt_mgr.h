@@ -34,10 +34,10 @@ event_dispatcher_main_loop(orchids_t *ctx);
  ** multiplexed to the real-time event flow.
  **
  ** @param ctx Orchids context.
- ** @param e   Real-time action to register.
+ ** @param he   Real-time action to register.  Should be gc_base_malloc()ed
+ **             and will be stored as is inside ctx->rtactionlist heap.
  **/
-void
-register_rtaction(orchids_t *ctx, rtaction_t *e);
+void register_rtaction(orchids_t *ctx, heap_entry_t *he);
 
 
 /**
@@ -46,13 +46,18 @@ register_rtaction(orchids_t *ctx, rtaction_t *e);
  ** parameters, then call register_rtaction().
  ** @param ctx    A pointer to the Orchids application context.
  ** @param cb     A function pointer to the function callback.
- ** @param data   Abritrary data which will be passed to the callback at
- **               the execution time.
+ ** @param gc_data Garbage-collected data which will be passed to
+ **               the callback at execution time.
+ ** @param data   Arbitrary data which will be passed to the callback at
+ **               execution time.
  ** @param delay  The delay (from now) when the callback will be executed.
  ** @return A pointer to the created and register real-time action rtaction_t.
  **/
-rtaction_t *
-register_rtcallback(orchids_t *ctx, rtaction_cb_t cb, void *data, time_t delay);
+heap_entry_t *register_rtcallback(orchids_t *ctx,
+				  rtaction_cb_t cb,
+				  gc_header_t *gc_data,
+				  void *data,
+				  time_t delay);
 
 
 #endif /* EVT_MGR_H */

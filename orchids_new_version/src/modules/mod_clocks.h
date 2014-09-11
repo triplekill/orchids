@@ -45,6 +45,7 @@ struct clocktime_s {
 
 typedef struct clockctx_s clockctx_t;
 struct clockctx_s {
+  gc_t *gc_ctx;
   strhash_t *clocks;
 };
 

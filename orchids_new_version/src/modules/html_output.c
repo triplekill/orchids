@@ -26,9 +26,17 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 #include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
 
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h> // for link()
 
 #include <string.h>
 #include <dirent.h>
@@ -46,28 +54,33 @@
 
 #include "html_output.h"
 
+#undef UNSAFE_IMAGE_PREVIEW
+/* Do not #define the latter macro.
+   Several pieces of code are encosed inside
+   #ifdef UNSAFE_IMAGE_PREVIEW ... #endif
+   The purpose is to comment them out.
+   These pieces of code were removed because:
+   - they involve too many dependencies on the system (graphviz, etc.)
+   - they use system() in an unsafe way (possibility of code injection)
+   - they take too much time
+ */
 
-static void
-do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg);
+static int do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg);
 
-static void
-convert_filename(char *file);
+static void convert_filename(char *file);
 
-static void
-fprintf_html_cfg_tree(FILE *fp, config_directive_t *root);
+static void fprintf_html_cfg_tree(FILE *fp, config_directive_t *root);
 
-static void
-fprintf_html_cfg_tree_sub(FILE *fp,
-                          config_directive_t *section,
-                          int depth,
-                          unsigned long mask,
-                          int *counter);
+static void fprintf_html_cfg_tree_sub(FILE *fp,
+				      config_directive_t *section,
+				      int depth,
+				      unsigned long mask,
+				      int *counter);
 
-static void
-generate_html_report(orchids_t		*ctx,
-		     mod_entry_t	*mod,
-		     void		*data,
-		     state_instance_t	*state);
+static int generate_html_report(orchids_t *ctx,
+				mod_entry_t *mod,
+				void *data,
+				state_instance_t *state);
 
 
 static htmloutput_list_t  *htmloutput_list_head_g = NULL;
@@ -77,64 +90,56 @@ static char *report_prefix_g;
 static char *report_ext_g;
 
 
-void
-html_output_add_menu_entry(orchids_t *ctx,
-			   mod_entry_t *mod,
-			   mod_htmloutput_t outputfunc)
+void html_output_add_menu_entry(orchids_t *ctx,
+				mod_entry_t *mod,
+				mod_htmloutput_t outputfunc)
 {
   htmloutput_list_t *elmt;
 
-  elmt = Xmalloc(sizeof (htmloutput_list_t));
+  elmt = gc_base_malloc(ctx->gc_ctx, sizeof (htmloutput_list_t));
   elmt->output = outputfunc;
   elmt->mod = mod;
   elmt->next = NULL;
 
-  if (htmloutput_list_tail_g) {
-    *htmloutput_list_tail_g = elmt;
-  }
-  else {
-    htmloutput_list_head_g = elmt;
-  }
+  if (htmloutput_list_tail_g!=NULL)
+    {
+      *htmloutput_list_tail_g = elmt;
+    }
+  else
+    {
+      htmloutput_list_head_g = elmt;
+    }
   htmloutput_list_tail_g = &elmt->next;
 }
 
 
 
-int
-rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e)
+int rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he)
 {
   DebugLog(DF_MOD, DS_TRACE,
            "HTML cache cleanup...\n");
 
-  html_output_cache_cleanup(e->data);
-
-  e->date.tv_sec += 60; /* XXX: use a customizable parameter */
-
-  register_rtaction(ctx, e);
-
-  return (0);
+  html_output_cache_cleanup(he->data);
+  he->date.tv_sec += 60; /* XXX: use a customizable parameter */
+  register_rtaction(ctx, he);
+  return 0;
 }
 
 
-int
-rtaction_html_regeneration(orchids_t *ctx, rtaction_t *e)
+int rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he)
 {
   DebugLog(DF_MOD, DS_TRACE,
            "HTML periodic regeneration...\n");
 
-  html_output(ctx, e->data);
-
-  e->date.tv_sec += 20; /* XXX: use a customizable parameter */
-
-  register_rtaction(ctx, e);
-
-  return (0);
+  html_output(ctx, he->data);
+  he->date.tv_sec += 20; /* XXX: use a customizable parameter */
+  register_rtaction(ctx, he);
+  return 0;
 }
 
 
 
-void
-html_output_preconfig(orchids_t *ctx)
+void html_output_preconfig(orchids_t *ctx)
 {
   int ret;
 
@@ -142,93 +147,85 @@ html_output_preconfig(orchids_t *ctx)
 
   /* if an old lockfile exists, try to remove it */
   ret = unlink(DEFAULT_OUTPUTHTML_LOCKFILE);
-  if (ret == -1 && errno != ENOENT) {
-    fprintf(stderr,
-            "unlink(pathname=\"%s\"): error %i: %s\n",
-            DEFAULT_OUTPUTHTML_LOCKFILE, errno, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
+  if (ret == -1 && errno != ENOENT)
+    {
+      fprintf(stderr,
+	      "unlink(pathname=\"%s\"): error %i: %s\n",
+	      DEFAULT_OUTPUTHTML_LOCKFILE, errno, strerror(errno));
+      exit(EXIT_FAILURE);
+    }
 }
 
-void
-html_output(orchids_t *ctx, html_output_cfg_t *cfg)
+void html_output(orchids_t *ctx, html_output_cfg_t *cfg)
 {
 #ifndef ORCHIDS_DEBUG
   pid_t pid;
 #endif
 
-  if (cfg->html_output_dir == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "HTML Output isn't set. Aborting.\n");
-    return ;
-  }
+  if (cfg->html_output_dir == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "HTML Output isn't set. Aborting.\n");
+      return;
+    }
 
   /* Update parent process rusage now.
    * So, the child process can access to its parent rusage. */
   getrusage(RUSAGE_SELF, &ctx->ru);
 
 #ifdef ORCHIDS_DEBUG
-
   do_html_output(ctx, cfg);
-
 #else /* ORCHIDS_DEBUG */
-
   pid = fork();
-  if (pid == 0) {
-    int i;
-    for (i = 3; i < 64; i++)
-      close(i);
-    do_html_output(ctx, cfg);
-    exit(EXIT_SUCCESS);
-  } else if (pid < 0) {
-    perror("fork()");
-    exit(EXIT_FAILURE);
-  }
+  if (pid == 0)
+    {
+      int i;
 
+      for (i = 3; i < 64; i++)
+	close(i);
+      do_html_output(ctx, cfg);
+      exit(EXIT_SUCCESS);
+    }
+  else if (pid < 0)
+    {
+      perror("fork()");
+      exit(EXIT_FAILURE);
+    }
 #endif /* ORCHIDS_DEBUG */
-
 }
 
 
-FILE *
-create_html_file(html_output_cfg_t  *cfg, char *file, int cache)
+FILE *create_html_file(html_output_cfg_t  *cfg, char *file, int cache)
 {
   char absolute_dir[PATH_MAX];
-  char absolute_filepath[PATH_MAX];
+  char absolute_filepath[2*PATH_MAX+1];
   FILE *fp;
 
-  Xrealpath(cfg->html_output_dir, absolute_dir);
-  snprintf(absolute_filepath, PATH_MAX, "%s/%s", absolute_dir, file);
+  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+    return NULL;
+  snprintf(absolute_filepath, 2*PATH_MAX+1, "%s/%s", absolute_dir, file);
 
-  if (cache) {
+  if (cache)
     fp = fopen_cached(absolute_filepath);
-  }
-  else {
-    fp = Xfopen(absolute_filepath, "w");
-  }
-
-  return (fp);
+  else
+    fp = fopen(absolute_filepath, "w");
+  return fp;
 }
 
 
-int
-cached_html_file(html_output_cfg_t  *cfg, char *file)
+int cached_html_file(html_output_cfg_t  *cfg, char *file)
 {
   char absolute_dir[PATH_MAX];
-  char absolute_filepath[PATH_MAX];
-  int ret;
+  char absolute_filepath[2*PATH_MAX+1];
 
-  Xrealpath(cfg->html_output_dir, absolute_dir);
-  snprintf(absolute_filepath, PATH_MAX, "%s/%s", absolute_dir, file);
+  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+    return 0;
+  snprintf(absolute_filepath, 2*PATH_MAX+1, "%s/%s", absolute_dir, file);
 
-  ret = cached_file(absolute_filepath);
-
-  return (ret);
+  return cached_file(absolute_filepath);
 }
 
 
-void
-fprintf_html_header(FILE *fp, char *title /*, int refresh_delay */)
+void fprintf_html_header(FILE *fp, char *title /*, int refresh_delay */)
 {
   fprintf(fp,
           "<!DOCTYPE html PUBLIC \"-//W3C//"
@@ -269,8 +266,7 @@ auto-reload
 */
 
 
-void
-fprintf_html_trailer(FILE *fp)
+void fprintf_html_trailer(FILE *fp)
 {
   time_t t;
   char asc_time[32];
@@ -289,27 +285,30 @@ fprintf_html_trailer(FILE *fp)
 }
 
 
-void
-generate_htmlfile_hardlink(html_output_cfg_t  *cfg, char *file, char *link)
+int generate_htmlfile_hardlink(html_output_cfg_t  *cfg,
+			       char *file, char *linkfile)
 {
   char abs_dir[PATH_MAX];
-  char abs_file[PATH_MAX];
-  char abs_link[PATH_MAX];
+  char abs_file[2*PATH_MAX+1];
+  char abs_link[2*PATH_MAX+1];
 
-  Xrealpath(cfg->html_output_dir, abs_dir);
-  snprintf(abs_file, PATH_MAX, "%s/%s", abs_dir, file);
-  snprintf(abs_link, PATH_MAX, "%s/%s", abs_dir, link);
+  if (realpath(cfg->html_output_dir, abs_dir)==NULL)
+    {
+      DebugLog (DF_MOD, DS_ERROR, strerror(errno));
+      return -1;
+    }
+  snprintf(abs_file, 2*PATH_MAX+1, "%s/%s", abs_dir, file);
+  snprintf(abs_link, 2*PATH_MAX+1, "%s/%s", abs_dir, linkfile);
 
-  DebugLog(DF_MOD, DS_INFO, "link \"%s\" to \"%s\"\n", file, link);
+  DebugLog(DF_MOD, DS_INFO, "link \"%s\" to \"%s\"\n", file, linkfile);
 
   unlink(abs_link);
-
-  Xlink(abs_file, abs_link);
+  return link(abs_file, abs_link);
 }
 
 
-static void
-generate_html_orchids_modules(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_orchids_modules(orchids_t *ctx,
+					 html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int m;
@@ -320,10 +319,10 @@ generate_html_orchids_modules(orchids_t *ctx, html_output_cfg_t  *cfg)
   Timer_to_NTP(&ctx->cur_loop_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-modules-%08lx-%08lx.html", ntph, ntpl);
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
+    }
   fprintf_html_header(fp, "Orchids Modules");
 
   fprintf(fp, "<center><h1>Loaded Orchids Modules<h1></center>\n");
@@ -334,28 +333,29 @@ generate_html_orchids_modules(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp,
           "<tr class=\"h\"><th>ID</th><th>Address</th>"
           "<th>Posted Events</th><th>Module Name</th></tr>\n");
-  for (m = 0; m < ctx->loaded_modules; m++) {
-    p = m % 2;
-    fprintf(fp,
-            "<tr><td class=\"e%i\">%d</td><td class=\"v%i\">0x%08lx</td>"
-            "<td class=\"v%i\">%li</td><td class=\"v%i\">%s</td></tr>\n",
-            p, m,
-            p, (unsigned long) ctx->mods[m].mod,
-            p, ctx->mods[m].posts,
-	    p, ctx->mods[m].mod->name);
-  }
+  for (m = 0; m < ctx->loaded_modules; m++)
+    {
+      p = m % 2;
+      fprintf(fp,
+	      "<tr><td class=\"e%i\">%d</td><td class=\"v%i\">0x%08lx</td>"
+	      "<td class=\"v%i\">%li</td><td class=\"v%i\">%s</td></tr>\n",
+	      p, m,
+	      p, (unsigned long) ctx->mods[m].mod,
+	      p, ctx->mods[m].posts,
+	      p, ctx->mods[m].mod->name);
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
 }
 
 
-static void
-generate_html_orchids_fields(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_orchids_fields(orchids_t *ctx,
+					html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int m;
@@ -369,10 +369,10 @@ generate_html_orchids_fields(orchids_t *ctx, html_output_cfg_t  *cfg)
   Timer_to_NTP(&ctx->start_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-fields-%08lx-%08lx.html", ntph, ntpl);
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
+    }
 
   fprintf_html_header(fp, "Orchids Data Fields");
 
@@ -390,49 +390,54 @@ generate_html_orchids_fields(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<th> Field Name </th> <th> Type </th> "
           "<th> Description </th> </tr>\n\n");
 
-  for (m = 0, gfid = 0; m < ctx->loaded_modules; m++) {
-    fprintf(fp,
-            "  <tr class=\"hh\"> <th colspan=\"5\"> Module %s </th> </tr>\n",
-            ctx->mods[m].mod->name);
-    if (ctx->mods[m].num_fields) {
-      for (f = 0; f < ctx->mods[m].num_fields; f++, gfid++) {
-        p = gfid % 2;
-        base = ctx->mods[m].first_field_pos;
-        fprintf(fp,
-                "  <tr> "
-                "<td class=\"e%i\"> %i </td> "
-                "<td class=\"e%i\"> %i </td> "
-                "<td class=\"v%i\"> %s </td> "
-                "<td class=\"v%i\"> %s </td> "
-                "<td class=\"v%i\"> %s </td> "
-                "</tr>\n",
-                p, gfid,
-                p, f,
-                p, ctx->global_fields[base + f].name,
-                p, str_issdltype(ctx->global_fields[base + f].type),
-                p, (ctx->global_fields[base + f].desc ?
-                    ctx->global_fields[base + f].desc : ""));
-      }
-    } else {
+  for (m = 0, gfid = 0; m < ctx->loaded_modules; m++)
+    {
       fprintf(fp,
-              "  <tr class=\"v%i\"> "
-              "<th colspan=\"5\"> No field. </th> "
-              "</tr>\n",
-              p);
+	      "  <tr class=\"hh\"> <th colspan=\"5\"> Module %s </th> </tr>\n",
+	      ctx->mods[m].mod->name);
+      if (ctx->mods[m].num_fields)
+	{
+	  for (f = 0; f < ctx->mods[m].num_fields; f++, gfid++)
+	    {
+	      p = gfid % 2;
+	      base = ctx->mods[m].first_field_pos;
+	      fprintf(fp,
+		      "  <tr> "
+		      "<td class=\"e%i\"> %i </td> "
+		      "<td class=\"e%i\"> %i </td> "
+		      "<td class=\"v%i\"> %s </td> "
+		      "<td class=\"v%i\"> %s </td> "
+		      "<td class=\"v%i\"> %s </td> "
+		      "</tr>\n",
+		      p, gfid,
+		      p, f,
+		      p, ctx->global_fields->fields[base + f].name,
+		      p, str_issdltype(ctx->global_fields->fields[base + f].type),
+		      p, (ctx->global_fields->fields[base + f].desc ?
+			  ctx->global_fields->fields[base + f].desc : ""));
+	    }
+	}
+      else
+	{
+	  fprintf(fp,
+		  "  <tr class=\"v%i\"> "
+		  "<th colspan=\"5\"> No field. </th> "
+		  "</tr>\n",
+		  p);
+	}
     }
-  }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
 }
 
 
-static void
-generate_html_orchids_functions(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_orchids_functions(orchids_t *ctx,
+					   html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int fid;
@@ -446,10 +451,10 @@ generate_html_orchids_functions(orchids_t *ctx, html_output_cfg_t  *cfg)
            "orchids-functions-%08lx-%08lx.html",
            ntph, ntpl);
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
+    }
   fprintf_html_header(fp, "Orchids Registered Language Functions");
 
   fprintf(fp, "<center><h1>Registered Language Functions<h1></center>\n");
@@ -462,35 +467,36 @@ generate_html_orchids_functions(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<th>ID</th><th>Name</th><th>Address</th>"
           "<th>Arity</th><th>Description</th>"
           "</tr>\n");
-  for (fid = 0; fid < ctx->vm_func_tbl_sz; fid++) {
-    f = &ctx->vm_func_tbl[ fid ];
-    p = fid % 2;
-    fprintf(fp,
-            "<tr>"
-            "<td class=\"e%i\">%d</td>"
-            "<td class=\"v%i\">%s</td>"
-            "<td class=\"v%i\">0x%08lx</td>"
-            "<td class=\"v%i\">%i</td>"
-            "<td class=\"v%i\">%s</td>"
-            "</tr>\n",
-            p, fid,
-            p, f->name,
-            p, (unsigned long)f->func,
-	    p, f->args_nb,
-	    p, f->desc);
-  }
+  for (fid = 0; fid < ctx->vm_func_tbl_sz; fid++)
+    {
+      f = &ctx->vm_func_tbl[ fid ];
+      p = fid % 2;
+      fprintf(fp,
+	      "<tr>"
+	      "<td class=\"e%i\">%d</td>"
+	      "<td class=\"v%i\">%s</td>"
+	      "<td class=\"v%i\">0x%08lx</td>"
+	      "<td class=\"v%i\">%i</td>"
+	      "<td class=\"v%i\">%s</td>"
+	      "</tr>\n",
+	      p, fid,
+	      p, f->name,
+	      p, (unsigned long)f->func,
+	      p, f->args_nb,
+	      p, f->desc);
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
 }
 
 
-static void
-generate_html_orchids_datatypes(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_orchids_datatypes(orchids_t *ctx,
+					   html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int tid;
@@ -504,10 +510,10 @@ generate_html_orchids_datatypes(orchids_t *ctx, html_output_cfg_t  *cfg)
            "orchids-datatypes-%08lx-%08lx.html",
            ntph, ntpl);
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
+    }
   fprintf_html_header(fp, "Orchids Registered Data Types");
 
   fprintf(fp, "<center><h1>Registered Data Types<h1></center>\n");
@@ -519,30 +525,31 @@ generate_html_orchids_datatypes(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<tr class=\"h\">"
           "<th>ID</th><th>Name</th><th>Description</th>"
           "</tr>\n");
-  for (tid = 0, t = issdlgettypes(); t->name ; tid++, t++) {
-    p = tid % 2;
-    fprintf(fp,
-            "<tr>"
-            "<td class=\"e%i\">%d</td>"
-            "<td class=\"v%i\">%s</td>"
-            "<td class=\"v%i\">%s</td>"
-            "</tr>\n",
-            p, tid,
-            p, t->name,
-	    p, t->desc);
-  }
+  for (tid = 0, t = issdlgettypes(); t->name ; tid++, t++)
+    {
+      p = tid % 2;
+      fprintf(fp,
+	      "<tr>"
+	      "<td class=\"e%i\">%d</td>"
+	      "<td class=\"v%i\">%s</td>"
+	      "<td class=\"v%i\">%s</td>"
+	      "</tr>\n",
+	      p, tid,
+	      p, t->name,
+	      p, t->desc);
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
 }
 
 
-static void
-generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_orchids_stats(orchids_t *ctx,
+				       html_output_cfg_t  *cfg)
 {
   FILE *fp;
   struct timeval diff_time;
@@ -562,10 +569,10 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   snprintf(file, sizeof (file), "orchids-stats-%08lx-%08lx.html", ntph, ntpl);
   /* cache never hit here... just add USE_CACHE for backlogging statistics */
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
+    }
 
   fprintf_html_header(fp, "Orchids statistics");
 
@@ -694,9 +701,9 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp,
           "  <tr> "
           "<td class=\"e1\"> registed fields </td> "
-          "<td class=\"v1\"> %i </td> "
+          "<td class=\"v1\"> %zd </td> "
           "</tr>\n",
-          ctx->num_fields);
+          ctx->global_fields->num_fields);
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> injected events </td> "
@@ -736,9 +743,9 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> ovm stack size </td> "
-          "<td class=\"v0\"> %zu </td> "
+          "<td class=\"v0\"> %i </td> "
           "</tr>\n",
-          ctx->ovm_stack->size);
+          ctx->ovm_stack->n);
   fprintf(fp,
           "  <tr> "
           "<td class=\"e1\"> registered functions </td> "
@@ -750,14 +757,13 @@ generate_html_orchids_stats(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
 }
 
 
-static void
-generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   rule_t *r;
@@ -771,10 +777,10 @@ generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
   Timer_to_NTP(&ctx->last_rule_act, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-rules-%08lx-%08lx.html", ntph, ntpl);
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
+    }
 
   fprintf_html_header(fp, "Orchids rules");
 
@@ -785,8 +791,7 @@ generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
        these is no rule... Just in case... */
     fprintf(fp, "<center> No rules. </center>\n");
     fprintf_html_trailer(fp);
-    Xfclose(fp);
-    return ;
+    return fclose(fp);
   }
 
   fprintf(fp, "<center>\n");
@@ -800,62 +805,60 @@ generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<th> Dyn. env. sz </th> <th> Inst. </th> "
           "<th> File:line </th> <th> Detail </th> "
           "</tr>\n\n");
-  for (r = ctx->rule_compiler->first_rule, i = 0; r; r = r->next, i++) {
-
-    strncpy(rulefile, r->filename, sizeof (rulefile));
-    rulefile[sizeof(rulefile)-1] = '\0';
-    convert_filename(rulefile);
-    snprintf(basefile, PATH_MAX,
-	     "orchids-rule-%s-%s-%08lx",
-	     r->name, rulefile, r->file_mtime);
-    p = i % 2;
-    fprintf(fp,
-            "  <tr> "
-            "<td class=\"e%i\"> <a href=\"rules/%s.html\"> %i </a> </td> "
-            "<td class=\"v%i\"> <a href=\"rules/%s.html\"> %s </a> </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %s:%i </td> "
-            "<td class=\"e%i\"> [<a href=\"rules/%s.html\">detail</a>]</td> "
-            "</tr>\n",
-            p, basefile, i,
-            p, basefile, r->name,
-            p, r->state_nb,
-            p, r->trans_nb,
-            p, r->static_env_sz,
-            p, r->dynamic_env_sz,
-            p, r->instances,
-            p, r->filename, r->lineno,
-            p, basefile);
-  }
+  for (r = ctx->rule_compiler->first_rule, i = 0; r!=NULL; r = r->next, i++)
+    {
+      strncpy(rulefile, r->filename, sizeof (rulefile));
+      rulefile[sizeof(rulefile)-1] = '\0';
+      convert_filename(rulefile);
+      snprintf(basefile, PATH_MAX,
+	       "orchids-rule-%s-%s-%08lx",
+	       r->name, rulefile, r->file_mtime);
+      p = i % 2;
+      fprintf(fp,
+	      "  <tr> "
+	      "<td class=\"e%i\"> <a href=\"rules/%s.html\"> %i </a> </td> "
+	      "<td class=\"v%i\"> <a href=\"rules/%s.html\"> %s </a> </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %s:%i </td> "
+	      "<td class=\"e%i\"> [<a href=\"rules/%s.html\">detail</a>]</td> "
+	      "</tr>\n",
+	      p, basefile, i,
+	      p, basefile, r->name,
+	      p, r->state_nb,
+	      p, r->trans_nb,
+	      p, r->static_env_sz,
+	      p, r->dynamic_env_sz,
+	      p, r->instances,
+	      p, r->filename, r->lineno,
+	      p, basefile);
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
 }
 
 
-static void
-fprintf_file(FILE *fp, const char *filename)
+static void fprintf_file(FILE *fp, const char *filename)
 {
   FILE *in;
   int c;
 
   in = Xfopen(filename, "r");
-  while ( (c = fgetc(in)) != EOF ) {
+  while ( (c = fgetc(in)) != EOF )
     fputc(c, fp);
-  }
+  Xfclose(in);
 }
 
 
-static void
-generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int i;
@@ -869,86 +872,99 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
   char base_name[PATH_MAX];
   char basefile[PATH_MAX];
   char rulefile[PATH_MAX];
+#ifdef UNSAFE_IMAGE_PREVIEW
   char cmdline[2048];
-
-  if (ctx->rule_compiler->first_rule == NULL) {
-    return ;
-  }
-
-  for (r = ctx->rule_compiler->first_rule, i = 0; r; r = r->next, i++) {
-    Xrealpath(cfg->html_output_dir, absolute_dir);
-    strncpy(rulefile, r->filename, sizeof (rulefile));
-    rulefile[sizeof(rulefile)-1] = '\0';
-    convert_filename(rulefile);
-    snprintf(basefile, PATH_MAX,
-             "orchids-rule-%s-%s-%08lx",
-             r->name, rulefile, r->file_mtime);
-    snprintf(base_name, PATH_MAX,
-             "%s/rules/%s",
-             absolute_dir, basefile);
-    snprintf(absolute_filepath, PATH_MAX, "%s.dot", base_name);
-    fp = fopen_cached(absolute_filepath);
-
-    if (fp != CACHE_HIT && fp != NULL) {
-      DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
-
-      fprintf_rule_dot(fp, r);
-      Xfclose(fp);
-
-      /* convert in various formats (eps/pdf/jpeg) */
-      snprintf(cmdline, sizeof(cmdline),
-               COMMAND_PREFIX PATH_TO_DOT
-               " -Tps -Grankdir=LR \"%s\" -o \"%s.eps\"",
-               absolute_filepath, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
-
-      snprintf(cmdline, sizeof(cmdline),
-               COMMAND_PREFIX PATH_TO_DOT
-               " -Tps -Grankdir=LR \"%s\" -Gsize=8,8 -o \"%s.thumb.eps\"",
-               absolute_filepath, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
-
-#ifndef ORCHIDS_DEMO
-      snprintf(cmdline, sizeof(cmdline),
-               COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
 #endif
 
-      snprintf(cmdline, sizeof(cmdline),
-               COMMAND_PREFIX PATH_TO_CONVERT
-               " \"%s.eps\" \"%s.jpg\"",
-               base_name, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+  if (ctx->rule_compiler->first_rule == NULL)
+    return -1;
 
-      snprintf(cmdline, sizeof(cmdline),
-               COMMAND_PREFIX PATH_TO_CONVERT
-               " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
-               base_name, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror (errno));
+      return -1;
     }
+
+  for (r = ctx->rule_compiler->first_rule, i = 0; r!=NULL; r = r->next, i++)
+    {
+      strncpy(rulefile, r->filename, sizeof (rulefile));
+      rulefile[sizeof(rulefile)-1] = '\0';
+      convert_filename(rulefile);
+      snprintf(basefile, PATH_MAX,
+	       "orchids-rule-%s-%s-%08lx",
+	       r->name, rulefile, r->file_mtime);
+      snprintf(base_name, PATH_MAX,
+	       "%s/rules/%s",
+             absolute_dir, basefile);
+      snprintf(absolute_filepath, PATH_MAX, "%s.dot", base_name);
+      fp = fopen_cached(absolute_filepath);
+
+      if (fp != CACHE_HIT && fp != NULL)
+	{
+	  DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
+
+	  fprintf_rule_dot(fp, r);
+	  (void) fclose(fp);
+
+#ifdef UNSAFE_IMAGE_PREVIEW
+	  /* convert to various formats (eps/pdf/jpeg) */
+	  snprintf(cmdline, sizeof(cmdline),
+		   COMMAND_PREFIX PATH_TO_DOT
+		   " -Tps -Grankdir=LR \"%s\" -o \"%s.eps\"",
+		   absolute_filepath, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+
+	  snprintf(cmdline, sizeof(cmdline),
+		   COMMAND_PREFIX PATH_TO_DOT
+		   " -Tps -Grankdir=LR \"%s\" -Gsize=8,8 -o \"%s.thumb.eps\"",
+		   absolute_filepath, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+
+#ifndef ORCHIDS_DEMO
+	  snprintf(cmdline, sizeof(cmdline),
+		   COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+#endif
+
+	  snprintf(cmdline, sizeof(cmdline),
+		   COMMAND_PREFIX PATH_TO_CONVERT
+		   " \"%s.eps\" \"%s.jpg\"",
+		   base_name, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+
+	  snprintf(cmdline, sizeof(cmdline),
+		   COMMAND_PREFIX PATH_TO_CONVERT
+		   " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
+		   base_name, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+#endif /* UNSAFE_IMAGE_PREVIEW */
+	}
 
     /* create html entry */
     snprintf(absolute_filepath, PATH_MAX, "%s.html", base_name);
     fp = fopen_cached(absolute_filepath);
-    if (fp != CACHE_HIT && fp != NULL) {
-      fprintf_html_header(fp, "Rule detail");
+    if (fp != CACHE_HIT && fp != NULL)
+      {
+	fprintf_html_header(fp, "Rule detail");
 
-      fprintf(fp, "<center><h1>Rule %i: %s</h1><br/>\n",i , r->name);
+	fprintf(fp, "<center><h1>Rule %i: %s</h1><br/>\n",i , r->name);
 
-      fprintf(fp,
-              "<br/>Preview: <br/> <img src=\"%s.thumb.jpg\"><br/>\n",
-              basefile);
-      fprintf(fp,
-              "[<a href=\"%s.jpg\">Full Size</a>] "
-              "[<a href=\"%s.dot\">dot</a>] "
-              "[<a href=\"%s.eps\">eps</a>] "
-              "[<a href=\"%s.pdf\">pdf</a>]<br/><br/><br/>",
-              basefile, basefile, basefile, basefile);
+#ifdef UNSAFE_IMAGE_PREVIEW
+	fprintf(fp,
+		"<br/>Preview: <br/> <img src=\"%s.thumb.jpg\"><br/>\n",
+		basefile);
+	fprintf(fp,
+		"[<a href=\"%s.jpg\">Full Size</a>] "
+		"[<a href=\"%s.dot\">dot</a>] "
+		"[<a href=\"%s.eps\">eps</a>] "
+		"[<a href=\"%s.pdf\">pdf</a>]<br/><br/><br/>",
+		basefile, basefile, basefile, basefile);
+#endif /*UNSAFE_IMAGE_PREVIEW */
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"300\">\n");
       fprintf(fp,
@@ -997,29 +1013,33 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
               "<th> ID </th> <th> Name </th> <th> Line </th> "
               "<th> Trans. </th> <th> Action code </th> "
               "</tr>\n\n");
-      for (s = 0; s < r->state_nb; s++) {
-        p = s % 2;
-        fprintf(fp,
-                "<tr> "
-                "<td class=\"e%i\"> %i </td> "
-                "<td class=\"v%i\"> %s </td> "
-                "<td class=\"v%i\"> %i </td> "
-                "<td class=\"v%i\"> %i </td> ",
-                p, s,
-                p, r->state[s].name,
-                p, r->state[s].line,
-                p, r->state[s].trans_nb);
+      for (s = 0; s < r->state_nb; s++)
+	{
+	  p = s % 2;
+	  fprintf(fp,
+		  "<tr> "
+		  "<td class=\"e%i\"> %i </td> "
+		  "<td class=\"v%i\"> %s </td> "
+		  "<td class=\"v%i\"> %i </td> "
+		  "<td class=\"v%i\"> %i </td> ",
+		  p, s,
+		  p, r->state[s].name,
+		  p, r->state[s].line,
+		  p, r->state[s].trans_nb);
 
-        fprintf(fp, "<td class=\"v%i\"> ", p);
-        if (r->state[s].action) {
-          fprintf(fp, "<pre>");
-          fprintf_bytecode_short(fp, r->state[s].action);
-          fprintf(fp, "</pre> ");
-        } else {
-          fprintf(fp, "No action. ");
-        }
-        fprintf(fp, "</tr> </tr>\n");
-      }
+	  fprintf(fp, "<td class=\"v%i\"> ", p);
+	  if (r->state[s].action)
+	    {
+	      fprintf(fp, "<pre>");
+	      fprintf_bytecode_short(fp, r->state[s].action);
+	      fprintf(fp, "</pre> ");
+	    }
+	  else
+	    {
+	      fprintf(fp, "No action. ");
+	    }
+	  fprintf(fp, "</tr> </tr>\n");
+	}
       fprintf(fp, "</table><br/><br/>\n");
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1031,29 +1051,34 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
               "  <tr class=\"hh\"> "
               "<th> ID </th> <th> Src </th> <th> Dst </th> "
               "<th> Evaluation bytecode </th> </tr>\n\n");
-      for (s = 0; s < r->state_nb; s++) {
-        for ( t = 0 ; t < r->state[s].trans_nb ; t++) {
-          p = r->state[s].trans[t].global_id % 2;
-          fprintf(fp,
-                  "<tr> "
-                  "<td class=\"e%i\"> %i </td> "
-                  "<td class=\"v%i\"> %s (%i) </td> "
-                  "<td class=\"v%i\"> %s (%i) </td>",
-                  p, r->state[s].trans[t].global_id,
-                  p, r->state[s].name, r->state[s].id,
-                  p, r->state[s].trans[t].dest->name,
-                     r->state[s].trans[t].dest->id);
-          fprintf(fp, "<td class=\"v%i\"> ", p);
-          if (r->state[s].trans[t].eval_code) {
-            fprintf(fp, "<pre>");
-            fprintf_bytecode_short(fp, r->state[s].trans[t].eval_code);
-            fprintf(fp, "</pre> ");
-          } else {
-            fprintf(fp, "No evaluation code. ");
-          }
-          fprintf(fp, "</td> </tr>\n");
-        }
-      }
+      for (s = 0; s < r->state_nb; s++)
+	{
+	  for ( t = 0 ; t < r->state[s].trans_nb ; t++)
+	    {
+	      p = r->state[s].trans[t].global_id % 2;
+	      fprintf(fp,
+		      "<tr> "
+		      "<td class=\"e%i\"> %i </td> "
+		      "<td class=\"v%i\"> %s (%i) </td> "
+		      "<td class=\"v%i\"> %s (%i) </td>",
+		      p, r->state[s].trans[t].global_id,
+		      p, r->state[s].name, r->state[s].id,
+		      p, r->state[s].trans[t].dest->name,
+		      r->state[s].trans[t].dest->id);
+	      fprintf(fp, "<td class=\"v%i\"> ", p);
+	      if (r->state[s].trans[t].eval_code!=NULL)
+		{
+		  fprintf(fp, "<pre>");
+		  fprintf_bytecode_short(fp, r->state[s].trans[t].eval_code);
+		  fprintf(fp, "</pre> ");
+		}
+	      else
+		{
+		  fprintf(fp, "No evaluation code. ");
+		}
+	      fprintf(fp, "</td> </tr>\n");
+	    }
+	}
       fprintf(fp, "</table><br/><br/>\n");
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1065,16 +1090,17 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
               "  <tr class=\"hh\"> "
               "<th> ID </th> <th> Type </th> <th> Value </th> "
               "</tr>\n\n");
-      for (e = 0 ; e < r->static_env_sz; e++) {
-        p = e % 2;
-        fprintf(fp,
-                "<tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td>",
-                p, e,
-                p, str_issdltype(r->static_env[e]->type));
-        fprintf(fp, "<td class=\"v%i\"> ", p);
-        fprintf_ovm_var(fp, r->static_env[e]);
-        fprintf(fp, "</td> </tr>\n");
-      }
+      for (e = 0 ; e < r->static_env_sz; e++)
+	{
+	  p = e % 2;
+	  fprintf(fp,
+		  "<tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td>",
+		  p, e,
+		  p, str_issdltype(TYPE(r->static_env[e])));
+	  fprintf(fp, "<td class=\"v%i\"> ", p);
+	  fprintf_ovm_var(fp, r->static_env[e]);
+	  fprintf(fp, "</td> </tr>\n");
+	}
       fprintf(fp, "</table><br/><br/>\n");
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1086,16 +1112,17 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
               "  <tr class=\"hh\"> "
               "<th> ID </th> <th> Variable name </th> "
               "</tr>\n\n");
-      for (e = 0 ; e < r->dynamic_env_sz; e++) {
-        p = e % 2;
-        fprintf(fp,
-                "<tr> "
-                "<td class=\"e%i\"> %i </td> "
-                "<td class=\"v%i\"> $%s </td> "
-                "</tr>\n",
-                p, e,
-                p, r->var_name[e]);
-      }
+      for (e = 0 ; e < r->dynamic_env_sz; e++)
+	{
+	  p = e % 2;
+	  fprintf(fp,
+		  "<tr> "
+		  "<td class=\"e%i\"> %i </td> "
+		  "<td class=\"v%i\"> $%s </td> "
+		  "</tr>\n",
+		  p, e,
+		  p, r->var_name[e]);
+	}
       fprintf(fp, "</table><br/><br/>\n");
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1107,18 +1134,19 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
               "  <tr class=\"hh\"> "
               "<th> ID </th> <th> Dyn Var ID </th> <th> Variable name </th> "
               "</tr>\n\n");
-      for (e = 0 ; e < r->sync_vars_sz; e++) {
-        p = e % 2;
-        fprintf(fp,
-                "<tr> "
-                "<td class=\"e%i\"> %i </td> "
-                "<td class=\"v%i\"> %i </td> "
-                "<td class=\"v%i\"> $%s </td> "
-                "</tr>\n",
-                p, e,
-                p, r->sync_vars[e],
-                p, r->var_name[ r->sync_vars[e] ]);
-      }
+      for (e = 0 ; e < r->sync_vars_sz; e++)
+	{
+	  p = e % 2;
+	  fprintf(fp,
+		  "<tr> "
+		  "<td class=\"e%i\"> %i </td> "
+		  "<td class=\"v%i\"> %i </td> "
+		  "<td class=\"v%i\"> $%s </td> "
+		  "</tr>\n",
+		  p, e,
+		  p, r->sync_vars[e],
+		  p, r->var_name[ r->sync_vars[e] ]);
+	}
       fprintf(fp, "</table><br/><br/>\n");
 
       fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1134,14 +1162,15 @@ generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
       fprintf(fp, "</center>\n");
 
       fprintf_html_trailer(fp);
-      Xfclose(fp);
+      (void) fclose(fp);
     }
   }
+  return 0;
 }
 
 
-static void
-generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_rule_instances(orchids_t *ctx,
+					 html_output_cfg_t  *cfg)
 {
   FILE *fp;
   int i;
@@ -1150,102 +1179,116 @@ generate_html_rule_instances(orchids_t *ctx, html_output_cfg_t  *cfg)
   char absolute_filepath[PATH_MAX];
   char base_name[PATH_MAX];
   char basefile[PATH_MAX];
+#ifdef UNSAFE_IMAGE_PREVIEW
   char cmdline[2048];
+#endif
   unsigned long ntpch, ntpcl, ntpah, ntpal;
 
-  if (ctx->first_rule_instance == NULL) {
-    return ;
-  }
+  if (ctx->first_rule_instance == NULL)
+    return -1;
 
-  for (r = ctx->first_rule_instance, i = 0; r; r = r->next, i++) {
-    Xrealpath(cfg->html_output_dir, absolute_dir);
-    Timer_to_NTP(&r->new_creation_date, ntpch, ntpcl);
-    Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
-    snprintf(basefile, sizeof (basefile),
-             "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
-             r->rule->name, ntpch, ntpcl, ntpah, ntpal);
-    snprintf(base_name, sizeof (base_name),
-             "%s/rule-insts/%s", absolute_dir, basefile);
-    snprintf(absolute_filepath, sizeof (absolute_filepath),
-             "%s.dot", base_name);
-    fp = fopen_cached(absolute_filepath);
-    if (fp != CACHE_HIT && fp != NULL) {
-      DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
-      fprintf_rule_instance_dot(fp,
-                                r,
-                                DOT_RETRIGLIST,
-                                ctx->new_qh,
-                                HTMLSTATE_STATE_LIMIT);
-      Xfclose(fp);
+  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror (errno));
+      return -1;
+    }
 
-      /* Convert in various formats (eps/pdf/jpeg) */
-      snprintf(cmdline, sizeof (cmdline),
-               COMMAND_PREFIX PATH_TO_DOT
-               " -Tps -Grankdir=LR "
-               "-Gnodesep=0.05 -Granksep=0.05 \"%s\" "
-               "-o \"%s.eps\"",
-               absolute_filepath, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+  for (r = ctx->first_rule_instance, i = 0; r!=NULL; r = r->next, i++)
+    {
+      Timer_to_NTP(&r->new_creation_date, ntpch, ntpcl);
+      Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
+      snprintf(basefile, sizeof (basefile),
+	       "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
+	       r->rule->name, ntpch, ntpcl, ntpah, ntpal);
+      snprintf(base_name, sizeof (base_name),
+	       "%s/rule-insts/%s", absolute_dir, basefile);
+      snprintf(absolute_filepath, sizeof (absolute_filepath),
+	       "%s.dot", base_name);
+      fp = fopen_cached(absolute_filepath);
+      if (fp != CACHE_HIT && fp != NULL)
+	{
+	  DebugLog(DF_MOD, DS_INFO, "dot file (%s).\n", absolute_filepath);
+	  fprintf_rule_instance_dot(fp,
+				    r,
+				    DOT_RETRIGLIST,
+				    ctx->new_qh,
+				    HTMLSTATE_STATE_LIMIT);
+	  (void)fclose(fp);
 
-      /* Smaller eps, for thumbs (for better image quality) */
-      snprintf(cmdline, sizeof (cmdline),
-               COMMAND_PREFIX PATH_TO_DOT
-               " -Tps -Grankdir=LR "
-               "-Gnodesep=0.05 -Granksep=0.05 -Gsize=8,8 \"%s\" "
-               "-o \"%s.thumb.eps\"",
-               absolute_filepath, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+#ifdef UNSAFE_IMAGE_PREVIEW
+	  /* Convert to various formats (eps/pdf/jpeg) */
+	  snprintf(cmdline, sizeof (cmdline),
+		   COMMAND_PREFIX PATH_TO_DOT
+		   " -Tps -Grankdir=LR "
+		   "-Gnodesep=0.05 -Granksep=0.05 \"%s\" "
+		   "-o \"%s.eps\"",
+		   absolute_filepath, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+
+	  /* Smaller eps, for thumbs (for better image quality) */
+	  snprintf(cmdline, sizeof (cmdline),
+		   COMMAND_PREFIX PATH_TO_DOT
+		   " -Tps -Grankdir=LR "
+		   "-Gnodesep=0.05 -Granksep=0.05 -Gsize=8,8 \"%s\" "
+		   "-o \"%s.thumb.eps\"",
+		   absolute_filepath, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
 
 #ifndef ORCHIDS_DEMO
-      snprintf(cmdline, sizeof (cmdline),
-               COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+	  snprintf(cmdline, sizeof (cmdline),
+		   COMMAND_PREFIX PATH_TO_EPSTOPDF " \"%s.eps\"", base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
 #endif
 
-      snprintf(cmdline, sizeof (cmdline),
-               COMMAND_PREFIX PATH_TO_CONVERT " \"%s.eps\" \"%s.jpg\"",
-               base_name, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+	  snprintf(cmdline, sizeof (cmdline),
+		   COMMAND_PREFIX PATH_TO_CONVERT " \"%s.eps\" \"%s.jpg\"",
+		   base_name, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
 
-      snprintf(cmdline, sizeof (cmdline),
-               COMMAND_PREFIX PATH_TO_CONVERT
-               " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
-               base_name, base_name);
-      DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
-      system(cmdline);
+	  snprintf(cmdline, sizeof (cmdline),
+		   COMMAND_PREFIX PATH_TO_CONVERT
+		   " \"%s.thumb.eps\" \"%s.thumb.jpg\"",
+		   base_name, base_name);
+	  DebugLog(DF_MOD, DS_DEBUG, "executing cmdline: %s\n", cmdline);
+	  system(cmdline);
+#endif /* UNSAFE_IMAGE_PREVIEW */
+	}
+
+      /* create html entry */
+      snprintf(absolute_filepath, sizeof (absolute_filepath),
+	       "%s/rule-insts/%s.html",
+	       absolute_dir, basefile);
+      /*     fp = Xfopen(absolute_filepath, "w"); */
+      fp = fopen_cached(absolute_filepath);
+      if (fp != CACHE_HIT && fp != NULL)
+	{
+	  fprintf_html_header(fp, "Rule instance detail");
+	
+#ifdef UNSAFE_IMAGE_PREVIEW
+	  fprintf(fp,
+		  "<center> Preview: <br/> <img src=\"%s.thumb.jpg\"><br/>\n",
+		  basefile);
+	  fprintf(fp, "[<a href=\"%s.jpg\">Full Size</a>] "
+		  "[<a href=\"%s.dot\">dot</a>] "
+		  "[<a href=\"%s.eps\">eps</a>] "
+		  "[<a href=\"%s.pdf\">pdf</a>]<br/></center>",
+		  basefile, basefile, basefile, basefile);
+#endif
+
+	  fprintf_html_trailer(fp);
+	  (void) fclose(fp);
+	}
     }
-
-    /* create html entry */
-    snprintf(absolute_filepath, sizeof (absolute_filepath),
-             "%s/rule-insts/%s.html",
-             absolute_dir, basefile);
-/*     fp = Xfopen(absolute_filepath, "w"); */
-    fp = fopen_cached(absolute_filepath);
-    if (fp != CACHE_HIT && fp != NULL) {
-    fprintf_html_header(fp, "Rule instance detail");
-
-    fprintf(fp,
-            "<center> Preview: <br/> <img src=\"%s.thumb.jpg\"><br/>\n",
-            basefile);
-    fprintf(fp, "[<a href=\"%s.jpg\">Full Size</a>] "
-                "[<a href=\"%s.dot\">dot</a>] "
-                "[<a href=\"%s.eps\">eps</a>] "
-                "[<a href=\"%s.pdf\">pdf</a>]<br/></center>",
-	    basefile, basefile, basefile, basefile);
-
-    fprintf_html_trailer(fp);
-    Xfclose(fp);
-    }
-  }
+  return 0;
 }
 
 
-static void
-generate_html_rule_instance_list(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_rule_instance_list(orchids_t *ctx,
+					    html_output_cfg_t  *cfg)
 {
   char asc_time[32];
   rule_instance_t *r;
@@ -1265,21 +1308,21 @@ generate_html_rule_instance_list(orchids_t *ctx, html_output_cfg_t  *cfg)
            ntph, ntpl);
 
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
+    }
   fprintf_html_header(fp, "Orchids rules instances");
 
   fprintf(fp, "<center><h1>Orchids rule instances<h1></center>\n");
 
-  if (ctx->first_rule_instance == NULL) {
-    fprintf(fp, "<center> No rule instance. </center>\n");
-    fprintf_html_trailer(fp);
-    Xfclose(fp);
-    generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
-    return ;
-  }
+  if (ctx->first_rule_instance == NULL)
+    {
+      fprintf(fp, "<center> No rule instance. </center>\n");
+      fprintf_html_trailer(fp);
+      (void) fclose(fp);
+      return generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
+    }
 
   fprintf(fp, "<center>\n");
   fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1293,59 +1336,61 @@ generate_html_rule_instance_list(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<th> Active threads </th> <th> Max. Depth</th> "
           "<th> Creation date </th> <th> Detail </th> "
           "</tr>\n\n");
-  for (r = ctx->first_rule_instance, i = 0; r; r = r->next, i++) {
-    Timer_to_NTP(&r->new_creation_date, ntph, ntpl);
-    Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
-    snprintf(basefile, PATH_MAX,
-	     "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
-	     r->rule->name, ntph, ntpl, ntpah, ntpal);
-    p = i % 2;
-    if (r->creation_date > 0) {
-      strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-               localtime(&r->creation_date));
-    }
-    else {
-      strcpy(asc_time, "Initial instance");
-    }
-    strncpy(rulefile, r->rule->filename, sizeof (rulefile));
-    rulefile[sizeof(rulefile)-1] = '\0';
-    convert_filename(rulefile);
-    snprintf(baserulefile, PATH_MAX,
-	     "orchids-rule-%s-%s-%08lx",
-	     r->rule->name, rulefile, r->rule->file_mtime);
+  for (r = ctx->first_rule_instance, i = 0; r!=NULL; r = r->next, i++)
+    {
+      Timer_to_NTP(&r->new_creation_date, ntph, ntpl);
+      Timer_to_NTP(&r->new_last_act, ntpah, ntpal);
+      snprintf(basefile, PATH_MAX,
+	       "orchids-ruleinst-%s-%08lx-%08lx-%08lx-%08lx",
+	       r->rule->name, ntph, ntpl, ntpah, ntpal);
+      p = i % 2;
+      if (r->creation_date > 0)
+	{
+	  strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
+		   localtime(&r->creation_date));
+	}
+      else
+	{
+	  strcpy(asc_time, "Initial instance");
+	}
+      strncpy(rulefile, r->rule->filename, sizeof (rulefile));
+      rulefile[sizeof(rulefile)-1] = '\0';
+      convert_filename(rulefile);
+      snprintf(baserulefile, PATH_MAX,
+	       "orchids-rule-%s-%s-%08lx",
+	       r->rule->name, rulefile, r->rule->file_mtime);
 
-    fprintf(fp,
-            "  <tr> "
-            "<td class=\"e%i\"> <a href=\"rule-insts/%s.html\"> %i </a> </td> "
-            "<td class=\"v%i\"><a href=\"rules/%s.html\">%s</a></td>"
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %.32s (%li) </td> "
-            "<td class=\"e%i\"> "
+      fprintf(fp,
+	      "  <tr> "
+	      "<td class=\"e%i\"> <a href=\"rule-insts/%s.html\"> %i </a> </td> "
+	      "<td class=\"v%i\"><a href=\"rules/%s.html\">%s</a></td>"
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %.32s (%li) </td> "
+	      "<td class=\"e%i\"> "
               "[<a href=\"rule-insts/%s.html\">detail</a>] "
-            "</td> "
-            "</tr>\n",
-            p, basefile, i,
-            p, baserulefile, r->rule->name,
-            p, r->state_instances,
-            p, r->threads,
-            p, r->max_depth,
-            p, asc_time, r->creation_date,
-            p, basefile);
-  }
+	      "</td> "
+	      "</tr>\n",
+	      p, basefile, i,
+	      p, baserulefile, r->rule->name,
+	      p, r->state_instances,
+	      p, r->threads,
+	      p, r->max_depth,
+	      p, asc_time, r->creation_date,
+	      p, basefile);
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-ruleinsts.html");
 }
 
 
-static void
-generate_html_thread_queue(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_thread_queue(orchids_t *ctx, html_output_cfg_t *cfg)
 {
   FILE *fp;
   int i;
@@ -1358,21 +1403,22 @@ generate_html_thread_queue(orchids_t *ctx, html_output_cfg_t  *cfg)
   snprintf(file, PATH_MAX, "orchids-thread-queue-%08lx-%08lx.html", ntph, ntpl);
 
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file,
+					"orchids-thread-queue.html");
+    }
   fprintf_html_header(fp, "Orchids thread queue");
 
   fprintf(fp, "<center><h1>Orchids thread queue<h1></center>\n");
 
-  if (ctx->new_qh == NULL) {
-    fprintf(fp, "<center> No active thread. </center>\n");
-    fprintf_html_trailer(fp);
-    Xfclose(fp);
-    generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
-    return ;
-  }
+  if (ctx->new_qh == NULL)
+    {
+      fprintf(fp, "<center> No active thread. </center>\n");
+      fprintf_html_trailer(fp);
+      (void) fclose(fp);
+      return generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
+    }
 
   fprintf(fp, "<center>\n");
   fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
@@ -1384,38 +1430,38 @@ generate_html_thread_queue(orchids_t *ctx, html_output_cfg_t  *cfg)
           "<th> Rule ID </th> <th> Transition ID </th> <th> Pass </th> "
           "<th> Bump? </th> "
           "</tr>\n\n");
-  for (i = 0, t = ctx->cur_retrig_qh; t; t = t->next, i++) {
-    p = i % 2;
-    fprintf(fp,
-            "  <tr> "
-            "<td class=\"e%i\"> %u </td> "
-            "<td class=\"v%i\"> %s </td> "
-            "<td class=\"v%i\"> %s(%i) -> %s(%i) </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %i </td> "
-            "<td class=\"v%i\"> %s </td>\n",
-            p, i,
-            p, t->state_instance->state->rule->name,
-            p, t->state_instance->state->name, t->state_instance->state->id,
-               t->trans->dest->name, t->trans->dest->id,
-            p, t->state_instance->state->rule->id,
-            p, t->trans->id,
-            p, t->pass,
-            p, (t->flags & THREAD_BUMP) ? "Bump!" : "");
-  }
+  for (i = 0, t = ctx->cur_retrig_qh; t!=NULL; t = t->next, i++)
+    {
+      p = i % 2;
+      fprintf(fp,
+	      "  <tr> "
+	      "<td class=\"e%i\"> %u </td> "
+	      "<td class=\"v%i\"> %s </td> "
+	      "<td class=\"v%i\"> %s(%i) -> %s(%i) </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %s </td>\n",
+	      p, i,
+	      p, t->state_instance->state->rule->name,
+	      p, t->state_instance->state->name, t->state_instance->state->id,
+	      t->trans->dest->name, t->trans->dest->id,
+	      p, t->state_instance->state->rule->id,
+	      p, t->trans->id,
+	      p, t->pass,
+	      p, (t->flags & THREAD_BUMP) ? "Bump!" : "");
+    }
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-thread-queue.html");
 }
 
 
-static void
-generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   active_event_t *ae;
@@ -1423,7 +1469,6 @@ generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
   int i;
   int f;
   int p;
-  char *mono = NULL;
   char file[PATH_MAX];
   unsigned long ntph, ntpl;
 
@@ -1431,75 +1476,61 @@ generate_html_events(orchids_t *ctx, html_output_cfg_t  *cfg)
   snprintf(file, sizeof (file), "orchids-events-%08lx-%08lx.html", ntph, ntpl);
 
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
-    return;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
+    }
   fprintf_html_header(fp, "Orchids active events");
 
   fprintf(fp, "<center><h1>Orchids active events<h1></center>\n");
 
-  if (ctx->active_event_head == NULL) {
-    fprintf(fp, "<center> No active event. </center>\n");
-    fprintf_html_trailer(fp);
-    Xfclose(fp);
-    generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
-    return ;
-  }
+  if (ctx->active_event_head == NULL)
+    {
+      fprintf(fp, "<center> No active event. </center>\n");
+      fprintf_html_trailer(fp);
+      (void) fclose(fp);
+      return generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
+    }
 
   fprintf(fp, "<center>\n");
-  for (i = 0, ae = ctx->active_event_head; ae; ae = ae->next, i++) {
-    fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
-    fprintf(fp,
-            "  <tr class=\"h\"> "
-            "<th colspan=\"5\"> Event %i (id:%p %i ref) </th> "
-            "</tr>\n",
-            i, ae->event, ae->refs);
-    fprintf(fp,
-            "  <tr class=\"hh\"> "
-            "<th> FID </th> <th> Field </th> <th> Type </th> "
-            "<th> Monotony </th> <th> Data content </th> "
-            "</tr>\n\n");
-
-    for (e = ae->event, f = 0; e; e = e->next, f++) {
-      p = f % 2;
-      switch (e->value->flags & MONOTONY_MASK) {
-      case TYPE_UNKNOWN:
-        mono = "unkn";
-      break;
-      case TYPE_MONO:
-        mono = "mono";
-        break;
-      case TYPE_ANTI:
-        mono = "anti";
-        break;
-      case TYPE_CONST:
-        mono = "const";
-        break;
-      }
-
+  for (i = 0, ae = ctx->active_event_head; ae!=NULL; ae = ae->next, i++)
+    {
+      fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
       fprintf(fp,
-              "  <tr> "
-              "<td class=\"e%i\"> %i </td> "
-              "<td class=\"v%i\"> %s </td> "
-              "<td class=\"v%i\"> %s </td> "
-              "<td class=\"v%i\"> %s </td> ",
-              p, e->field_id,
-              p, ctx->global_fields[ e->field_id ].name,
-              p, str_issdltype(e->value->type),
-              p, mono);
-      fprintf(fp, "<td class=\"v%i\"> ", p);
-      fprintf_ovm_var(fp, e->value);
-      fprintf(fp, " </td></tr>\n");
+	      "  <tr class=\"h\"> "
+	      "<th colspan=\"4\"> Event %i (id:%p %i ref) </th> "
+	      "</tr>\n",
+	      i, ae->event, ae->refs);
+      fprintf(fp,
+	      "  <tr class=\"hh\"> "
+	      "<th> FID </th> <th> Field </th> <th> Type </th> "
+	      "<th> Data content </th> "
+	      "</tr>\n\n");
+
+      for (e = ae->event, f = 0; e!=NULL; e = e->next, f++)
+	{
+	  p = f % 2;
+
+	  fprintf(fp,
+		  "  <tr> "
+		  "<td class=\"e%i\"> %i </td> "
+		  "<td class=\"v%i\"> %s </td> "
+		  "<td class=\"v%i\"> %s </td> ",
+		  p, e->field_id,
+		  p, ctx->global_fields->fields[ e->field_id ].name,
+		  p, str_issdltype(TYPE(e->value)));
+	  fprintf(fp, "<td class=\"v%i\"> ", p);
+	  fprintf_ovm_var(fp, e->value);
+	  fprintf(fp, " </td></tr>\n");
+	}
+      fprintf(fp, "</table> <br/>\n\n");
     }
-    fprintf(fp, "</table> <br/>\n\n");
-  }
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-events.html");
 }
 
 
@@ -1538,11 +1569,10 @@ compar_report(
 }
 
 
-void
-generate_html_report_cb(orchids_t	*ctx,
-			mod_entry_t	*mod,
-			void		*data,
-			state_instance_t *state)
+void generate_html_report_cb(orchids_t	*ctx,
+			     mod_entry_t	*mod,
+			     void		*data,
+			     state_instance_t *state)
 {
 #ifndef ORCHIDS_DEBUG
   pid_t pid;
@@ -1550,29 +1580,31 @@ generate_html_report_cb(orchids_t	*ctx,
 
 
 #ifdef ORCHIDS_DEBUG
-
-  generate_html_report(ctx, mod, data, state);
+  (void) generate_html_report(ctx, mod, data, state);
 #else /* ORCHIDS_DEBUG */
 
   pid = fork();
-  if (pid == 0) {
-    int i;
-    for (i = 3; i < 64; i++)
-      close(i);
-    generate_html_report(ctx, mod, data, state);
-    exit(EXIT_SUCCESS);
-  } else if (pid < 0) {
-    perror("fork()");
-    exit(EXIT_FAILURE);
-  }
+  if (pid == 0)
+    {
+      int i;
+
+      for (i = 3; i < 64; i++)
+	(void) close(i);
+      (void) generate_html_report(ctx, mod, data, state);
+      exit(EXIT_SUCCESS);
+    }
+  else if (pid < 0)
+    {
+      perror("fork()");
+      exit(EXIT_FAILURE);
+    }
 #endif /* ORCHIDS_DEBUG */
 }
 
-static void
-generate_html_report(orchids_t		*ctx,
-		     mod_entry_t	*mod,
-		     void		*data,
-		     state_instance_t	*state)
+static int generate_html_report(orchids_t		*ctx,
+				mod_entry_t	*mod,
+				void		*data,
+				state_instance_t	*state)
 {
   html_output_cfg_t  *cfg = data;
   char report[PATH_MAX];
@@ -1585,7 +1617,6 @@ generate_html_report(orchids_t		*ctx,
   int i;
   int p;
   int f;
-  char *mono = NULL;
 
   gettimeofday(&tv, NULL);
   Timer_to_NTP(&tv, ntph, ntpl);
@@ -1593,13 +1624,16 @@ generate_html_report(orchids_t		*ctx,
            "%s/reports/%s%08lx-%08lx%s",
            cfg->html_output_dir, cfg->report_prefix, ntph, ntpl, ".html");
 
-  fp = Xfopen(report, "w");
+  fp = fopen(report, "w");
+  if (fp==NULL)
+    return -1;
 
   /* build reversed backtrace list */
-  for (report_events = NULL; state; state = state->parent) {
-    state->next_report_elmt = report_events;
-    report_events = state;
-  }
+  for (report_events = NULL; state!=NULL; state = state->parent)
+    {
+      GC_TOUCH (ctx->gc_ctx, state->next_report_elmt = report_events);
+      report_events = state;
+    }
 
   fprintf_html_header(fp, "Orchids report");
 
@@ -1611,52 +1645,38 @@ generate_html_report(orchids_t		*ctx,
 
   /* walk report list */
   fprintf(fp, "<center>\n");
-  for (i = 0 ; report_events ; report_events = report_events->next_report_elmt, i++) {
+  for (i = 0 ; report_events!=NULL ;
+       report_events = report_events->next_report_elmt, i++)
+    {
+      if (report_events->event!=NULL)
+	{
+	  fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
+	  fprintf(fp, "  <tr class=\"h\"> <th colspan=\"4\"> Event %i (id:%p %i ref) " \
+		  "</th> </tr>\n", i, report_events->event->event, report_events->event->refs);
+	  fprintf(fp, "  <tr class=\"hh\"> <th> FID </th> <th> Field </th> <th> Type </th> " \
+		  "<th> Data content </th> </tr>\n\n");
 
-    if (report_events->event) {
+	  for (e = report_events->event->event, f = 0; e!=NULL; e = e->next, f++)
+	    {
+	      p = f % 2;
 
-      fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
-      fprintf(fp, "  <tr class=\"h\"> <th colspan=\"5\"> Event %i (id:%p %i ref) " \
-	      "</th> </tr>\n", i, report_events->event->event, report_events->event->refs);
-      fprintf(fp, "  <tr class=\"hh\"> <th> FID </th> <th> Field </th> <th> Type </th> " \
-	      "<th> Monotony </th> <th> Data content </th> </tr>\n\n");
-
-      for (e = report_events->event->event, f = 0; e; e = e->next, f++) {
-        p = f % 2;
-        switch (e->value->flags & MONOTONY_MASK) {
-        case TYPE_UNKNOWN:
-          mono = "unkn";
-          break;
-        case TYPE_MONO:
-          mono = "mono";
-          break;
-        case TYPE_ANTI:
-          mono = "anti";
-          break;
-        case TYPE_CONST:
-          mono = "const";
-          break;
-        }
-
-        fprintf(fp, "  <tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td> " \
-		"<td class=\"v%i\"> %s </td> <td class=\"v%i\"> %s </td> ",
-                p, e->field_id,
-                p, ctx->global_fields[ e->field_id ].name,
-                p, str_issdltype(e->value->type),
-                p, mono);
-        fprintf(fp, "<td class=\"v%i\"> ", p);
-        fprintf_ovm_var(fp, e->value);
-        fprintf(fp, " </td></tr>\n");
-      }
-      fprintf(fp, "</table> <br>\n\n");
+	      fprintf(fp, "  <tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td> " \
+		      "<td class=\"v%i\"> %s </td> ",
+		      p, e->field_id,
+		      p, ctx->global_fields->fields[ e->field_id ].name,
+		      p, str_issdltype(TYPE(e->value)));
+	      fprintf(fp, "<td class=\"v%i\"> ", p);
+	      fprintf_ovm_var(fp, e->value);
+	      fprintf(fp, " </td></tr>\n");
+	    }
+	  fprintf(fp, "</table> <br>\n\n");
+	}
     }
-  }
   fprintf(fp, "</center>\n");
-  Xfclose(fp);
+  return fclose(fp);
 }
 
-static void
-generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   struct dirent **namelist;
@@ -1669,77 +1689,90 @@ generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
   char file[PATH_MAX];
 
   snprintf(reportdir, sizeof (reportdir), "%s/reports", cfg->html_output_dir);
-  Xstat(reportdir, &s);
+  if (stat(reportdir, &s)!=0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror(errno));
+      return -1;
+    }
   snprintf(file, sizeof (file), "orchids-reports-%08lx.html", s.st_mtime);
 
   fp = create_html_file(cfg, file, USE_CACHE);
-  if ((fp == CACHE_HIT) || (fp == NULL)) {
-    generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
-    return ;
-  }
+  if (fp == CACHE_HIT || fp == NULL)
+    {
+      return generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
+    }
   fprintf_html_header(fp, "Orchids reports");
 
   fprintf(fp, "<center><h1>Orchids reports<h1></center>\n");
-
 
   report_prefix_g = cfg->report_prefix;
   report_ext_g = cfg->report_ext;
   n = scandir(reportdir, &namelist, select_report, compar_report);
 
   if (n < 0)
-    perror("scandir()");
-  else {
-    fprintf(fp, "<center>\n");
-    fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
-    fprintf(fp,
-            "  <tr class=\"h\"> "
-            "<th colspan=\"3\"> Report list </th> "
-            "</tr>\n");
-    fprintf(fp,
-            "  <tr class=\"hh\"> "
-            "<th> Report file name </th> <th> File size </th> "
-            "<th> Creation time </th> "
-            "</tr>\n\n");
-
-    for (i = 0; i < n; i++) {
-      snprintf(reportfile, sizeof (reportfile), "%s/%s",
-               reportdir, namelist[i]->d_name);
-      Xstat(reportfile, &s);
-      strftime(asc_time, sizeof (asc_time),
-               "%a %b %d %H:%M:%S %Y",
-               localtime(&s.st_mtime));
-      fprintf(fp,
-              "  <tr> "
-              "<td class=\"e%i\"> <a href=\"reports/%s\"> %s </a> </td> "
-              "<td class=\"v%i\"> %jd </td> "
-              "<td class=\"v%i\"> %s </td> "
-              "</tr>\n",
-              i % 2, namelist[i]->d_name, namelist[i]->d_name,
-              i % 2, (intmax_t)s.st_size,
-              i % 2, asc_time);
-
-      free(namelist[i]);
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror(errno));
+      return -1;
     }
-    free(namelist);
-    fprintf(fp, "</table>\n");
-    fprintf(fp, "</center>\n");
+  else
+    {
+      fprintf(fp, "<center>\n");
+      fprintf(fp, "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n");
+      fprintf(fp,
+	      "  <tr class=\"h\"> "
+	      "<th colspan=\"3\"> Report list </th> "
+	      "</tr>\n");
+      fprintf(fp,
+	      "  <tr class=\"hh\"> "
+	      "<th> Report file name </th> <th> File size </th> "
+	      "<th> Creation time </th> "
+	      "</tr>\n\n");
 
-  }
+      for (i = 0; i < n; i++)
+	{
+	  snprintf(reportfile, sizeof (reportfile), "%s/%s",
+		   reportdir, namelist[i]->d_name);
+	  if (stat(reportfile, &s)!=0)
+	    {
+	      DebugLog (DF_MOD, DS_ERROR, strerror(errno));
+	    }
+	  else
+	    {
+	      strftime(asc_time, sizeof (asc_time),
+		       "%a %b %d %H:%M:%S %Y",
+		       localtime(&s.st_mtime));
+	      fprintf(fp,
+		      "  <tr> "
+		      "<td class=\"e%i\"> <a href=\"reports/%s\"> %s </a> </td> "
+		      "<td class=\"v%i\"> %jd </td> "
+		      "<td class=\"v%i\"> %s </td> "
+		      "</tr>\n",
+		      i % 2, namelist[i]->d_name, namelist[i]->d_name,
+		      i % 2, (intmax_t)s.st_size,
+		      i % 2, asc_time);
+	    }
+	  free(namelist[i]);
+	}
+      free(namelist);
+      fprintf(fp, "</table>\n");
+      fprintf(fp, "</center>\n");
+    }
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
+  return generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
 }
 
 
 /* XXX: Rewrite this */
-static void
-generate_html_config(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_config(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
 
   fp = create_html_file(cfg, "orchids-config.html", NO_CACHE);
+  if (fp==NULL)
+    return -1;
 
   fprintf(fp,
           "<!DOCTYPE html PUBLIC \"-//W3C//"
@@ -1769,12 +1802,11 @@ generate_html_config(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf_html_cfg_tree(fp, ctx->cfg_tree);
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  return fclose(fp);
 }
 
 
-static void
-fprintf_html_cfg_tree(FILE *fp, config_directive_t *root)
+static void fprintf_html_cfg_tree(FILE *fp, config_directive_t *root)
 {
   int counter;
 
@@ -1791,12 +1823,11 @@ fprintf_html_cfg_tree(FILE *fp, config_directive_t *root)
 }
 
 
-static void
-fprintf_html_cfg_tree_sub(FILE *fp,
-                          config_directive_t *section,
-                          int depth,
-                          unsigned long mask,
-                          int *counter)
+static void fprintf_html_cfg_tree_sub(FILE *fp,
+				      config_directive_t *section,
+				      int depth,
+				      unsigned long mask,
+				      int *counter)
 {
   int i;
   int s;
@@ -1804,68 +1835,78 @@ fprintf_html_cfg_tree_sub(FILE *fp,
   unsigned long d;
 
   last = 0;
-  for (s = 0; section; section = section->next, s++) {
-    if (section->next == NULL) {
-      last = 1;
-      mask |= 1 << depth;
-    }
-    fprintf(fp, "<p>");
-    for (i = 0, d = 1; i < depth; i++, d <<= 1) {
-      if (d & mask) {
-        fprintf(fp,
-                "<img src=\"icon_blank.png\" alt=\"_\" width=16 height=22>");
-      }
-      else {
-        fprintf(fp,
-                "<img src=\"icon_vertline.png\" alt=\"|\" width=16 height=22>");
-      }
-    }
-    if (section->first_child) {
-      (*counter)++;
-      fprintf(fp,
-              "<img "
-                "src=\"icon_p%snode.png\" "
-                "alt=\"*\" "
-                "width=16 height=22 "
-                "onclick=\"toggleFolder('section-%i', this)\">"
-              "<img "
-                "src=\"icon_folder_closed.png\" "
-                "alt=\"+\" "
-                "width=24 height=22>"
-              "Section <b style=\"font-size: 10pt;\">%s</b> %s</p>\n"
-              "<div id=\"section-%i\">\n",
-              last ? "last" : "",
-              *counter,
-              section->directive+1, section->args,
-              *counter);
+  for (s = 0; section!=NULL; section = section->next, s++)
+    {
+      if (section->next == NULL)
+	{
+	  last = 1;
+	  mask |= 1 << depth;
+	}
+      fprintf(fp, "<p>");
+      for (i = 0, d = 1; i < depth; i++, d <<= 1)
+	{
+	  if (d & mask)
+	    {
+	      fprintf(fp,
+		      "<img src=\"icon_blank.png\" alt=\"_\" width=16 height=22>");
+	    }
+	  else
+	    {
+	      fprintf(fp,
+		      "<img src=\"icon_vertline.png\" alt=\"|\" width=16 height=22>");
+	    }
+	}
+      if (section->first_child!=NULL)
+	{
+	  (*counter)++;
+	  fprintf(fp,
+		  "<img "
+		  "src=\"icon_p%snode.png\" "
+		  "alt=\"*\" "
+		  "width=16 height=22 "
+		  "onclick=\"toggleFolder('section-%i', this)\">"
+		  "<img "
+		  "src=\"icon_folder_closed.png\" "
+		  "alt=\"+\" "
+		  "width=24 height=22>"
+		  "Section <b style=\"font-size: 10pt;\">%s</b> %s</p>\n"
+		  "<div id=\"section-%i\">\n",
+		  last ? "last" : "",
+		  *counter,
+		  section->directive+1, section->args,
+		  *counter);
 
-      fprintf_html_cfg_tree_sub(fp,
-                                section->first_child, depth + 1,
-                                mask,
-                                counter);
-      fprintf(fp, "</div>\n");
+	  fprintf_html_cfg_tree_sub(fp,
+				    section->first_child, depth + 1,
+				    mask,
+				    counter);
+	  fprintf(fp, "</div>\n");
+	}
+      else
+	{
+	  fprintf(fp,
+		  "<img src=\"icon_%snode.png\" alt=\"o\" width=16 height=22>"
+		  "<img src=\"icon_doc.png\" alt=\"*\" width=24 height=22>"
+		  " <b>%s</b> %s</p>\n",
+		  last ? "last" : "",
+		  section->directive, section->args);
+	}
     }
-    else {
-      fprintf(fp,
-              "<img src=\"icon_%snode.png\" alt=\"o\" width=16 height=22>"
-              "<img src=\"icon_doc.png\" alt=\"*\" width=24 height=22>"
-              " <b>%s</b> %s</p>\n",
-              last ? "last" : "",
-              section->directive, section->args);
-    }
-  }
 }
 
 
 #if 0
-static void
-generate_html_menu_timestamps(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_menu_timestamps(orchids_t *ctx,
+					 html_output_cfg_t  *cfg)
 {
   FILE *fp;
   unsigned long ntpl, ntph;
   htmloutput_list_t *m;
 
   fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
+  if (fp==NULL)
+    return -1;
+
   fprintf_html_header(fp, "Orchids Menu");
 
   fprintf(fp, "<center>\n");
@@ -1916,8 +1957,8 @@ generate_html_menu_timestamps(orchids_t *ctx, html_output_cfg_t  *cfg)
   if (htmloutput_list_head_g) {
     fprintf(fp, "<hr/>\n");
     fprintf(fp, "Modules:<br/>\n");
-    for (m = htmloutput_list_head_g; m; m = m->next)
-      m->output(ctx, m->mod, fp);
+    for (m = htmloutput_list_head_g; m!=NULL; m = m->next)
+      (void) (*m->output) (ctx, m->mod, fp);
   }
 
   fprintf(fp, "<hr/>\n");
@@ -1927,18 +1968,19 @@ generate_html_menu_timestamps(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp, "</body>\n");
   fprintf(fp, "</html>\n");
 
-  Xfclose(fp);
+  return fclose(fp);
 }
 #endif
 
 
-static void
-generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   htmloutput_list_t *m;
 
   fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
+  if (fp==NULL)
+    return -1;
 
   fprintf_html_header(fp, "Orchids Menu");
 
@@ -1983,12 +2025,13 @@ generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
           "target=\"main\">Reports</a><br/>\n");
 
   /* Execute registered outputs */
-  if (htmloutput_list_head_g) {
-    fprintf(fp, "<hr/>\n");
-    fprintf(fp, "Modules:<br/>\n");
-    for (m = htmloutput_list_head_g; m; m = m->next)
-      m->output(ctx, m->mod, fp, cfg);
-  }
+  if (htmloutput_list_head_g!=NULL)
+    {
+      fprintf(fp, "<hr/>\n");
+      fprintf(fp, "Modules:<br/>\n");
+      for (m = htmloutput_list_head_g; m!=NULL; m = m->next)
+	(void) (*m->output)(ctx, m->mod, fp, cfg);
+    }
 
   fprintf(fp, "<hr/>\n");
   fprintf(fp, "<a href=\"index-help.html\" target=\"main\">Help</a><br/>\n");
@@ -1997,68 +2040,72 @@ generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf(fp, "</body>\n");
   fprintf(fp, "</html>\n");
 
-  Xfclose(fp);
+  return fclose(fp);
 }
 
 
-static void
-do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   int fd;
-  int ret;
+  int ret = 0;
 
   /* Acquire lock or return */
-  fd = Xopen(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  fd = open(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  if (fd<0)
+    return fd;
   ret = Write_lock(fd, 0, SEEK_SET, 0);
-  if (ret) {
-    if (errno == EACCES || errno == EAGAIN) {
-      DebugLog(DF_MOD, DS_NOTICE, "HTML already in rendering...\n");
-      return ;
+  if (ret)
+    {
+      if (errno == EACCES || errno == EAGAIN)
+	{
+	  DebugLog(DF_MOD, DS_NOTICE, "HTML already in rendering...\n");
+	  return -1;
+	}
+      else
+	{
+	  perror("fcntl()");
+	  exit(EXIT_FAILURE);
+	}
     }
-    else {
-      perror("fcntl()");
-      exit(EXIT_FAILURE);
-    }
-  }
 
-  generate_html_orchids_modules(ctx, cfg);
-  generate_html_orchids_fields(ctx, cfg);
-  generate_html_orchids_functions(ctx, cfg);
-  generate_html_orchids_stats(ctx, cfg);
-  generate_html_orchids_datatypes(ctx, cfg);
-  generate_html_rules(ctx, cfg);
-  generate_html_rule_list(ctx, cfg);
-  generate_html_rule_instances(ctx, cfg);
-  generate_html_rule_instance_list(ctx,cfg);
-  generate_html_thread_queue(ctx, cfg);
-  generate_html_events(ctx, cfg);
-  generate_html_report_list(ctx, cfg);
-  generate_html_config(ctx, cfg);
+  ret |= generate_html_orchids_modules(ctx, cfg);
+  ret |= generate_html_orchids_fields(ctx, cfg);
+  ret |= generate_html_orchids_functions(ctx, cfg);
+  ret |= generate_html_orchids_stats(ctx, cfg);
+  ret |= generate_html_orchids_datatypes(ctx, cfg);
+  ret |= generate_html_rules(ctx, cfg);
+  ret |= generate_html_rule_list(ctx, cfg);
+  ret |= generate_html_rule_instances(ctx, cfg);
+  ret |= generate_html_rule_instance_list(ctx,cfg);
+  ret |= generate_html_thread_queue(ctx, cfg);
+  ret |= generate_html_events(ctx, cfg);
+  ret |= generate_html_report_list(ctx, cfg);
+  ret |= generate_html_config(ctx, cfg);
 
-  generate_html_menu(ctx, cfg);
+  ret |= generate_html_menu(ctx, cfg);
 
   /* Lock will be released by child-process exit */
   /* but in DEBUG mode, no child is created. */
-  close(fd);
+  ret |= close(fd);
+  return ret;
 }
 
 
-static void
-convert_filename(char *file)
+static void convert_filename(char *file)
 {
   int c;
 
-  for (c = *file; c; c = *++file) {
-    if (!((c >= 'a' && c <= 'z') ||
-	  (c >= 'A' && c <= 'Z') ||
-	  (c >= '0' && c <= '9')))
-      *file = '-';
-  }
+  for (c = *file; c!=0; c = *++file)
+    {
+      if (!((c >= 'a' && c <= 'z') ||
+	    (c >= 'A' && c <= 'Z') ||
+	    (c >= '0' && c <= '9')))
+	*file = '-';
+    }
 }
 
 
-void
-html_output_cache_cleanup(html_output_cfg_t  *cfg)
+void html_output_cache_cleanup(html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
   char dir[PATH_MAX];
@@ -2084,11 +2131,10 @@ html_output_cache_cleanup(html_output_cfg_t  *cfg)
 }
 
 
-void
-html_output_cache_flush(html_output_cfg_t  *cfg)
+void html_output_cache_flush(html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
-  char dir[PATH_MAX];
+  char dir[2*PATH_MAX+2];
 
   Xrealpath(cfg->html_output_dir, base_dir);
 

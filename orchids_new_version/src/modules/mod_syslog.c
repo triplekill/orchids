@@ -78,73 +78,100 @@ static char *syslog_facility_g[] = {
 };
 
 
-int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
   return dissect_syslog(ctx, mod, event, data);
 }
 
 
-static int
-dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			  void *data)
 {
-  ovm_var_t *attr[SYSLOG_FIELDS];
   struct tm *t;
   char *txt_line;
   int txt_len;
   size_t token_size;
   long syslog_priority;
+  long n;
+  int ret;
+  ovm_var_t *val;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
   DebugLog(DF_MOD, DS_DEBUG, "syslog_dissector()\n");
 
-  memset(attr, 0, sizeof(attr));
+  if (event->value==NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
+      return -1;
+    }
+  switch (TYPE(event->value))
+    {
+    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+      break;
+    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      return -1;
+    }
 
-  txt_line = STR(event->value);
-  txt_len = STRLEN(event->value);
+  GC_START(gc_ctx, SYSLOG_FIELDS+1);
+  GC_UPDATE(gc_ctx, SYSLOG_FIELDS, event);
+  ret = 0;
 
   /* check if we have a raw syslog line (with encoded facility and priotity) */
-  if (txt_line[0] == '<') {
-    token_size = get_next_int(txt_line + 1, &syslog_priority, txt_len);
-    if (syslog_priority > 191) { /* 23 (local7) * 8 + 7 (debug) == 191 */
-      DebugLog(DF_MOD, DS_WARN, "PRI error.\n");
-      return (1);
-    }
-    attr[F_FACILITY] = ovm_vstr_new();
-    VSTR(attr[F_FACILITY]) = syslog_facility_g[syslog_priority >> 3];
-    VSTRLEN(attr[F_FACILITY])= strlen(syslog_facility_g[syslog_priority >> 3]);
-    attr[F_SEVERITY] = ovm_vstr_new();
-    VSTR(attr[F_SEVERITY]) = syslog_severity_g[syslog_priority & 0x07];
-    VSTRLEN(attr[F_SEVERITY]) = strlen(syslog_severity_g[syslog_priority & 0x07]);
+  if (txt_line[0] == '<')
+    {
+      token_size = get_next_int(txt_line + 1, &syslog_priority, txt_len);
+      if (syslog_priority > 191)
+	{ /* 23 (local7) * 8 + 7 (debug) == 191 */
+	  DebugLog(DF_MOD, DS_WARN, "PRI error.\n");
+	  ret = 1;
+	  goto end;
+	}
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = syslog_facility_g[syslog_priority >> 3];
+      VSTRLEN(val)= strlen(VSTR(val));
+      GC_UPDATE(gc_ctx, F_FACILITY, val);
 
-    txt_line += token_size + 2; /* number size and '<' '>' */
-    txt_len -= token_size + 2;
-  }
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = syslog_severity_g[syslog_priority & 0x07];
+      VSTRLEN(val)= strlen(VSTR(val));
+      GC_UPDATE(gc_ctx, F_SEVERITY, val);
+
+      txt_line += token_size + 2; /* number size and '<' '>' */
+      txt_len -= token_size + 2;
+    }
 
   if ((txt_len > 15) &&
       (txt_line[3] == ' ') && (txt_line[6] == ' ') &&
       (txt_line[9] == ':') && (txt_line[12] == ':') &&
-      (txt_line[15] == ' ')) {
-    t = syslog_getdate(txt_line);
-    if (t == NULL) {
-      DebugLog(DF_MOD, DS_WARN, "time format error.\n");
-      free_fields(attr, SYSLOG_FIELDS);
-      return (1);
+      (txt_line[15] == ' '))
+    {
+      t = syslog_getdate(txt_line);
+      if (t == NULL)
+	{
+	  DebugLog(DF_MOD, DS_WARN, "time format error.\n");
+	  ret = 1;
+	  goto end;
+	}
+      val = ovm_ctime_new(gc_ctx, mktime(t));
+      GC_UPDATE(gc_ctx, F_TIME, val);
+
+      txt_line += 16;
+      txt_len -= 16;
     }
-    attr[F_TIME] = ovm_ctime_new();
-    attr[F_TIME]->flags |= TYPE_MONO;
-    CTIME(attr[F_TIME]) = mktime(t);
+  else
+    {
+      DebugLog(DF_MOD, DS_INFO, "no date present.\n");
+    }
 
-    txt_line += 16;
-    txt_len -= 16;
-  } else {
-    DebugLog(DF_MOD, DS_INFO, "no date present.\n");
-  }
-
-  if (txt_len <= 0) {
-    DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-    free_fields(attr, SYSLOG_FIELDS);
-    return (1);
-  }
+  if (txt_len <= 0)
+    {
+      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
+      ret = 1;
+      goto end;
+    }
 
   token_size = my_strspn(txt_line, " [:", txt_len);
 #ifdef NO_GCONFD_HACK
@@ -154,104 +181,123 @@ dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 #endif
     DebugLog(DF_MOD, DS_DEBUG, "read host.\n");
 
-    attr[F_HOST] = ovm_vstr_new();
-    VSTRLEN(attr[F_HOST]) = token_size;
-    VSTR(attr[F_HOST]) = txt_line;
+    val = ovm_vstr_new (gc_ctx, event->value);
+    VSTR(val) = txt_line;
+    VSTRLEN(val) = token_size;
+    GC_UPDATE(gc_ctx, F_HOST, val);
 
     ++token_size; /* skip separator */
     txt_line += token_size;
     txt_len -= token_size;
-    /* XXX check sizes are always positives */
-    if (txt_len <= 0) {
-      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-      free_fields(attr, SYSLOG_FIELDS);
-      return (1);
-    }
-  } else {
-    DebugLog(DF_MOD, DS_DEBUG, "read src retry.\n");
+    /* XXX check sizes are always positive */
+    if (txt_len <= 0)
+      {
+	DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
+	ret = 1;
+	goto end;
+      }
   }
+  else
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "read src retry.\n");
+    }
 
   /* Handle syslog message repetition */
-  if (!strncmp("last message repeated ", txt_line, 22)) {
-    token_size = my_strspn(txt_line, "\r\n", txt_len);
-    attr[F_MSG] = ovm_vstr_new();
-    VSTR(attr[F_MSG]) = txt_line;
-    VSTRLEN(attr[F_MSG]) = token_size;
-    txt_line += 22;
-    txt_len -= 22;
-    attr[F_REPEAT] = ovm_int_new();
-    token_size = get_next_int(txt_line, &(INT(attr[F_REPEAT])), txt_len);
-    token_size++;
-    txt_line += token_size;
-    txt_len -= token_size;
-    attr[F_PROG] = ovm_str_new(6);
-    strcpy(STR(attr[F_PROG]), "syslog");
-    add_fields_to_event(ctx, mod, &event, attr, SYSLOG_FIELDS);
-    post_event(ctx, mod, event);
+  if (!strncmp("last message repeated ", txt_line, 22))
+    {
+      token_size = my_strspn(txt_line, "\r\n", txt_len);
 
-    return (0);
-  }
+      val = ovm_vstr_new (gc_ctx, event->value);
+      VSTR(val) = txt_line;
+      VSTRLEN(val) = token_size;
+      GC_UPDATE(gc_ctx, F_MSG, val);
+
+      txt_line += 22;
+      txt_len -= 22;
+
+      token_size = get_next_int(txt_line, &n, txt_len);
+      token_size++;
+      val = ovm_int_new (gc_ctx, n);
+      GC_UPDATE(gc_ctx, F_REPEAT, val);
+
+      txt_line += token_size;
+      txt_len -= token_size;
+
+      val = ovm_str_new (gc_ctx, 6);
+      strcpy(STR(val), "syslog");
+      GC_UPDATE(gc_ctx, F_PROG, val);
+
+      REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
+      goto end;
+    }
 
   token_size = my_strspn(txt_line, "[:", txt_len);
 
-  attr[F_PROG] = ovm_vstr_new();
-
+  val = ovm_vstr_new (gc_ctx, event->value);
+  VSTR(val) = txt_line;
 #ifndef NO_GCONFD_HACK
   if (!strncmp("gconfd", txt_line, 6)) {
-    VSTRLEN(attr[F_PROG]) = 6;
+    VSTRLEN(val) = 6;
   }
   else {
 #endif
-
-  VSTRLEN(attr[F_PROG]) = token_size;
-
+    VSTRLEN(val) = token_size;
 #ifndef NO_GCONFD_HACK
   }
 #endif
+  GC_UPDATE(gc_ctx, F_PROG, val);
 
-  VSTR(attr[F_PROG]) = txt_line;
   txt_line += token_size;
   txt_len -= token_size;
 
   /* XXX check sizes are always positives */
-  if (txt_len <= 0) {
-    DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-    free_fields(attr, SYSLOG_FIELDS);
-    return (1);
-  }
+  if (txt_len <= 0)
+    {
+      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
+      ret = 1;
+      goto end;
+    }
 
   /* look ahead */
-  if (*txt_line == '[') { /* fill pid */
-    attr[F_PID] = ovm_int_new();
-    token_size = get_next_int(txt_line + 1, &(INT(attr[F_PID])), txt_len);
-    if (strncmp(txt_line + token_size + 1, "]: ", 3)) {
-      DebugLog(DF_MOD, DS_WARN, "syntax error.\n");
-      /* XXX: Drop event ??? */
-    }
-    txt_line += token_size + 4; /* 1 for "[" and 3 for "]: " */
-    txt_len -= token_size + 4;
-  } else if (*txt_line == ':') { /* Skip ": " */
-    txt_line += 2;
-    txt_len -= 2;
-  }
+  if (*txt_line == '[')
+    { /* fill pid */
+      token_size = get_next_int(txt_line + 1, &n, txt_len);
+      val = ovm_int_new (gc_ctx, n);
+      GC_UPDATE(gc_ctx, F_PID, val);
 
-  if (txt_len <= 0) {
-    DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-    free_fields(attr, SYSLOG_FIELDS);
-    return (1);
-  }
+      if (strncmp(txt_line + token_size + 1, "]: ", 3))
+	{
+	  DebugLog(DF_MOD, DS_WARN, "syntax error.\n");
+	  /* XXX: Drop event ??? */
+	}
+      txt_line += token_size + 4; /* 1 for "[" and 3 for "]: " */
+      txt_len -= token_size + 4;
+    }
+  else if (*txt_line == ':')
+    { /* Skip ": " */
+      txt_line += 2;
+      txt_len -= 2;
+    }
+
+  if (txt_len <= 0)
+    {
+      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
+      ret = 1;
+      goto end;
+    }
 
   /* remaining string is the syslog message */
-  attr[F_MSG] = ovm_vstr_new();
+  val = ovm_vstr_new (gc_ctx, event->value);
   token_size = my_strspn(txt_line, "\r\n", txt_len);
-  VSTRLEN(attr[F_MSG]) = token_size;
-  VSTR(attr[F_MSG]) = txt_line;
+  VSTR(val) = txt_line;
+  VSTRLEN(val) = token_size;
+  GC_UPDATE(gc_ctx, F_MSG, val);
 
-  add_fields_to_event(ctx, mod, &event, attr, SYSLOG_FIELDS);
+  REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
 
-  post_event(ctx, mod, event);
-
-  return (0);
+  end:
+  GC_END(gc_ctx);
+  return ret;
 }
 
 field_t syslog_fields[] = {

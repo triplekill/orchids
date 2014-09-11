@@ -17,6 +17,19 @@
 #ifndef ORCHIDS_TYPES
 #define ORCHIDS_TYPES
 
+/* XXX Warning: should include config.h this way before this file:
+
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+If you don't, HAVE_STDINT_H below won't be defined, leading
+to possibly subtle problems (type representation mismatch).
+We could include the above lines systematically, but
+config.h does not (yet) check whether it has been included
+already.
+*/
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdint.h>
@@ -30,7 +43,7 @@ typedef struct rusage rusage_t;
 /* custom types */
 typedef int bool_t;
 
-#ifndef HAVE_STDINT
+#ifndef HAVE_STDINT_H
 typedef   signed char  int8_t;
 typedef unsigned char uint8_t;
 
@@ -48,7 +61,7 @@ typedef   signed long long  int64_t;
 typedef unsigned long long uint64_t;
 # endif
 
-#endif /* HAVE_STDINT */
+#endif /* HAVE_STDINT_H */
 
 
 /*

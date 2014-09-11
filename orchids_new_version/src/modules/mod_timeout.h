@@ -26,8 +26,7 @@
 #define F_STATEINST     6
 
 
-static int
-timeout_rtcallback(orchids_t *ctx, rtaction_t *e);
+static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he);
 
 
 static void

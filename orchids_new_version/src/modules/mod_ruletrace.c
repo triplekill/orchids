@@ -19,6 +19,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
+
 #include <string.h>
 #include <errno.h>
 
@@ -269,19 +277,20 @@ ruletrace_output_rule_inst(orchids_t *ctx,
 }
 
 
-static void *
-ruletrace_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *ruletrace_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   ruletrace_ctx_t *modcfg;
 
   DebugLog(DF_MOD, DS_TRACE, "ruletrace_preconfig()\n");
 
-  modcfg = Xzmalloc(sizeof (ruletrace_ctx_t));
+  modcfg = gc_base_malloc(ctx->gc_ctx, sizeof (ruletrace_ctx_t));
+  modcfg->output_dir = NULL;
   modcfg->file_prefix = MOD_RULETRACE_DEFAULT_PREFIX;
   modcfg->rule_limit = MOD_RULETRACE_DEFAULT_RULE_LIMIT;
+  modcfg->state_limit = 0;
   modcfg->ruletracepid = getpid();
-
-  return (modcfg);
+  modcfg->created_pid_dir = 0;
+  return modcfg;
 }
 
 
@@ -338,7 +347,7 @@ set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ruletracectx = (ruletrace_ctx_t *)mod->config;
 
-  ruletracectx->rule_limit = atoi(dir->args);
+  ruletracectx->rule_limit = strtol(dir->args, (char **)NULL, 10);
 }
 
 
@@ -351,7 +360,7 @@ set_state_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   ruletracectx = (ruletrace_ctx_t *)mod->config;
 
-  ruletracectx->state_limit = atoi(dir->args);
+  ruletracectx->state_limit = strtol(dir->args, (char **)NULL, 10);
 }
 
 

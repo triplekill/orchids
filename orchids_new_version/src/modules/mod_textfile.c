@@ -28,6 +28,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
+
 #include <errno.h>
 
 #include "orchids.h"
@@ -41,36 +49,35 @@
 input_module_t mod_textfile;
 
 
-static void
-textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf)
+static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
+				textfile_t *tf, char *buf)
 {
-  ovm_var_t *attr[TF_FIELDS];
-  event_t *event;
+  ovm_var_t *val;
+  size_t len;
+  gc_t* gc_ctx = ctx->gc_ctx;
+  GC_START(gc_ctx, TF_FIELDS+1);
 
   DebugLog(DF_MOD, DS_TRACE, "Dissecting: %s", buf);
+gc_check(gc_ctx);
 
-  memset(attr, 0, sizeof(attr));
+  val = ovm_int_new (gc_ctx, tf->line);
+  GC_UPDATE(gc_ctx, F_LINE_NUM, val);
 
-  attr[F_LINE_NUM] = ovm_int_new();
-  attr[F_LINE_NUM]->flags |= TYPE_MONO;
-  INT(attr[F_LINE_NUM]) = tf->line;
+  GC_UPDATE(gc_ctx, F_FILE, tf->file_name);
 
-  attr[F_FILE] = ovm_vstr_new();
-  VSTR(attr[F_FILE]) = tf->filename;
-  VSTRLEN(attr[F_FILE]) = tf->filename_len;
+  len = strlen(buf);
+  val = ovm_str_new (gc_ctx, len);
+  memcpy (STR(val), buf, len);
+  GC_UPDATE(gc_ctx, F_LINE, val);
+gc_check(gc_ctx);
 
-  attr[F_LINE] = ovm_str_new(strlen(buf));
-  memcpy (STR(attr[F_LINE]), buf,STRLEN(attr[F_LINE]));
-
-  event = NULL;
-  add_fields_to_event(ctx, mod, &event, attr, TF_FIELDS);
-
-  post_event(ctx, mod, event);
+  REGISTER_EVENTS(ctx, mod, TF_FIELDS);
+  GC_END(gc_ctx);
+gc_check(gc_ctx);
 }
 
 
-static int
-process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
+static int process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
 {
   char s_buff[BUFF_SZ];
   char* d_buff = NULL;
@@ -80,64 +87,61 @@ process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
   /* read and process new lines */
 
   buff_sz = BUFF_SZ;
-  eof = (Xfgets(s_buff, BUFF_SZ, tf->fd) == NULL);
+  eof = (fgets(s_buff, BUFF_SZ, tf->fd) == NULL);
   if (!eof)
-  {
-    if (s_buff[strlen (s_buff) - 1] != '\n')
     {
-      d_buff = Xzmalloc (buff_sz);
-      do {
-	buff_sz += BUFF_SZ;
-	if (buff_sz < MAX_LINE_SZ)
+      if (s_buff[strlen (s_buff) - 1] != '\n')
 	{
-	  d_buff = Xrealloc(d_buff, buff_sz);
+	  d_buff = gc_base_malloc (ctx->gc_ctx, buff_sz);
+	  do {
+	    buff_sz += BUFF_SZ;
+	    if (buff_sz < MAX_LINE_SZ)
+	      {
+		d_buff = gc_base_realloc(ctx->gc_ctx, d_buff, buff_sz);
+		strcat (d_buff, s_buff);
+	      }
+	    eof = (fgets(s_buff, BUFF_SZ, tf->fd)==NULL);
+	    if (eof)
+	      break;
+	  } while (s_buff[strlen (s_buff) - 1] != '\n');
+	  
+	  buff_sz += BUFF_SZ;
+	  d_buff = gc_base_realloc(ctx->gc_ctx, d_buff, buff_sz);
 	  strcat (d_buff, s_buff);
+	  
+	  buff = d_buff;
 	}
-	Xfgets(s_buff, BUFF_SZ, tf->fd);
-      } while (s_buff[strlen (s_buff) - 1] != '\n');
+      else
+	buff = s_buff;
+      
+      if (buff_sz >= MAX_LINE_SZ)
+	{
+	  DebugLog(DF_MOD, DS_WARN,
+		   "Line too long, dropping event (max line size : %i)",
+		   MAX_LINE_SZ);
+	  if (buff == d_buff)
+	    gc_base_free(buff);
+	}
+      else
+	{
+	  /* update line # */
+	  tf->line++;
+	  /* update crc */
+	  tf->hash = crc32(tf->hash, buff, strlen(buff));
+	  DebugLog(DF_MOD, DS_DEBUG,
+		   "read line %i crc(0x%08X) %s",
+		   tf->line, tf->hash, buff);
 
-      buff_sz += BUFF_SZ;
-      d_buff = Xrealloc(d_buff, buff_sz);
-      strcat (d_buff, s_buff);
-
-      buff = d_buff;
+	  textfile_buildevent(ctx, mod, tf, buff);
+	  if (buff == d_buff)
+	    gc_base_free(buff);
+	}
     }
-    else
-      buff = s_buff;
-
-    if (buff_sz >= MAX_LINE_SZ)
-    {
-      DebugLog(DF_MOD, DS_WARN,
-	       "Line too long, dropping event (max line size : %i)",
-	       MAX_LINE_SZ);
-      if (buff == d_buff)
-	Xfree(buff);
-    }
-    else
-    {
-
-      /* update line # */
-      tf->line++;
-      /* update crc */
-      *(unsigned int *)&tf->hash =
-	crc32( *(unsigned int *)&tf->hash, buff, strlen(buff));
-      DebugLog(DF_MOD, DS_DEBUG,
-	       "read line %i crc(0x%08X) %s",
-	       tf->line, *(unsigned int *)&tf->hash, buff);
-
-      textfile_buildevent(ctx, mod, tf, buff);
-      if (buff == d_buff)
-	Xfree(buff);
-    }
-  }
-
   tf->eof = eof;
-
   return eof;
 }
 
-static int
-textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
+static int textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 {
   textfile_config_t *cfg;
   textfile_t *tf;
@@ -147,73 +151,88 @@ textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
   /*  DebugLog(DF_MOD, DS_TRACE, "textfile_callback();\n"); */
 
   cfg = (textfile_config_t *)mod->config;
-  for (tf = cfg->file_list; tf; tf = tf->next) {
-    if (tf->eof)
+  for (tf = cfg->file_list; tf; tf = tf->next)
     {
-      /* Checks if mtime has changed for each file... */
-      Xfstat(fileno(tf->fd), &st);
-      if (tf->file_stat.st_size > st.st_size) {
-	DebugLog(DF_MOD, DS_NOTICE,
-		 "File [%s] has been truncated (%lu->%lu) rewind()ing\n",
-		 tf->filename, tf->file_stat.st_size, st.st_size);
-	rewind(tf->fd);
-      }
-      if (st.st_mtime > tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "mtime updated for [%s]\n", tf->filename);
-	/* Update file stat */
-	tf->file_stat = st;
-	/* read and process new lines */
-	eof &= process_new_lines(ctx, mod, tf);
-      }
+      if (tf->eof)
+	{
+	  /* Checks if mtime has changed for each file... */
+	  if (fstat(fileno(tf->fd), &st))
+	    {
+	      DebugLog(DF_MOD, DS_ERROR,
+		       "file no longer exists in textfile_callback\n");
+	      continue;
+	    }
+	  if (tf->file_stat.st_size > st.st_size)
+	    {
+	      DebugLog(DF_MOD, DS_NOTICE,
+		       "textfile_callback file has been truncated (%lu->%lu) rewind()ing\n",
+		       tf->file_stat.st_size, st.st_size);
+	      rewind(tf->fd);
+	    }
+	  if (st.st_mtime > tf->file_stat.st_mtime)
+	    {
+	      DebugLog(DF_MOD, DS_DEBUG, "mtime updated in textfile_callback\n");
+	      /* Update file stat */
+	      tf->file_stat = st;
+	      /* read and process new lines */
+	      eof &= process_new_lines(ctx, mod, tf);
+	    }
 #ifdef ORCHIDS_DEBUG
-      else if (st.st_mtime < tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "mtime older for [%s] ?.\n", tf->filename);
-      } else if (st.st_mtime == tf->file_stat.st_mtime) {
-	DebugLog(DF_MOD, DS_DEBUG, "no changes for [%s]\n", tf->filename);
-      }
+	  else if (st.st_mtime < tf->file_stat.st_mtime)
+	    {
+	      DebugLog(DF_MOD, DS_DEBUG,
+		       "mtime older in textfile_callback ?.\n");
+	    }
+	  else if (st.st_mtime == tf->file_stat.st_mtime)
+	    {
+	      DebugLog(DF_MOD, DS_DEBUG,
+		       "no changes in textfile_callback file\n");
+	    }
 #endif
+	}
+      else
+	eof &= process_new_lines(ctx, mod, tf);
     }
-    else
-      eof &= process_new_lines(ctx, mod, tf);
-  }
 
   if (cfg->exit_process_all_data && eof)
     exit(EXIT_SUCCESS);
-
-  return (eof);
+  return eof;
 }
 
-static int
-textsocket_try_reconnect(orchids_t *ctx, rtaction_t *e)
+static int textsocket_try_reconnect(orchids_t *ctx, heap_entry_t *he)
 {
-  textsock_t *f = (textsock_t *)e->data;
+  textsock_t *f = (textsock_t *)he->data;
   struct sockaddr_un sunx;
   int fd, n;
 
   fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (fd<0)
     { // cannot even (re)create socket
-      DebugLog(DF_MOD, DS_DEBUG, "textsocket_try_reconnect: cannot recreate socket, errno=%d.\n", errno);
-      e->date.tv_sec += 5; // XXX hard-coded: 5 seconds into the future
-      register_rtaction(ctx,e);
+      DebugLog(DF_MOD, DS_DEBUG,
+	       "textsocket_try_reconnect: cannot recreate socket, errno=%d.\n",
+	       errno);
+      he->date.tv_sec += 5; // XXX hard-coded: 5 seconds into the future
+      register_rtaction(ctx, he);
       return 1;
     }
   memset(&sunx, 0, sizeof(sunx));
   sunx.sun_family = AF_UNIX;
-  strncpy(sunx.sun_path, f->filename, f->filename_len);
+  strncpy(sunx.sun_path, STR(f->file_name), STRLEN(f->file_name));
   sunx.sun_path[sizeof(sunx.sun_path)-1] = '\0';
   n = connect(fd, (struct sockaddr *)&sunx, SUN_LEN(&sunx));
   if (n)
     {
        close(fd);
-       DebugLog(DF_MOD, DS_DEBUG, "textsocket_try_reconnect: cannot connect, errno=%d.\n", errno);
-       e->date.tv_sec += 1; // XXX hard-coded: 1 second into the future
-       register_rtaction(ctx,e);
+       DebugLog(DF_MOD, DS_DEBUG,
+		"textsocket_try_reconnect: cannot connect, errno=%d.\n",
+		errno);
+       he->date.tv_sec += 1; // XXX hard-coded: 1 second into the future
+       register_rtaction(ctx, he);
        return 2;
     }
   reincarnate_fd(ctx,f->fd,fd);
   f->fd = fd;
-  free(e);
+  gc_base_free(he);
 /*
   reincarnate_fd(ctx, f->fd, f->fd);
   free(e);
@@ -221,8 +240,8 @@ textsocket_try_reconnect(orchids_t *ctx, rtaction_t *e)
   return 0;
 }
 
-static int
-textsocket_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
+static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
+			       int fd, void *data)
 {
   textsock_t *f = (textsock_t *)data;
   ssize_t sz;
@@ -260,16 +279,10 @@ textsocket_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
       if (cfg->poll_period==0)
 	cfg->poll_period = DEFAULT_MODTEXT_POLL_PERIOD;
 
-      rtaction_t *e;
-
-      e = Xzmalloc(sizeof(struct rtaction_s));
-      e->date = ctx->cur_loop_time;
-      e->date.tv_sec += cfg->poll_period;
-	 // try to reconnect later
-      e->cb = textsocket_try_reconnect;
-      e->data = data;
-      register_rtaction(ctx,e);
-
+      (void) register_rtcallback(ctx, textsocket_try_reconnect,
+				 NULL,
+				 data,
+				 cfg->poll_period);
       return 1; // a positive return value will force the event manager
 	// to remove fd from the file descriptors watched by select().
     }
@@ -298,31 +311,25 @@ textsocket_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
             }
           else
             {
-	      ovm_var_t *attr[TF_FIELDS];
-	      event_t *event;
+	      ovm_var_t *val;
 	      size_t len;
+	      gc_t* gc_ctx = ctx->gc_ctx;
+	      GC_START(gc_ctx, TF_FIELDS+1);
 
-	      memset(attr, 0, sizeof(attr));
+	      DebugLog(DF_MOD, DS_TRACE, "Dissecting socket input");
 
-	      attr[F_LINE_NUM] = ovm_int_new();
-	      attr[F_LINE_NUM]->flags |= TYPE_MONO;
-	      INT(attr[F_LINE_NUM]) = f->line;
+	      val = ovm_int_new (gc_ctx, f->line);
+	      GC_UPDATE(gc_ctx, F_LINE_NUM, val);
 
-	      attr[F_FILE] = ovm_vstr_new();
-	      VSTR(attr[F_FILE]) = f->filename;
-	      VSTRLEN(attr[F_FILE]) = f->filename_len;
+	      GC_UPDATE(gc_ctx, F_FILE, f->file_name);
 
 	      len = p-pstart;
-	      attr[F_LINE] = ovm_str_new(len);
-	      memcpy (STR(attr[F_LINE]), pstart, len);
-	      STR(attr[F_LINE])[len] = '\0';
+	      val = ovm_str_new (gc_ctx, len);
+	      memcpy (STR(val), pstart, len);
+	      GC_UPDATE(gc_ctx, F_LINE, val);
 
-	      DebugLog(DF_MOD, DS_TRACE, "Dissecting: %s", STR(attr[F_LINE]));
-
-	      event = NULL;
-	      add_fields_to_event(ctx, mod, &event, attr, TF_FIELDS);
-
-	      post_event(ctx, mod, event);
+	      REGISTER_EVENTS(ctx, mod, TF_FIELDS);
+	      GC_END(gc_ctx);
             }
           pstart = p;
 	  f->read_off = pstart - f->buf;
@@ -354,8 +361,14 @@ textfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   DebugLog(DF_MOD, DS_INFO, "load() textfile@%p\n", (void *) &mod_textfile);
 
-  mod_cfg = Xzmalloc(sizeof (textfile_config_t));
-  add_polled_input_callback(ctx, mod, textfile_callback, NULL);
+  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (textfile_config_t));
+  mod_cfg->flags = 0;
+  mod_cfg->process_all_data = 0;
+  mod_cfg->exit_process_all_data = 0;
+  mod_cfg->poll_period = 0;
+  mod_cfg->file_list = NULL;
+
+  //add_polled_input_callback(ctx, mod, textfile_callback, NULL);
 
   register_fields(ctx, mod, tf_fields, TF_FIELDS);
 
@@ -366,17 +379,14 @@ textfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 static void
 textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  textfile_config_t *cfg;
-
   DebugLog(DF_MOD, DS_TRACE,
            "textfile_postconfig() -- registering file polling if needed...\n");
-
-  cfg = (textfile_config_t *)mod->config;
 
   /* register real-time action for file polling, if requested. */
   DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
   register_rtcallback(ctx,
 		      rtaction_read_files,
+		      NULL,
 		      mod,
 		      INITIAL_MODTEXT_POLL_DELAY);
 }
@@ -395,7 +405,7 @@ textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
 
   /* if we don't have to compute hashes, just fseek to the end-of-file */
   for (tf = cfg->file_list; tf; tf = tf->next) {
-    DebugLog(DF_MOD, DS_DEBUG, "process file : %s\n", tf->filename);
+    DebugLog(DF_MOD, DS_DEBUG, "process next file in textfile_postcompil\n");
     /* read and process new lines */
     process_new_lines(ctx, mod, tf);
   }
@@ -431,15 +441,22 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       textsock_t *f;
       size_t len;
 
-      f = Xzmalloc(sizeof (textsock_t));
+      f = gc_base_malloc(ctx->gc_ctx, sizeof (textsock_t));
       f->buf_sz = 2*MAX_LINE_SZ+1; // should be at least 2*MAX_LINE_SZ
-      f->buf = Xzmalloc(f->buf_sz);
-      f->read_off = f->write_off = 0;
+      f->buf = gc_base_malloc(ctx->gc_ctx, f->buf_sz);
+      f->buf[0] = '\0';
       f->flags = TEXTSOCK_ISSOCK;
       f->line = 0;
-      f->filename = strdup(dir->args);
-      f->filename_len = strlen(dir->args);
+      f->read_off = f->write_off = 0;
+      f->file_name = NULL;
+      f->fd = 0;
 
+      len = strlen(dir->args);
+      GC_TOUCH (ctx->gc_ctx, f->file_name = ovm_str_new (ctx->gc_ctx, len+1));
+      /* allocate string, keeping the final '\0' */
+      strcpy (STR(f->file_name), dir->args);
+      STRLEN(f->file_name) = len;
+      gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
       fd = Xsocket(AF_UNIX, SOCK_STREAM, 0);
       /*
@@ -462,15 +479,24 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
       int fd;
       textsock_t *f;
+      size_t len;
 
-      f = Xzmalloc(sizeof (textsock_t));
+      f = gc_base_malloc(ctx->gc_ctx, sizeof (textsock_t));
       f->buf_sz = 2*MAX_LINE_SZ+1; // should be at least 2*MAX_LINE_SZ
-      f->buf = Xzmalloc(f->buf_sz);
-      f->read_off = f->write_off = 0;
+      f->buf = gc_base_malloc(ctx->gc_ctx, f->buf_sz);
+      f->buf[0] = '\0';
       f->flags = 0;
       f->line = 0;
-      f->filename = strdup(dir->args);
-      f->filename_len = strlen(dir->args);
+      f->read_off = f->write_off = 0;
+      f->file_name = NULL;
+      f->fd = 0;
+
+      len = strlen(dir->args);
+      GC_TOUCH (ctx->gc_ctx, f->file_name = ovm_str_new (ctx->gc_ctx, len+1));
+      /* allocate string, keeping the final '\0' */
+      strcpy (STR(f->file_name), dir->args);
+      STRLEN(f->file_name) = len;
+      gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
       fd = Xopen(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
 
@@ -480,15 +506,27 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   else
     { // We assume we read from a regular file (or a pipe) here.
       textfile_t *f;
+      size_t len;
 
-      f = Xzmalloc(sizeof (textfile_t));
-      f->filename = strdup(dir->args);
-      f->filename_len = strlen(dir->args);
+      f = gc_base_malloc(ctx->gc_ctx, sizeof (textfile_t));
+      f->next = NULL;
+
+      len = strlen(dir->args);
+      GC_TOUCH (ctx->gc_ctx, f->file_name = ovm_str_new (ctx->gc_ctx, len+1));
+      /* allocate string, keeping the final '\0' */
+      strcpy (STR(f->file_name), dir->args);
+      STRLEN(f->file_name) = len;
+      gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
+
       f->fd = Xfopen(filepath, "r");
       Xfstat(fileno(f->fd), &f->file_stat);
 
-      DebugLog(DF_MOD, DS_INFO, "adding file '%s' to polled inputs (fp=%p fd=%i).\n",
-           f->filename, f->fd, fileno(f->fd));
+      f->line = 0;
+      f->hash = 0;
+      f->eof = 0;
+
+      DebugLog(DF_MOD, DS_INFO, "adding next file to polled inputs (fp=%p fd=%i).\n",
+	       f->fd, fileno(f->fd));
 
       /* if this file is the first added and poll period is not set,
          activate the file polling with the default poll period */
@@ -514,7 +552,7 @@ set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   DebugLog(DF_MOD, DS_INFO, "setting ProoceedAll to %s\n", dir->args);
 
-  flag = atoi(dir->args);
+  flag = strtol(dir->args, (char **)NULL, 10);
   if (flag)
     ((textfile_config_t *)mod->config)->process_all_data = 1;
 }
@@ -526,7 +564,7 @@ set_exit_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   DebugLog(DF_MOD, DS_INFO, "setting ExitAfterProoceedAll to %s\n", dir->args);
 
-  flag = atoi(dir->args);
+  flag = strtol(dir->args, (char **)NULL, 10);
   if (flag)
     ((textfile_config_t *)mod->config)->exit_process_all_data = 1;
 }
@@ -539,7 +577,7 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   DebugLog(DF_MOD, DS_INFO, "setting PollPeriod to %s\n", dir->args);
 
-  value = atoi(dir->args);
+  value = strtol(dir->args, (char **)NULL, 10);
   if (value < 0) {
     value = 0;
   }
@@ -548,8 +586,7 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static int
-rtaction_read_files(orchids_t *ctx, rtaction_t *e)
+static int rtaction_read_files(orchids_t *ctx, heap_entry_t *he)
 {
   mod_entry_t *mod;
   textfile_config_t *cfg;
@@ -558,17 +595,16 @@ rtaction_read_files(orchids_t *ctx, rtaction_t *e)
   /* DebugLog(DF_MOD, DS_TRACE,
 	              "Real-time action: Checking files...\n"); */
 
-  mod = (mod_entry_t *)(e->data);
-  cfg = (textfile_config_t *)(mod->config);
+  mod = (mod_entry_t *)he->data;
+  cfg = (textfile_config_t *)mod->config;
 
   eof = textfile_callback(ctx, mod, NULL);
 
-  e->date = ctx->cur_loop_time;
+  he->date = ctx->cur_loop_time;
   if (eof)
-    e->date.tv_sec += cfg->poll_period;
-  register_rtaction(ctx, e);
-
-  return (0);
+    he->date.tv_sec += cfg->poll_period;
+  register_rtaction(ctx, he);
+  return 0;
 }
 
 

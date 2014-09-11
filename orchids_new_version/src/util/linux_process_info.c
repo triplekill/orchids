@@ -187,6 +187,9 @@ fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p)
 
 #endif /* ORCHIDS_DEMO */
 
+/* Black cpp magic: */
+#define XSTR(s) XXSTR(s)
+#define XXSTR(s) #s
 
 /*
 ** WARNING: doesn't work if the process comm name contains ")" or " "
@@ -213,7 +216,7 @@ get_linux_process_info(linux_process_info_t *p, pid_t pid)
 
   fscanf(fp,
          "%d "  /* pid */
-         "%s "  /* comm -- BUG: doen't work if comm contains ')' or ' ' */
+         "%" XSTR(MAX_COMM_SIZE) "s "  /* comm -- BUG: doen't work if comm contains ')' or ' ' */
          "%c "  /* state */
          "%d "  /* ppid */
          "%d "  /* pgrp */

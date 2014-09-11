@@ -26,16 +26,11 @@
 #include "orchids.h"
 #include "tree.h"
 #include "rule_compiler.h"
-#include "dlist.h"
 
 #include "issdl.tab.h"
 
-/*
-** Since the maxline limit is usually 4096 and quoted string can't
-** be defined in multiple lines, we can't have a quoted string
-** bigger than 4096.
-*/
-#define QSTRMAX 4096
+#define issdllval (*yylval)
+#define issdltext yytext
 
 #define QSTR_PUTC(c) \
   do { \
@@ -47,8 +42,21 @@
      *qstr_ptr_g++ = (c); \
   } while (0)
 
+#define issdllineno_g (ctx)->issdllineno
+#define issdlcurrentfile_g (ctx)->issdlcurrentfile
+#define issdlfilestack_g (ctx)->issdlfilestack
+#define qstr_buf_g (ctx)->qstr_buf
+#define qstr_ptr_g (ctx)->qstr_ptr
+#define qstr_sz_g (ctx)->qstr_sz
+
+#define YY_DECL int issdllex (YYSTYPE * yylval_param, rule_compiler_t *ctx, yyscan_t yyscanner)
+#define YY_USER_INIT				\
+  {						\
+    yyin = (ctx)->issdlin;			\
+  }
+
+#ifdef NOT_REENTRANT
 unsigned int issdllineno_g = 1;
-static rule_compiler_t *compiler_ctx_g = NULL;
 char *issdlcurrentfile_g = NULL;
 SLIST_HEAD(filestack, filestack_t) issdlfilestack_g =
   SLIST_HEAD_INITIALIZER(filestack);
@@ -61,13 +69,14 @@ static size_t qstr_sz_g;
 
 /* Add this line with BYacc */
 /* extern int issdllval; **/
+#endif
 
 %}
 
 /* eXclusive state COMMENT */
 %x COMMENT QSTR
 
-%option nounput never-interactive
+%option nounput never-interactive reentrant bison-bridge
 
 %%
 
@@ -78,12 +87,6 @@ static size_t qstr_sz_g;
 "rule"     { return (RULE);     }
 "state"    { return (STATE);    }
 "synchronize" { return (SYNCHRONIZE); }
-"init" {
-  issdllval.sym.file = issdlcurrentfile_g;
-  issdllval.sym.line = issdllineno_g;
-  issdllval.sym.name = strdup(issdltext);
-  return (INIT);
-}
 "goto"     { return (GOTO);     }
 "if"       { return (IF);       }
 "else"     { return (ELSE);     }
@@ -96,10 +99,18 @@ static size_t qstr_sz_g;
 ";"        { return (SEMICOLUMN); }
 ","        { return (COMMA);    }
 "||"       { return (OROR);     }
+"|"        { return (O_OR);     }
+"^"        { return (O_XOR);    }
 "&&"       { return (ANDAND);   }
+"&"        { return (O_AND);    }
+"~"        { return (O_NOT);    }
 "=="       { return (EQCOMPARE); }
 "!="       { return (NOTEQUAL); }
 "+"        { return (O_PLUS);   }
+"+"[ \t\f\n\r]*".{"       { int i;
+             for (i=0; i<yyleng; i++) if (yytext[i]=='\n') ++issdllineno_g;
+             return (O_PLUS_EVENT); }
+".{"       { return (O_OPEN_EVENT); }
 "-"        { return (O_MINUS);  }
 "*"        { return (O_TIMES); }
 "/"        { return (O_DIV); }
@@ -110,11 +121,9 @@ static size_t qstr_sz_g;
 "<"        { return (LESS);     }
 ">="       { return (GREATER_EQ); }
 "<="       { return (LESS_EQ);  }
-"=:="      { return (EQBIND); }
 "_CTIME"   { return (KW_CTIME); }
 "_IPV4"    { return (KW_IPV4); }
 "_TIMEVAL" { return (KW_TIMEVAL); }
-"_COUNTER" { return (KW_COUNTER); }
 "_REGEX"   { return (KW_REGEX); }
 
  /* Handle comments */
@@ -155,8 +164,8 @@ static size_t qstr_sz_g;
     /* Handle flags */
     if (flag1 == 1) {
       /* If 1 is set, push new file and set line counter */
-      fs = Xmalloc(sizeof (filestack_t));
-      fs->file = strdup(issdlcurrentfile_g);
+      fs = gc_base_malloc ((ctx)->gc_ctx, sizeof (filestack_t));
+      fs->file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
       fs->line = issdllineno_g;
       SLIST_INSERT_HEAD(&issdlfilestack_g, fs, elmt);
     }
@@ -165,8 +174,8 @@ static size_t qstr_sz_g;
       if ( ! SLIST_IS_EMPTY(&issdlfilestack_g) ) {
         fs = SLIST_FIRST(&issdlfilestack_g);
         SLIST_REMOVE_HEAD(&issdlfilestack_g, elmt);
-        Xfree(fs->file);
-        Xfree(fs);
+        gc_base_free (fs->file);
+        gc_base_free (fs);
       }
       else {
         fprintf(stderr, "warning: cpp file inclusion underflow.\n");
@@ -175,8 +184,8 @@ static size_t qstr_sz_g;
     /* Other flags are specific to C */
 
     if (issdlcurrentfile_g)
-      Xfree(issdlcurrentfile_g);
-    issdlcurrentfile_g = strdup(file);
+      gc_base_free (issdlcurrentfile_g);
+    issdlcurrentfile_g = gc_strdup((ctx)->gc_ctx, file);
     issdllineno_g = line;
 
   } else {
@@ -186,29 +195,29 @@ static size_t qstr_sz_g;
 
  /* Variable name */
 $[A-Za-z_][A-Za-z0-9_\.]* {
-  issdllval.string = strdup(issdltext + 1);
+  issdllval.string = gc_strdup((ctx)->gc_ctx, issdltext + 1);
   /* DPRINTF( ("VARIABLE %s\n", issdltext) ); */
-  return (VARIABLE);
+  return VARIABLE;
 }
 
  /* Field name */
-\.[a-z]+\.[a-z_]+ {
-  issdllval.string = strdup(issdltext + 1); /* +1 skip the dot */
+\.[A-Za-z0-9_]+\.[A-Za-z0-9_\.]* {
+  issdllval.string = gc_strdup((ctx)->gc_ctx, issdltext + 1); /* +1 skip the dot */
   /* DPRINTF( ("FIELD %s\n", issdltext) ); */
-  return(FIELD);
+  return FIELD;
 }
 
  /* Symbol names (same as a C declaration) */
-[A-Za-z][A-Za-z0-9_]* {
-  issdllval.sym.file = strdup(issdlcurrentfile_g);
+[A-Za-z_][A-Za-z0-9_\.]* {
+  issdllval.sym.file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
   issdllval.sym.line = issdllineno_g;
-  issdllval.sym.name = strdup(issdltext);
+  issdllval.sym.name = gc_strdup((ctx)->gc_ctx, issdltext);
   DebugLog(DF_OLC, DS_DEBUG,
            "sym file=%s line=%i name=%s\n",
            issdllval.sym.file,
            issdllval.sym.line,
            issdllval.sym.name);
-  return (SYMNAME);
+  return SYMNAME;
 }
 
  /* Floating point numbers */
@@ -220,7 +229,7 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 
  /* Integer numbers */
 [0-9]+ {
-  issdllval.integer = atoi(issdltext);
+  issdllval.integer = strtol(issdltext, (char **)NULL, 10);
   /* printf("NUMBER %i\n", issdllval.integer); */
   return (NUMBER);
 }
@@ -237,8 +246,8 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 <QSTR>\" {
   BEGIN INITIAL;
   *qstr_ptr_g = '\0';
-  issdllval.string = strdup(qstr_buf_g);
-  return (STRING);
+  issdllval.string = gc_strdup((ctx)->gc_ctx, qstr_buf_g);
+  return STRING;
 }
 
   /* Newline in qstr must be specified as \n */
@@ -306,16 +315,17 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 ** yywrap()
 */
 
+  /*
 void
 set_lexer_context(rule_compiler_t *ctx)
 {
   compiler_ctx_g = ctx;
 }
+  */
 
-int
-issdlwrap(void)
+int issdlwrap (yyscan_t yyscanner)
 {
-  return (1);
+  return 1;
 }
 
 

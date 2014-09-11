@@ -30,8 +30,8 @@
 #include <netdb.h>
 
 #include "orchids.h"
-
 #include "orchids_api.h"
+#include "ovm.h"
 
 #include "mod_consoles.h"
 
@@ -40,81 +40,89 @@ input_module_t mod_consoles;
 static conscfg_t *conscfg_g;
 
 
-static void
-issdl_console_msg(orchids_t *ctx, state_instance_t *state)
+static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *str;
   ovm_var_t *con;
   char *s;
+  size_t len;
   char *c;
 
-  con = stack_pop(ctx->ovm_stack);
-  if (TYPE(con) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
-    return ;
-  }
+  con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  switch (TYPE(con))
+    {
+    case T_STR:
+    case T_VSTR: /* OK */
+      break;
+    default:
+      DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_TRUE(ctx);
+      return;
+    }
+  str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  switch (TYPE(str))
+    {
+    case T_STR: s = STR(str); len = STRLEN(str); break;
+    case T_VSTR: s = VSTR(str); len = VSTRLEN(str); break;
+    default:
+      DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(str));
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_TRUE(ctx);
+      return;
+    }
 
-  str = stack_pop(ctx->ovm_stack);
-  if (TYPE(str) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(str));
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
-    return ;
-  }
-
-  c = ovm_strdup(con);
-  s = ovm_strdup(str);
-
-  output_console_msg(c, s);
-  ISSDL_RETURN_TRUE(ctx, state);
+  c = ovm_strdup(ctx->gc_ctx, con);
+  output_console_msg(c, s, len);
+  gc_base_free (c);
+  STACK_DROP(ctx->ovm_stack, 2);
+  PUSH_RETURN_TRUE(ctx);
 }
 
 
-static void
-issdl_console_evt(orchids_t *ctx, state_instance_t *state)
+static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *con;
   char *c;
 
-  con = stack_pop(ctx->ovm_stack);
-  if (TYPE(con) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
-    return ;
-  }
-
-  c = ovm_strdup(con);
-
+  con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  switch (TYPE(con))
+    {
+    case T_STR:
+    case T_VSTR: /* OK */
+      break;
+    default:
+      DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_TRUE(ctx);
+      return;
+    }
+  c = ovm_strdup(ctx->gc_ctx, con);
   output_console_evt(ctx, c, state);
-  ISSDL_RETURN_TRUE(ctx, state);
+  gc_base_free (c);
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_RETURN_TRUE(ctx);
 }
 
 
-static void *
-cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   conscfg_t *mod_cfg;
 
   DebugLog(DF_MOD, DS_INFO,
            "loading consoles module @ %p\n", (void *) &mod_consoles);
-
   register_lang_function(ctx, issdl_console_msg,
                          "console_msg", 2, "Console message output");
-
   register_lang_function(ctx, issdl_console_evt,
                          "console_evt", 1, "Console event output");
-
-  mod_cfg = Xzmalloc(sizeof (conscfg_t));
-  mod_cfg->consoles = new_strhash(1021);
-
+  mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
+  mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);
   conscfg_g = mod_cfg;
-
-  return (mod_cfg);
+  return mod_cfg;
 }
 
 
-static FILE *
-create_udp_socket(const char *host, const int port)
+static FILE *create_udp_socket(const char *host, const int port)
 {
   struct sockaddr_in srvaddr;
   struct hostent *he;
@@ -122,13 +130,14 @@ create_udp_socket(const char *host, const int port)
   FILE *sp;
 
   he = gethostbyname(host);
-  if (he == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "Unknown hostname '%s'.\n", host);
-    exit(EXIT_FAILURE);
-  }
+  if (he == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Unknown hostname '%s'.\n", host);
+      exit(EXIT_FAILURE);
+    }
 
   memset(&srvaddr, 0, sizeof (struct sockaddr_in));
-  memcpy(&srvaddr.sin_addr, he->h_addr, he->h_length);
+  memcpy(&srvaddr.sin_addr, he->h_addr_list[0], he->h_length);
   srvaddr.sin_family = he->h_addrtype;
   srvaddr.sin_port = htons(port);
 
@@ -136,12 +145,12 @@ create_udp_socket(const char *host, const int port)
   Xconnect(sd, (struct sockaddr *) &srvaddr, sizeof (struct sockaddr));
   sp = Xfdopen(sd, "w");
 
-  return (sp);
+  return sp;
 }
 
 
-static void
-add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_console(orchids_t *ctx, mod_entry_t *mod,
+			config_directive_t *dir)
 {
   char console[64];
   char hostname[64];
@@ -150,64 +159,75 @@ add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   console_t *con;
 
   ret = sscanf(dir->args, "%64s %64s %u", console, hostname, &port);
-  if (ret != 3) {
-    DebugLog(DF_MOD, DS_ERROR, "Error in console module configuration.\n");
-    return ;
-  }
+  if (ret != 3)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Error in console module configuration.\n");
+      return;
+    }
 
   DebugLog(DF_MOD, DS_INFO, "Creating new console '%s' to %s:%i\n",
            console, hostname, port);
 
-  if (strhash_get( ((conscfg_t *)mod->config)->consoles, console) != NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "console '%s' already defined\n", console);
-    return ;
-  }
+  if (strhash_get( ((conscfg_t *)mod->config)->consoles, console) != NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "console '%s' already defined\n", console);
+      return;
+    }
 
-  con = Xzmalloc(sizeof (console_t));
-  con->name = strdup(console);
-  con->host = strdup(hostname);
+  con = gc_base_malloc (ctx->gc_ctx, sizeof (console_t));
+  con->name = gc_strdup(ctx->gc_ctx, console);
+  con->host = gc_strdup(ctx->gc_ctx, strdup(hostname));
   con->port = port;
   con->fp = create_udp_socket(con->host, con->port);
 
-  strhash_add(((conscfg_t *)mod->config)->consoles, con, con->name);
+  strhash_add (((conscfg_t *)mod->config)->consoles, con, con->name);
 }
 
 
-static void
-output_console_msg(char *console, char *msg)
+static void output_console_msg(char *console, char *msg, size_t len)
 {
   console_t *con;
+  size_t i;
+  FILE *fp;
+  char c;
 
   DebugLog(DF_MOD, DS_INFO, "Output msg '%s' to console '%s'\n",
            msg, console);
 
   con = strhash_get(conscfg_g->consoles, console);
-  if (con == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
-    return ;
-  }
-
-  fprintf(con->fp, "%s\n", msg);
-  fflush(con->fp);
+  if (con == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
+      return;
+    }
+  fp = con->fp;
+  for (i=0; i<len; i++)
+    {
+      c = msg[i];
+      putc (c, fp);
+    }
+  putc ('\n', fp);
+  fflush(fp);
 }
 
 
-static void
-output_console_evt(orchids_t *ctx, char *console, state_instance_t *state)
+static void output_console_evt(orchids_t *ctx, char *console,
+			       state_instance_t *state)
 {
   console_t *con;
 
   DebugLog(DF_MOD, DS_INFO, "Output msg event to console '%s'\n", console);
 
   con = strhash_get(conscfg_g->consoles, console);
-  if (con == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
-    return ;
-  }
+  if (con == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
+      return;
+    }
 
-  for ( ; state && state->event == NULL; state = state->parent)
+  for ( ; state!=NULL && state->event == NULL; state = state->parent)
     ;
-  if (state && state->event)
+  if (state!=NULL && state->event!=NULL)
     fprintf_event(con->fp, ctx, state->event->event);
   else
     fprintf(con->fp, "No event to display.\n");

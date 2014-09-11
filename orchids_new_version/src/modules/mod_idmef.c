@@ -16,12 +16,25 @@
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
+#define _XOPEN_SOURCE 600 /* (ugly) for strptime(), included from <time.h>
+			     on Linux/glibc2 only if this is defined */
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h> // for PATH_MAX
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
+
+#include "ovm.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
@@ -39,8 +52,7 @@ field_t idmef_fields[MAX_IDMEF_FIELDS] = {
   { "idmef.ptr",		    T_EXTERNAL,"idmef xml doc"   }
 };
 
-static ovm_var_t*
-parse_idmef_datetime(char	*datetime)
+static ovm_var_t* parse_idmef_datetime(gc_t *gc_ctx, char *datetime)
 {
   struct tm tm;
   char	*datetime_ = datetime;
@@ -53,9 +65,9 @@ parse_idmef_datetime(char	*datetime)
 
   datetime = strptime(datetime, "%Y-%m-%dT%H:%M:%S", &tm);
 
-  if (!datetime)
+  if (datetime==NULL)
   {
-    DebugLog(DF_MOD, DS_ERROR, "Malformated idmef datetime (%s)\n", datetime_);
+    DebugLog(DF_MOD, DS_ERROR, "Malformed idmef datetime (%s)\n", datetime_);
     return NULL;
   }
 
@@ -64,7 +76,7 @@ parse_idmef_datetime(char	*datetime)
   {
     // skip fraction seconds
     datetime++;
-    while ( isdigit(*datetime) )
+    while (isdigit(*datetime))
       datetime++;
   }
 
@@ -72,7 +84,7 @@ parse_idmef_datetime(char	*datetime)
       (*datetime == '-'))
   {
     if (sscanf(datetime + 1, "%2u:%2u", &h, &m) != 2)
-      DebugLog(DF_MOD, DS_ERROR, "Malformated idmef datetime (%s)\n", datetime_);
+      DebugLog(DF_MOD, DS_ERROR, "Malformed idmef datetime (%s)\n", datetime_);
     if (*datetime == '+')
     {
       tm.tm_min -= m;
@@ -85,50 +97,54 @@ parse_idmef_datetime(char	*datetime)
     }
   }
 
-  res = ovm_ctime_new();
-  CTIME(res) = mktime(&tm);
+  res = ovm_ctime_new(gc_ctx, mktime(&tm));
   return res;
 }
 
-static int
-load_idmef_xmlDoc(orchids_t	*ctx,
-		  mod_entry_t	*mod,
-		  const char	*txt_line,
-		  const size_t	txt_len)
+static int load_idmef_xmlDoc(orchids_t *ctx,
+			     mod_entry_t *mod,
+			     const char	*txt_line,
+			     const size_t txt_len)
 {
   idmef_cfg_t	*cfg;
   xmlDocPtr	doc = NULL;
-  ovm_var_t	*attr[MAX_IDMEF_FIELDS];
-  event_t	*event;
   xmlXPathContextPtr	xpath_ctx = NULL;
   xml_doc_t	*xml_doc = NULL;
   int		c;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  ovm_var_t *val;
 
   cfg = mod->config;
-  if (((doc = xmlReadMemory(txt_line, txt_len, "idmef", NULL, 0)) == NULL)
-      || ((xpath_ctx = xmlXPathNewContext(doc)) == NULL))
-  {
-    fprintf(stdout, "Error loading IDMEF xml doc \n");
-    return (0);
-  }
+  doc = xmlReadMemory(txt_line, txt_len, "idmef", NULL, 0);
+  if (doc==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Error loading IDMEF xml doc\n");
+      return 0;
+    }
+  xpath_ctx = xmlXPathNewContext(doc);
+  if (xpath_ctx==NULL)
+    {
+      xmlFreeDoc(doc);
+      DebugLog(DF_MOD, DS_ERROR, "Error creating XPath context\n");
+      return 0;
+    }
 
-  xml_doc = Xzmalloc(sizeof (xml_doc_t));
+  GC_START(gc_ctx, MAX_IDMEF_FIELDS+1);
+  
+  xml_doc = gc_base_malloc(gc_ctx, sizeof (xml_doc_t));
   xml_doc->doc = doc;
   xml_doc->xpath_ctx = xpath_ctx;
 
   xmlXPathRegisterNs(xpath_ctx, BAD_CAST ("idmef"),
 		     BAD_CAST ("http://iana.org/idmef"));
 
-  memset(attr, 0, sizeof(attr));
-  attr[F_PTR] = ovm_extern_new();
-  EXTPTR(attr[F_PTR]) = xml_doc;
-  EXTFREE(attr[F_PTR]) = free_xml_doc;
+  val = ovm_extern_new(gc_ctx, xml_doc, xml_description, free_xml_doc);
+  GC_UPDATE (gc_ctx, F_PTR, val);
 
   for (c = 1; c < cfg->nb_fields; c++)
   {
     char	*text;
     int		text_len;
-    ovm_var_t	*res;
 
     if ((text = xml_get_string(xml_doc, cfg->field_xpath[c])) != NULL)
     {
@@ -137,86 +153,130 @@ load_idmef_xmlDoc(orchids_t	*ctx,
 	case T_STR :
 	case T_VSTR :
 	  text_len = strlen(text);
-	  res = ovm_str_new(text_len);
-	  memcpy (STR(res), text, text_len);
-	  attr[c] = res;
+	  val = ovm_str_new(gc_ctx, text_len);
+	  memcpy (STR(val), text, text_len);
+	  GC_UPDATE (gc_ctx, c, val);
 	  break;
 	case T_CTIME :
-	{
-	  attr[c] = parse_idmef_datetime(text);
+	  val = parse_idmef_datetime(gc_ctx, text);
+	  GC_UPDATE (gc_ctx, c, val);
 	  break;
-	}
 	case T_IPV4 :
-	  attr[c] = ovm_ipv4_new();
-	  IPV4(attr[c]).s_addr = inet_addr(text);
+	  val = ovm_ipv4_new(gc_ctx);
+	  IPV4(val).s_addr = inet_addr(text);
+	  GC_UPDATE (gc_ctx, c, val);
 	  break;
 	case T_INT :
-	  attr[c] = ovm_int_new();
-	  sscanf(text, "%li", &(INT(attr[c])));
-	  break;
+	  {
+	    long i;
+
+	    sscanf(text, "%li", &i);
+	    val = ovm_int_new(gc_ctx, i);
+	    GC_UPDATE (gc_ctx, c, val);
+	    break;
+	  }
 	case T_UINT :
-	  attr[c] = ovm_uint_new();
-	  sscanf(text, "%lu", &(UINT(attr[c])));
-	  break;
+	  {
+	    unsigned long i;
+
+	    sscanf(text, "%lu", &i);
+	    val = ovm_uint_new(gc_ctx, i);
+	    GC_UPDATE (gc_ctx, c, val);
+	    break;
+	  }
       }
       xmlFree (text);
     }
   }
 
-  event = NULL;
-  add_fields_to_event(ctx, mod, &event, attr, cfg->nb_fields);
-  post_event(ctx, mod, event);
-
-  return (1);
+  REGISTER_EVENTS(ctx, mod, MAX_IDMEF_FIELDS);
+  GC_END(gc_ctx);
+  return 1;
 }
 
-static int
-dissect_idmef(orchids_t		*ctx,
-	      mod_entry_t	*mod,
-	      event_t		*event,
-	      void		*data)
+static char *my_strnstr (char *text, size_t len, char *pattern)
 {
-  char		*line;
-  char		*end;
-  idmef_cfg_t	*cfg;
+  size_t patlen = strlen(pattern);
+  char *end = text + len - patlen;
+  int res;
+
+  while (text <= end)
+    {
+      res = memcmp(text, pattern, patlen);
+      if (res==0)
+	return text;
+      text++;
+    }
+  return NULL;
+}
+
+static int dissect_idmef(orchids_t *ctx,
+			 mod_entry_t *mod,
+			 event_t *event,
+			 void *data)
+{
+  char *txt_line, *txt_end;
+  size_t txt_len, msg_len;
+  char *end;
+  idmef_cfg_t *cfg;
 
   cfg = mod->config;
-  line = STR(event->value);
-
-  while ((end = strstr(line, "</idmef:IDMEF-Message>")) != NULL)
-  {
-    if (cfg->buff_len +  end - line + 22 >= MAX_IDMEF_SIZE)
-      DebugLog(DF_MOD, DS_ERROR, "idmef message too big\n");
-    else
+  if (event->value==NULL)
     {
-      strncat (cfg->buff, line, end - line + 22);
-      load_idmef_xmlDoc(ctx, mod, cfg->buff, strlen(cfg->buff));
+      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
+      return -1;
     }
+  switch (TYPE(event->value))
+    {
+    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+      break;
+    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      return -1;
+    }
+  txt_end = txt_line + txt_len;
+
+  while ((end = my_strnstr(txt_line, txt_end-txt_line,
+			   "</idmef:IDMEF-Message>")) != NULL)
+  {
+    msg_len = end - txt_line + 22;
+    if (cfg->buff_len +  msg_len >= MAX_IDMEF_SIZE)
+      DebugLog(DF_MOD, DS_ERROR, "IDMEF message too big\n");
+    else
+      {
+	strncpy (cfg->buff+cfg->buff_len, txt_line, msg_len);
+	load_idmef_xmlDoc(ctx, mod, cfg->buff, cfg->buff_len + msg_len);
+      }
     cfg->buff[0] = 0;
     cfg->buff_len = 0;
-    line = end + 22;
-    while (*line && (*line != '<'))
-      line ++;
-
+    txt_line = end + 22;
+    while (txt_line<txt_end && (*txt_line != '<'))
+      txt_line++;
   }
-  strcat (cfg->buff, line);
-
-  return (1);
+  msg_len = txt_end - txt_line;
+  if (msg_len > MAX_IDMEF_SIZE - cfg->buff_len)
+    msg_len = MAX_IDMEF_SIZE - cfg->buff_len; /* avoid overflows - may lose
+						 part of the message,
+						 in principle */
+  memcpy (cfg->buff+cfg->buff_len, txt_line, msg_len);
+  cfg->buff_len += msg_len;
+  return 1;
 }
 
-int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+		    void *data)
 {
   return dissect_idmef(ctx, mod, event, data);
 }
 
-static void
-add_analyzer_node(xmlNode	*alert_root,
-		  idmef_cfg_t	*cfg)
+static void add_analyzer_node(xmlNode *alert_root,
+			      idmef_cfg_t *cfg)
 {
-  xmlNode	*ana_node = NULL;
-  xmlNode	*node_node = NULL;
-  xmlChar	*xmlEncStr = NULL;
+  xmlNode *ana_node = NULL;
+  xmlNode *node_node = NULL;
+  xmlChar *xmlEncStr = NULL;
 
   ana_node = xmlNewChild(alert_root, alert_root->ns, BAD_CAST "Analyzer", NULL);
   xmlNewProp(ana_node, BAD_CAST "analyzerid", BAD_CAST cfg->analyzer_id);
@@ -250,10 +310,9 @@ add_analyzer_node(xmlNode	*alert_root,
   }
 }
 
-xml_doc_t*
-generate_alert(orchids_t	*ctx,
-	       mod_entry_t	*mod,
-	       state_instance_t *state)
+xml_doc_t* generate_alert(orchids_t	*ctx,
+			  mod_entry_t	*mod,
+			  state_instance_t *state)
 {
   xmlDoc	*alert_doc = NULL;
   xmlNode	*alert_root = NULL;
@@ -290,7 +349,6 @@ generate_alert(orchids_t	*ctx,
 	     xmlEncodeEntities(alert_root->doc,
 			       BAD_CAST buff));
 
-
   add_analyzer_node(cur_node, mod->config);
 
   snprintf(buff, sizeof(buff), "%08lx.%08lx", ntph, ntpl);
@@ -310,31 +368,28 @@ generate_alert(orchids_t	*ctx,
 			       BAD_CAST buff));
 
 
-  xml_doc = Xzmalloc(sizeof(xml_doc_t));
+  xml_doc = gc_base_malloc (ctx->gc_ctx, sizeof(xml_doc_t));
   xml_doc->doc = alert_doc;
   xml_doc->xpath_ctx = alert_ctx;
 
-  return (xml_doc);
+  return xml_doc;
 }
 
 
-static void
-issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*res;
   static mod_entry_t	*mod_entry = NULL;
 
-  if (!mod_entry)
+  if (mod_entry==NULL)
     mod_entry = find_module_entry(ctx, "idmef");
 
-  res = ovm_xml_new ();
+  res = ovm_xml_new (ctx->gc_ctx, xml_description);
+  PUSH_VALUE(ctx, res);
   EXTPTR(res) = generate_alert(ctx, mod_entry, state);
-
-  stack_push(ctx->ovm_stack, res);
 }
 
-static void
-issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var;
   xml_doc_t	*report;
@@ -349,44 +404,68 @@ issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "idmef");
 
-  cfg = (idmef_cfg_t*)mod_entry->config;
+  cfg = (idmef_cfg_t *)mod_entry->config;
+  var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_description)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+    }
+  else if (cfg->report_dir==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Report Directory isn't set. Aborting.\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+    }
+  else
+    {
+      report = EXTPTR(var);
 
-  var = stack_pop(ctx->ovm_stack);
-  if (!var || (TYPE(var) != T_EXTERNAL) || !EXTPTR(var))
-  {
-    DebugLog(DF_ENG, DS_ERROR, "parameter error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-  }
+      gettimeofday(&tv, NULL);
+      Timer_to_NTP(&tv, ntph, ntpl);
 
-  if (cfg->report_dir == NULL) {
-    DebugLog(DF_CORE, DS_ERROR, "Report Directory isn't set. Aborting.\n");
-    return ;
-  }
-
-  report = EXTPTR(var);
-
-  gettimeofday(&tv, NULL);
-  Timer_to_NTP(&tv, ntph, ntpl);
-
-  // Write the report in the reports dir
-  snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
-	   cfg->report_dir, "report-", ntph, ntpl, ".xml");
-  fp = Xfopen(buff, "w");
-  xmlDocFormatDump(fp, report->doc, 1);
-  Xfclose(fp);
-
-  ISSDL_RETURN_TRUE(ctx, state);
+      // Write the report into the reports dir
+      snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
+	       cfg->report_dir, "report-", ntph, ntpl, ".xml");
+      fp = fopen(buff, "w");
+      if (fp==NULL)
+	{
+	  DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
+		   buff, strerror(errno));
+	  STACK_DROP(ctx->ovm_stack, 1);
+	  PUSH_RETURN_FALSE(ctx);
+	}
+      else
+	{
+	  xmlDocFormatDump(fp, report->doc, 1);
+	  (void) fclose(fp);
+	  STACK_DROP(ctx->ovm_stack, 1);
+	  PUSH_RETURN_TRUE(ctx);
+	}
+    }
 }
 
-static void *
-idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   idmef_cfg_t*	cfg;
+  int i;
 
   DebugLog(DF_MOD, DS_INFO, "load() idmef@%p\n", (void *) &mod_idmef);
 
-  cfg = Xzmalloc(sizeof (idmef_cfg_t));
+  cfg = gc_base_malloc(ctx->gc_ctx, sizeof (idmef_cfg_t));
   cfg->nb_fields = 1;
+  for (i=0; i<MAX_IDMEF_FIELDS; i++)
+    cfg->field_xpath[i] = NULL;
+  cfg->buff[0] =  '\0';
+  cfg->buff_len = 0;
+  cfg->too_big = 0;
+  cfg->analyzer_id = 0;
+  cfg->analyzer_name = NULL;
+  cfg->analyzer_node_address = NULL;
+  cfg->analyzer_node_location = NULL;
+  cfg->analyzer_node_name = NULL;
+  cfg->report_dir = NULL;
 
   register_lang_function(ctx,
 			 issdl_idmef_new_alert,
@@ -398,46 +477,53 @@ idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 "idmef_write_alert", 0,
 			 "write idmef alert in the report folder");
 
-  return (cfg);
+  return cfg;
 }
 
-static void
-idmef_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void idmef_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  DebugLog(DF_MOD, DS_INFO, "load() idmef %i\n", ((idmef_cfg_t*)mod->config)->nb_fields );
+  DebugLog(DF_MOD, DS_INFO, "load() idmef %i\n",
+	   ((idmef_cfg_t *)mod->config)->nb_fields );
 
-  register_fields(ctx, mod, idmef_fields, ((idmef_cfg_t*)mod->config)->nb_fields);
+  register_fields(ctx, mod, idmef_fields,
+		  ((idmef_cfg_t*)mod->config)->nb_fields);
 }
 
-static void
-add_field(char* field_name, char* path, idmef_cfg_t*	cfg, int type)
+static void add_field(orchids_t *ctx, char *field_name, char *path,
+		      idmef_cfg_t *cfg, int type)
 {
   if (cfg->nb_fields == MAX_IDMEF_FIELDS)
   {
-    DebugLog(DF_MOD, DS_WARN, "Max number of idmef fields reached, cannot add %s %s\n", field_name , path);
+    DebugLog(DF_MOD, DS_WARN,
+	     "Max number of idmef fields reached, cannot add %s %s\n",
+	     field_name, path);
     return;
   }
 
-  idmef_fields[cfg->nb_fields].name = Xzmalloc((9 + strlen(field_name))
-							  * sizeof(char));
-  strcat(idmef_fields[cfg->nb_fields].name, "idmef.");
-  strcat(idmef_fields[cfg->nb_fields].name, field_name);
+  {
+    char *s;
 
-  idmef_fields[cfg->nb_fields].type = type;
-  idmef_fields[cfg->nb_fields].desc = path;
+    s = gc_base_malloc(ctx->gc_ctx, 7 + strlen(field_name));
+    idmef_fields[cfg->nb_fields].name = s;
+    memcpy (s, "idmef.", 6);
+    strcpy (s+6, field_name);
 
-  DebugLog(DF_MOD, DS_INFO, "add new field %i (%s) : %s\n",
-	   cfg->nb_fields,
-	   idmef_fields[cfg->nb_fields].name , path);
-  cfg->field_xpath[cfg->nb_fields++] = path;
+    idmef_fields[cfg->nb_fields].type = type;
+    idmef_fields[cfg->nb_fields].desc = path;
+
+    DebugLog(DF_MOD, DS_INFO, "add new field %i (%s) : %s\n",
+	     cfg->nb_fields,
+	     idmef_fields[cfg->nb_fields].name , path);
+    cfg->field_xpath[cfg->nb_fields++] = path;
+  }
 }
 
-static void
-dir_add_field(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void dir_add_field(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir)
 {
   char* pos;
 
-  for (pos = dir->args; *pos && !isblank(*pos); pos++)
+  for (pos = dir->args; *pos!='\0' && !isblank(*pos); pos++)
     continue;
   if (!pos)
   {
@@ -447,17 +533,16 @@ dir_add_field(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   *pos = '\0';
 
   if (!strcmp(dir->directive, "str_field"))
-    add_field(dir->args, pos + 1, mod->config, T_STR);
+    add_field(ctx, dir->args, pos + 1, mod->config, T_STR);
   else if (!strcmp(dir->directive, "time_field"))
-    add_field(dir->args, pos + 1, mod->config, T_CTIME);
+    add_field(ctx, dir->args, pos + 1, mod->config, T_CTIME);
   else if (!strcmp(dir->directive, "ipv4_field"))
-    add_field(dir->args, pos + 1, mod->config, T_IPV4);
+    add_field(ctx, dir->args, pos + 1, mod->config, T_IPV4);
   else if (!strcmp(dir->directive, "int_field"))
-  add_field(dir->args, pos + 1, mod->config, T_INT);
+    add_field(ctx, dir->args, pos + 1, mod->config, T_INT);
 }
 
-static void
-dir_set_analyzer_info(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void dir_set_analyzer_info(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   idmef_cfg_t*	cfg = mod->config;
 
@@ -473,8 +558,9 @@ dir_set_analyzer_info(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     cfg->analyzer_node_name = dir->args;
   DebugLog(DF_MOD, DS_INFO, "%s set to %s\n", dir->directive, dir->args);
 }
-static void
-dir_set_report_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+
+static void dir_set_report_dir(orchids_t *ctx, mod_entry_t *mod,
+			       config_directive_t *dir)
 {
   idmef_cfg_t*	cfg = mod->config;
   struct stat	s;
@@ -486,7 +572,6 @@ dir_set_report_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     DebugLog(DF_MOD, DS_ERROR, "%s is not a directory\n", dir->args);
     exit(EXIT_FAILURE);
   }
-
   cfg->report_dir = dir->args;
 }
 

@@ -55,6 +55,8 @@
 #define F_OFFSET    31
 
 
+extern void snareparse_set_gc_ctx(gc_t *gc_ctx);
+extern void snareparse_set_delegate(ovm_var_t *delegate);
 extern void snareparse_set_str(char *str, size_t s);
 extern void snareparse_set_attrs(ovm_var_t **attr_fields);
 extern int snareparse(void);
@@ -62,12 +64,10 @@ extern void snareparse_set_attrs(ovm_var_t **attr_fields);
 extern void snareparse_reset(void);
 
 
-static int
-snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
+static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			 void *data);
 
-
-static void *
-snare_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
 //static void

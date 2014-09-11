@@ -15,6 +15,9 @@
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -70,20 +73,20 @@ int my_yyinput(char *buf, int max_size);
 
 packets? { return (CISCO_PACKETS); }
 
-[0-9]+ { ciscolval.integer = atoi(ciscotext); return (INTEGER); }
+[0-9]+ { ciscolval.integer = strtol(yytext, (char **)NULL, 10); return (INTEGER); }
 [a-zA-Z][a-zA-Z0-9_]+ {
-  ciscolval.string = strdup(ciscotext);
+  ciscolval.string = strdup(yytext);
   DPRINTF( ("string\n") );
   return (STRING);
 }
 ([0-9]{1,3}\.){3}[0-9]{1,3} {
-  ciscolval.ipv4addr.s_addr = inet_addr(ciscotext);
+  ciscolval.ipv4addr.s_addr = inet_addr(yytext);
   return (INETADDR);
 }
 
 \n /* skip new lines */;
 
-. { return (ciscotext[0]); }
+. { return (yytext[0]); }
 
 
 %%

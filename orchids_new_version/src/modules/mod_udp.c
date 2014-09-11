@@ -37,8 +37,7 @@
 input_module_t mod_udp;
 
 
-static int
-create_udp_socket(int udp_port)
+static int create_udp_socket(int udp_port)
 {
   int fd, on = 1;
   struct sockaddr_in sin;
@@ -53,54 +52,53 @@ create_udp_socket(int udp_port)
 
   Xbind(fd, (struct sockaddr *) &sin, sizeof(sin));
 
-  return (fd);
+  return fd;
 }
 
+#define MAXSOCKLEN 8192
 
-static int
-udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
+static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
 {
-  ovm_var_t *attr[UDP_FIELDS];
-  char buf[8194];
+  gc_t *gc_ctx = ctx->gc_ctx;
   socklen_t sz;
   struct sockaddr_in from;
   socklen_t len;
-  event_t *event;
+  ovm_var_t *var;
+
+  GC_START(gc_ctx, UDP_FIELDS+1);
+  /* UDP_FIELDS fields, plus the event to be built */
 
   DebugLog(DF_MOD, DS_TRACE, "udp_callback()\n");
 
-  memset(attr, 0, sizeof(attr));
+  var = ovm_timeval_new (gc_ctx);
+  gettimeofday(&TIMEVAL(var) , NULL);
+  GC_UPDATE(gc_ctx, F_TIME, var);
 
+  var = ovm_int_new (gc_ctx, (long) mod->posts);
+  GC_UPDATE(gc_ctx, F_EVENT, var);
+
+  GC_UPDATE(gc_ctx, F_DST_PORT, (ovm_var_t *)data);
+  /* F_DST_ADDR never filled in */
+
+  var = ovm_bstr_new (gc_ctx, MAXSOCKLEN);
+  GC_UPDATE (gc_ctx, F_MSG, var);
   len = sizeof (struct sockaddr_in);
   memset(&from, 0, sizeof (struct sockaddr_in));
-  sz = Xrecvfrom(fd,buf,8192,0, (struct sockaddr *)&from, &len);
-  buf[sz] = '\0';
+  sz = Xrecvfrom(fd,BSTR(var),MAXSOCKLEN,0,
+		 (struct sockaddr *)&from, &len);
 
   DebugLog(DF_MOD, DS_TRACE, "read size = %i\n", sz);
 
-  attr[F_EVENT] = ovm_int_new();
-  attr[F_EVENT]->flags |= TYPE_MONO;
-  INT(attr[F_EVENT]) = (long) mod->posts;
+  var = ovm_ipv4_new(gc_ctx);
+  IPV4(var) = from.sin_addr;
+  GC_UPDATE(gc_ctx, F_SRC_ADDR, var);
 
-  attr[F_TIME] = ovm_timeval_new();
-  attr[F_TIME]->flags |= TYPE_MONO;
-  gettimeofday( &(TIMEVAL(attr[F_TIME])) , NULL);
+  var = ovm_uint_new(gc_ctx, (long)from.sin_port);
+  GC_UPDATE(gc_ctx, F_SRC_PORT, var);
 
-  attr[F_SRC_ADDR] = ovm_ipv4_new();
-  IPV4(attr[F_SRC_ADDR]) = from.sin_addr;
-
-  attr[F_DST_PORT] = ovm_int_new();
-  INT(attr[F_DST_PORT]) = (int) data;
-
-  attr[F_MSG] = ovm_bstr_new(sz);
-  memcpy(BSTR(attr[F_MSG]), buf, sz);
-
-  event = NULL;
-  add_fields_to_event(ctx, mod, &event, attr, UDP_FIELDS);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  REGISTER_EVENTS(ctx, mod, UDP_FIELDS);
+  GC_END(gc_ctx);
+  return 0;
 }
 
 
@@ -108,40 +106,43 @@ static field_t udp_fields[] = {
   { "udp.event",    T_INT,      "event number"        },
   { "udp.time",     T_TIMEVAL,  "reception time"      },
   { "udp.src_addr", T_IPV4,     "source adress"       },
-  { "udp.src_port", T_INT,      "source port"         },
-  { "udp.dst_addr", T_IPV4,     "destination address" },
-  { "udp.dst_port", T_INT,      "destination port"    },
+  { "udp.src_port", T_UINT,      "source port"         },
+  { "udp.dst_addr", T_IPV4,     "destination address" }, /* never used? */
+  { "udp.dst_port", T_UINT,      "destination port"    },
   { "udp.msg",      T_BSTR,     "message"             }
 };
 
 
-static void *
-udp_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *udp_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() udp@%p\n", (void *) &mod_udp);
 
+gc_check(ctx->gc_ctx);
   register_fields(ctx, mod, udp_fields, UDP_FIELDS);
-
-  return (NULL);
+  return NULL;
 }
 
 
-static void
-add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int sd;
   int port;
+  ovm_var_t *var;
 
-  port = atoi(dir->args);
+  port = (int)strtol(dir->args, (char **)NULL, 10); /* atoi() is deprecated */
   DebugLog(DF_MOD, DS_INFO, "Add udp listen port %i\n", port);
 
   if ((port < 1) || (port > 65535)) {
     DebugLog(DF_MOD, DS_WARN, "bad port number.\n");
-    return ;
+    return;
   }
 
   sd = create_udp_socket(port);
-  add_input_descriptor(ctx, mod, udp_callback, sd, (void *)port);
+  GC_START(ctx->gc_ctx, 1);
+  var = ovm_uint_new (ctx->gc_ctx, port);
+  GC_UPDATE(ctx->gc_ctx, 0, var);
+  add_input_descriptor(ctx, mod, udp_callback, sd, (void *)var);
+  GC_END(ctx->gc_ctx);
 }
 
 

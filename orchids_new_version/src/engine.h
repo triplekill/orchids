@@ -29,8 +29,7 @@
  ** @param ctx    Orchids application context.
  ** @param event  The event to inject.
  **/
-void
-inject_event(orchids_t *ctx, event_t *event);
+void inject_event(orchids_t *ctx, event_t *event);
 
 
 /**

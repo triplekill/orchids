@@ -35,37 +35,34 @@
 input_module_t mod_snare;
 
 
-static int
-snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			 void *data)
 {
   char *txt_line;
   size_t txt_len;
-  ovm_var_t *attr[SNARE_FIELDS]; /* move into static array ?? */
   int ret;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  GC_START(gc_ctx, SNARE_FIELDS+1);
+  GC_UPDATE(gc_ctx, SNARE_FIELDS, event);
 
   DebugLog(DF_MOD, DS_DEBUG, "snare_dissect()\n");
-
-  memset(attr, 0, sizeof(attr));
 
   txt_line = STR(event->value);
   txt_len = STRLEN(event->value);
 
   /* XXX parse here */
+  snareparse_set_gc_ctx(gc_ctx);
+  snareparse_set_delegate(event->value);
   snareparse_set_str(txt_line, txt_len);
-  snareparse_set_attrs(attr); /* XXX move into static array */
+  snareparse_set_attrs((ovm_var_t **)&GC_LOOKUP(0));
   ret = snareparse();
   snareparse_reset();
-  if (ret != 0) {
+  if (ret != 0)
     DebugLog(DF_MOD, DS_WARN, "parse error\n");
-    free_fields(attr, SNARE_FIELDS);
-    return (1);
-  }
-
-  add_fields_to_event(ctx, mod, &event, attr, SNARE_FIELDS);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  else
+    REGISTER_EVENTS(ctx, mod, SNARE_FIELDS);
+  GC_END(gc_ctx);
+  return ret;
 }
 
 
@@ -105,18 +102,16 @@ static field_t snare_fields[] = {
 };
 
 
-static void *
-snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() snare@%p\n", (void *) &mod_snare);
 
   register_fields(ctx, mod, snare_fields, SNARE_FIELDS);
-
-  return (NULL);
+  return NULL;
 }
 
-int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+		    void *data)
 {
   return snare_dissect(ctx, mod, event, data);
 }

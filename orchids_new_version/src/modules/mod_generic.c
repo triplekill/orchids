@@ -39,263 +39,307 @@ input_module_t mod_generic;
 mod_generic_cfg_t *gen_cfg_g;
 
 
-static int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			   void *data)
 {
   char *txt_line;
   int txt_len;
   generic_vmod_t *vmod;
-  generic_field_t *field;
+  generic_field_t *field, *field2;
   generic_match_t *match;
   regmatch_t regmatch[256];
   int ret;
-/*   int i; */
-  char buf[4096];
+#ifndef HAVE_REGNEXEC
+  char *buf;
+#endif
   generic_hook_t *hook;
+  field_table_t *fields;
+  int err;
 
-  if (TYPE(event->value) == T_STR) {
-    txt_line = STR(event->value);
-    txt_len = STRLEN(event->value);
-  } else if (TYPE(event->value) == T_VSTR) {
-    txt_line = VSTR(event->value);
-    txt_len = VSTRLEN(event->value);
-  } else {
-    DebugLog(DF_MOD, DS_ERROR, "bad input type\n");
-    return (1);
-  }
+  err = 0;
+  if (event->value==NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
+      return -1;
+    }
+  switch (TYPE(event->value))
+    {
+    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+      break;
+    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      return -1;
+    }
 
   hook = data;
 
-  memcpy(buf, txt_line, txt_len);
-  buf[ txt_len ] = '\0';
+#ifndef HAVE_REGNEXEC
+  /* The following is costly, and can be avoided if we have regnexec()
+     instead of regexec().
+  */
+  buf = ovm_strdup (ctx->gc_ctx, event->value);
+  DebugLog(DF_MOD, DS_DEBUG, "mod_generic: process line [%s]\n", buf);
+#else
+  DebugLog(DF_MOD, DS_DEBUG, "mod_generic: process line\n");
+#endif
 
-  DebugLog(DF_MOD, DS_DEBUG, "process line [%s]\n", buf);
+  GC_START (ctx->gc_ctx, 1);
+  GC_UPDATE (ctx->gc_ctx, 0, event);
 
-  STAILQ_FOREACH(vmod, &hook->vmod_list, vmods) {
-    DebugLog(DF_MOD, DS_DEBUG, "enter vmod [%s]\n", vmod->name);
+  STAILQ_FOREACH(vmod, &hook->vmod_list, vmods)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "enter vmod [%s]\n", vmod->name);
 
-    STAILQ_FOREACH(match, &vmod->match_list, matches) {
-      DebugLog(DF_MOD, DS_DEBUG, "  enter match [%s]\n", match->regex_str);
+      STAILQ_FOREACH(match, &vmod->match_list, matches)
+	{
+	  DebugLog(DF_MOD, DS_DEBUG, "  enter match [%s]\n", match->regex_str);
 
-      ret = regexec(&match->regex, buf, 255, regmatch, 0);
-      if (ret) {
-        char err_buf[64];
-        regerror(ret, &match->regex, err_buf, sizeof (err_buf));
-        DebugLog(DF_MOD, DS_DEBUG, "regexec() error (%s)\n", err_buf);
-        continue ;
-      }
+#ifdef HAVE_REGNEXEC
+	  ret = regnexec(&match->regex, txt_line, txt_len, 255, regmatch, 0);
+#else
+	  ret = regexec(&match->regex, buf, 255, regmatch, 0);
+#endif
+	  if (ret)
+	    {
+	      char err_buf[64];
 
-      DebugLog(DF_MOD, DS_DEBUG, "regexec() MATCH\n");
+	      regerror(ret, &match->regex, err_buf, sizeof (err_buf));
+	      DebugLog(DF_MOD, DS_DEBUG, "regexec() error (%s)\n", err_buf);
+	      continue;
+	    }
 
-      memset(vmod->field_values, 0, vmod->fields * sizeof (ovm_var_t *));
+	  DebugLog(DF_MOD, DS_DEBUG, "regexec() MATCH\n");
 
-      STAILQ_FOREACH(field, &match->field_list, fields) {
-        char buff[4096];
-        size_t res_sz;
-        ovm_var_t *res;
-/*         event_t *new_event; */
+	  fields = vmod->fields;
+	  /* Should reset all fields to NULL,
+	     but instead we shall reset only the fields read to NULL
+	     on successful match. */
+#if 0
+	  for (i=0, n = fields->nfields; i<n; i++)
+	    fields->field_values[i] = NULL;
+#endif
 
-        res_sz = regmatch[ field->substring ].rm_eo
-               - regmatch[ field->substring ].rm_so;
-        if (res_sz >= sizeof (buff))
-          res_sz = sizeof (buff) - 1;
-        memcpy(buff,
-               &txt_line[ regmatch[ field->substring ].rm_so ],
-               res_sz);
-        buff[ res_sz ] = '\0';
-        DebugLog(DF_MOD, DS_DEBUG,
-                 "field '%s' %i (%i): \"%s\"\n",
-                 field->name, field->substring, field->field_id, buff);
+	  STAILQ_FOREACH(field, &match->field_list, fields)
+	    {
+	      char *buff;
+	      size_t res_sz;
+	      ovm_var_t *res;
 
-        switch (field->type) {
+	      res_sz = regmatch[ field->substring ].rm_eo
+		- regmatch[ field->substring ].rm_so;
+	      buff = &txt_line[regmatch[ field->substring ].rm_so];
+	      DebugLog(DF_MOD, DS_DEBUG,
+                 "field '%s' %i (%i)\n",
+		       field->name, field->substring, field->field_id);
 
-        case T_VSTR:
-          res = ovm_vstr_new();
-          VSTR(res) = &txt_line[ regmatch[ field->substring ].rm_so ];
-          VSTRLEN(res) = res_sz;
-          break;
-
-        case T_INT:
-          res = ovm_int_new();
-          INT(res) = atoi(buff);
-          break;
-
-        case T_IPV4:
-          res = ovm_ipv4_new();
-          if ( inet_aton(buff, &IPV4(res)) == 0) {
-            DebugLog(DF_MOD, DS_ERROR,
-                     "Error in IPV4 convertion of (%s)\n",
-                     buff);
-            return (1);
-          }
-          break;
-
-        case T_FLOAT:
-          res = ovm_float_new();
-          FLOAT(res) = atof(buff);
-          break;
-
-        default:
-          DebugLog(DF_MOD, DS_ERROR, "Unknown field type\n", field->type);
-          return (1);
-          break;
-        }
-
-        vmod->field_values[ field->field_id ] = res;
-
-/*         new_event = Xzmalloc(sizeof (event_t)); */
-/* /\*         new_event->field_id = res; *\/ */
-/*         new_event->value = res; */
-/*         new_event->next = event; */
-/*         event = new_event; */
-      }
-
+	      switch (field->type)
+		{
+		case T_VSTR:
+		  res = ovm_vstr_new(ctx->gc_ctx, event->value);
+		  VSTR(res) = &txt_line[regmatch[ field->substring ].rm_so];
+		  VSTRLEN(res) = res_sz;
+		  break;
+		case T_INT:
+		  res = ovm_int_new(ctx->gc_ctx,
+				    orchids_atoi(buff, res_sz));
+		  break;
+		case T_IPV4:
+		  res = ovm_ipv4_new(ctx->gc_ctx);
+		  if ( inet_aton(buff, &IPV4(res)) == 0)
+		    {
+		      DebugLog(DF_MOD, DS_ERROR,
+			       "Error in IPV4 convertion\n");
+		      err = 1;
+		      goto end;
+		    }
+		  break;
+		case T_FLOAT:
+		  res = ovm_float_new(ctx->gc_ctx,
+				      orchids_atof (buff, res_sz));
+		  break;
+		default:
+		  DebugLog(DF_MOD, DS_ERROR, "Unknown field type\n", field->type);
+		  /* Reset the written to fields to NULL */
+		  STAILQ_FOREACH(field2, &match->field_list, fields)
+		    {
+		      if (field2==field)
+			break;
+		      vmod->fields->field_values[field2->field_id] = NULL;
+		    }
+		  err = 1;
+		  goto end;
+		}
+	      GC_TOUCH (ctx->gc_ctx,
+			vmod->fields->field_values[field->field_id] = res);
+	    }
       add_fields_to_event(ctx,
                           &ctx->mods[vmod->mod_id],
-                          &event,
-                          vmod->field_values,
-                          vmod->fields);
-
-      post_event(ctx, &ctx->mods[vmod->mod_id], event);
-
-      return (0);
+                          (event_t **)&GC_LOOKUP(0),
+                          vmod->fields->field_values,
+                          vmod->fields->nfields);
+      /* Reset the written to fields to NULL */
+      STAILQ_FOREACH(field2, &match->field_list, fields)
+	{
+	  vmod->fields->field_values[field2->field_id] = NULL;
+	}
+      post_event(ctx, &ctx->mods[vmod->mod_id], (event_t *)GC_LOOKUP(0));
+      goto end;
     }
   }
-
   DebugLog(DF_MOD, DS_DEBUG, "No match\n");
-
-  return (1); /* 1  E_NOMATCH */
+  err = 1;
+ end:
+#ifndef HAVE_REGNEXEC
+  gc_base_free(buf);
+#endif
+  GC_END(ctx->gc_ctx);
+  return err; /* 1 = E_NOMATCH */
 }
 
 
-static void *
-generic_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void * generic_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   mod_generic_cfg_t *mod_cfg;
 
   DebugLog(DF_MOD, DS_DEBUG, "load() generic@%p\n", (void *) &mod_generic);
 
-  mod_cfg = Xzmalloc(sizeof (mod_generic_cfg_t));
+  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (mod_generic_cfg_t));
   gen_cfg_g = mod_cfg;
 
-  mod_cfg->mod_hash = new_strhash(257);
+  mod_cfg->hook_array = NULL;
+  mod_cfg->used_hook = 0;
+  mod_cfg->mod_hash = new_strhash(ctx->gc_ctx, 257);
+  mod_cfg->mods = 0;
   STAILQ_INIT(&mod_cfg->vmod_globlist);
 
-  return (mod_cfg);
+  return mod_cfg;
 }
 
 
-static void
-generic_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void generic_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   generic_hook_t *hook;
   generic_vmod_t *vmod;
   generic_field_t *field;
-  int i;
-  char field_name[128]; /* XXX: correct this ! */
+  size_t i, n;
+  char *field_name;
 
   /* register hooks (as generic modules)
    * then, the registered callback will post event as the virtual mod matching the field */
 
-  STAILQ_FOREACH(vmod, &gen_cfg_g->vmod_globlist, globvmods) {
-    DebugLog(DF_MOD, DS_DEBUG, "*** adding mod [%s]\n", vmod->name);
+  STAILQ_FOREACH(vmod, &gen_cfg_g->vmod_globlist, globvmods)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "*** adding mod [%s]\n", vmod->name);
 
-    vmod->field_array = Xmalloc(vmod->fields * sizeof (field_t));
-    vmod->field_values = Xzmalloc(vmod->fields * sizeof (ovm_var_t *));
+      n = vmod->nfields;
+      vmod->field_array = gc_base_malloc(ctx->gc_ctx, n*sizeof (field_t));
 
-    /* build field array */
-    i = 0;
-    STAILQ_FOREACH(field, &vmod->field_globlist, globfields) {
-      snprintf(field_name, sizeof (field_name),
-               "%s.%s",
-               vmod->name, field->name);
-      DebugLog(DF_MOD, DS_DEBUG,
-               "  *** adding field %i [%s]\n",
-               i, field_name);
-      vmod->field_array[i].name = strdup(field_name);
-      vmod->field_array[i].type = field->type;
-      vmod->field_array[i].desc = field->description;
-      i++;
+      GC_TOUCH (ctx->gc_ctx, vmod->fields = new_field_table(ctx->gc_ctx, n));
+      gc_add_root(ctx->gc_ctx, (gc_header_t **)&vmod->fields);
+
+      /* build field array */
+      i = 0;
+      STAILQ_FOREACH(field, &vmod->field_globlist, globfields)
+	{
+	  n = strlen (vmod->name) + strlen (field->name) + 2;
+	  field_name = gc_base_malloc (ctx->gc_ctx, n);
+	  snprintf(field_name, n,
+		   "%s.%s",
+		   vmod->name, field->name);
+	  DebugLog(DF_MOD, DS_DEBUG,
+		   "  *** adding field %i [%s]\n",
+		   i, field_name);
+	  vmod->field_array[i].name = field_name;
+	  vmod->field_array[i].type = field->type;
+	  vmod->field_array[i].desc = field->description;
+	  i++;
+	}
+
+      /* add modules */
+      vmod->mod_id = add_module(ctx, &vmod->mod_entry, NULL);
+
+      /* register fields */
+      register_fields(ctx,
+		      &ctx->mods[vmod->mod_id],
+		      vmod->field_array,
+		      vmod->fields->nfields);
     }
-
-    /* add modules */
-    vmod->mod_id = add_module(ctx, &vmod->mod_entry, NULL);
-
-    /* register fields */
-    register_fields(ctx,
-                    &ctx->mods[vmod->mod_id],
-                    vmod->field_array,
-                    vmod->fields);
-  }
 
   /* register vmod hook stubs */
   for (i = 0, hook = gen_cfg_g->hook_array;
-       (i < gen_cfg_g->used_hook); hook++, i++) {
-    DebugLog(DF_MOD, DS_DEBUG, "Registering hook: module=%s condition=%s\n", 
-             hook->module, hook->condition);
-    register_conditional_dissector(ctx, mod, hook->module, hook->condition,
-                                   strlen(hook->condition),
-                                   generic_dissect, hook);
-  }
+       (i < gen_cfg_g->used_hook); hook++, i++)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "Registering hook: module=%s condition=%s\n", 
+	       hook->module, hook->condition);
+      register_conditional_dissector(ctx, mod, hook->module, hook->condition,
+				     strlen(hook->condition),
+				     generic_dissect, hook);
+    }
 
-  return ;
+  return;
 }
 
 
-static void
-add_field(orchids_t *ctx,
-          generic_vmod_t *v,
-          generic_match_t *m,
-          config_directive_t *field_dir)
+static void add_field(orchids_t *ctx,
+		      generic_vmod_t *v,
+		      generic_match_t *m,
+		      config_directive_t *field_dir)
 {
   generic_field_t *f, *f2;
-  char buf[256]; /* <- argh ! */
-  char comment_buf[64]; /* <- argh ! */
+  char buf[64]; /* <- argh ! */
+  char comment_buf[256]; /* <- argh ! */
   /* add a field match here */
 
-  f = Xzmalloc(sizeof (generic_field_t));
+  f = gc_base_malloc (ctx->gc_ctx, sizeof (generic_field_t));
+  f->field_id = 0;
+  f->type = 0;
+  f->name = NULL;
+  f->substring = 0;
+  f->description = NULL;
 
-  if ( !strcmp(field_dir->directive, "str_field") ) {
+  if (!strcmp(field_dir->directive, "str_field"))
     f->type = T_VSTR;
-  }
-  else if ( !strcmp(field_dir->directive, "int_field") ) {
+  else if (!strcmp(field_dir->directive, "int_field"))
     f->type = T_INT;
-  }
-  else if ( !strcmp(field_dir->directive, "ip4_field") ) {
+  else if (!strcmp(field_dir->directive, "ip4_field"))
     f->type = T_IPV4;
-  }
-  else if ( !strcmp(field_dir->directive, "flt_field") ) {
+  else if (!strcmp(field_dir->directive, "flt_field"))
     f->type = T_FLOAT;
-  }
-  else {
-    DebugLog(DF_MOD, DS_FATAL,
-             "Unimplemented type '%s'\n",
-             field_dir->directive);
-    exit(EXIT_FAILURE);
-  }
+  else
+    {
+      DebugLog(DF_MOD, DS_FATAL,
+	       "Unimplemented type '%s'\n",
+	       field_dir->directive);
+      exit(EXIT_FAILURE);
+    }
 
   buf[0] = '\0';
   comment_buf[0] = '\0';
   sscanf(field_dir->args,
-         "%64s %i %64[^\n]",
+         "%64s %i %256[^\n]",
          buf, &f->substring, comment_buf);
-  f->name = strdup(buf);
+  f->name = gc_strdup(ctx->gc_ctx, buf);
   if (comment_buf[0] != '\0')
-    f->description = strdup(comment_buf);
+    f->description = gc_strdup(ctx->gc_ctx, comment_buf);
 
   STAILQ_INSERT_TAIL(&m->field_list, f, fields);
   m->fields++;
 
-  if ((f2 = strhash_get(v->field_hash, f->name)) == NULL) {
-    DebugLog(DF_MOD, DS_DEBUG,
-             "    Adding field [%s] into hash and globlist\n",
-             f->name, f->substring);
-    strhash_add(v->field_hash, f, f->name);
-    f->field_id = v->fields++;
-    STAILQ_INSERT_TAIL(&v->field_globlist, f, globfields);
-  } else {
-    f->field_id = f2->field_id;
-  }
+  if ((f2 = strhash_get(v->field_hash, f->name)) == NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG,
+	       "    Adding field [%s] into hash and globlist\n",
+	       f->name, f->substring);
+      strhash_add(v->field_hash, f, f->name);
+      f->field_id = v->nfields++;
+      STAILQ_INSERT_TAIL(&v->field_globlist, f, globfields);
+    }
+  else
+    {
+      f->field_id = f2->field_id;
+    }
 
   DebugLog(DF_MOD, DS_DEBUG,
            "    Adding field [%s] %i\n",
@@ -303,100 +347,121 @@ add_field(orchids_t *ctx,
 }
 
 
-static void
-add_fmatch(orchids_t *ctx, generic_vmod_t *v, config_directive_t *fmatch_dir)
+static void add_fmatch(orchids_t *ctx, generic_vmod_t *v,
+		       config_directive_t *fmatch_dir)
 {
   generic_match_t *m;
   config_directive_t *field_dir;
   int ret;
+  size_t len;
 
-  m = Xzmalloc(sizeof (generic_match_t));
+  m = gc_base_malloc (ctx->gc_ctx, sizeof (generic_match_t));
   STAILQ_INIT(&m->field_list);
-  m->regex_str = strdup(fmatch_dir->args + 1);
-  m->regex_str[ strlen(m->regex_str) - 2] = '\0';
+  m->fields = 0;
+  m->regex_str = gc_strdup(ctx->gc_ctx, fmatch_dir->args + 1);
+  len = strlen(m->regex_str);
+  if (len>=2)
+    m->regex_str[len - 2] = '\0'; /* !!! ??? */
 
   ret = regcomp(&m->regex, m->regex_str, REG_EXTENDED);
-  if (ret) {
-    char err_buf[64];
+  if (ret)
+    {
+      char err_buf[64];
 
-    DebugLog(DF_MOD, DS_FATAL,
-             "regex compilation error (%s)\n",
-             m->regex_str);
-    regerror(ret, &m->regex, err_buf, sizeof (err_buf));
-    exit(EXIT_FAILURE);
-  }
+      DebugLog(DF_MOD, DS_FATAL,
+	       "regex compilation error (%s)\n",
+	       m->regex_str);
+      regerror(ret, &m->regex, err_buf, sizeof (err_buf));
+      exit(EXIT_FAILURE);
+    }
 
   DebugLog(DF_MOD, DS_DEBUG, "    Adding field match [%s]\n", m->regex_str);
 
   for (field_dir = fmatch_dir->first_child;
-       field_dir;
-       field_dir = field_dir->next) {
-    add_field(ctx, v, m, field_dir);
-  }
+       field_dir!=NULL;
+       field_dir = field_dir->next)
+    {
+      add_field(ctx, v, m, field_dir);
+    }
   STAILQ_INSERT_TAIL(&v->match_list, m, matches);
 }
 
 
-static void
-add_vmod(orchids_t *ctx, generic_hook_t *h, config_directive_t *vmod_dir)
+static void add_vmod(orchids_t *ctx, generic_hook_t *h,
+		     config_directive_t *vmod_dir)
 {
   generic_vmod_t *vmod;
   config_directive_t *fmatch_dir;
   char *mod_name;
+  size_t len;
   /* add a virtual module */
 
-  mod_name = strdup(vmod_dir->args);
-  mod_name[ strlen(mod_name) - 1 ] = '\0';
+  mod_name = gc_strdup(ctx->gc_ctx, vmod_dir->args);
+  len = strlen(mod_name);
+  if (len>=1)
+  mod_name[len - 1] = '\0';
 
   vmod = strhash_get(gen_cfg_g->mod_hash, mod_name);
 
-  if (vmod == NULL) {
-    vmod = Xzmalloc(sizeof (generic_vmod_t));
-    STAILQ_INIT(&vmod->match_list);
-    STAILQ_INIT(&vmod->field_globlist);
-    vmod->name = mod_name;
-    vmod->mod_entry.magic = MOD_MAGIC;
-    vmod->mod_entry.version = ORCHIDS_VERSION;
-    vmod->mod_entry.license = mod_generic.license;
-    vmod->mod_entry.name = vmod->name;
-    vmod->field_hash = new_strhash(257);
+  if (vmod == NULL)
+    {
+      vmod = gc_base_malloc (ctx->gc_ctx, sizeof (generic_vmod_t));
+      STAILQ_INIT(&vmod->match_list);
+      STAILQ_INIT(&vmod->field_globlist);
+      vmod->name = mod_name;
+      vmod->mod_id = 0; /* temporary */
+      vmod->mod_entry.magic = MOD_MAGIC;
+      vmod->mod_entry.version = ORCHIDS_VERSION;
+      vmod->mod_entry.license = mod_generic.license;
+      vmod->mod_entry.name = vmod->name;
+      vmod->mod_entry.dependencies = NULL;
+      vmod->mod_entry.cfg_cmds = NULL;
+      vmod->mod_entry.pre_config = NULL;
+      vmod->mod_entry.post_config = NULL;
+      vmod->mod_entry.post_compil = NULL;
+      vmod->nfields = 0;
+      vmod->field_array = NULL;
+      vmod->field_hash = new_strhash(ctx->gc_ctx, 257);
+      vmod->fields = NULL;
 
-    DebugLog(DF_MOD, DS_DEBUG, "  Adding virtual module [%s]\n", vmod->name);
+      DebugLog(DF_MOD, DS_DEBUG, "  Adding virtual module [%s]\n", vmod->name);
 
-    if (find_module(ctx, vmod->name) != NULL) {
-      DebugLog(DF_MOD, DS_DEBUG,
-               "warning! module [%s] already loaded...\n",
-               vmod->name);
-      exit(EXIT_FAILURE);
+      if (find_module(ctx, vmod->name) != NULL)
+	{
+	  DebugLog(DF_MOD, DS_DEBUG,
+		   "warning! module [%s] already loaded...\n",
+		   vmod->name);
+	  exit(EXIT_FAILURE);
+	}
+
+      strhash_add(gen_cfg_g->mod_hash, vmod, vmod->name);
+      gen_cfg_g->mods++;
+      STAILQ_INSERT_TAIL(&gen_cfg_g->vmod_globlist, vmod, globvmods);
     }
-
-    strhash_add(gen_cfg_g->mod_hash, vmod, vmod->name);
-    gen_cfg_g->mods++;
-    STAILQ_INSERT_TAIL(&gen_cfg_g->vmod_globlist, vmod, globvmods);
-  }
-  else {
-    DebugLog(DF_MOD, DS_DEBUG, "  Reuse virtual module [%s]\n", vmod->name);
-  }
+  else
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "  Reuse virtual module [%s]\n", vmod->name);
+    }
 
   STAILQ_INSERT_TAIL(&h->vmod_list, vmod, vmods);
 
   for (fmatch_dir = vmod_dir->first_child;
-       fmatch_dir;
-       fmatch_dir = fmatch_dir->next) {
-    if (strcmp(fmatch_dir->directive, "<fieldmatch")) {
-      fprintf(stderr,
-              "bad directive ('%s' instead of '<fieldmatch')\n",
-              fmatch_dir->directive);
-      exit(EXIT_FAILURE);
+       fmatch_dir!=NULL;
+       fmatch_dir = fmatch_dir->next)
+    {
+      if (strcmp(fmatch_dir->directive, "<fieldmatch"))
+	{
+	  fprintf(stderr,
+		  "bad directive ('%s' instead of '<fieldmatch')\n",
+		  fmatch_dir->directive);
+	  exit(EXIT_FAILURE);
+	}
+      add_fmatch(ctx, vmod, fmatch_dir);
     }
-    add_fmatch(ctx, vmod, fmatch_dir);
-  }
   DebugLog(DF_MOD, DS_DEBUG, "end\n");
 }
 
-
-static void
-add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   generic_hook_t *h;
   config_directive_t *vmod_dir;
@@ -404,7 +469,9 @@ add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   size_t new_array_size;
 
   new_array_size = (gen_cfg_g->used_hook + 1) * sizeof (generic_hook_t);
-  gen_cfg_g->hook_array = Xrealloc(gen_cfg_g->hook_array, new_array_size);
+  gen_cfg_g->hook_array = gc_base_realloc(ctx->gc_ctx,
+					  gen_cfg_g->hook_array,
+					  new_array_size);
 
   DebugLog(DF_MOD, DS_DEBUG,
            "Adding hook #%i [%s]\n",
@@ -412,19 +479,21 @@ add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   h = &gen_cfg_g->hook_array[ gen_cfg_g->used_hook++ ];
   STAILQ_INIT(&h->vmod_list);
-  sscanf(dir->args, "%s \"%[^\"]\"", mod_buf, mod_cond);
-  h->module = strdup(mod_buf);
-  h->condition = strdup(mod_cond);
+  sscanf(dir->args, "%64s \"%256[^\"]\"", mod_buf, mod_cond);
+  h->module = gc_strdup(ctx->gc_ctx, mod_buf);
+  h->condition = gc_strdup(ctx->gc_ctx, mod_cond);
 
-  for (vmod_dir = dir->first_child; vmod_dir; vmod_dir = vmod_dir->next) {
-    if (strcmp(vmod_dir->directive, "<vmod")) {
-      fprintf(stderr,
-              "bad directive ('%s' instead of '<vmod')\n", 
-              vmod_dir->directive);
-      exit(EXIT_FAILURE);
+  for (vmod_dir = dir->first_child; vmod_dir!=NULL; vmod_dir = vmod_dir->next)
+    {
+      if (strcmp(vmod_dir->directive, "<vmod"))
+	{
+	  fprintf(stderr,
+		  "bad directive ('%s' instead of '<vmod')\n", 
+		  vmod_dir->directive);
+	  exit(EXIT_FAILURE);
+	}
+      add_vmod(ctx, h, vmod_dir);
     }
-    add_vmod(ctx, h, vmod_dir);
-  }
 }
 
 

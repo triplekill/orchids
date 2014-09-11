@@ -32,16 +32,30 @@
 
 input_module_t mod_htmlstate;
 
-static void *
-htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   html_output_cfg_t *mod_cfg;
 
   DebugLog(DF_MOD, DS_INFO,
            "loading htmlstate module @ %p\n", (void *) &mod_htmlstate);
 
-  mod_cfg = Xzmalloc(sizeof (html_output_cfg_t));
+  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (html_output_cfg_t));
   /* default initialisation here */
+  mod_cfg->enable_cache = 0;
+  mod_cfg->fork = 0;
+
+  mod_cfg->auto_refresh_delay = 0;
+  mod_cfg->page_generation_delay = 0;
+  mod_cfg->cache_cleanup_delay = 0;;
+  mod_cfg->rule_media = 0; /* flags for graphs */
+  mod_cfg->rule_limit = 0;
+  mod_cfg->rule_state_limit = 0;
+  mod_cfg->rule_instance_limit = 0;
+  mod_cfg->rule_instance_state_limit = 0;
+  mod_cfg->thread_limit = 0;
+  mod_cfg->event_limit = 0;
+
+  mod_cfg->html_output_dir = NULL;
 
   mod_cfg->report_prefix = "report-";
   mod_cfg->report_ext = ".html";
@@ -49,10 +63,10 @@ htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
   html_output_preconfig(ctx);
 
   /* register cache cleanup periodic job */
-  register_rtcallback(ctx, rtaction_html_cache_cleanup, mod_cfg, 10);
+  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, mod_cfg, 10);
 
   /* register regeneration job */
-  register_rtcallback(ctx, rtaction_html_regeneration, mod_cfg, 2);
+  register_rtcallback(ctx, rtaction_html_regeneration, NULL, mod_cfg, 2);
 
 
 
@@ -91,7 +105,7 @@ set_HTML_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   cfg = (html_output_cfg_t *)mod->config;
 
 
-  cfg->html_output_dir = strdup(dir->args);
+  cfg->html_output_dir = gc_strdup(ctx->gc_ctx, dir->args);
 }
 
 

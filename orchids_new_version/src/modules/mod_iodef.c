@@ -26,11 +26,21 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
+
 #include <time.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "orchids.h"
 #include "orchids_api.h"
+#include "ovm.h"
 #include "evt_mgr.h"
 #include "mod_mgr.h"
 #include "util/hash.h"
@@ -38,21 +48,24 @@
 #include "file_cache.h"
 #include "html_output.h"
 
-// Buff used for variable expantion
+// Buff used for variable expansion
 #define BUFF_SIZE 1024
 
 input_module_t mod_iodef;
 static iodef_cfg_t *iodef_cfg;
 
-static xmlDocPtr
-parse_iodef_template (iodef_cfg_t* cfg, rule_t *rule)
+static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, rule_t *rule)
 {
   struct stat	s;
   char		file_path[PATH_MAX];
   char*		ext = NULL;
   xmlDocPtr	doc;
 
-  Xstat(cfg->iodef_conf_dir, &s);
+  if (stat(cfg->iodef_conf_dir, &s)!=0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror(errno));
+      return NULL;
+    }
 
   // Verify that the path with the new extension will fit in PATH_MAX
   if (strlen(rule->filename) + cfg->iodef_conf_dir_len + 2 >= PATH_MAX)
@@ -87,12 +100,11 @@ parse_iodef_template (iodef_cfg_t* cfg, rule_t *rule)
   return doc;
 }
 
-static char
-expand_var (orchids_t		*ctx,
-	    char		*text,
-	    state_instance_t	*state,
-	    char		*buff,
-	    unsigned int	buff_size)
+static char expand_var (orchids_t		*ctx,
+			char		*text,
+			state_instance_t	*state,
+			char		*buff,
+			unsigned int	buff_size)
 {
   unsigned int	i;
   unsigned int	v;
@@ -100,7 +112,7 @@ expand_var (orchids_t		*ctx,
   unsigned int	text_offset = 0;
   char		c;
 
-  if ((!text) || (!strchr(text, '$')))
+  if (!text=='\0' || !strchr(text, '$'))
     return 0;
 
   memset(buff, 0, buff_size);
@@ -126,20 +138,19 @@ expand_var (orchids_t		*ctx,
       c = text[text_offset + i];
       text[text_offset + i] = '\0';
 
-      // Retreive the last variable value and add it the the buffer
+      // Retrieve the last variable value and add it to the buffer
       for (v = 0; v < state->rule_instance->rule->dynamic_env_sz; ++v)
       {
 	if (!strcmp(text + text_offset + 1,
 		    state->rule_instance->rule->var_name[v]))
 	{
-	  if (state->current_env[v])
+	  ovm_var_t *val;
+
+	  val = ovm_read_value (state->env, v);
+	  if (val!=NULL)
 	    buff_offset += snprintf_ovm_var(buff + buff_offset,
 					    buff_size - buff_offset,
-					    state->current_env[v]);
-	  else if (state->inherit_env[v])
-	    buff_offset += snprintf_ovm_var(buff + buff_offset,
-					    buff_size - buff_offset,
-					    state->inherit_env[v]);
+					    val);
 	}
       }
 
@@ -156,10 +167,9 @@ expand_var (orchids_t		*ctx,
   return (1);
 }
 
-static void
-expand_iodef_template (orchids_t *ctx,
-		       xmlNodePtr cur_node,
-		       state_instance_t *state)
+static void expand_iodef_template (orchids_t *ctx,
+				   xmlNodePtr cur_node,
+				   state_instance_t *state)
 {
   xmlAttrPtr	cur_attr = NULL;
   char		buff[BUFF_SIZE];
@@ -183,9 +193,8 @@ expand_iodef_template (orchids_t *ctx,
     expand_iodef_template(ctx, cur_node, state);
 }
 
-static void
-rXmlSetNs(xmlNode	*node,
-	  xmlNs	*ns)
+static void rXmlSetNs(xmlNode	*node,
+		      xmlNs	*ns)
 {
   if (node->type != XML_ELEMENT_NODE)
     return;
@@ -196,12 +205,11 @@ rXmlSetNs(xmlNode	*node,
     rXmlSetNs(node, ns);
 }
 
-static void
-insert_template_report(orchids_t	*ctx,
-		       xmlXPathContext	*report_ctx,
-		       xmlNode		*insert_node,
-		       xmlChar		*xpath,
-		       state_instance_t	*state)
+static void insert_template_report(orchids_t	*ctx,
+				   xmlXPathContext	*report_ctx,
+				   xmlNode		*insert_node,
+				   xmlChar		*xpath,
+				   state_instance_t	*state)
 {
   xmlNode	*report_node = NULL;
   xmlNode	*copy_node = NULL;
@@ -234,11 +242,10 @@ insert_template_report(orchids_t	*ctx,
  * @param template_node idoef template root node
  * @param report_events	first report state instance
  */
-static void
-process_iodef_template (orchids_t		*ctx,
-			xmlXPathContext		*report_ctx,
-			xmlNode			*template_node,
-			state_instance_t	*report_events)
+static void process_iodef_template (orchids_t		*ctx,
+				    xmlXPathContext	*report_ctx,
+				    xmlNode		*template_node,
+				    state_instance_t	*report_events)
 {
   xmlNode	*insert_node = NULL;
   xmlChar	*state_name = NULL;
@@ -282,11 +289,10 @@ process_iodef_template (orchids_t		*ctx,
  * @param data  Unused
  * @param state First report state instance
  */
-static void
-generate_and_write_report (orchids_t	*ctx,
-			   mod_entry_t	*mod,
-			   void		*data,
-			   state_instance_t *state)
+static void generate_and_write_report (orchids_t	*ctx,
+				       mod_entry_t	*mod,
+				       void		*data,
+				       state_instance_t *state)
 {
   xml_doc_t	*report;
   iodef_cfg_t*	cfg;
@@ -298,7 +304,7 @@ generate_and_write_report (orchids_t	*ctx,
 
   cfg = (iodef_cfg_t *)mod->config;
   if (cfg->report_dir == NULL) {
-    DebugLog(DF_CORE, DS_ERROR, "Output Dir isn't set. Aborting.\n");
+    DebugLog(DF_MOD, DS_ERROR, "Output Dir isn't set. Aborting.\n");
     return ;
   }
 
@@ -310,17 +316,24 @@ generate_and_write_report (orchids_t	*ctx,
     // Write the report in the reports dir
     snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
 	     cfg->report_dir, "report-", ntph, ntpl, ".xml");
-    fp = Xfopen(buff, "w");
-    xmlDocFormatDump(fp, report->doc, 1);
-    Xfclose(fp);
+    fp = fopen(buff, "w");
+    if (fp==NULL)
+      {
+	DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
+		 buff, strerror(errno));
+      }
+    else
+      {
+	xmlDocFormatDump(fp, report->doc, 1);
+	(void) fclose(fp);
+      }
+    free_xml_doc (report); // [jgl] Baptiste did not call this but wrote 'XXX FREE REPORT': why?
   }
-//XXX FREE REPORT
 }
 
-xml_doc_t*
-generate_report(orchids_t	*ctx,
-		mod_entry_t	*mod,
-		state_instance_t *state)
+xml_doc_t *generate_report(orchids_t	*ctx,
+			   mod_entry_t	*mod,
+			   state_instance_t *state)
 {
   xmlDoc	*report_doc = NULL;
   xmlDoc	*iodef_doc = NULL;
@@ -348,7 +361,6 @@ generate_report(orchids_t	*ctx,
   xmlXPathRegisterNs(report_ctx, BAD_CAST ("iodef"),
 		     BAD_CAST ("urn:ietf:params:xml:ns:iodef-1.0"));
   report_root = xmlNewNode(NULL, BAD_CAST "IODEF-Document");
-
 
   xmlDocSetRootElement(report_doc, report_root);
   xmlNewProp(report_root, BAD_CAST "version", BAD_CAST "1.00");
@@ -398,18 +410,17 @@ generate_report(orchids_t	*ctx,
     process_iodef_template (ctx, report_ctx,
   			    xmlDocGetRootElement(iodef_doc),
   			    state);
-     xmlFreeDoc(iodef_doc);
+    xmlFreeDoc(iodef_doc);
   }
 
-  xml_doc = Xzmalloc(sizeof(xml_doc_t));
+  xml_doc = gc_base_malloc(ctx->gc_ctx, sizeof(xml_doc_t));
   xml_doc->doc = report_doc;
   xml_doc->xpath_ctx = report_ctx;
 
   return xml_doc;
 }
 
-static void
-issdl_generate_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*res;
   static mod_entry_t	*mod_entry = NULL;
@@ -417,14 +428,13 @@ issdl_generate_report(orchids_t *ctx, state_instance_t *state)
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
 
-  res = ovm_xml_new ();
+  res = ovm_xml_new (ctx->gc_ctx, xml_description);
+  PUSH_VALUE(ctx, res);
   EXTPTR(res) = generate_report(ctx, mod_entry, state);
-  stack_push(ctx->ovm_stack, res);
 }
 
 
-static void
-issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var;
   xml_doc_t	*report;
@@ -439,19 +449,23 @@ issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
 
-  cfg = (iodef_cfg_t*)mod_entry->config;
+  cfg = (iodef_cfg_t *)mod_entry->config;
 
-  var = stack_pop(ctx->ovm_stack);
-  if (!var || (TYPE(var) != T_EXTERNAL) || !EXTPTR(var))
-  {
-    DebugLog(DF_ENG, DS_ERROR, "parameter error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-  }
+  var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_description)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+    }
 
-  if (cfg->report_dir == NULL) {
-    DebugLog(DF_CORE, DS_ERROR, "Report Directory isn't set. Aborting.\n");
-    return ;
-  }
+  if (cfg->report_dir == NULL)
+    {
+      DebugLog(DF_CORE, DS_ERROR, "Report Directory isn't set. Aborting.\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+      return ;
+    }
 
   report = EXTPTR(var);
 
@@ -461,16 +475,25 @@ issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
   // Write the report in the reports dir
   snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
 	   cfg->report_dir, "report-", ntph, ntpl, ".xml");
-  fp = Xfopen(buff, "w");
-  xmlDocFormatDump(fp, report->doc, 1);
-  Xfclose(fp);
-
-  ISSDL_RETURN_TRUE(ctx, state);
+  fp = fopen(buff, "w");
+  if (fp==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
+	       buff, strerror(errno));
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+    }
+  else
+    {
+      xmlDocFormatDump(fp, report->doc, 1);
+      (void) fclose(fp);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_TRUE(ctx);
+    }
 }
 
-static int
-iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
-		 html_output_cfg_t *htmlcfg)
+static int iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
+			    html_output_cfg_t *htmlcfg)
 {
   FILE *fp;
   struct dirent **namelist;
@@ -482,40 +505,56 @@ iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
   iodef_cfg_t* cfg;
 
   cfg = (iodef_cfg_t *)mod->config;
-  if (cfg->report_dir == NULL) {
-    printf("IODEF Output isn't set. Aborting.\n");
-    DebugLog(DF_CORE, DS_ERROR, "IODEF Output isn't set. Aborting.\n");
-    return 0;
-  }
-  DebugLog(DF_CORE, DS_ERROR, "IODEF Output OK.\n");
+  if (cfg->report_dir == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "IODEF Output isn't set. Aborting.\n");
+      return 0;
+    }
+  DebugLog(DF_MOD, DS_INFO, "IODEF Output OK.\n");
 
-  Xstat(cfg->report_dir, &s);
+  if (stat(cfg->report_dir, &s)!=0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, strerror(errno));
+      return 0;
+    }
   fp = create_html_file(htmlcfg, "orchids-iodef.html", NO_CACHE);
+  if (fp==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Cannot open file orchids-iodef.html\n");
+      return 0;
+    }
+
   fprintf_html_header(fp, "Orchids IODEF reports");
   fprintf(fp, "<center><h1>Orchids IODEF reports<h1></center>\n");
   n = scandir(cfg->report_dir, &namelist, NULL, alphasort);
   if (n < 0)
-    perror("scandir()");
-  else {
-    fprintf(fp, "<center>\n" \
-	    "<div id=\"display_report\" style=\"position:absolute; "	\
-	    "z-index:42;\"> </div>\n"					\
-	    "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n"	\
-	    "  <tr class=\"h\"><th> Report list </th></tr>\n");
+    {
+      DebugLog (DF_MOD, DS_ERROR, strerror(errno));
+    }
+  else
+    {
+      fprintf(fp, "<center>\n"						\
+	      "<div id=\"display_report\" style=\"position:absolute; "	\
+	      "z-index:42;\"> </div>\n"					\
+	      "<table border=\"0\" cellpadding=\"3\" width=\"600\">\n"	\
+	      "  <tr class=\"h\"><th> Report list </th></tr>\n");
 
-    for (i = 0; i < n; i++) {
-      if ((!strcmp(namelist[i]->d_name, ".")) ||
-	  (!strcmp(namelist[i]->d_name, "..")))
-	continue;
-      snprintf(reportfile, sizeof (reportfile), "%s/%s",
-              cfg->report_dir , namelist[i]->d_name);
-      Xstat(reportfile, &s);
-      strftime(asc_time, sizeof (asc_time), "%a %b %d %H:%M:%S %Y",
-               localtime(&s.st_mtime));
-      fprintf(fp, "<tr><td class=\"e%i\"><a href=\"iodef/%s\">%s -> %s </a>" \
-	      "<div style=\"display:none\" id=\"report_%i\"> </div></td></tr>\n",
-              i % 2, namelist[i]->d_name, asc_time, namelist[i]->d_name, i);
-      free(namelist[i]);
+    for (i = 0; i < n; i++)
+      {
+	if ((!strcmp(namelist[i]->d_name, ".")) ||
+	    (!strcmp(namelist[i]->d_name, "..")))
+	  continue;
+	snprintf(reportfile, sizeof (reportfile), "%s/%s",
+		 cfg->report_dir , namelist[i]->d_name);
+	if (stat(reportfile, &s)==0)
+	  {
+	    strftime(asc_time, sizeof (asc_time), "%a %b %d %H:%M:%S %Y",
+		     localtime(&s.st_mtime));
+	    fprintf(fp, "<tr><td class=\"e%i\"><a href=\"iodef/%s\">%s -> %s </a>" \
+		    "<div style=\"display:none\" id=\"report_%i\"> </div></td></tr>\n",
+		    i % 2, namelist[i]->d_name, asc_time, namelist[i]->d_name, i);
+	  }
+	free(namelist[i]);
     }
     free(namelist);
     fprintf(fp, "</table></center>\n");
@@ -523,7 +562,7 @@ iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
 
   fprintf_html_trailer(fp);
 
-  Xfclose(fp);
+  (void) fclose(fp);
 
   fprintf(menufp,
   	  "<a href=\"orchids-iodef.html\" target=\"main\">IODEF</a><br/>\n");
@@ -531,27 +570,27 @@ iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
   return 1;
 }
 
-static void
-set_iodef_conf_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_iodef_conf_dir(orchids_t *ctx, mod_entry_t *mod,
+			       config_directive_t *dir)
 {
   iodef_cfg_t *cfg;
 
   cfg = (iodef_cfg_t *)mod->config;
-  cfg->iodef_conf_dir = strdup(dir->args);
+  cfg->iodef_conf_dir = gc_strdup(ctx->gc_ctx, dir->args);
   cfg->iodef_conf_dir_len = strlen(cfg->iodef_conf_dir);
 }
 
-static void
-set_report_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_report_dir(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
 {
   iodef_cfg_t *cfg;
 
   cfg = (iodef_cfg_t *)mod->config;
-  cfg->report_dir = strdup(dir->args);
+  cfg->report_dir = gc_strdup(ctx->gc_ctx, dir->args);
 }
 
-static void
-set_csirt_name(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_csirt_name(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
 {
   iodef_cfg_t *cfg;
 
@@ -559,8 +598,7 @@ set_csirt_name(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   cfg->CSIRT_name = dir->args;
 }
 
-static void *
-iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   iodef_cfg_t *mod_cfg;
 
@@ -583,7 +621,16 @@ iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			"write iodef report in the report folder");
 
 
-  mod_cfg = Xzmalloc(sizeof (iodef_cfg_t));
+  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (iodef_cfg_t));
+  mod_cfg->CSIRT_name = NULL;
+  mod_cfg->report_dir = NULL;
+  mod_cfg->iodef_conf_dir = NULL;
+  mod_cfg->iodef_conf_dir_len = 0;
+  mod_cfg->schema = NULL;
+    // XXX: Not implemented  => Use a contact database (xml file provided)
+  mod_cfg->contacts = NULL;
+  mod_cfg->full_dump = 0;
+
   iodef_cfg = mod_cfg;
 
   return (mod_cfg);

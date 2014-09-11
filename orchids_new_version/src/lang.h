@@ -30,8 +30,8 @@
 
 #include "orchids.h"
 
-/* Minimal natives types */
-#define T_NULL        0
+/* Minimal native types */
+#define T_NULL        0 /* obsolete */
 #define T_FNCT        1
 #define T_INT         2
 #define T_BSTR        3
@@ -45,68 +45,47 @@
 #define T_CTIME       9
 #define T_IPV4       10
 #define T_TIMEVAL    11
-#define T_COUNTER    12
-#define T_REGEX      13
-#define T_SREGEX     14
-#define T_PTR32      15
-#define T_UINT       16
-#define T_SNMPOID    17
-#define T_FLOAT      18
-#define T_DOUBLE     19
+#define T_REGEX      12
+#define T_UINT       13
+#define T_SNMPOID    14
+#define T_FLOAT      15
+#define T_EVENT      16
+#define T_STATE_INSTANCE 17
 
-#define T_EXTERNAL	 20
+#define T_EXTERNAL	 18
 
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
 #define T_TCPPORT 0
-#define T_IPV4PEER 0#define T_IPV6ADDR 0
+#define T_IPV4PEER 0
+#define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
-/* types flags mask -- this allow 2^16 types and 16 bits for flags */
-#define TYPE_FLAGS 0xFFFF0000
-#define TYPE_MASK  0x0000FFFF
+/* Extra types, not used for constant values */
+#define T_BIND 255
+/* T_BIND is for environments; see env_bind_t in orchids.h */
+#define T_SPLIT 254
+/* T_SPLIT is for environments; see env_split_t in orchids.h */
+#define T_HEAP 253
+/* T_HEAP is for skew heaps, as used in register_rtaction() and others in evt_mgr.c */
+
 
 /* monotony flags */
+/*
 #define MONOTONY_MASK 3
 #define TYPE_UNKNOWN  0
 #define TYPE_MONO     1
 #define TYPE_ANTI     2
 #define TYPE_CONST    (TYPE_MONO|TYPE_ANTI)
-
-/* Named variable or anonymous value.
-** Used for intermediate temporary values in expressions.
-** Intermediate values must be freed, but value bound to a variable
-** must be kept. */
-#define TYPE_CANFREE     (1 << 2)
-#define TYPE_NOTBOUND    (1 << 3)
-
-#define CAN_FREE_VAR(x) ((x)->flags & TYPE_CANFREE)
-#define IS_NOT_BOUND(x) \
-     (((x)->flags & (TYPE_CANFREE|TYPE_NOTBOUND)) == (TYPE_CANFREE|TYPE_NOTBOUND))
-
-#define FREE_VAR(x)			\
-  do {						\
-    if (x)			\
-   issdl_free(x);	\
-  } while (0)
-
-#define FREE_IF_NEEDED(x) \
-  do { \
-    if (x && IS_NOT_BOUND(x)) { \
-      issdl_free(x); \
-     } \
-  } while (0)
-
+*/
 
 #define STR_PAD_LEN 4
 
 #define OVM_VAR(var)   ((ovm_var_t *)(var))
 
 /* data accessors */
-#define       TYPE(var)      (((ovm_var_t *)(var))->type)
+#define       TYPE(var)      ((uint32_t)((ovm_var_t *)(var))->gc.type)
 #define    STRTYPE(var)     (str_issdltype(TYPE((ovm_var_t *)(var))))
-#define      FLAGS(var)      (((ovm_var_t *)(var))->flags)
-#define      ERRNO(var)     (((ovm_null_t *)(var))->err_no)
 #define        INT(var)      (((ovm_int_t *)(var))->val)
 #define       UINT(var)     (((ovm_uint_t *)(var))->val)
 #define        STR(var)      (((ovm_str_t *)(var))->str)
@@ -120,53 +99,17 @@
 #define      VBSTR(var)    (((ovm_vbstr_t *)(var))->str)
 #define   VBSTRLEN(var)    (((ovm_vbstr_t *)(var))->len)
 #define       IPV4(var)     (((ovm_ipv4_t *)(var))->ipv4addr)
-#define    COUNTER(var)  (((ovm_counter_t *)(var))->val)
 #define      REGEX(var)    (((ovm_regex_t *)(var))->regex)
 #define   REGEXSTR(var)    (((ovm_regex_t *)(var))->regex_str)
-#define     SREGEX(var)   (((ovm_sregex_t *)(var))->regex)
-#define  SREGEXNUM(var)   (((ovm_sregex_t *)(var))->splits)
-#define  SREGEXSTR(var)   (((ovm_sregex_t *)(var))->regex_str)
-#define      PTR32(var)    (((ovm_ptr32_t *)(var))->addr)
+#define   REGEXNUM(var)   (((ovm_regex_t *)(var))->splits)
 #define SNMPOIDLEN(var)  (((ovm_snmpoid_t *)(var))->len)
 #define    SNMPOID(var)  (((ovm_snmpoid_t *)(var))->objoid)
 #define      FLOAT(var)    (((ovm_float_t *)(var))->val)
-#define     DOUBLE(var)   (((ovm_double_t *)(var))->val)
 #define     EXTPTR(var)    (((ovm_extern_t *)(var))->ptr)
 #define    EXTDESC(var)    (((ovm_extern_t *)(var))->desc)
 #define    EXTFREE(var)    (((ovm_extern_t *)(var))->free)
 
-#define IS_NULL(x) (!x || (TYPE(x) == T_NULL))
-
-/* ERRNO values */
-#define ERRNO_UNDEFINED		1
-#define ERRNO_PARAMETER_ERROR	2
-#define ERRNO_REGEX_ERROR	3
-
-#define STATIC_VAR(ctx, si, var)			       \
-   ((si)->state->rule->static_env[	       \
-    (ctx)->rule_compiler->var				       \
-    ])
-
-
-#define ISSDL_RETURN_TRUE(ctx, si)			       \
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_1_res_id));	\
-  } while (0)
-
-#define ISSDL_RETURN_FALSE(ctx, si)		\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_0_res_id));	\
-  } while (0)
-
-#define ISSDL_RETURN_NULL(ctx, si)		\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_null_res_id));	\
-  } while (0)
-
-#define ISSDL_RETURN_PARAM_ERROR(ctx, si)	\
-  do { \
-  stack_push((ctx)->ovm_stack, STATIC_VAR(ctx, si, static_param_error_res_id));	\
-  } while (0)
+#define IS_NULL(var) ((var)==NULL)
 
 /**
  ** @struct ovm_var_s
@@ -188,8 +131,7 @@
 typedef struct ovm_var_s ovm_var_t;
 struct ovm_var_s
 {
-  uint32_t type;
-  uint32_t flags;
+  gc_header_t gc;
   uint8_t  data[STR_PAD_LEN];
 };
 
@@ -199,13 +141,17 @@ typedef void *(*issdl_getdata_t)(ovm_var_t *data);
 typedef size_t (*issdl_getdata_len_t)(ovm_var_t *data);
 
 typedef int (*var_cmp_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_add_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_sub_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_mul_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_div_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_mod_t)(ovm_var_t *var1, ovm_var_t *var2);
-typedef ovm_var_t *(*var_clone_t)(ovm_var_t *var);
-typedef void	   (*var_destruct_t)(ovm_var_t *var);
+typedef ovm_var_t *(*var_add_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_sub_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_opp_t)(gc_t *gc_ctx, ovm_var_t *var);
+typedef ovm_var_t *(*var_mul_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_div_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_mod_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_clone_t)(gc_t *gc_ctx, ovm_var_t *var);
+typedef ovm_var_t *(*var_and_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_or_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_xor_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+typedef ovm_var_t *(*var_not_t)(gc_t *gc_ctx, ovm_var_t *var);
 
 /**
  ** @struct issdl_type_s
@@ -232,6 +178,9 @@ typedef void	   (*var_destruct_t)(ovm_var_t *var);
 /**   @var issdl_type_s::sub
  **     Subtraction function handler.
  **/
+/**   @var issdl_type_s::opp
+ **     Opposite function handler.
+ **/
 /**   @var issdl_type_s::mul
  **     Multiplication function handler.
  **/
@@ -244,8 +193,17 @@ typedef void	   (*var_destruct_t)(ovm_var_t *var);
 /**   @var issdl_type_s::clone
  **     Cloning function handler.
  **/
-/**   @var issdl_type_s::destruct
- **     Destructor function handler.
+/**   @var issdl_type_s::add
+ **     Bitwise add function handler.
+ **/
+/**   @var issdl_type_s::or
+ **     Bistwise inclusive or function handler.
+ **/
+/**   @var issdl_type_s::xor
+ **     Biteise exclusive or function handler.
+ **/
+/**   @var issdl_type_s::not
+ **     Bitwise complement function handler.
  **/
 /**   @var issdl_type_s::desc
  **     A shot text description of the type.
@@ -260,36 +218,17 @@ struct issdl_type_s
   var_cmp_t            cmp;
   var_add_t            add;
   var_sub_t            sub;
+  var_opp_t            opp;
   var_mul_t            mul;
   var_div_t            div;
   var_mod_t            mod;
   var_clone_t          clone;
-  var_destruct_t       destruct;
+  var_and_t            and;
+  var_or_t             or;
+  var_xor_t            xor;
+  var_not_t            not;
   /* XXX add extension here */
   char                *desc;
-};
-
-/**
- ** @struct ovm_null_s
- **   ISSDL null datatype.
- **   Used for uninitialized data and/or error/exception reporting
- **   (divide by 0, not allocated, etc... etc...).
- **/
-/**   @var ovm_null_s::type
- **     Data type identifier: T_NULL.
- **/
-/**   @var ovm_null_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_null_s::err_no
- **     Error/exception identifer.
- **/
-typedef struct ovm_null_s ovm_null_t;
-struct ovm_null_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  int       err_no;
 };
 
 /**
@@ -308,9 +247,8 @@ struct ovm_null_s
 typedef struct ovm_int_s ovm_int_t;
 struct ovm_int_s
 {
-  uint32_t  type;
-  uint32_t  flags;
-  long   val;
+  gc_header_t gc;
+  long val;
 };
 
 /**
@@ -329,8 +267,7 @@ struct ovm_int_s
 typedef struct ovm_uint_s ovm_uint_t;
 struct ovm_uint_s
 {
-  uint32_t      type;
-  uint32_t      flags;
+  gc_header_t gc;
   unsigned long val;
 };
 
@@ -356,8 +293,7 @@ struct ovm_uint_s
 typedef struct ovm_str_s ovm_str_t;
 struct ovm_str_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   size_t    len;
   char      str[STR_PAD_LEN];
 };
@@ -386,8 +322,7 @@ struct ovm_str_s
 typedef struct ovm_bstr_s ovm_bstr_t;
 struct ovm_bstr_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   size_t    len;
   uint8_t   str[STR_PAD_LEN];
 };
@@ -413,8 +348,8 @@ struct ovm_bstr_s
 typedef struct ovm_vstr_s ovm_vstr_t;
 struct ovm_vstr_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
+  ovm_var_t *delegate;
   size_t    len;
   char     *str;
 };
@@ -441,8 +376,8 @@ struct ovm_vstr_s
 typedef struct ovm_vbstr_s ovm_vbstr_t;
 struct ovm_vbstr_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
+  ovm_var_t *delegate;
   size_t    len;
   uint8_t  *str;
 };
@@ -464,8 +399,7 @@ struct ovm_vbstr_s
 typedef struct ovm_ctime_s ovm_ctime_t;
 struct ovm_ctime_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   time_t    time;
 };
 
@@ -487,9 +421,8 @@ struct ovm_ctime_s
 typedef struct ovm_ipv4_s ovm_ipv4_t;
 struct ovm_ipv4_s
 {
-  uint32_t        type;
-  uint32_t        flags;
-  struct in_addr  ipv4addr;
+  gc_header_t gc;
+  struct in_addr ipv4addr;
 };
 
 
@@ -511,31 +444,8 @@ struct ovm_ipv4_s
 typedef struct ovm_timeval_s ovm_timeval_t;
 struct ovm_timeval_s
 {
-  uint32_t        type;
-  uint32_t        flags;
-  struct timeval  time;
-};
-
-
-/**
- ** @struct @ovm_counter_s
- **   ISSDL counter data type. Contain a 'C uint32_t'.
- **/
-/**   @var ovm_counter_s::type
- **     Data type identifier: T_COUNTER.
- **/
-/**   @var ovm_counter_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_counter_s::val
- **     Counter value.
- **/
-typedef struct ovm_counter_s ovm_counter_t;
-struct ovm_counter_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  unsigned long  val;
+  gc_header_t gc;
+  struct timeval time;
 };
 
 
@@ -555,66 +465,16 @@ struct ovm_counter_s
 /**   @var ovm_regex_s::regex
  **     Compiled regular expression.
  **/
+/**   @var ovm_regex_s::splits
+ **     Number of splits.
+ **/
 typedef struct ovm_regex_s ovm_regex_t;
 struct ovm_regex_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   char     *regex_str;
   regex_t   regex;
-};
-
-
-/**
- ** @struct @ovm_sregex_s
- **   ISSDL compiled splitting regular expression data type.
- **/
-/**   @var ovm_sregex_s::type
- **     Data type identifier: T_REGEX.
- **/
-/**   @var ovm_sregex_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_sregex_s::regex_str
- **     Regular expression string.
- **/
-/**   @var ovm_sregex_s::regex
- **     Compiled regular expression.
- **/
-/**   @var ovm_sregex_s::splits
- **     Number of splits.
- **/
-
-typedef struct ovm_sregex_s ovm_sregex_t;
-struct ovm_sregex_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  char     *regex_str;
-  regex_t   regex;
-  int       splits;
-};
-
-
-/**
- ** @struct @ovm_ptr32_s
- **   ISSDL address data type. Contain a 'void * ptr'.
- **/
-/**   @var ovm_ptr32_s::type
- **     Data type identifier: T_ADDRESS.
- **/
-/**   @var ovm_ptr32_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_ptr32_s::addr
- **     Address value.
- **/
-typedef struct ovm_ptr32_s ovm_ptr32_t;
-struct ovm_ptr32_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  void     *addr;
+  int splits;
 };
 
 
@@ -646,16 +506,15 @@ typedef unsigned long oid_t;
 typedef struct ovm_snmpoid_s ovm_snmpoid_t;
 struct ovm_snmpoid_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   size_t    len;
-  oid_t     objoid[STR_PAD_LEN];
+  oid_t     objoid[1]; /* actually objoid[len] */
 };
 
 
 /**
  ** @struct ovm_float_s
- **   ISSDL 32-bits floating point value.
+ **   ISSDL (64-bit) floating point value.
  **/
 /**   @var ovm_float_s::type
  **     Data type identifier: T_FLOAT.
@@ -669,30 +528,8 @@ struct ovm_snmpoid_s
 typedef struct ovm_float_s ovm_float_t;
 struct ovm_float_s
 {
-  uint32_t  type;
-  uint32_t  flags;
-  float     val;
-};
-
-/**
- ** @struct ovm_double_s
- **   ISSDL 64-bits floating point value.
- **/
-/**   @var ovm_double_s::type
- **     Data type identifier: T_DOUBLE.
- **/
-/**   @var ovm_double_s::flags
- **     Data access flags.
- **/
-/**   @var ovm_double_s::val
- **     Floating point value.
- **/
-typedef struct ovm_double_s ovm_double_t;
-struct ovm_double_s
-{
-  uint32_t  type;
-  uint32_t  flags;
-  double    val;
+  gc_header_t gc;
+  double     val;
 };
 
 /**
@@ -713,8 +550,7 @@ typedef void (*freefct)(void *ptr);
 typedef struct ovm_extern_s ovm_extern_t;
 struct ovm_extern_s
 {
-  uint32_t  type;
-  uint32_t  flags;
+  gc_header_t gc;
   void     *ptr;
   char	   *desc;
   void (*free)(void *ptr);
@@ -730,8 +566,7 @@ struct ovm_extern_s
  ** Accessor to the global type table.
  ** @return  A pointer to the type table.
  **/
-issdl_type_t *
-issdlgettypes(void);
+issdl_type_t *issdlgettypes(void);
 
 
 /**
@@ -740,12 +575,6 @@ issdlgettypes(void);
  **/
 int
 issdl_test(ovm_var_t *var);
-
-/**
- ** Free a variable and its contents if needed.
- **/
-void
-issdl_free(ovm_var_t	*var);
 
 
 /**
@@ -772,8 +601,7 @@ issdl_cmp(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var2  The second operand.
  ** @return      A new allocated variable containing the result.
  **/
-ovm_var_t *
-issdl_add(ovm_var_t *var1, ovm_var_t *var2);
+ovm_var_t *issdl_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 
 /**
@@ -782,8 +610,14 @@ issdl_add(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var2  The second operand.
  ** @return      A new allocated variable containing the result.
  **/
-ovm_var_t *
-issdl_sub(ovm_var_t *var1, ovm_var_t *var2);
+ovm_var_t *issdl_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+
+/**
+ ** Opposite function of the Orchids language.
+ ** @param var   The operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_opp(gc_t *gc_ctx, ovm_var_t *var1);
 
 
 /**
@@ -792,8 +626,7 @@ issdl_sub(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var2  The second operand.
  ** @return      A new allocated variable containing the result.
  **/
-ovm_var_t *
-issdl_mul(ovm_var_t *var1, ovm_var_t *var2);
+ovm_var_t *issdl_mul(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 
 /**
@@ -802,8 +635,7 @@ issdl_mul(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var2  The second operand.
  ** @return      A new allocated variable containing the result.
  **/
-ovm_var_t *
-issdl_div(ovm_var_t *var1, ovm_var_t *var2);
+ovm_var_t *issdl_div(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 
 /**
@@ -812,8 +644,7 @@ issdl_div(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var2  The second operand.
  ** @return      A new allocated variable containing the result.
  **/
-ovm_var_t *
-issdl_mod(ovm_var_t *var1, ovm_var_t *var2);
+ovm_var_t *issdl_mod(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 
 /**
@@ -823,126 +654,88 @@ issdl_mod(ovm_var_t *var1, ovm_var_t *var2);
  ** @param var  The variable to be cloned.
  ** @return     A new allocated copy.
  **/
-ovm_var_t *
-issdl_clone(ovm_var_t *var);
+ovm_var_t *issdl_clone(gc_t *gc_ctx, ovm_var_t *var);
 
+/**
+ ** Bitwise logical and.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+
+/**
+ ** Bitwise inclusive or.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+
+/**
+ ** Bitwise exclusive or.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+
+/**
+ ** Bitwise complement.
+ ** @param var1  The first operand.
+ ** @param var2  The second operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_not(gc_t *gc_ctx, ovm_var_t *var);
 
 /**
  ** Return the type name string given a type id.
  ** @param type  The type id.
  ** @return      The type name.
  **/
-char *
-str_issdltype(int type);
+char *str_issdltype(int type);
+
+void *issdl_get_data(ovm_var_t *val);
+size_t issdl_get_data_len(ovm_var_t *val);
 
 
-ovm_var_t *
-ovm_null_new(void);
+void fprintf_issdl_val(FILE *fp, ovm_var_t *val);
 
-ovm_var_t *
-ovm_sregex_new(void);
+void set_ip_resolution(int value);
 
+ovm_var_t *ovm_int_new(gc_t *gc_ctx, long val);
+void ovm_int_fprintf(FILE *fp, ovm_int_t *val);
 
-void *
-issdl_get_data(ovm_var_t *val);
+ovm_var_t *ovm_str_new(gc_t *gc_ctx, size_t size);
+void ovm_str_fprintf (FILE *fp, ovm_str_t *str);
 
-size_t
-issdl_get_data_len(ovm_var_t *val);
+ovm_var_t *ovm_vstr_new(gc_t *gc_ctx, ovm_var_t *str);
+void ovm_vstr_fprintf(FILE *f, ovm_vstr_t *vstr);
 
+ovm_var_t *ovm_regex_new(gc_t *gc_ctx);
+void ovm_regex_fprintf(FILE *fp, ovm_regex_t *regex);
 
-void
-fprintf_issdl_val(FILE *fp, ovm_var_t *val);
+ovm_var_t *ovm_ctime_new(gc_t *gc_ctx, time_t tm);
+void ovm_ctime_fprintf(FILE *fp, ovm_ctime_t *time);
 
-void
-set_ip_resolution(int value);
+ovm_var_t *ovm_ipv4_new(gc_t *gc_ctx);
+void ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr);
 
-void
-ovm_null_fprintf(FILE *fp, ovm_null_t *val);
+ovm_var_t *ovm_timeval_new(gc_t *gc_ctx);
+void ovm_timeval_fprintf(FILE *fp, ovm_timeval_t *time);
 
+ovm_var_t *ovm_bstr_new (gc_t *gc_ctx, size_t size);
+void ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *bstr);
 
-ovm_var_t *
-ovm_int_new(void);
+ovm_var_t *ovm_vbstr_new(gc_t *gc_ctx, ovm_var_t *delegate);
+void ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
 
-void
-ovm_int_fprintf(FILE *fp, ovm_int_t *val);
+ovm_var_t *ovm_uint_new (gc_t *gc_ctx, unsigned long val);
 
+ovm_var_t *ovm_extern_new(gc_t* gc_ctx, void *ptr, char *desc,
+			  void (*free) (void *ptr));
 
-ovm_var_t *
-ovm_str_new(size_t size);
-
-void
-ovm_str_fprintf(FILE *fp, ovm_str_t *str);
-
-
-ovm_var_t *
-ovm_vstr_new(void);
-
-void
-ovm_vstr_fprintf(FILE *f, ovm_vstr_t *vstr);
-
-
-ovm_var_t *
-ovm_counter_new(void);
-
-void
-ovm_counter_fprintf(FILE *fp, ovm_counter_t *c);
-
-
-ovm_var_t *
-ovm_regex_new(void);
-
-void
-ovm_regex_fprintf(FILE *fp, ovm_regex_t *regex);
-
-
-ovm_var_t *
-ovm_ptr32_new(void);
-
-void
-ovm_ptr32_fprintf(FILE *fp, ovm_ptr32_t *val);
-
-
-ovm_var_t *
-ovm_ctime_new(void);
-
-void
-ovm_ctime_fprintf(FILE *fp, ovm_ctime_t *time);
-
-
-ovm_var_t *
-ovm_ipv4_new(void);
-
-void
-ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr);
-
-
-ovm_var_t *
-ovm_timeval_new(void);
-
-void
-ovm_timeval_fprintf(FILE *fp, ovm_timeval_t *time);
-
-
-ovm_var_t *
-ovm_bstr_new(size_t size);
-
-void
-ovm_bstr_fprintf(FILE *fp, ovm_bstr_t *bstr);
-
-ovm_var_t *
-ovm_vbstr_new(void);
-
-void
-ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
-
-ovm_var_t *
-ovm_uint_new(void);
-
-ovm_var_t *
-ovm_extern_new(void);
-
-void
-ovm_uint_fprintf(FILE *fp, ovm_uint_t *val);
+void ovm_uint_fprintf (FILE *fp, ovm_uint_t *val);
 
 /**
  ** Print a variable on a stream.
@@ -962,24 +755,26 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val);
 int
 snprintf_ovm_var(char *buff, unsigned int size, ovm_var_t *val);
 
+ovm_var_t *ovm_float_new(gc_t *gc_ctx, double val);
+void ovm_float_fprintf(FILE *fp, ovm_float_t *val);
 
-ovm_var_t *
-ovm_float_new(void);
-void
-ovm_float_fprintf(FILE *fp, ovm_float_t *val);
-
-ovm_var_t *
-ovm_snmpoid_new(size_t len);
+ovm_var_t *ovm_snmpoid_new(gc_t *gc_ctx, size_t len);
 
 
 /**
  ** Duplicate a string of the orchids language, and convert it to a C
  ** string (null terminated).
+ ** @param gc_ctx The garbage collector context.
  ** @param str  A virtual machine variable.
  ** @return     A newly allocated C string.
  **/
-char *
-ovm_strdup(ovm_var_t *str);
+char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str);
+
+ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var);
+
+long orchids_atoi (char *str, size_t len);
+unsigned long orchids_atoui (char *str, size_t len);
+double orchids_atof (char *str, size_t len);
 
 
 #endif /* LANG_H */

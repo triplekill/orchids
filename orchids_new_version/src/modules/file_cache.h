@@ -27,12 +27,11 @@
 #define CACHE_HIT ((void *)-1)
 
 
-void
-cache_gc(char *dir,
-	 char *prefix,
-	 int file_limit,
-	 size_t size_limit,
-	 time_t time_limit);
+void cache_gc(char *dir,
+	      char *prefix,
+	      int file_limit,
+	      size_t size_limit,
+	      time_t time_limit);
 
 
 FILE *

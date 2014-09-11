@@ -23,7 +23,7 @@
 #include <string.h>
 
 #include "orchids.h"
-
+#include "ovm.h"
 #include "evt_mgr.h"
 #include "orchids_api.h"
 
@@ -48,77 +48,95 @@ static field_t timeout_fields[] = {
 };
 
 
-static int
-timeout_rtcallback(orchids_t *ctx, rtaction_t *e)
+static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he)
 {
-  ovm_var_t **attr;
-  event_t *event;
+  field_table_t *fields;
+  ovm_var_t *val;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
-  attr = (ovm_var_t **)e->data;
-
+  fields = (field_table_t *)he->gc_data;
+  GC_START(gc_ctx, 1); /* To store the event list.
+			  No need to protect fields, which our caller
+			  protected already. */
   /* set the current date */
-  attr[F_DATE] = ovm_timeval_new();
-  TIMEVAL(attr[F_DATE]) = ctx->cur_loop_time;
+  val = ovm_timeval_new (gc_ctx);
+  TIMEVAL(val) = ctx->cur_loop_time;
+  GC_TOUCH (gc_ctx, fields->field_values[F_DATE] = val);
 
-  event = NULL;
-  add_fields_to_event(ctx, mod_entry_g, &event, attr, TIMEOUT_FIELDS);
+  add_fields_to_event(ctx, mod_entry_g, (event_t **)GC_LOOKUP(0),
+		      fields->field_values, TIMEOUT_FIELDS);
+  post_event (ctx, mod_entry_g, (event_t *)GC_LOOKUP(0));
 
-  Xfree(attr);
-
-  post_event(ctx, mod_entry_g, event);
-
-  return (0);
+  gc_base_free (he);
+  GC_END(gc_ctx);
+  return 0;
 }
 
 
-static void
-issdl_timeout(orchids_t *ctx, state_instance_t *state)
+static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
 {
+  gc_t *gc_ctx = ctx->gc_ctx;
   ovm_var_t *toname;
   ovm_var_t *todelay;
-  ovm_var_t **attr;
+  ovm_var_t *val;
+  rule_t *rule;
   char *str;
+  field_table_t *fields;
 
-  toname = stack_pop(ctx->ovm_stack);
-  if (TYPE(toname) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    return ;
-  }
+  toname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (toname==NULL || (TYPE(toname) != T_STR && TYPE(toname) != T_VSTR))
+    {
+      DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
 
-  todelay = stack_pop(ctx->ovm_stack);
-  if (TYPE(todelay) != T_INT) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    return ;
-  }
+  todelay = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (todelay==NULL || TYPE(todelay) != T_INT)
+    {
+      DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
 
-  attr = Xzmalloc( sizeof (ovm_var_t) * TIMEOUT_FIELDS);
+  fields = new_field_table (gc_ctx, TIMEOUT_FIELDS);
+  GC_START(gc_ctx, 1);
+  GC_UPDATE(gc_ctx, 0, fields);
 
   /* clone all data, in case of the rule which registered the timeout
      was killed before the timeout */
-  attr[F_REGDATE] = ovm_timeval_new();
-  TIMEVAL(attr[F_REGDATE]) = ctx->cur_loop_time;
+  val = ovm_timeval_new(gc_ctx);
+  TIMEVAL(val) = ctx->cur_loop_time;
+  GC_TOUCH (gc_ctx, fields->field_values[F_REGDATE] = val);
 
-  attr[F_NAME] = ovm_str_new( STRLEN(toname) );
-  memcpy(STR(attr[F_NAME]), STR(toname), STRLEN(toname));
+  GC_TOUCH (gc_ctx, fields->field_values[F_NAME] = toname);
 
-  attr[F_RULE] = ovm_vstr_new();
-  str = state->rule_instance->rule->name;
-  VSTR(attr[F_RULE]) = str;
-  VSTRLEN(attr[F_RULE]) = strlen(str);
+  rule = state->rule_instance->rule;
+  val = ovm_vstr_new (gc_ctx, (ovm_var_t *)rule);
+  str = rule->name;
+  VSTR(val) = str;
+  VSTRLEN(val) = strlen(str);
+  GC_TOUCH (gc_ctx, fields->field_values[F_RULE] = val);
 
-  attr[F_STATE] = ovm_vstr_new();
+  val = ovm_vstr_new (gc_ctx, (ovm_var_t *)rule);
+  /* We are creating a vstring on state->state->name.  The delegate
+     really should be rule, which holds the rule->state[] of all its states */
   str = state->state->name;
-  VSTR(attr[F_STATE]) = str;
-  VSTRLEN(attr[F_STATE]) = strlen(str);
+  VSTR(val) = str;
+  VSTRLEN(val) = strlen(str);
+  GC_TOUCH (gc_ctx, fields->field_values[F_STATE] = val);
 
-  register_rtcallback(ctx, timeout_rtcallback, attr, INT(todelay) );
-
-  /* XXX: FREE IF NEEDED parameters */
+  register_rtcallback(ctx, timeout_rtcallback,
+		      (gc_header_t *)fields, NULL, INT(todelay) );
+  GC_END(gc_ctx);
+  STACK_DROP(ctx->ovm_stack, 2);
+  PUSH_RETURN_TRUE(ctx);
 }
 
 
-static void *
-timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() timeout@%p\n", (void *) &mod_timeout);
 

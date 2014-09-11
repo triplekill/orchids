@@ -18,8 +18,10 @@ typedef struct {
     xmlXPathContextPtr	xpath_ctx;
 }		xml_doc_t;
 
-ovm_var_t*
-ovm_xml_new();
+
+extern char * xml_description;
+
+ovm_var_t* ovm_xml_new(gc_t *gc_ctx, char *desc);
 
 char*
 xml_get_string(xml_doc_t	*xml_doc,

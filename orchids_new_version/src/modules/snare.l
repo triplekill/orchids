@@ -263,20 +263,24 @@ static char *input_string_ptr_g = NULL;
 <DATE>. { return (snaretext[0]); }
 
 <STRADDR>([0-9]{1,3}\.){3}[0-9]{1,3} { snarelval.ipv4addr.s_addr = inet_addr(snaretext); return (INETADDR); }
-<STRADDR>[0-9]+ { snarelval.integer = atoi(snaretext); return (INTEGER); }
+<STRADDR>[0-9]+ { snarelval.integer = strtol(snaretext, (char **)NULL, 10);
+                  return (INTEGER); }
 <STRADDR>\t { BEGIN INITIAL; return (snaretext[0]); }
 <STRADDR>. { return (snaretext[0]); }
 
 <DATA_STR>, { BEGIN DATA_STR_SUB; return (snaretext[0]); }
 <DATA_STR_SUB>[^\t]+ { BEGIN INITIAL; /* DPRINTF( ("data_string %s\n", snaretext) ); */ snarelval.str = strdup(snaretext); return (DATA_STRING); }
 
-<INTSTR>-?[0-9]+ { /* DPRINTF( ("int %s\n", snaretext) ); */ snarelval.integer = atoi(snaretext); return (INTEGER); }
+<INTSTR>-?[0-9]+ { /* DPRINTF( ("int %s\n", snaretext) ); */
+                   snarelval.integer = strtol(snaretext, (char **)NULL, 10);
+                   return (INTEGER); }
 <INTSTR>[a-zA-Z0-9\._\/\-]+ { /* DPRINTF( ("string \"%s\"\n", snaretext) ); */ snarelval.str = strdup(snaretext); return (STRING); }
 <INTSTR>\t { BEGIN INITIAL; return (snaretext[0]); }
 <INTSTR>\n /* skip new lines */;
 <INTSTR>. { return (snaretext[0]); }
 
-<ATTRIBS>-?[0-9]+ { snarelval.integer = atoi(snaretext); return (INTEGER); }
+<ATTRIBS>-?[0-9]+ { snarelval.integer = strtol(snaretext, (char **)NULL, 10);
+                    return (INTEGER); }
 <ATTRIBS>[rwxsS\-]+ {
   snarelval.mode = 0;
   if (snaretext[0] == 'r') snarelval.mode |= S_IRUSR;
@@ -295,7 +299,8 @@ static char *input_string_ptr_g = NULL;
 <ATTRIBS>\n /* skip new lines */;
 <ATTRIBS>. { return (snaretext[0]); }
 
--?[0-9]+ { snarelval.integer = atoi(snaretext); return (INTEGER); }
+-?[0-9]+ { snarelval.integer = strtol(snaretext, (char **)NULL, 10);
+           return (INTEGER); }
 [a-zA-Z0-9\._\/\-]+ { /* DPRINTF( ("string %s\n", snaretext) ); */ return (STRING); }
 
 \n /* skip new lines */;

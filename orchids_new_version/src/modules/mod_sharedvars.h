@@ -24,6 +24,7 @@
 typedef struct sharedvars_config_s sharedvars_config_t;
 struct sharedvars_config_s
 {
+  gc_header_t gc;
   int hash_size;
   strhash_t *vars_hash;
 };

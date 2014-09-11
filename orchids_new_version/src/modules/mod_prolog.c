@@ -36,10 +36,19 @@ plld -DORCHIDS_DEBUG -DENABLE_DEBUGLOG -DHAVE_SWIPROLOG \
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <limits.h> // for PATH_MAX
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
 
 #include <SWI-Prolog.h>
 
 #include "orchids.h"
+#include "ovm.h"
 #include "file_cache.h"
 
 #include "mod_prolog.h"
@@ -104,7 +113,7 @@ pl_execute(const char *goal)
 
 
 static char *
-pl_execute_var(const char *goal_str, const char *var_name)
+pl_execute_var(orchids_t *ctx, const char *goal_str, const char *var_name)
 {
   fid_t fid;
   term_t goal_atom;
@@ -155,27 +164,27 @@ pl_execute_var(const char *goal_str, const char *var_name)
 
   while( PL_get_list(list, list_head, list) ) {
 
-    PL_get_name_arity(list_head, &atom, &arity);
+    (void) PL_get_name_arity(list_head, &atom, &arity);
     eq_funct = PL_atom_chars(atom);
 
     if (PL_is_compound(list_head) == TRUE &&
         !strcmp("=", eq_funct) &&
         arity == 2) {
-      PL_get_arg(1, list_head, var);
-      PL_get_chars(var, &var_str, CVT_WRITE);
+      (void) PL_get_arg(1, list_head, var);
+      (void) PL_get_chars(var, &var_str, CVT_WRITE);
       if ( !strcmp(var_name, var_str)) {
-        PL_get_arg(2, list_head, val);
-        PL_get_chars(val, &val_str, CVT_WRITE);
-        ret_str = strdup(val_str);
+        (void) PL_get_arg(2, list_head, val);
+        (void) PL_get_chars(val, &val_str, CVT_WRITE);
+        ret_str = gc_strdup(ctx->gc_ctx, val_str);
         PL_discard_foreign_frame(fid);
-        return (ret_str);
+        return ret_str;
       }
     }
   }
 
   PL_discard_foreign_frame(fid);
 
-  return (NULL);
+  return NULL;
 }
 
 
@@ -237,38 +246,53 @@ pl_consult(const char *file)
 }
 
 
-static void
-issdl_prolog(orchids_t *ctx, state_instance_t *state)
+static void issdl_prolog(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *plq;
   ovm_var_t *var;
+  char *plq_str;
+  char *var_str;
   ovm_var_t *val;
   char *ret;
+  size_t len;
 
-  plq = stack_pop(ctx->ovm_stack);
-  if (TYPE(plq) != T_STR) {
-    DebugLog(DF_MOD, DS_ERROR, "parameter type error (%i)\n", TYPE(plq));
-    return ;
-  }
+  plq = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (TYPE(plq) != T_STR && TYPE(plq) !=T_VSTR)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error (%i)\n", TYPE(plq));
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_EMPTY(ctx);
+      return;
+    }
 
-  var = stack_pop(ctx->ovm_stack);
-  if (TYPE(var) != T_STR) {
-    DebugLog(DF_MOD, DS_ERROR, "parameter type error (%i)\n", TYPE(var));
-    return ;
-  }
+  var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (TYPE(var) != T_STR && TYPE(var) != T_VSTR)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error (%i)\n", TYPE(var));
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_EMPTY(ctx);
+      return;
+    }
 
-  ret = pl_execute_var(STR(plq), STR(var));
-  if (ret) {
-    val = ovm_str_new( strlen(ret) );
-    memcpy(STR(val), ret, strlen(ret));
-    Xfree(ret);
-  }
-  else {
-    val = ovm_str_new( 2 );
-    strcpy(STR(val), "No");
-  }
+  plq_str = ovm_strdup (ctx->gc_ctx, plq);
+  var_str = ovm_strdup (ctx->gc_ctx, var);
 
-  stack_push(ctx->ovm_stack, val);
+  ret = pl_execute_var(ctx, plq_str, var_str);
+  gc_base_free (plq_str);
+  gc_base_free (var_str);
+  if (ret!=NULL)
+    {
+      len = strlen(ret);
+      val = ovm_str_new(ctx->gc_ctx, len);
+      memcpy(STR(val), ret, len);
+      gc_base_free(ret);
+    }
+  else
+    {
+      val = NULL;
+    }
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_VALUE(ctx, val);
 }
 
 
@@ -280,7 +304,9 @@ prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   DebugLog(DF_MOD, DS_INFO, "load() prolog@%p\n", &mod_prolog);
 
-  cfg = Xzmalloc(sizeof (prolog_cfg_t));
+  cfg = gc_base_malloc(ctx->gc_ctx, sizeof (prolog_cfg_t));
+  cfg->last_db_update.tv_sec = 0;
+  cfg->last_db_update.tv_usec = 0;
 
   snprintf(bootfile, sizeof (bootfile), "%s/mod_prolog.prc", ctx->modules_dir);
 
@@ -367,19 +393,20 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   	   "orchids-prolog-%08lx-%08lx.html", ntph, ntpl);
 
   if (cached_html_file(htmlcfg, bodyfile)) {
-    generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
-    return (0);
+    return generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
   }
 
   /* generate header */
   fp = create_html_file(htmlcfg, bodyfile, NO_CACHE);
+  if (fp==NULL)
+    return -1;
   fprintf_html_header(fp, "Orchids Prolog Database");
   fprintf(fp, "<center><h1>Orchids Prolog Database<h1></center>\n");
   fprintf(fp,
           "<center>"
           "<table border=\"0\" cellpadding=\"3\" width=\"600\">"
           "<tr> <td class=\"v1\">");
-  Xfclose(fp);
+  (void) fclose(fp);
 
   /* generate html prolog listing */
   snprintf(pl_code, sizeof (pl_code),
@@ -393,14 +420,14 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   /* generate footer */
   snprintf(file, sizeof (file),
   	   "%s/%s", htmlcfg->html_output_dir, bodyfile);
-  fp = Xfopen(file, "a");
+  fp = fopen(file, "a");
+  if (fp==NULL)
+    return -1;
   fprintf(fp, "</td></tr></table></center>\n");
   fprintf_html_trailer(fp);
-  Xfclose(fp);
+  (void) fclose(fp);
 
-  generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
-
-  return (0);
+  return generate_htmlfile_hardlink(htmlcfg, bodyfile, "orchids-prolog.html");
 }
 
 input_module_t mod_prolog = {

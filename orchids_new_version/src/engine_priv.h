@@ -20,15 +20,14 @@
 #include "orchids.h"
 
 /**
- * Free an entire rule instance (state instances and environments)
+ * Clean up an entire rule instance (state instances and environments)
  * and update global statistics (active states and rules).
  *
  * @param ctx Orchids context.
  * @param rule_instance Rule instance to destroy.
  **/
-static void
-free_rule_instance(orchids_t *ctx,
-                   rule_instance_t *rule_instance);
+static void cleanup_rule_instance(orchids_t *ctx,
+				  rule_instance_t *rule_instance);
 
 
 /**
@@ -40,10 +39,9 @@ free_rule_instance(orchids_t *ctx,
  * @param parent The parent state instance, in the path tree.
  * @return The new state instance.
  **/
-static state_instance_t *
-create_state_instance(orchids_t *ctx,
-                      state_t *state,
-                      const state_instance_t *parent);
+static state_instance_t * create_state_instance(orchids_t *ctx,
+						state_t *state,
+						const state_instance_t *parent);
 
 
 /**
@@ -54,29 +52,26 @@ create_state_instance(orchids_t *ctx,
  * @param rule The rule definition to instantiate its 'init' state.
  * @return The new 'init' state instance.
  **/
-static state_instance_t *
-create_init_state_instance(orchids_t *ctx,
-                           const rule_t *rule);
+static state_instance_t * create_init_state_instance(orchids_t *ctx,
+						     const rule_t *rule);
 
 /**
- * Flag all thread of a rule instance as killed.  This function only
- * set a 'kill-flag' on threads.  It does not free anything.
+ * Flag all threads of a rule instance as killed.  This function only
+ * sets a 'kill-flag' on threads.  It does not free anything.
  * @param ctx  A pointer to the Orchids application context.
  * @param rule A pointer to the rule instance to kill.
  **/
-static void
-mark_dead_rule(orchids_t *ctx,
-               rule_instance_t *rule);
+static void mark_dead_rule(orchids_t *ctx,
+			   rule_instance_t *rule);
 
 
 /**
  * Dead rule reaper: free all memory of a rule instance marked
- * as dead.  This function search for a rule, and update the linked list.
+ * as dead.  This function searches for a rule, and updates the linked list.
  * @param ctx  A pointer to the Orchids application context.
  * @param rule A pointer to the dead rule instance to reap.
  **/
-static void
-reap_dead_rule(orchids_t *ctx, rule_instance_t *rule);
+static void reap_dead_rule(orchids_t *ctx, rule_instance_t *rule);
 
 
 /**
@@ -85,8 +80,7 @@ reap_dead_rule(orchids_t *ctx, rule_instance_t *rule);
  * @param ctx  Orchids context.
  * @param state  The state instance to test.
  **/
-static int
-sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state);
+static int sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state);
 
 
 /**
@@ -98,35 +92,33 @@ sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state);
  * @param only_once THREAD_ONLYONCE flag (for rule initialisation).
  * @return Returns the number of created thread
  **/
-static int
-simulate_state_and_create_threads(orchids_t        *ctx,
-                                  state_instance_t *state,
-                                  active_event_t   *event,
-                                  int               only_once);
+static int simulate_state_and_create_threads(orchids_t        *ctx,
+					     state_instance_t *state,
+					     active_event_t   *event,
+					     int               only_once);
 
 
 /**
  * Create initial threads of each rules, put the COMMIT flags
  * and merge to the current wait queue.
- * This function correspond to the q-init judgement of Jean's algorithm).
+ * This function corresponds to the q-init judgement of Jean's algorithm).
  * @param ctx Orchids context.
  * @param event A reference to the current event.
  **/
-static void
-create_rule_initial_threads(orchids_t *ctx,
-                            active_event_t *event /* XXX: NOT USED */);
+static void create_rule_initial_threads(orchids_t *ctx,
+					active_event_t *event /* XXX: NOT USED */);
 
 
 /**
- * This function unlink a thread from the list of its state instance.
- * This naive implementation have to walk the list to find
+ * This function unlinks a thread from the list of its state instance.
+ * This naive implementation has to walk the list to find
  * its previous element.  A better solution should be to use
  * a double linked list (or a tail queue depending of the type
  * of access).
  * @param thread  The thread to unlink.
  **/
-static void
-unlink_thread_in_state_instance_list(wait_thread_t *thread);
+static void unlink_thread_in_state_instance_list(gc_t *gc_ctx,
+						 wait_thread_t *thread);
 
 /**
  * This function tells if this thread will need to be re-checked in

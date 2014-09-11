@@ -97,25 +97,24 @@ add_odbc_history(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   times = strchr(dir->args, '/');
   *times = 0;
-  tm.tm_mon = atoi(dir->args);
+  tm.tm_mon = strtol(dir->args, (char **)NULL, 10);
 
   dir->args = times + 1;
   times = strchr(dir->args, '/');
   *times = 0;
-  tm.tm_mday = atoi(dir->args);
+  tm.tm_mday = strtol(dir->args, (char **)NULL, 10);
 
   dir->args = times + 1;
-  tm.tm_year = atoi(dir->args) - 1900;
+  tm.tm_year = strtol(dir->args, (char **)NULL, 10) - 1900;
 
   timet = mktime(&tm);
 
-  history = Xzmalloc(sizeof(prolog_history_t));
-
+  history = gc_base_malloc(ctx->gc_ctx, sizeof(prolog_history_t));
   history->time = timet;
 
   // XXX Need to strdup ?
-  history->odbc_DSN = strdup(odbc + 1);
-
+  history->odbc_DSN = gc_strdup(ctx->gc_ctx, odbc + 1);
+  SLIST_NEXT(history, next) = NULL;
   SLIST_INSERT_HEAD(&cfg->history, history, next);
   DebugLog(DF_MOD, DS_INFO, "prolog %d\n", history->time);
 }
@@ -151,10 +150,11 @@ build_time_fields_ids(orchids_t		*ctx,
   for (i = 0; i < cfg->time_fields_nb; i++)
   {
     found = 0;
-    for (k = 0; k < ctx->num_fields; k++)
-      if (!strcmp(cfg->time_fields_name[i], ctx->global_fields[k].name))
+    for (k = 0; k < ctx->global_fields->num_fields; k++)
+      if (!strcmp(cfg->time_fields_name[i],
+		  ctx->global_fields->fields[k].name))
       {
-	cfg->time_fields_ids[nb++] = ctx->global_fields[k].id;
+	cfg->time_fields_ids[nb++] = ctx->global_fields->fields[k].id;
 	found = 1;
 	break;
       }
@@ -171,6 +171,7 @@ prolog_history_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   prolog_history_cfg_t *cfg;
   mod_entry_t	*mod_prolog;
+  int i;
 
   DebugLog(DF_MOD, DS_INFO, "load() prolog_history@%p\n", &mod_prolog_history);
 
@@ -180,11 +181,17 @@ prolog_history_preconfig(orchids_t *ctx, mod_entry_t *mod)
     return NULL;
   }
 
-  cfg = Xzmalloc(sizeof (prolog_history_cfg_t));
+  cfg = gc_base_malloc(ctx->gc_ctx, sizeof (prolog_history_cfg_t));
+  for (i=0; i<256; i++)
+    {
+      cfg->time_fields_name[i] = NULL;
+      cfg->time_fields_ids[i] = 0;
+    }
+  cfg->time_fields_nb = 0;
   SLIST_INIT(&cfg->history);
   cfg->prolog_cfg = mod_prolog->config;
 
-  return (cfg);
+  return cfg;
 }
 
 static void

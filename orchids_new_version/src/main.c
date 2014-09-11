@@ -31,6 +31,13 @@
 #include <pwd.h>
 #include <sys/types.h> /* for stat() */
 #include <limits.h> /* for PATH_MAX */
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
 
 #include "orchids.h"
 
@@ -169,9 +176,10 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 
     case 'r':
       DebugLog(DF_CORE, DS_NOTICE, "adding the rule file '%s'\n", optarg);
-      ctx->rulefile_list = Xzmalloc(sizeof (rulefile_t));
+      ctx->rulefile_list = gc_base_malloc(ctx->gc_ctx, sizeof (rulefile_t));
       ctx->last_rulefile = ctx->rulefile_list;
-      ctx->rulefile_list->name = strdup(optarg);
+      ctx->rulefile_list->next = NULL;
+      ctx->rulefile_list->name = gc_strdup(ctx->gc_ctx, optarg);
       if (ctx->off_line_mode == MODE_ONLINE)
         ctx->off_line_mode = MODE_SYSLOG;
       break;
@@ -189,7 +197,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 
         Xrealpath(optarg, filepath);
         DebugLog(DF_CORE, DS_NOTICE, "set input file to %s\n", filepath);
-        ctx->off_line_input_file = strdup(filepath);
+        ctx->off_line_input_file = gc_strdup(ctx->gc_ctx, filepath);
 
         if (ctx->off_line_mode == MODE_ONLINE)
           ctx->off_line_mode = MODE_SYSLOG;

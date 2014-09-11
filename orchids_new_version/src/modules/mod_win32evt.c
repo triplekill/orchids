@@ -434,12 +434,12 @@ win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
-  cfg = Xzmalloc(sizeof (win32evt_config_t));
-
+  cfg = gc_base_malloc (ctx->gc_ctx, sizeof (win32evt_config_t));
+  cfg->files = NULL;
   register_fields(ctx, mod, win32evt_fields, WIN32EVT_FIELDS);
 
   /* return config structure, for module manager */
-  return (cfg);
+  return cfg;
 }
 
 

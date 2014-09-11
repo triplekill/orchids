@@ -44,373 +44,425 @@ static char *linux24_ptrace_reqname_g[26];
 
 static char *linux24_signal_g[32];
 
-static int
-read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_io(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   io_class_t *io;
+  ovm_var_t *val;
 
   io = (io_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = io->t_return.returncode;
+  val = ovm_int_new (gc_ctx, io->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = io->t_process.pid;
+  val = ovm_int_new (gc_ctx, io->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = io->t_process.ppid;
+  val = ovm_int_new (gc_ctx, io->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = io->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(io->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = io->t_process.name;
+  VSTRLEN(val) = strlen(io->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_PATH] = ovm_vstr_new();
-  VSTR(attr[F_PATH]) = io->t_path.path;
-  VSTRLEN(attr[F_PATH]) = strlen(io->t_path.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = io->t_path.path;
+  VSTRLEN(val) = strlen(io->t_path.path);
+  GC_TOUCH (gc_ctx, attr[F_PATH] = val);
 
-  attr[F_WORKDIR] = ovm_vstr_new();
-  VSTR(attr[F_WORKDIR]) = io->t_pwd.path;
-  VSTRLEN(attr[F_WORKDIR]) = strlen(io->t_pwd.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = io->t_pwd.path;
+  VSTRLEN(val) = strlen(io->t_pwd.path);
+  GC_TOUCH (gc_ctx, attr[F_WORKDIR] = val);
 
-  attr[F_MODE] = ovm_int_new();
-  INT(attr[F_MODE]) = io->t_attributes.mode;
-  attr[F_CREATEMODE] = ovm_int_new();
-  INT(attr[F_CREATEMODE]) = io->t_attributes.createmode;
+  val = ovm_int_new (gc_ctx, io->t_attributes.mode);
+  GC_TOUCH (gc_ctx, attr[F_MODE] = val);
 
-  return (0);
+  val = ovm_int_new (gc_ctx, io->t_attributes.createmode);
+  GC_TOUCH (gc_ctx, attr[F_CREATEMODE] = val);
+
+  return 0;
 }
 
 
-static int
-read_pc(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_pc(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
+  ovm_var_t *val;
   pc_class_t *pc;
 
   pc = (pc_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = pc->t_return.returncode;
+  val = ovm_int_new (gc_ctx, pc->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = pc->t_process.pid;
+  val = ovm_int_new (gc_ctx, pc->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = pc->t_process.ppid;
+  val = ovm_int_new (gc_ctx, pc->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = pc->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(pc->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = pc->t_process.name;
+  VSTRLEN(val) = strlen(pc->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static int
-read_exec(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_exec(gc_t *gc_ctx,
+		     ovm_var_t *delegate,
+		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
+  ovm_var_t *val;
   ex_class_t *ex;
 
   ex = (ex_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = ex->t_return.returncode;
+  val = ovm_int_new (gc_ctx, ex->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = ex->t_process.pid;
+  val = ovm_int_new (gc_ctx, ex->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = ex->t_process.ppid;
+  val = ovm_int_new (gc_ctx, ex->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = ex->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(ex->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ex->t_process.name;
+  VSTRLEN(val) = strlen(ex->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_PATH] = ovm_vstr_new();
-  VSTR(attr[F_PATH]) = ex->t_path.path;
-  VSTRLEN(attr[F_PATH]) = strlen(ex->t_path.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ex->t_path.path;
+  VSTRLEN(val) = strlen(ex->t_path.path);
+  GC_TOUCH (gc_ctx, attr[F_PATH] = val);
 
-  attr[F_WORKDIR] = ovm_vstr_new();
-  VSTR(attr[F_WORKDIR]) = ex->t_pwd.path;
-  VSTRLEN(attr[F_WORKDIR]) = strlen(ex->t_pwd.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ex->t_pwd.path;
+  VSTRLEN(val) = strlen(ex->t_pwd.path);
+  GC_TOUCH (gc_ctx, attr[F_WORKDIR] = val);
 
-  attr[F_CMDLINE] = ovm_vstr_new();
-  VSTR(attr[F_CMDLINE]) = ex->t_execargs.args;
-  VSTRLEN(attr[F_CMDLINE]) = strlen(ex->t_execargs.args);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ex->t_execargs.args;
+  VSTRLEN(val) = strlen(ex->t_execargs.args);
+  GC_TOUCH (gc_ctx, attr[F_CMDLINE] = val);
 
-  return (0);
+  return 0;
 }
 
-
-static int
-read_net(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_net(gc_t *gc_ctx,
+		    ovm_var_t *delegate,
+		    ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   nt_class_t       *net;
+  ovm_var_t *val;
 
   net = (nt_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = net->t_return.returncode;
+  val = ovm_int_new (gc_ctx, net->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = net->t_process.pid;
+  val = ovm_int_new (gc_ctx, net->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = net->t_process.ppid;
+  val = ovm_int_new (gc_ctx, net->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = net->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(net->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = net->t_process.name;
+  VSTRLEN(val) = strlen(net->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
 /*   attr[F_SOCKCALL] = ovm_int_new(); */
 /*   INT(attr[F_SOCKCALL]) = net->syscall; */
   /* XXX -- For demo only */
-  if (net->syscall < 20) {
-  attr[F_SOCKCALL] = ovm_vstr_new();
-  VSTR(attr[F_SOCKCALL]) = linux24_socketcall_name_g[ net->syscall ];
-  VSTRLEN(attr[F_SOCKCALL]) = strlen(linux24_socketcall_name_g[net->syscall]);
+  if (net->syscall < 20)
+    {
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = linux24_socketcall_name_g[net->syscall];
+      VSTRLEN(val) = strlen(linux24_socketcall_name_g[net->syscall]);
+      GC_TOUCH (gc_ctx, attr[F_SOCKCALL] = val);
   }
 
-  attr[F_SRCIP] = ovm_ipv4_new();
-  IPV4(attr[F_SRCIP]).s_addr = inet_addr(net->t_connection.src_ip);
+  val = ovm_ipv4_new (gc_ctx);
+  IPV4(val).s_addr = inet_addr(net->t_connection.src_ip);
+  GC_TOUCH (gc_ctx, attr[F_SRCIP] = val);
 
-  attr[F_SRCPORT] = ovm_int_new();
-  INT(attr[F_SRCPORT]) = net->t_connection.src_port;
+  val = ovm_int_new (gc_ctx, net->t_connection.src_port);
+  GC_TOUCH (gc_ctx, attr[F_SRCPORT] = val);
 
-  attr[F_DSTIP] = ovm_ipv4_new();
-  IPV4(attr[F_DSTIP]).s_addr = inet_addr(net->t_connection.dst_ip);
+  val = ovm_ipv4_new (gc_ctx);
+  IPV4(val).s_addr = inet_addr(net->t_connection.dst_ip);
+  GC_TOUCH (gc_ctx, attr[F_DSTIP] = val);
 
-  attr[F_DSTPORT] = ovm_int_new();
-  INT(attr[F_DSTPORT]) = net->t_connection.dst_port;
+  val = ovm_int_new (gc_ctx, net->t_connection.dst_port);
+  GC_TOUCH (gc_ctx, attr[F_DSTPORT] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static int
-read_pt(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_pt(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   pt_class_t       *pt;
+  ovm_var_t *val;
 
   pt = (pt_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = pt->t_return.returncode;
+  val = ovm_int_new (gc_ctx, pt->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = pt->t_process.pid;
+  val = ovm_int_new (gc_ctx, pt->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = pt->t_process.ppid;
+  val = ovm_int_new (gc_ctx, pt->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = pt->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(pt->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = pt->t_process.name;
+  VSTRLEN(val) = strlen(pt->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
 /*   attr[F_PTRACEREQ] = ovm_int_new(); */
 /*   INT(attr[F_PTRACEREQ]) = pt->request; */
   /* XXX -- For demo only */
-  if (pt->request < 25) {
-    attr[F_PTRACEREQ] = ovm_vstr_new();
-    VSTR(attr[F_PTRACEREQ]) = linux24_ptrace_reqname_g[ pt->request ];
-    VSTRLEN(attr[F_PTRACEREQ]) = strlen(linux24_ptrace_reqname_g[pt->request]);
-  }
+  if (pt->request < 25)
+    {
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = linux24_ptrace_reqname_g[ pt->request ];
+      VSTRLEN(val) = strlen(linux24_ptrace_reqname_g[pt->request]);
+      GC_TOUCH (gc_ctx, attr[F_PTRACEREQ] = val);
+    }
 
-  attr[F_PTRACEPID] = ovm_int_new();
-  INT(attr[F_PTRACEPID]) = pt->pid;
+  val = ovm_int_new (gc_ctx, pt->pid);
+  GC_TOUCH (gc_ctx, attr[F_PTRACEPID] = val);
 
-  attr[F_PTRACEADDR] = ovm_ptr32_new();
-  PTR32(attr[F_PTRACEADDR]) = (void *) pt->addr;
+  val = ovm_uint_new (gc_ctx, (unsigned long)(void *) pt->addr);
+  GC_TOUCH (gc_ctx, attr[F_PTRACEADDR] = val);
 
-  attr[F_PTRACEDATA] = ovm_ptr32_new();
-  PTR32(attr[F_PTRACEDATA]) = (void *) pt->data;
+  val = ovm_uint_new (gc_ctx, (unsigned long)(void *) pt->data);
+  GC_TOUCH (gc_ctx, attr[F_PTRACEDATA] = val);
 
   return (0);
 }
 
 
-static int
-read_kill(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_kill(gc_t *gc_ctx,
+		     ovm_var_t *delegate,
+		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   kill_class_t       *kill;
+  ovm_var_t *val;
 
   kill = (kill_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = kill->t_return.returncode;
+  val = ovm_int_new (gc_ctx, kill->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = kill->t_process.pid;
+  val = ovm_int_new (gc_ctx, kill->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = kill->t_process.ppid;
+  val = ovm_int_new (gc_ctx, kill->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = kill->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(kill->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = kill->t_process.name;
+  VSTRLEN(val) = strlen(kill->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  if (kill->sig < 32) {
-    attr[F_KILLSIG] = ovm_vstr_new();
-    VSTR(attr[F_KILLSIG]) = linux24_signal_g[ kill->sig ];
-    VSTRLEN(attr[F_KILLSIG]) = strlen(linux24_signal_g[ kill->sig ]);
-  }
+  if (kill->sig < 32)
+    {
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = linux24_signal_g[kill->sig];
+      VSTRLEN(val) = strlen(linux24_signal_g[kill->sig]);
+      GC_TOUCH (gc_ctx, attr[F_KILLSIG] = val);
+    }
 
-  attr[F_KILLPID] = ovm_int_new();
-  INT(attr[F_KILLPID]) = kill->pid;
+  val = ovm_int_new (gc_ctx, kill->pid);
+  GC_TOUCH (gc_ctx, attr[F_KILLPID] = val);
 
-  return (0);
+  return 0;
 }
 
 
 #if 0
-static int
-read_admin(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_admin(gc_t *gc_ctx,
+		      ovm_var_t *delegate,
+		      ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   /* XXX: Not Used */
 
   DPRINTF( ("Warning !...\n") );
 
-  return (0);
+  return 0;
 }
 #endif
 
-
-static int
-read_ch(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_ch(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   ch_class_t *ch;
+  ovm_var_t *val;
 
   ch = (ch_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = ch->t_return.returncode;
+  val = ovm_int_new (gc_ctx, ch->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = ch->t_process.pid;
+  val = ovm_int_new (gc_ctx, ch->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = ch->t_process.ppid;
+  val = ovm_int_new (gc_ctx, ch->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = ch->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(ch->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ch->t_process.name;
+  VSTRLEN(val) = strlen(ch->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_PATH] = ovm_vstr_new();
-  VSTR(attr[F_PATH]) = ch->t_path.path;
-  VSTRLEN(attr[F_PATH]) = strlen(ch->t_path.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ch->t_path.path;
+  VSTRLEN(val) = strlen(ch->t_path.path);
+  GC_TOUCH (gc_ctx, attr[F_PATH] = val);
 
-  attr[F_WORKDIR] = ovm_vstr_new();
-  VSTR(attr[F_WORKDIR]) = ch->t_pwd.path;
-  VSTRLEN(attr[F_WORKDIR]) = strlen(ch->t_pwd.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ch->t_pwd.path;
+  VSTRLEN(val) = strlen(ch->t_pwd.path);
+  GC_TOUCH (gc_ctx, attr[F_WORKDIR] = val);
 
-  attr[F_OWNERUID] = ovm_int_new();
-  INT(attr[F_OWNERUID]) = ch->t_owner.owner;
+  val = ovm_int_new (gc_ctx, ch->t_owner.owner);
+  GC_TOUCH (gc_ctx, attr[F_OWNERUID] = val);
 
-  attr[F_OWNERGID] = ovm_int_new();
-  INT(attr[F_OWNERGID]) = ch->t_owner.group;
+  val = ovm_int_new (gc_ctx, ch->t_owner.group);
+  GC_TOUCH (gc_ctx, attr[F_OWNERGID] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static int
-read_cp(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_cp(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   cp_class_t *cp;
+  ovm_var_t *val;
 
   cp = (cp_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = cp->t_return.returncode;
+  val = ovm_int_new (gc_ctx, cp->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = cp->t_process.pid;
+  val = ovm_int_new (gc_ctx, cp->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = cp->t_process.ppid;
+  val = ovm_int_new (gc_ctx, cp->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = cp->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(cp->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = cp->t_process.name;
+  VSTRLEN(val) = strlen(cp->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_SRCPATH] = ovm_vstr_new();
-  VSTR(attr[F_SRCPATH]) = cp->t_sourcepath.path;
-  VSTRLEN(attr[F_SRCPATH]) = strlen(cp->t_sourcepath.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = cp->t_sourcepath.path;
+  VSTRLEN(val) = strlen(cp->t_sourcepath.path);
+  GC_TOUCH (gc_ctx, attr[F_SRCPATH] = val);
 
-  attr[F_WORKDIR] = ovm_vstr_new();
-  VSTR(attr[F_WORKDIR]) = cp->t_pwd.path;
-  VSTRLEN(attr[F_WORKDIR]) = strlen(cp->t_pwd.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = cp->t_pwd.path;
+  VSTRLEN(val) = strlen(cp->t_pwd.path);
+  GC_TOUCH (gc_ctx, attr[F_WORKDIR] = val);
 
-  attr[F_DSTPATH] = ovm_vstr_new();
-  VSTR(attr[F_DSTPATH]) = cp->t_destpath.path;
-  VSTRLEN(attr[F_DSTPATH]) = strlen(cp->t_destpath.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = cp->t_destpath.path;
+  VSTRLEN(val) = strlen(cp->t_destpath.path);
+  GC_TOUCH (gc_ctx, attr[F_DSTPATH] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static int
-read_su(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_su(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   su_class_t *su;
+  ovm_var_t *val;
 
   su = (su_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = su->t_return.returncode;
+  val = ovm_int_new (gc_ctx, su->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = su->t_process.pid;
+  val = ovm_int_new (gc_ctx, su->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = su->t_process.ppid;
+  val = ovm_int_new (gc_ctx, su->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = su->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(su->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = su->t_process.name;
+  VSTRLEN(val) = strlen(su->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_TARGETID] = ovm_int_new();
-  INT(attr[F_TARGETID]) = su->t_target.id;
+  val = ovm_int_new (gc_ctx, su->t_target.id);
+  GC_TOUCH (gc_ctx, attr[F_TARGETID] = val);
 
-  attr[F_TARGETRID] = ovm_int_new();
-  INT(attr[F_TARGETRID]) = su->t_target.rid;
+  val = ovm_int_new (gc_ctx, su->t_target.rid);
+  GC_TOUCH (gc_ctx, attr[F_TARGETRID] = val);
 
-  attr[F_TARGETSID] = ovm_int_new();
-  INT(attr[F_TARGETSID]) = su->t_target.sid;
+  val = ovm_int_new (gc_ctx, su->t_target.sid);
+  GC_TOUCH (gc_ctx, attr[F_TARGETSID] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static int
-read_ad(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
+static int read_ad(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr)
 {
   ad_class_t *ad;
+  ovm_var_t *val;
 
   ad = (ad_class_t *) hdr;
 
-  attr[F_RETCODE] = ovm_int_new();
-  INT(attr[F_RETCODE]) = ad->t_return.returncode;
+  val = ovm_int_new (gc_ctx, ad->t_return.returncode);
+  GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  attr[F_PID] = ovm_int_new();
-  INT(attr[F_PID]) = ad->t_process.pid;
+  val = ovm_int_new (gc_ctx, ad->t_process.pid);
+  GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  attr[F_PPID] = ovm_int_new();
-  INT(attr[F_PPID]) = ad->t_process.ppid;
+  val = ovm_int_new (gc_ctx, ad->t_process.ppid);
+  GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
-  attr[F_PROCNAME] = ovm_vstr_new();
-  VSTR(attr[F_PROCNAME]) = ad->t_process.name;
-  VSTRLEN(attr[F_PROCNAME]) = strlen(ad->t_process.name);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ad->t_process.name;
+  VSTRLEN(val) = strlen(ad->t_process.name);
+  GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  attr[F_MODNAME] = ovm_vstr_new();
-  VSTR(attr[F_MODNAME]) = ad->t_name.path;
-  VSTRLEN(attr[F_MODNAME]) = strlen(ad->t_name.path);
+  val = ovm_vstr_new (gc_ctx, delegate);
+  VSTR(val) = ad->t_name.path;
+  VSTRLEN(val) = strlen(ad->t_name.path);
+  GC_TOUCH (gc_ctx, attr[F_MODNAME] = val);
 
-  return (0);
+  return 0;
 }
 
 
-static
-int (*read_class[])(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr) = {
+static int (*read_class[])(gc_t *gc_ctx,
+			   ovm_var_t *delegate,
+			   ovm_var_t *attr[RAWSNARE_FIELDS],
+			   header_token_t *hdr) =
+{
   NULL,
   read_io,
   read_pc,
@@ -430,54 +482,62 @@ int (*read_class[])(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr) = {
 static int
 rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
-  ovm_var_t *attr[RAWSNARE_FIELDS];
   header_token_t *snare_hdr;
+  ovm_var_t *val;
+  int err = 0;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  GC_START(gc_ctx, RAWSNARE_FIELDS+1);
+  GC_UPDATE(gc_ctx, RAWSNARE_FIELDS, event);
 
   DebugLog(DF_MOD, DS_DEBUG, "rawsnare_dissect()\n");
 
   snare_hdr = (header_token_t *) BSTR(event->value);
-  memset(attr, 0, sizeof(attr));
 
-  attr[F_CLASS] = ovm_int_new();
-  INT(attr[F_CLASS]) = snare_hdr->event_class;
-  if (snare_hdr->event_id < LIN24_SYSCALL_MAX) {
-    /* XXX -- Text for demo !!! */
-    /* attr[F_SYSCALL] = ovm_int_new(); */
-    /* INT(attr[F_SYSCALL]) = snare_hdr->event_id; */
-    attr[F_SYSCALL] = ovm_vstr_new();
-    VSTR(attr[F_SYSCALL]) = linux24_syscall_name_g[ snare_hdr->event_id ];
-    VSTRLEN(attr[F_SYSCALL]) =
-      strlen(linux24_syscall_name_g[snare_hdr->event_id]);
-  }
-  attr[F_TIME] = ovm_timeval_new();
-  attr[F_TIME]->flags |= TYPE_MONO;
-  TIMEVAL(attr[F_TIME]) = snare_hdr->time;
+  val = ovm_int_new (gc_ctx, snare_hdr->event_class);
+  GC_UPDATE(gc_ctx, F_CLASS, val);
 
-  attr[F_RUID] = ovm_int_new();
-  INT( attr[F_RUID] ) = snare_hdr->user_id;
-
-  attr[F_RGID] = ovm_int_new();
-  INT( attr[F_RGID] ) = snare_hdr->group_id;
-
-  attr[F_EUID] = ovm_int_new();
-  INT( attr[F_EUID] ) = snare_hdr->euser_id;
-
-  attr[F_EGID] = ovm_int_new();
-  INT( attr[F_EGID] ) = snare_hdr->egroup_id;
-
-  if (snare_hdr->event_class > NUMCLASS) {
-    DebugLog(DF_MOD, DS_WARN, "bad event class.\n");
-    free_fields(attr, RAWSNARE_FIELDS);
-    return (1);
+  if (snare_hdr->event_id < LIN24_SYSCALL_MAX)
+    {
+      /* XXX -- Text for demo !!! */
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = linux24_syscall_name_g[snare_hdr->event_id];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_UPDATE(gc_ctx, F_SYSCALL, val);
   }
 
-  if (read_class[ snare_hdr->event_class ])
-    read_class[ snare_hdr->event_class ](attr, snare_hdr);
+  val = ovm_timeval_new (gc_ctx);
+  TIMEVAL(val) = snare_hdr->time;
+  GC_UPDATE(gc_ctx, F_TIME, val);
 
-  add_fields_to_event(ctx, mod, &event, attr, RAWSNARE_FIELDS);
-  post_event(ctx, mod, event);
+  val = ovm_int_new(gc_ctx, snare_hdr->user_id);
+  GC_UPDATE(gc_ctx, F_RUID, val);
 
-  return (0);
+  val = ovm_int_new(gc_ctx, snare_hdr->group_id);
+  GC_UPDATE(gc_ctx, F_RGID, val);
+
+  val = ovm_int_new(gc_ctx, snare_hdr->euser_id);
+  GC_UPDATE(gc_ctx, F_EUID, val);
+
+  val = ovm_int_new(gc_ctx, snare_hdr->egroup_id);
+  GC_UPDATE(gc_ctx, F_EGID, val);
+
+  if (snare_hdr->event_class > NUMCLASS)
+    {
+      DebugLog(DF_MOD, DS_WARN, "bad event class.\n");
+      err = 1;
+    }
+  else
+    {
+      if (read_class[ snare_hdr->event_class ])
+	(*read_class[ snare_hdr->event_class ]) (gc_ctx,
+						 event->value,
+						 (ovm_var_t **)GC_DATA(),
+						 snare_hdr);
+
+      REGISTER_EVENTS(ctx, mod, RAWSNARE_FIELDS);
+    }
+  GC_END(gc_ctx);
+  return err;
 }
 
 /*
@@ -517,8 +577,8 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.mod_name",   T_VSTR,     "module name"          },
   { "rawsnare.ptrace_req", T_VSTR,     "ptrace request"       },
   { "rawsnare.ptrace_pid", T_INT,      "ptrace pid"           },
-  { "rawsnare.ptrace_addr",T_PTR32,    "ptrace address"       },
-  { "rawsnare.ptrace_data",T_PTR32,    "ptrace data"          },
+  { "rawsnare.ptrace_addr",T_UINT,     "ptrace address"       },
+  { "rawsnare.ptrace_data",T_UINT,     "ptrace data"          },
   { "rawsnare.kill_pid",   T_INT,      "kill dest pid"        },
   { "rawsnare.kill_sig",   T_VSTR,     "signal to send"       },
 };

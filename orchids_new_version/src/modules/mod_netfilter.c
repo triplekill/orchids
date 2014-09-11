@@ -27,6 +27,8 @@
 
 static char *nf_hook_g = NULL;
 
+extern void netfilter_set_gc_ctx(gc_t *gc_ctx);
+extern void netfilter_set_delegate(ovm_var_t *delegate);
 extern void netfilter_set_vstr_base(char *str);
 extern void netfilter_set_str(char *str, size_t s);
 extern int netfilterparse(void);
@@ -68,46 +70,49 @@ extern void netfilter_reset(void);
 input_module_t mod_netfilter;
 
 
-static int
-netfilter_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int netfilter_dissect(orchids_t *ctx, mod_entry_t *mod,
+			     event_t *event, void *data)
 {
   char *txt_line;
   size_t txt_len;
-  ovm_var_t *attr[NETFILTER_FIELDS];
   int ret;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
   DebugLog(DF_MOD, DS_DEBUG, "netfilter_dissect()\n");
 
-  memset(attr, 0, sizeof(attr));
+  if (event->value==NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
+      return -1;
+    }
+  switch (TYPE(event->value))
+    {
+    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+      break;
+    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      return -1;
+    }
 
-  if ( TYPE(event->value) == T_STR ) {
-    txt_line =    STR(event->value);
-    txt_len  = STRLEN(event->value);
-  } else if ( TYPE(event->value) == T_VSTR ) {
-    txt_line =    VSTR(event->value);
-    txt_len  = VSTRLEN(event->value);
-  } else {
-    DebugLog(DF_MOD, DS_WARN, "type error\n");
-/*     exit(EXIT_FAILURE); */
-    return (1);
-  }
+  GC_START(gc_ctx, NETFILTER_FIELDS+1);
+  GC_UPDATE(gc_ctx, NETFILTER_FIELDS, event);
+  ret = 0;
 
+  netfilter_set_gc_ctx(gc_ctx);
+  netfilter_set_delegate(event->value);
   netfilter_set_str(txt_line, txt_len);
   netfilter_set_vstr_base(txt_line);
-  netfilter_set_attrs(attr);
+  netfilter_set_attrs((ovm_var_t **)&GC_LOOKUP(0));
   ret = netfilterparse();
   netfilter_reset();
-  if (ret != 0) {
+  if (ret != 0)
     DebugLog(DF_MOD, DS_WARN, "parse error\n");
-    free_fields(attr, NETFILTER_FIELDS);
-    return (1);
-  }
-
-  add_fields_to_event(ctx, mod, &event, attr, NETFILTER_FIELDS);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  else
+    REGISTER_EVENTS(ctx, mod, NETFILTER_FIELDS);
+  GC_END(gc_ctx);
+  return ret;
 }
 
 
@@ -147,22 +152,20 @@ static field_t netfilter_fields[] = {
 };
 
 
-static void *
-netfilter_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void * netfilter_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() netfilter@%p\n", (void *) &mod_netfilter);
-
-  return (NULL);
+  return NULL;
 }
 
-int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+		    void *data)
 {
   return netfilter_dissect(ctx, mod, event, data);
 }
 
-static void
-add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_hook(orchids_t *ctx, mod_entry_t *mod,
+		     config_directive_t *dir)
 {
   DebugLog(DF_MOD, DS_DEBUG, "Adding unconditionnal hook on module %s\n",
            dir->args);
@@ -171,15 +174,13 @@ add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   nf_hook_g = dir->args;
 }
 
-static void
-netfilter_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void netfilter_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_TRACE,
            "netfilter_postconfig() -- registering hook.\n");
 
   register_fields(ctx, mod, netfilter_fields, NETFILTER_FIELDS);
-
-  if (nf_hook_g)
+  if (nf_hook_g!=NULL)
     register_dissector(ctx, mod, nf_hook_g, netfilter_dissect, NULL);
 }
 

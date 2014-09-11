@@ -74,6 +74,9 @@ static int
 ovm_sub(isn_param_t *param);
 
 static int
+ovm_opp(isn_param_t *param);
+
+static int
 ovm_mul(isn_param_t *param);
 
 static int
@@ -138,9 +141,6 @@ ovm_regsplit(isn_param_t *param);
 
 static int
 ovm_cesv(isn_param_t *param);
-
-static int
-ovm_past(isn_param_t *param);
 
 /**
  ** The type of a function implementing a virtual machine instruction.

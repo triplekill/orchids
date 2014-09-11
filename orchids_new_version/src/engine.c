@@ -39,8 +39,7 @@
 
 
 /* XXX: need to sort threads by rule instance, for fast marking */
-static void
-mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
+static void mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 {
   wait_thread_t *t;
 
@@ -59,7 +58,7 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
   }
 
   for (t = ctx->current_tail; t; t = t->next) {
-    if ((t->state_instance->rule_instance == rule)) {
+    if (t->state_instance->rule_instance == rule) {
       DebugLog(DF_ENG, DS_TRACE,
                "Marking thread %p as KILLED (current_tail)\n", t);
       KILL_THREAD(ctx, t);
@@ -77,8 +76,7 @@ mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 
 
 
-static void
-reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
+static void reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 {
   rule_instance_t *r;
   rule_instance_t *next_rule;
@@ -89,12 +87,11 @@ reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
     next_rule = r->next;
     if (r == rule) {
       DebugLog(DF_ENG, DS_TRACE, "ripping killed rule %p\n", r);
-      if (prev_rule) {
-        prev_rule->next = r->next;
-      } else {
-        ctx->first_rule_instance = r->next;
-      }
-      free_rule_instance(ctx, r);
+      if (prev_rule!=NULL)
+        GC_TOUCH (ctx->gc_ctx, prev_rule->next = next_rule);
+      else
+        GC_TOUCH (ctx->gc_ctx, ctx->first_rule_instance = next_rule);
+      cleanup_rule_instance(ctx, r);
       return ;
     } else {
       prev_rule = r;
@@ -103,8 +100,7 @@ reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
 }
 
 
-static int
-sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
+static int sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
 {
   int i;
   int sync_var_sz;
@@ -112,22 +108,92 @@ sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
 
   sync_var_sz = state->rule_instance->rule->sync_vars_sz;
 
-  for (i = 0; i < sync_var_sz; i++) {
-    sync_var = state->rule_instance->rule->sync_vars[i];
-    if (   state->current_env[sync_var] == NULL
-        && state->inherit_env[sync_var] == NULL)
-      return (0);
-  }
-
-  return (1);
+  for (i = 0; i < sync_var_sz; i++)
+    {
+      sync_var = state->rule_instance->rule->sync_vars[i];
+      if (ovm_read_value (state->env, sync_var)==NULL)
+	return 0;
+    }
+  return 1;
 }
 
 
-static int
-simulate_state_and_create_threads(orchids_t        *ctx,
-                                  state_instance_t *state,
-                                  active_event_t   *event, /* XXX: NOT USED */
-                                  int               only_once)
+static void sync_lock_list_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  sync_lock_list_t *sll = (sync_lock_list_t *)p;
+
+  GC_TOUCH (gc_ctx, sll->next);
+  GC_TOUCH (gc_ctx, sll->state);
+}
+
+static void sync_lock_list_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int sync_lock_list_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				    void *data)
+{
+  sync_lock_list_t *sll = (sync_lock_list_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)sll->next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)sll->state, data);
+  return err;
+}
+
+static gc_class_t sync_lock_list_class = {
+  GC_ID('l','o','k','l'),
+  sync_lock_list_mark_subfields,
+  sync_lock_list_finalize,
+  sync_lock_list_traverse
+};
+
+
+static void wait_thread_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  wait_thread_t *wt = (wait_thread_t *)p;
+
+  GC_TOUCH (gc_ctx, wt->next);
+  GC_TOUCH (gc_ctx, wt->state_instance);
+  GC_TOUCH (gc_ctx, wt->next_in_state_instance);
+}
+
+static void wait_thread_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int wait_thread_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				 void *data)
+{
+  wait_thread_t *wt = (wait_thread_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->state_instance, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->next_in_state_instance, data);
+  return err;
+}
+
+static gc_class_t wait_thread_class = {
+  GC_ID('t','h','r','d'),
+  wait_thread_mark_subfields,
+  wait_thread_finalize,
+  wait_thread_traverse
+};
+
+
+static int simulate_state_and_create_threads(orchids_t        *ctx,
+					     state_instance_t *state,
+					     active_event_t   *event, /* XXX: NOT USED */
+					     int               only_once)
 {
   wait_thread_t *thread;
   state_instance_t *new_state;
@@ -138,42 +204,52 @@ simulate_state_and_create_threads(orchids_t        *ctx,
   int simul_ret;
   state_instance_t *sync_lock;
   sync_lock_list_t *lock_elmt;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
-  if (state->state->action)
-    ovm_exec(ctx, state, state->state->action);
+  if (state->state->action!=NULL)
+    ovm_exec_stmt(ctx, state, state->state->action);
 
   trans_nb = state->state->trans_nb;
-  if (trans_nb == 0) {
-    DebugLog(DF_ENG, DS_INFO,
+  if (trans_nb == 0)
+    {
+      DebugLog(DF_ENG, DS_INFO,
              "Terminal state reached for rule instance (%p)\n",
-             state->rule_instance);
-    mark_dead_rule(ctx, state->rule_instance);
-    return (-1);
-  }
+	       state->rule_instance);
+      mark_dead_rule(ctx, state->rule_instance);
+      return -1;
+    }
 
   /* test sync vars here, if sync, return */
-  if (state->rule_instance->rule->sync_lock) {
-    DebugLog(DF_ENG, DS_INFO, "Checking synchronization variables\n");
-    if ( sync_var_env_is_defined(ctx, state) ) {
-      DebugLog(DF_ENG, DS_INFO, "Sync env is fully defined.\n");
-      sync_lock = objhash_get(state->rule_instance->rule->sync_lock, state);
-      if (sync_lock) {
-        DebugLog(DF_ENG, DS_INFO, "LOCK FOUND !\n");
-        if (sync_lock->rule_instance != state->rule_instance) {
-          DebugLog(DF_ENG, DS_INFO, "Pruning.\n");
-          return (-1);
-        }
-        DebugLog(DF_ENG, DS_INFO, "In lock owner.\n");
-      }
-      else {
-        /* create lock */
-        if ( !only_once ) {
-          DebugLog(DF_ENG, DS_INFO, "No lock found.  Creating...\n");
-          objhash_add(state->rule_instance->rule->sync_lock, state, state);
-          lock_elmt = Xmalloc(sizeof (sync_lock_list_t));
-          lock_elmt->state = state;
-          lock_elmt->next = state->rule_instance->sync_lock_list;
-          state->rule_instance->sync_lock_list = lock_elmt;
+  if (state->rule_instance->rule->sync_lock!=NULL)
+    {
+      DebugLog(DF_ENG, DS_INFO, "Checking synchronization variables\n");
+      if ( sync_var_env_is_defined(ctx, state) )
+	{
+	  DebugLog(DF_ENG, DS_INFO, "Sync env is fully defined.\n");
+	  sync_lock = objhash_get(state->rule_instance->rule->sync_lock, state);
+	  if (sync_lock!=NULL)
+	    {
+	      DebugLog(DF_ENG, DS_INFO, "LOCK FOUND !\n");
+	      if (sync_lock->rule_instance != state->rule_instance) {
+		DebugLog(DF_ENG, DS_INFO, "Pruning.\n");
+		return -1;
+	      }
+	      DebugLog(DF_ENG, DS_INFO, "In lock owner.\n");
+	    }
+	  else
+	    {
+	      /* create lock */
+	      if ( !only_once ) {
+		DebugLog(DF_ENG, DS_INFO, "No lock found.  Creating...\n");
+		objhash_add(gc_ctx, state->rule_instance->rule->sync_lock,
+			    state, state);
+		lock_elmt = gc_alloc (gc_ctx, sizeof (sync_lock_list_t),
+				      &sync_lock_list_class);
+		GC_TOUCH (gc_ctx, lock_elmt->state = state);
+		GC_TOUCH (gc_ctx, lock_elmt->next =
+			  state->rule_instance->sync_lock_list);
+		GC_TOUCH (gc_ctx, state->rule_instance->sync_lock_list =
+			  lock_elmt);
         }
         else {
           DebugLog(DF_ENG, DS_INFO,
@@ -187,11 +263,11 @@ simulate_state_and_create_threads(orchids_t        *ctx,
   }
 
   for (t = 0; t < trans_nb; t++) {
-    /* if we have an e-transition, pass-it */
+    /* if we have an e-transition, pass it */
     if (state->state->trans[t].required_fields_nb == 0) {
       vmret = 0;
-      if (state->state->trans[t].eval_code)
-        vmret = ovm_exec(ctx, state, state->state->trans[t].eval_code);
+      if (state->state->trans[t].eval_code!=NULL)
+        vmret = ovm_exec_expr(ctx, state, state->state->trans[t].eval_code);
       if (vmret == 0) {
         DPRINTF( ("e-trans passed (to %s)\n",
                   state->state->trans[t].dest->name) );
@@ -200,13 +276,14 @@ simulate_state_and_create_threads(orchids_t        *ctx,
                                           state);
 
         /* link new_state instance in the tree */
-        new_state->next_sibling = state->first_child;
-        state->first_child = new_state;
-        new_state->parent = state;
+        GC_TOUCH (gc_ctx, new_state->next_sibling = state->first_child);
+        GC_TOUCH (gc_ctx, state->first_child = new_state);
+        GC_TOUCH (gc_ctx, new_state->parent = state);
 
         /* update state instance list of the current rule instance */
-        new_state->retrig_next = state->rule_instance->state_list;
-        state->rule_instance->state_list = new_state;
+        GC_TOUCH (gc_ctx, new_state->retrig_next =
+		  state->rule_instance->state_list);
+        GC_TOUCH (gc_ctx, state->rule_instance->state_list = new_state);
 
         /* and recursively call the simulation function */
         simul_ret = simulate_state_and_create_threads(ctx,
@@ -218,10 +295,14 @@ simulate_state_and_create_threads(orchids_t        *ctx,
         created_threads += simul_ret;
       }
     } else { /* we have a blocking trans, so create a new thread if needed */
-      thread = Xzmalloc(sizeof (wait_thread_t));
+      thread = gc_alloc (gc_ctx, sizeof (wait_thread_t),
+			 &wait_thread_class);
+      thread->next = NULL;
       thread->trans = &state->state->trans[t];
-      thread->state_instance = state;
-      thread->flags |= only_once;
+      GC_TOUCH (gc_ctx, thread->state_instance = state);
+      thread->next_in_state_instance = NULL;
+      thread->flags = only_once;
+      thread->pass = 0;
       state->rule_instance->threads++;
       ctx->threads++;
       created_threads++;
@@ -232,8 +313,9 @@ simulate_state_and_create_threads(orchids_t        *ctx,
 
       if (only_once == 0) {
         /* add it to the thread-list of the current state instance */
-        thread->next_in_state_instance = state->thread_list;
-        state->thread_list = thread;
+        GC_TOUCH (gc_ctx, thread->next_in_state_instance =
+		  state->thread_list);
+        GC_TOUCH (gc_ctx, state->thread_list = thread);
       }
 
       /* compute the timeout date */
@@ -241,36 +323,106 @@ simulate_state_and_create_threads(orchids_t        *ctx,
 
       /* add thread into the 'new thread' queue */
       if (ctx->new_qt) { /* if queue isn't empty, append to the tail */
-        ctx->new_qt->next = thread;
-        ctx->new_qt = thread;
+        GC_TOUCH (gc_ctx, ctx->new_qt->next = thread);
+        GC_TOUCH (gc_ctx, ctx->new_qt = thread);
       } else { /* else create head */
-        ctx->new_qh = thread;
-        ctx->new_qt = thread;
+        GC_TOUCH (gc_ctx, ctx->new_qh = thread);
+        GC_TOUCH (gc_ctx, ctx->new_qt = thread);
       }
     }
   }
-
-  return (created_threads);
+  return created_threads;
 }
 
 
-static void
-create_rule_initial_threads(orchids_t *ctx,
-                            active_event_t *event /* XXX: NOT USED */)
+static void rule_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  rule_instance_t *ri = (rule_instance_t *)p;
+
+  GC_TOUCH (gc_ctx, ri->rule);
+  GC_TOUCH (gc_ctx, ri->first_state);
+  GC_TOUCH (gc_ctx, ri->next);
+  GC_TOUCH (gc_ctx, ri->queue_head);
+  GC_TOUCH (gc_ctx, ri->queue_tail);
+  GC_TOUCH (gc_ctx, ri->state_list);
+  GC_TOUCH (gc_ctx, ri->sync_lock_list);
+}
+
+static void rule_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int rule_instance_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				   void *data)
+{
+  rule_instance_t *ri = (rule_instance_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->rule, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->first_state, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->queue_head, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->queue_tail, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->state_list, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->sync_lock_list, data);
+  return err;
+}
+
+static gc_class_t rule_instance_class = {
+  GC_ID('r','u','l','i'),
+  rule_instance_mark_subfields,
+  rule_instance_finalize,
+  rule_instance_traverse
+};
+
+
+static void create_rule_initial_threads(orchids_t *ctx,
+					active_event_t *event /* XXX: NOT USED */)
 {
   rule_t *r;
   state_instance_t *init;
   rule_instance_t *new_rule;
   int ret;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
+  GC_START (gc_ctx, 1);
   for (r = ctx->rule_compiler->first_rule; r; r = r->next) {
     init = create_init_state_instance(ctx, r);
+    GC_UPDATE (gc_ctx, 0, init);
 
-    new_rule = Xzmalloc(sizeof (rule_instance_t));
-    new_rule->rule = r;
-    new_rule->first_state = init;
+    new_rule = gc_alloc(gc_ctx, sizeof (rule_instance_t),
+			&rule_instance_class);
+    GC_TOUCH (gc_ctx, new_rule->rule = r);
+    GC_TOUCH (gc_ctx, new_rule->first_state = init);
+    new_rule->next = NULL;
     new_rule->state_instances = 1;
-    init->rule_instance = new_rule; /* move in create_init_inst() ? */
+    new_rule->creation_date = 0;
+    new_rule->new_creation_date.tv_sec = 0;
+    new_rule->new_creation_date.tv_usec = 0;
+    new_rule->new_last_act.tv_sec = 0;
+    new_rule->new_last_act.tv_usec = 0;
+    new_rule->queue_head = NULL;
+    new_rule->queue_tail = NULL;
+    new_rule->state_list = NULL;
+    new_rule->max_depth = 0;
+    new_rule->threads = 0;
+    new_rule->flags = 0;
+    new_rule->sync_lock_list = NULL;
+    GC_UPDATE (gc_ctx, 0, new_rule); /* useless, because of the following line */
+    GC_TOUCH (gc_ctx, init->rule_instance = new_rule); /* move in create_init_inst() ? */
     /* link rule */
 /*     ctx->state_instances++; */
 
@@ -279,36 +431,41 @@ create_rule_initial_threads(orchids_t *ctx,
     if (ret <= 0) {
       DebugLog(DF_ENG, DS_DEBUG, "No initial threads for rule %s\n",
                r->name);
-      free_rule_instance(ctx, new_rule);
+      cleanup_rule_instance(ctx, new_rule);
     }
     else {
       new_rule->threads = ret;
-      new_rule->next = ctx->first_rule_instance;
-      ctx->first_rule_instance = new_rule;
+      GC_TOUCH (gc_ctx, new_rule->next = ctx->first_rule_instance);
+      GC_TOUCH (gc_ctx, ctx->first_rule_instance = new_rule);
 
-      if (ctx->new_qt)
+      if (ctx->new_qt!=NULL)
         ctx->new_qt->flags |= THREAD_BUMP;
     }
   }
 
-  /* Prepare the current retrig queue by merging new and retirg queues
+  /* Prepare the current retrig queue by merging new and retrig queues
      (q_cur = q_new @ q_retrig) */
-  if (ctx->new_qh) {
-    ctx->new_qt->next = ctx->retrig_qh;
-    ctx->cur_retrig_qh = ctx->new_qh;
-    ctx->cur_retrig_qt = ctx->retrig_qt ? ctx->retrig_qt : ctx->new_qt;
-    ctx->new_qh = NULL;
-    ctx->new_qt = NULL;
-  } else {
-    ctx->cur_retrig_qh = ctx->retrig_qh;
-    ctx->cur_retrig_qt = ctx->retrig_qt;
-  }
+  if (ctx->new_qh!=NULL)
+    {
+      GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
+      GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = ctx->new_qh);
+      GC_TOUCH (gc_ctx, ctx->cur_retrig_qt =
+		(ctx->retrig_qt!=NULL) ? ctx->retrig_qt : ctx->new_qt);
+      ctx->new_qh = NULL;
+      ctx->new_qt = NULL;
+    }
+  else
+    {
+      GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = ctx->retrig_qh);
+      GC_TOUCH (gc_ctx, ctx->cur_retrig_qt = ctx->retrig_qt);
+    }
   ctx->retrig_qh = NULL;
   ctx->retrig_qt = NULL;
+  GC_END(gc_ctx);
 }
 
-static void
-unlink_thread_in_state_instance_list(wait_thread_t *thread)
+static void unlink_thread_in_state_instance_list(gc_t *gc_ctx,
+						 wait_thread_t *thread)
 {
   wait_thread_t *t;
   wait_thread_t *prev_thread;
@@ -318,30 +475,38 @@ unlink_thread_in_state_instance_list(wait_thread_t *thread)
            thread);
 
   prev_thread = NULL;
-  for (t = thread->state_instance->thread_list; t; t = next_thread) {
-    next_thread = t->next_in_state_instance;
-    if (t == thread) {
-      if (prev_thread) {
-        prev_thread->next_in_state_instance = t->next_in_state_instance;
-      } else {
-        thread->state_instance->thread_list = t->next_in_state_instance;
-      }
-      return ;
-    } else {
-      prev_thread = t;
+  for (t = thread->state_instance->thread_list; t!=NULL; t = next_thread)
+    {
+      next_thread = t->next_in_state_instance;
+      if (t == thread)
+	{
+	  if (prev_thread!=NULL)
+	    {
+	      GC_TOUCH (gc_ctx, prev_thread->next_in_state_instance =
+			t->next_in_state_instance);
+	    }
+	  else
+	    {
+	      GC_TOUCH (gc_ctx, thread->state_instance->thread_list =
+			t->next_in_state_instance);
+	    }
+	  return;
+	}
+      else
+	{
+	  prev_thread = t;
+	}
     }
-  }
 }
 
-static int
-backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
+static int backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
 {
 #if 1
   /* if destination state is fully blocking AND doesn't bind field value
    * to a free variable, this is THE shortest run.
    * Next threads will be redundant. */
   if (thread->trans->dest->trans_nb > 0 &&
-      !(thread->trans->dest->flags & BYTECODE_HAVE_PUSHFIELD))
+      !(thread->trans->dest->flags & BYTECODE_HAS_PUSHFIELD))
     return (TRUE);
   /* XXX: Destination MUST NOT be a cut-point.
      Destination cuts should be resolved at compilation-time
@@ -351,11 +516,45 @@ backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
   return (FALSE);
 }
 
-
-void
-inject_event(orchids_t *ctx, event_t *event)
+static void active_event_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
-  int i;
+  active_event_t *ae = (active_event_t *)p;
+
+  GC_TOUCH (gc_ctx, ae->event);
+  GC_TOUCH (gc_ctx, ae->next);
+  GC_TOUCH (gc_ctx, ae->prev);
+}
+
+static void active_event_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int active_event_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				  void *data)
+{
+  active_event_t *ae = (active_event_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->event, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->prev, data);
+  return err;
+}
+
+static gc_class_t active_event_class = {
+  GC_ID('a','e','v','t'),
+  active_event_mark_subfields,
+  active_event_finalize,
+  active_event_traverse
+};
+
+void inject_event(orchids_t *ctx, event_t *event)
+{
   event_t *e;
   wait_thread_t *t, *next_thread;
   int vmret;
@@ -364,6 +563,7 @@ inject_event(orchids_t *ctx, event_t *event)
   int ret = 0;
   int passed_threads = 0;
   time_t cur_time;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
   cur_time = time(NULL);
 
@@ -374,17 +574,22 @@ inject_event(orchids_t *ctx, event_t *event)
   ctx->events++;
 
   /* prepare an active event record */
-  active_event = Xzmalloc(sizeof (active_event_t));
-  active_event->event = event;
-  ctx->active_event_cur = active_event;
+  active_event = gc_alloc(gc_ctx, sizeof (active_event_t),
+			  &active_event_class);
+  GC_TOUCH (gc_ctx, active_event->event = event);
+  active_event->next = NULL;
+  active_event->prev = NULL;
+  active_event->refs = 0;
+  GC_TOUCH (gc_ctx, ctx->active_event_cur = active_event);
 
   execute_pre_inject_hooks(ctx, active_event->event);
 
   /* UDP event feedback monitoring */
-  if (ctx->evt_fb_fp) {
-    fprintf_event(ctx->evt_fb_fp, ctx, event);
-    fflush(ctx->evt_fb_fp);
-  }
+  if (ctx->evt_fb_fp!=NULL)
+    {
+      fprintf_event(ctx->evt_fb_fp, ctx, event);
+      fflush(ctx->evt_fb_fp);
+    }
 
 #if ORCHIDS_DEBUG
   fprintf_event(stderr, ctx, event);
@@ -392,20 +597,22 @@ inject_event(orchids_t *ctx, event_t *event)
 
   /* -0- resolve field value XXX: should be done with field checks */
   DebugLog(DF_ENG, DS_DEBUG, "STEP 0 - resolve field attribute values\n");
-  /* jgl: the following resetting loop is too slow when ctx->num_fields
-	becomes large.  Instead, we will maintain the invariant that
-	ctx->global_fields[i].val==NULL between any two calls to inject_event()
+  /* jgl: the following resetting loop is too slow when
+     ctx->global_fields->num_fields
+     becomes large.  Instead, we will maintain the invariant that
+     ctx->global_fields->fields[i].val==NULL between any two calls to inject_event()
   */
-//  for (i = 0; i < ctx->num_fields; i++) /* clean field val refs */
-//    ctx->global_fields[i].val = NULL;
+//  for (i = 0; i < ctx->global_fields->num_fields; i++) /* clean field val refs */
+//    ctx->global_fields->fields[i].val = NULL;
 
 #if ORCHIDS_DEBUG
-  for (i=0; i<ctx->num_fields; i++)
-    if (ctx->global_fields[i].val!=NULL)
+  for (i=0; i<ctx->global_fields->num_fields; i++)
+    if (ctx->global_fields->fields[i].val!=NULL)
       abort();
 #endif
-  for (e = event; e; e = e->next)
-    ctx->global_fields[ e->field_id ].val = e->value;
+  for (e = event; e!=NULL; e = e->next)
+    GC_TOUCH (gc_ctx,
+	      ctx->global_fields->fields[ e->field_id ].val = e->value);
 
 #if 0
     fprintf(stdout, "begin new queue\n");
@@ -426,39 +633,44 @@ inject_event(orchids_t *ctx, event_t *event)
 
   /* evt-loop */
   DebugLog(DF_ENG, DS_DEBUG,
-           "STEP 2 - evaluate all thread in retrig queue (evt-loop)\n");
-  for (t = ctx->cur_retrig_qh; t; t = next_thread) {
+           "STEP 2 - evaluate all threads in retrig queue (evt-loop)\n");
+  for (t = ctx->cur_retrig_qh; t!=NULL; t = next_thread) {
     next_thread = t->next;
-    ctx->current_tail = t;
+    GC_TOUCH (gc_ctx, ctx->current_tail = t);
 
     /* Check timeout date */
-    if ( !(t->flags & THREAD_ONLYONCE) && (t->timeout <= cur_time) ) {
-      DebugLog(DF_ENG, DS_DEBUG, "thread %p timed-out ! (killing)\n", t);
-      t->flags |= THREAD_KILLED;
-    }
+    if ( !(t->flags & THREAD_ONLYONCE) && (t->timeout <= cur_time) )
+      {
+	DebugLog(DF_ENG, DS_DEBUG, "thread %p timed out ! (killing)\n", t);
+	t->flags |= THREAD_KILLED;
+      }
 
     /* Killed thread reaper (and rule instance if apply) */
-    if ( THREAD_IS_KILLED(t) ) {
-      ctx->last_ruleinst_act = ctx->cur_loop_time;
-      DebugLog(DF_ENG, DS_DEBUG, "Rip and overide killed thread (%p)\n", t);
-      t->state_instance->rule_instance->threads--;
-      ctx->threads--;
-      if ( NO_MORE_THREAD(t->state_instance->rule_instance) ) {
-        /* Update rule instance list links (before removing) */
-        t->state_instance->rule_instance->flags |= THREAD_KILLED;
-        reap_dead_rule(ctx, t->state_instance->rule_instance);
-      } else {
-        unlink_thread_in_state_instance_list(t);
+    if ( THREAD_IS_KILLED(t) )
+      {
+	ctx->last_ruleinst_act = ctx->cur_loop_time;
+	DebugLog(DF_ENG, DS_DEBUG, "Rip and overide killed thread (%p)\n", t);
+	t->state_instance->rule_instance->threads--;
+	ctx->threads--;
+	if ( NO_MORE_THREAD(t->state_instance->rule_instance) )
+	  {
+	    /* Update rule instance list links (before removing) */
+	    t->state_instance->rule_instance->flags |= THREAD_KILLED;
+	    reap_dead_rule(ctx, t->state_instance->rule_instance);
+	  }
+	else
+	  {
+	    unlink_thread_in_state_instance_list(gc_ctx, t);
+	  }
+	if (t == ctx->cur_retrig_qh)
+	  {
+	    GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = next_thread);
+	  }
+	if (ctx->cur_retrig_qt!=NULL)
+	  ctx->cur_retrig_qt->next = NULL;
+	ctx->current_tail = NULL;
+	continue;
       }
-      if (t == ctx->cur_retrig_qh) {
-        ctx->cur_retrig_qh = next_thread;
-      }
-      if (ctx->cur_retrig_qt)
-        ctx->cur_retrig_qt->next = NULL;
-      ctx->current_tail = NULL;
-      Xfree(t);
-      continue ;
-    }
 
     DebugLog(DF_ENG, DS_DEBUG,
              "  processing thread %p (r=%s s=%s d=%s)\n",
@@ -467,116 +679,134 @@ inject_event(orchids_t *ctx, event_t *event)
              t->state_instance->state->name,
              t->trans->dest->name);
 
-    vmret = ovm_exec(ctx, t->state_instance, t->trans->eval_code);
-    if (vmret == 0) {
-      state_instance_t *new_state;
+    vmret = ovm_exec_expr(ctx, t->state_instance, t->trans->eval_code);
+    if (vmret == 0)
+      {
+	state_instance_t *new_state;
 
-      DebugLog(DF_ENG, DS_DEBUG,
-               "TRANSITION MATCH ! (destination '%s')\n",
-               t->trans->dest->name);
-      t->pass++;
-      passed_threads++;
+	DebugLog(DF_ENG, DS_DEBUG,
+		 "TRANSITION MATCH ! (destination '%s')\n",
+		 t->trans->dest->name);
+	t->pass++;
+	passed_threads++;
 
-      ctx->last_ruleinst_act = ctx->cur_loop_time;
-      t->state_instance->rule_instance->new_last_act = ctx->last_ruleinst_act;
+	ctx->last_ruleinst_act = ctx->cur_loop_time;
+	t->state_instance->rule_instance->new_last_act = ctx->last_ruleinst_act;
 
-      if ( THREAD_IS_ONLYONCE(t) ) {
-        DebugLog(DF_ENG, DS_DEBUG,
-                 "Initial thread passed. Create rule instance.\n");
-        t->state_instance->rule_instance->creation_date = time(NULL);
-	t->state_instance->rule_instance->new_creation_date =
-          ctx->last_ruleinst_act;
-        t->state_instance->rule_instance->rule->instances++;
-        t->state_instance->rule_instance->flags |= RULE_INUSE;
-        ctx->rule_instances++;
+	if ( THREAD_IS_ONLYONCE(t) )
+	  {
+	    DebugLog(DF_ENG, DS_DEBUG,
+		     "Initial thread passed. Create rule instance.\n");
+	    t->state_instance->rule_instance->creation_date = time(NULL);
+	    t->state_instance->rule_instance->new_creation_date =
+	      ctx->last_ruleinst_act;
+	    t->state_instance->rule_instance->rule->instances++;
+	    t->state_instance->rule_instance->flags |= RULE_INUSE;
+	    ctx->rule_instances++;
+	  }
+
+	/* Create a new state instance */
+	new_state = create_state_instance(ctx,
+					  t->trans->dest, t->state_instance);
+
+	/* Link the new_state instance into the tree */
+	GC_TOUCH (gc_ctx, new_state->next_sibling =
+		  t->state_instance->first_child);
+	GC_TOUCH (gc_ctx, t->state_instance->first_child = new_state);
+	GC_TOUCH (gc_ctx, new_state->parent = t->state_instance);
+	GC_TOUCH (gc_ctx, new_state->event = active_event);
+	active_event->refs++;
+
+	/* Update state instance list of the current rule instance */
+	GC_TOUCH (gc_ctx, new_state->retrig_next =
+		  t->state_instance->rule_instance->state_list);
+	GC_TOUCH (gc_ctx, t->state_instance->rule_instance->state_list =
+		  new_state);
+
+	/* And recursively call simulation function */
+	sret = simulate_state_and_create_threads(ctx,
+						 new_state, active_event, 0);
+	if (sret < 0)
+	  ret -= sret;
+	else
+	  ret += sret;
+
+	/* Static analysis flags test here (RETRIGGER) */
+	if ( backtrack_is_not_needed(ctx, t) ) {
+	  DebugLog(DF_ENG, DS_DEBUG, "Backtrack not needed\n");
+	  KILL_THREAD(ctx, t);
+	}
       }
 
-      /* Create a new state instance */
-      new_state = create_state_instance(ctx, t->trans->dest, t->state_instance);
+    if ( THREAD_IS_ONLYONCE(t))
+      {
+	KILL_THREAD(ctx, t);
+	/* Initial thread reaper: an initial thread can't be free()d at
+	 * the next loop because initial environment can make references
+	 * to the current event.  In the case of the event didn't match
+	 * any transition, it will be free()d _before_ the initial
+	 * environment, so we'll lose the reference.  */
 
-      /* Link the new_state instance in the tree */
-      new_state->next_sibling = t->state_instance->first_child;
-      t->state_instance->first_child = new_state;
-      new_state->parent = t->state_instance;
-      new_state->event = active_event;
-      active_event->refs++;
+	DebugLog(DF_ENG, DS_DEBUG, "Reap INITIAL thread (%p)\n", t);
 
-      /* Update state instance list of the current rule instance */
-      new_state->retrig_next = t->state_instance->rule_instance->state_list;
-      t->state_instance->rule_instance->state_list = new_state;
+	if (t->flags & THREAD_BUMP)
+	  {
+	    DebugLog(DF_ENG, DS_DEBUG,
+		     "initial thread bump "
+		     "(commit q'_{new} = q_{new} @ q_{retrig})\n");
+	    if (ctx->retrig_qt)
+	      ctx->retrig_qt->flags |= THREAD_BUMP;
+	    if (ctx->new_qh!=NULL)
+	      {
+		ctx->new_qt->flags |= THREAD_BUMP;
+		GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
+		if (ctx->retrig_qt!=NULL)
+		  GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
+		ctx->retrig_qh = NULL;
+		ctx->retrig_qt = NULL;
+	      }
+	    else
+	      { /* q_new is empty */
+		GC_TOUCH (gc_ctx, ctx->new_qh = ctx->retrig_qh);
+		GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
+		ctx->retrig_qh = NULL;
+		ctx->retrig_qt = NULL;
+	      }
+	  }
 
-      /* And recursively call simulation function */
-      sret = simulate_state_and_create_threads(ctx, new_state, active_event, 0);
-      if (sret < 0)
-	ret -= sret;
-      else
-	ret += sret;
-
-      /* Static analysis flags test here (RETRIGGER) */
-      if ( backtrack_is_not_needed(ctx, t) ) {
-        DebugLog(DF_ENG, DS_DEBUG, "Backtrack not needed\n");
-        KILL_THREAD(ctx, t);
+	t->state_instance->rule_instance->threads--;
+	ctx->threads--;
+	if ( NO_MORE_THREAD(t->state_instance->rule_instance) )
+	  {
+	    /* Update rule instance list links (before removing) */
+	    t->state_instance->rule_instance->flags |= THREAD_KILLED;
+	    reap_dead_rule(ctx, t->state_instance->rule_instance);
+	  }
+	else
+	  {
+	    unlink_thread_in_state_instance_list(gc_ctx, t);
+	  }
+	if (t == ctx->cur_retrig_qh)
+	  {
+	    GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = next_thread);
+	  }
+	if (ctx->cur_retrig_qt!=NULL)
+	  ctx->cur_retrig_qt->next = NULL;
+	ctx->current_tail = NULL;
+	continue;
       }
-    }
-
-    if ( THREAD_IS_ONLYONCE(t)) {
-      KILL_THREAD(ctx, t);
-      /* Initial thread reaper: an initial thread can't be free()d at
-       * the next loop because initial environment can make references
-       * to the current event.  In the case of the event didn't match
-       * any transition, it will be free()d _before_ the initial
-       * environment, so we'll lose the reference.  */
-
-      DebugLog(DF_ENG, DS_DEBUG, "Reap INITIAL thread (%p)\n", t);
-
-      if (t->flags & THREAD_BUMP) {
-        DebugLog(DF_ENG, DS_DEBUG,
-                 "initial thread bump "
-                 "(commit q'_{new} = q_{new} @ q_{retrig})\n");
-        if (ctx->retrig_qt)
-          ctx->retrig_qt->flags |= THREAD_BUMP;
-        if (ctx->new_qh) {
-          ctx->new_qt->flags |= THREAD_BUMP;
-          ctx->new_qt->next = ctx->retrig_qh;
-          if (ctx->retrig_qt)
-            ctx->new_qt = ctx->retrig_qt;
-          ctx->retrig_qh = NULL;
-          ctx->retrig_qt = NULL;
-        } else { /* q_new is empty */
-          ctx->new_qh = ctx->retrig_qh;
-          ctx->new_qt = ctx->retrig_qt;
-          ctx->retrig_qh = NULL;
-          ctx->retrig_qt = NULL;
-        }
-      }
-
-      t->state_instance->rule_instance->threads--;
-      ctx->threads--;
-      if ( NO_MORE_THREAD(t->state_instance->rule_instance) ) {
-        /* Update rule instance list links (before removing) */
-        t->state_instance->rule_instance->flags |= THREAD_KILLED;
-        reap_dead_rule(ctx, t->state_instance->rule_instance);
-      } else {
-        unlink_thread_in_state_instance_list(t);
-      }
-      if (t == ctx->cur_retrig_qh) {
-        ctx->cur_retrig_qh = next_thread;
-      }
-      if (ctx->cur_retrig_qt)
-        ctx->cur_retrig_qt->next = NULL;
-      ctx->current_tail = NULL;
-      Xfree(t);
-      continue;
-    }
 
     DebugLog(DF_ENG, DS_DEBUG, "RETRIG q'_{retrig} = q_{retrig} + t\n");
-    if (ctx->retrig_qh) {
-      ctx->retrig_qt->next = t;
-      ctx->retrig_qt = t;
-    } else {
-      ctx->retrig_qh = t;
-      ctx->retrig_qt = t;
-    }
+    if (ctx->retrig_qh!=NULL)
+      {
+	GC_TOUCH (gc_ctx, ctx->retrig_qt->next = t);
+	GC_TOUCH (gc_ctx, ctx->retrig_qt = t);
+      }
+    else
+      {
+	GC_TOUCH (gc_ctx, ctx->retrig_qh = t);
+	GC_TOUCH (gc_ctx, ctx->retrig_qt = t);
+      }
     t->next = NULL;
 
 #if 0
@@ -588,25 +818,29 @@ inject_event(orchids_t *ctx, event_t *event)
 #endif
 
     /* If we need to commit new threads, then merge two queues */
-    if (t->flags & THREAD_BUMP) {
-      DebugLog(DF_ENG, DS_DEBUG,
-               "thread bump (commit q'_{new} = q_{new} @ q_{retrig})\n");
-      if (ctx->retrig_qt)
-        ctx->retrig_qt->flags |= THREAD_BUMP;
-      if (ctx->new_qh) {
-        ctx->new_qt->flags |= THREAD_BUMP;
-        ctx->new_qt->next = ctx->retrig_qh;
-        if (ctx->retrig_qt)
-          ctx->new_qt = ctx->retrig_qt;
-        ctx->retrig_qh = NULL;
-        ctx->retrig_qt = NULL;
-      } else { /* q_new is empty */
-        ctx->new_qh = ctx->retrig_qh;
-        ctx->new_qt = ctx->retrig_qt;
-        ctx->retrig_qh = NULL;
-        ctx->retrig_qt = NULL;
+    if (t->flags & THREAD_BUMP)
+      {
+	DebugLog(DF_ENG, DS_DEBUG,
+		 "thread bump (commit q'_{new} = q_{new} @ q_{retrig})\n");
+	if (ctx->retrig_qt!=NULL)
+	  ctx->retrig_qt->flags |= THREAD_BUMP;
+	if (ctx->new_qh!=NULL)
+	  {
+	    ctx->new_qt->flags |= THREAD_BUMP;
+	    GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
+	    if (ctx->retrig_qt!=NULL)
+	      GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
+	    ctx->retrig_qh = NULL;
+	    ctx->retrig_qt = NULL;
+	  }
+	else
+	  { /* q_new is empty */
+	    GC_TOUCH (gc_ctx, ctx->new_qh = ctx->retrig_qh);
+	    GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
+	    ctx->retrig_qh = NULL;
+	    ctx->retrig_qt = NULL;
+	  }
       }
-    }
 
 #if 0
     fprintf(stdout, "end new queue\n");
@@ -620,33 +854,28 @@ inject_event(orchids_t *ctx, event_t *event)
 
   execute_post_inject_hooks(ctx, active_event->event);
 
-  for (e = event; e; e = e->next)
-    ctx->global_fields[ e->field_id ].val = NULL;
+  for (e = event; e!=NULL; e = e->next)
+    ctx->global_fields->fields[ e->field_id ].val = NULL;
 
-  /* Free unreferenced event here (if the current event didn't pass any
-     transition, Xfree() it) */
-  if (active_event->refs == 0) {
-    DebugLog(DF_ENG, DS_DEBUG,
-             "free unreferenced event (%p/%p)\n",
-             active_event, active_event->event);
-    free_event(active_event->event);
-    Xfree(active_event);
-  }
-  else {
-    ctx->last_evt_act = ctx->cur_loop_time;
-    DebugLog(DF_ENG, DS_DEBUG,
-             "Keep new event: active_event->refs = %i (linking) %i\n",
-             active_event->refs, passed_threads);
-    if (ctx->active_event_head == NULL) {
-      ctx->active_event_head = active_event;
-      ctx->active_event_tail = active_event;
-    } else {
-      active_event->prev = ctx->active_event_tail;
-      ctx->active_event_tail->next = active_event;
-      ctx->active_event_tail = active_event;
+  if (active_event->refs != 0) /* If event still alive: */
+    {
+      ctx->last_evt_act = ctx->cur_loop_time;
+      DebugLog(DF_ENG, DS_DEBUG,
+	       "Keep new event: active_event->refs = %i (linking) %i\n",
+	       active_event->refs, passed_threads);
+      if (ctx->active_event_head == NULL)
+	{
+	  GC_TOUCH (gc_ctx, ctx->active_event_head = active_event);
+	  GC_TOUCH (gc_ctx, ctx->active_event_tail = active_event);
+	}
+      else
+	{
+	  GC_TOUCH (gc_ctx, active_event->prev = ctx->active_event_tail);
+	  GC_TOUCH (gc_ctx, ctx->active_event_tail->next = active_event);
+	  GC_TOUCH (gc_ctx, ctx->active_event_tail = active_event);
+	}
+      ctx->active_events++;
     }
-    ctx->active_events++;
-  }
 
   DebugLog(DF_ENG, DS_TRACE,
            "simulate_state_and_create_threads() = %i\n", ret);
@@ -656,165 +885,185 @@ inject_event(orchids_t *ctx, event_t *event)
 #endif
 }
 
+static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  state_instance_t *si = (state_instance_t *)p;
 
-/* XXX: Environments management really needs _HEAVY_ optimizations */
-static state_instance_t *
-create_state_instance(orchids_t *ctx,
-                      state_t *state,
-                      const state_instance_t *parent)
+  GC_TOUCH (gc_ctx, si->first_child);
+  GC_TOUCH (gc_ctx, si->next_sibling);
+  GC_TOUCH (gc_ctx, si->parent);
+  GC_TOUCH (gc_ctx, si->event);
+  GC_TOUCH (gc_ctx, si->rule_instance);
+  GC_TOUCH (gc_ctx, si->env);
+  GC_TOUCH (gc_ctx, si->global_next);
+  GC_TOUCH (gc_ctx, si->retrig_next);
+  GC_TOUCH (gc_ctx, si->thread_list);
+  GC_TOUCH (gc_ctx, si->next_report_elmt);
+}
+
+static void state_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  //state_instance_t *si = (state_instance_t *)p;
+
+  return;
+}
+
+static int state_instance_traverse (gc_traverse_ctx_t *gtc,
+				    gc_header_t *p,
+				    void *data)
+{
+  state_instance_t *si = (state_instance_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->first_child, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->next_sibling, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->parent, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->event, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->rule_instance, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->env, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->global_next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->retrig_next, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->thread_list, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->next_report_elmt, data);
+  return err;
+}
+
+static gc_class_t state_instance_class = {
+  GC_ID('s','t','t','i'),
+  state_instance_mark_subfields,
+  state_instance_finalize,
+  state_instance_traverse
+};
+
+static state_instance_t *create_state_instance(orchids_t *ctx,
+					       state_t *state,
+					       const state_instance_t *parent)
 {
   state_instance_t *new_state;
-  int env_sz;
-  int i;
 
   /* Allocate and init state instance */
-  new_state = Xzmalloc(sizeof (state_instance_t));
-  new_state->state = state;
-  new_state->rule_instance = parent->rule_instance;
+  new_state = gc_alloc (ctx->gc_ctx, sizeof (state_instance_t),
+			&state_instance_class);
+  new_state->gc.type = T_STATE_INSTANCE;
+  new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
+  GC_TOUCH (ctx->gc_ctx, new_state->rule_instance = parent->rule_instance);
   new_state->depth = parent->depth + 1;
-
-  /* Build inherited environment */
-  if (state->rule->dynamic_env_sz > 0) {
-    env_sz = state->rule->dynamic_env_sz * sizeof (ovm_var_t *);
-    /* inherit_env will be entirely overwritten
-     * (no need to initialize the memory) */
-    new_state->inherit_env = Xmalloc(env_sz);
-    new_state->current_env = Xzmalloc(env_sz);
-  }
-  /* IDEA of optimization :
-  ** if there is no action byte-code in this state, inherit_env can be
-  ** a reference to parent environments (this add a problem for
-  ** freeing memory).  Maybe a third environment pointer should
-  ** be added */
-
-  /* inherit_env construction:
-     XXX: optimize this: remove pointer resolution. */
-  for (i = 0; i < state->rule->dynamic_env_sz; ++i) {
-    if (parent->current_env[i])
-      new_state->inherit_env[i] = parent->current_env[i];
-    else
-      new_state->inherit_env[i] = parent->inherit_env[i];
-  }
+  new_state->first_child = NULL;
+  new_state->next_sibling = NULL;
+  new_state->parent = NULL;
+  new_state->event_level = 0;
+  new_state->flags = 0;
+  new_state->event = NULL;
+  GC_TOUCH (ctx->gc_ctx, new_state->env = parent->env);
+  new_state->global_next = NULL;
+  new_state->retrig_next = NULL;
 
   ctx->state_instances++;
-
-  return (new_state);
+  return new_state;
 }
 
 
-static state_instance_t *
-create_init_state_instance(orchids_t *ctx, const rule_t *rule)
+static state_instance_t *create_init_state_instance(orchids_t *ctx, const rule_t *rule)
 {
   state_t *state;
   state_instance_t *new_state;
-  int env_sz;
 
   state = &rule->state[0];
-  new_state = Xzmalloc(sizeof (state_instance_t));
-  new_state->state = state;
-
-  if (state->rule->dynamic_env_sz > 0) {
-    env_sz = state->rule->dynamic_env_sz * sizeof (ovm_var_t *);
-    new_state->current_env = Xzmalloc(env_sz);
-    /* XXX: Initial state does not have parent, so it can't inherit
-     * of something.  This should be removed, and the inheritance logic
-     * should be enhanced. */
-    new_state->inherit_env = Xzmalloc(env_sz);
-  }
+  new_state = gc_alloc (ctx->gc_ctx, sizeof (state_instance_t),
+			&state_instance_class);
+  new_state->gc.type = T_STATE_INSTANCE;
+  new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
+  new_state->rule_instance = NULL;
+  new_state->depth = 0;
+  new_state->first_child = NULL;
+  new_state->next_sibling = NULL;
+  new_state->parent = NULL;
+  new_state->event_level = 0;
+  new_state->flags = 0;
+  new_state->event = NULL;
+  new_state->env = NULL;
+  new_state->global_next = NULL;
+  new_state->retrig_next = NULL;
+  new_state->thread_list = NULL;
+  new_state->next_report_elmt = NULL;
 
   ctx->state_instances++;
-
-  return (new_state);
+  return new_state;
 }
 
 
-static void
-free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
+static void cleanup_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
 {
   state_instance_t *si;
   state_instance_t *next_si;
-  ovm_var_t **cur_env;
-  int dyn_env_sz;
-  int i;
   sync_lock_list_t *lock_elmt;
   sync_lock_list_t *lock_next;
 
-  DebugLog(DF_ENG, DS_DEBUG, "free_rule_instance(%p)\n", rule_instance);
+  DebugLog(DF_ENG, DS_DEBUG, "cleanup_rule_instance(%p)\n", rule_instance);
 
   /* Remove synchronization locks, if any exists */
   for (lock_elmt = rule_instance->sync_lock_list;
-       lock_elmt;
-       lock_elmt = lock_next) {
-    lock_next = lock_elmt->next;
-    DebugLog(DF_ENG, DS_DEBUG, "free_rule_instance(%p): removing lock %p\n",
-             rule_instance, lock_elmt->state);
-    si = objhash_del(rule_instance->rule->sync_lock, lock_elmt->state);
-    if (si == NULL) {
-      DebugLog(DF_ENG, DS_ERROR, "free_rule_instance(%p): lock not found\n",
-               rule_instance);
-    }
-    Xfree(lock_elmt);
+       lock_elmt!=NULL;
+       lock_elmt = lock_next)
+    {
+      lock_next = lock_elmt->next;
+      DebugLog(DF_ENG, DS_DEBUG, "cleanup_rule_instance(%p): removing lock %p\n",
+	       rule_instance, lock_elmt->state);
+      si = objhash_del(rule_instance->rule->sync_lock, lock_elmt->state);
+      if (si == NULL)
+	{
+	  DebugLog(DF_ENG, DS_ERROR,
+		   "cleanup_rule_instance(%p): lock not found\n",
+		   rule_instance);
+	}
   }
-
-  /* Free the initial state instance */
-  if (rule_instance->first_state->inherit_env)
-    Xfree(rule_instance->first_state->inherit_env);
-
-  dyn_env_sz = rule_instance->rule->dynamic_env_sz;
-  cur_env = rule_instance->first_state->current_env;
-  for (i = 0; i < dyn_env_sz; ++i)
-    if (cur_env[i] && CAN_FREE_VAR(cur_env[i]) ) {
-      issdl_free(cur_env[i]);
-    }
-
-  if (rule_instance->first_state->current_env)
-    Xfree(rule_instance->first_state->current_env);
-  Xfree(rule_instance->first_state);
-
   ctx->state_instances--;
 
   si = rule_instance->state_list;
   while (si) {
     next_si = si->retrig_next;
-    if (si->inherit_env)
-      Xfree(si->inherit_env);
-
-    /* Free all variables in the current environment */
-    dyn_env_sz = rule_instance->rule->dynamic_env_sz;
-    if (dyn_env_sz > 0) {
-      for (i = 0, cur_env = si->current_env; i < dyn_env_sz; ++i)
-        if (cur_env[i] && CAN_FREE_VAR(cur_env[i]) ) {
-          Xfree(cur_env[i]);
-        }
-      Xfree(si->current_env);
-    }
 
     /* Update event reference count */
     if (si->event) {
-
       si->event->refs--;
 
       /* The current active event is freed in inject_event() if unreferenced.
        * There is the special case of rules that terminate after exactly one
-       * event: the event matches a transition, is referenced, the rule reach
+       * event: the event matches a transition, is referenced, the rule reaches
        * instantaneously a final state, then terminate.  Here, we have to
        * only free events other than the current one (i.e. past events). */
       if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
         ctx->last_evt_act = ctx->cur_loop_time;
         DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
-        free_event(si->event->event);
         si->event->event = NULL;
         ctx->active_events--;
         /* unlink */
         if (!si->event->prev) { /* If we are in the first event reference */
-
           if (!si->event->next) { /* If it is also the last (it is alone) */
             ctx->active_event_head = NULL;
             ctx->active_event_tail = NULL;
           }
           else {
             /* Else it is the first, and there is other references after it */
-            ctx->active_event_head = si->event->next;
+            GC_TOUCH (ctx->gc_ctx, ctx->active_event_head = si->event->next);
             ctx->active_event_head->prev = NULL;
           }
           /* si->event->next->prev = si->event->prev; */
@@ -824,20 +1073,17 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
           if (!si->event->next) { /* If it is exactly the last one */
             /* Then update the previous element */
             si->event->prev->next = NULL;
-            ctx->active_event_tail = si->event->prev;
+            GC_TOUCH (ctx->gc_ctx, ctx->active_event_tail = si->event->prev);
           }
           else { /* Else the event reference is not the last
                     we are in the middle of the list */
-            si->event->prev->next = si->event->next;
-            si->event->next->prev = si->event->prev;
+            GC_TOUCH (ctx->gc_ctx, si->event->prev->next = si->event->next);
+            GC_TOUCH (ctx->gc_ctx, si->event->next->prev = si->event->prev);
           }
           /* ctx->active_event_tail = si->event->prev; */
         }
-
-        Xfree(si->event);
       }
     }
-    Xfree(si);
     si = next_si;
     ctx->state_instances--;
   }
@@ -846,13 +1092,10 @@ free_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
     rule_instance->rule->instances--;
     ctx->rule_instances--;
   }
-
-  Xfree(rule_instance);
 }
 
 
-void
-fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
+void fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
 {
   char asc_time[32];
   rule_instance_t *r;
@@ -860,7 +1103,7 @@ fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
 
   if (ctx->first_rule_instance == NULL) {
     fprintf(fp, "no rule instance.\n");
-    return ;
+    return;
   }
 
   fprintf(fp,
@@ -889,8 +1132,7 @@ fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
 }
 
 
-void
-fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
+void fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
 {
   unsigned int i;
   unsigned int k;
@@ -911,52 +1153,54 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
           "-----+----------+----+-----+----\n");
 
   k = 0;
-  for (i = 0; thread; thread = thread->next, i++) {
-    if (!(thread->flags & THREAD_KILLED)) {
-      fprintf(fp,
-              "%5u | "
-              "%12.12s | "
-              "%8.8s -> %-8.8s | "
-              "%3i | "
-              "%2i -> %-2i | "
-              "%2i | "
-              "%3i | "
-              "%s\n",
-              i,
-              thread->state_instance->state->rule->name,
-              thread->state_instance->state->name,
-              thread->trans->dest->name,
-              thread->state_instance->state->rule->id,
-              thread->state_instance->state->id,
-              thread->trans->dest->id,
-              thread->trans->id,
-              thread->pass,
-              (thread->flags & THREAD_BUMP) ? "_." : "  ");
+  for (i = 0; thread!=NULL; thread = thread->next, i++)
+    {
+      if (!(thread->flags & THREAD_KILLED))
+	{
+	  fprintf(fp,
+		  "%5u | "
+		  "%12.12s | "
+		  "%8.8s -> %-8.8s | "
+		  "%3i | "
+		  "%2i -> %-2i | "
+		  "%2i | "
+		  "%3i | "
+		  "%s\n",
+		  i,
+		  thread->state_instance->state->rule->name,
+		  thread->state_instance->state->name,
+		  thread->trans->dest->name,
+		  thread->state_instance->state->rule->id,
+		  thread->state_instance->state->id,
+		  thread->trans->dest->id,
+		  thread->trans->id,
+		  thread->pass,
+		  (thread->flags & THREAD_BUMP) ? "_." : "  ");
+	}
+      else
+	{
+	  k++;
+	  fprintf(fp,
+		  "%5u*| "
+		  "%12.12s | "
+		  "%8.8s -> %-8.8s | "
+		  "%3i | "
+		  "%2i -> %-2i | "
+		  "%2i | "
+		  "%3i |"
+		  "%s\n",
+		  i,
+		  thread->state_instance->state->rule->name,
+		  thread->state_instance->state->name,
+		  thread->trans->dest->name,
+		  thread->state_instance->state->rule->id,
+		  thread->state_instance->state->id,
+		  thread->trans->dest->id,
+		  thread->trans->id,
+		  thread->pass,
+		  (thread->flags & THREAD_BUMP) ? "_." : "  "); 
+	}
     }
-    else {
-      k++;
-      fprintf(fp,
-              "%5u*| "
-              "%12.12s | "
-              "%8.8s -> %-8.8s | "
-              "%3i | "
-              "%2i -> %-2i | "
-              "%2i | "
-              "%3i |"
-              "%s\n",
-              i,
-              thread->state_instance->state->rule->name,
-              thread->state_instance->state->name,
-              thread->trans->dest->name,
-              thread->state_instance->state->rule->id,
-              thread->state_instance->state->id,
-              thread->trans->dest->id,
-              thread->trans->id,
-              thread->pass,
-              (thread->flags & THREAD_BUMP) ? "_." : "  ");
-
-    }
-  }
   fprintf(fp, "(*) %u killed threads\n", k);
   fprintf(fp,
           "------+"
@@ -965,27 +1209,28 @@ fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
           "-----+----------+----+-----+----\n");
 }
 
-void
-fprintf_active_events(FILE *fp, orchids_t *ctx)
+void fprintf_active_events(FILE *fp, orchids_t *ctx)
 {
   unsigned int i;
   active_event_t *e;
 
-  if (ctx->active_event_head == NULL) {
-    fprintf(fp, "no active event.\n");
-    return ;
-  }
+  if (ctx->active_event_head == NULL)
+    {
+      fprintf(fp, "no active event.\n");
+      return;
+    }
 
   fprintf(fp, "--------------[ active events ]-------------\n");
 
-  for (i = 0, e = ctx->active_event_head; e; e = e->next, i++) {
-    fprintf(fp,
-            "\n"
-            "=============================[ "
-            "evt %5u (%i refs)"
-            " ]============================\n\n", i, e->refs);
-    fprintf_event(fp, ctx, e->event);
-  }
+  for (i = 0, e = ctx->active_event_head; e!=NULL; e = e->next, i++)
+    {
+      fprintf(fp,
+	      "\n"
+	      "=============================[ "
+	      "evt %5u (%i refs)"
+	      " ]============================\n\n", i, e->refs);
+      fprintf_event(fp, ctx, e->event);
+    }
 }
 
 

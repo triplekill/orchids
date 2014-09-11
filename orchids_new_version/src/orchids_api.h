@@ -127,24 +127,7 @@ orchids_lock(const char *lockfile);
  **
  ** @return A new allocated application context structure.
  **/
-orchids_t *
-new_orchids_context(void);
-
-
-/**
- ** Add a new polled input callback.
- **
- ** @param ctx  Orchids application context.
- ** @param mod  A pointer to the caller module entry adding
- **             the polled input callback.
- ** @param cb   A Polled input callback.
- ** @param data Data to pass to the callback. (some configuration for example).
- **/
-void
-add_polled_input_callback(orchids_t *ctx,
-                          mod_entry_t *mod,
-                          poll_callback_t cb,
-                          void *data);
+orchids_t *new_orchids_context(void);
 
 
 /**
@@ -303,18 +286,6 @@ register_fields(orchids_t *ctx,
                 field_t *field_tab,
                 size_t sz);
 
-
-/**
- ** Free fields.
- **
- ** @param tbl_event Event property table.
- ** @param s         Event property table size.
- **/
-void
-free_fields(ovm_var_t **tbl_event, size_t s);
-
-
-
 /**
  ** Append part of an event with a given property table filled
  ** by a dissection module.
@@ -369,16 +340,6 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event);
 
 
 /**
- ** Event destructor.
- ** Free all allocated resources of an event.
- **
- ** @param event The event to destroy.
- **/
-void
-free_event(event_t *event);
-
-
-/**
  ** Post an event.
  ** If module has registered a sub-dissector, the function will call it.
  ** If no more module can apply, the event will be injected into the
@@ -390,6 +351,23 @@ free_event(event_t *event);
  **/
 void
 post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event);
+
+/* One of the standard ways of posting events.
+   This should be included inside the standard calls:
+
+   GC_START(ctx->gc_ctx, <nevents>+1);
+   GC_UPDATE(ctx->gc_ctx, <event>); // where <event> is the event to dissect
+   [...] // store subfield values into GC_DATA() table; eqiuvalently,
+         // store them using GC_UPDATE()
+   REGISTER_EVENTS(ctx, mod, <nevents>);
+   GC_END(ctx-gc_ctx);
+*/
+#define REGISTER_EVENTS(ctx, mod, nevents)				\
+  do {									\
+    add_fields_to_event (ctx, mod, (event_t **)&GC_LOOKUP(nevents),	\
+			 (ovm_var_t **)GC_DATA(), nevents);		\
+    post_event (ctx, mod, (event_t *)GC_LOOKUP(nevents));		\
+  } while (0)
 
 /**
  ** Print the Orchids application statistics to a stdio stream.
@@ -432,15 +410,11 @@ fprintf_fields(FILE *fp, const orchids_t *ctx);
 
 /**
  ** Display a state environment on a stream.
- ** This function display the resulting environment given the current
- ** (state_instance_s::current_env) and the
- ** inherited (state_instance_s::inherit_env) ones.
  **
  ** @param fp    The output stream.
  ** @param state The state instance which contains the environment to print.
  **/
-void
-fprintf_state_env(FILE *fp, const state_instance_t *state);
+void fprintf_state_env(FILE *fp, const state_instance_t *state);
 
 
 #endif /* ORCHIDS_API_H */

@@ -41,12 +41,13 @@ struct objhash_s
   objhashcmp_t cmp;
 };
 
-objhash_t *new_objhash(size_t hsize);
-void objhash_resize(objhash_t *hash, size_t newsize);
-void objhash_add(objhash_t *hash, void *data, void *key);
+objhash_t *new_objhash(gc_t *ctx, size_t hsize);
+void objhash_resize(gc_t *ctx, objhash_t *hash, size_t newsize);
+void objhash_add(gc_t *ctx, objhash_t *hash, void *data, void *key);
 void *objhash_get(objhash_t *hash, void *key);
 void *objhash_del(objhash_t *hash, void *key);
-int objhash_walk(objhash_t *hash, int (func)(void *elmt, void *data), void *data);
+int objhash_walk(objhash_t *hash, int (*func)(void *key, void *elmt, void *data), void *data);
+void free_objhash(objhash_t *hash, void (*elmt_free)(void *e));
 int objhash_collide_count(objhash_t *hash);
 
 unsigned long objhash_pjw(void *key);

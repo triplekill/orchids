@@ -20,6 +20,8 @@
 # include "config.h"
 #endif
 
+#include "ovm.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 //#include <avl.h>
@@ -29,47 +31,28 @@
 
 input_module_t mod_mark;
 
-static void
-issdl_mark(orchids_t *ctx, state_instance_t *state)
+static void issdl_mark(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*res = NULL;
-
-  res = ovm_extern_new();
-  EXTPTR(res) = state;
-  stack_push(ctx->ovm_stack, res);
-}
-
-static void
-issdl_mark_update(orchids_t *ctx, state_instance_t *state)
-{
-  ovm_var_t *mark;
-
-  mark = stack_pop(ctx->ovm_stack);
-  if (TYPE(mark) != T_EXTERNAL) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-    return;
-  }
-  EXTPTR(mark) = state;
-
-  ISSDL_RETURN_TRUE(ctx, state);
+  PUSH_VALUE(ctx, state);
 }
 
 
-static void
-do_recursive_cut(state_instance_t *state)
+static void do_recursive_cut(state_instance_t *state)
 {
   wait_thread_t *t;
 
   state->flags |= SF_PRUNED;
 
   /* Cut current state instance threads */
-  for (t = state->thread_list; t; t = t->next_in_state_instance) {
-    if ( !(t->flags & THREAD_ONLYONCE) ) {
-      DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (cut)\n", t);
-      t->flags |= THREAD_KILLED;
+  for (t = state->thread_list; t; t = t->next_in_state_instance)
+    {
+      if ( !(t->flags & THREAD_ONLYONCE) )
+	{
+	  DebugLog(DF_ENG, DS_TRACE,
+		   "Marking thread %p as KILLED (cut)\n", t);
+	  t->flags |= THREAD_KILLED;
+	}
     }
-  }
 
   /* Then call recursively */
   if (state->first_child)
@@ -79,25 +62,24 @@ do_recursive_cut(state_instance_t *state)
     do_recursive_cut(state->next_sibling);
 }
 
-static void
-issdl_mark_cut(orchids_t *ctx, state_instance_t *state)
+static void issdl_mark_cut(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t *mark;
+  state_instance_t *mark;
 
-  mark = stack_pop(ctx->ovm_stack);
-  if (TYPE(mark) != T_EXTERNAL) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-    return;
-  }
-
-  do_recursive_cut(EXTPTR(mark));
-
-  ISSDL_RETURN_TRUE(ctx, state);
+  mark = (state_instance_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (mark==NULL || TYPE(mark)!=T_STATE_INSTANCE)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
+  do_recursive_cut(mark);
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_RETURN_TRUE(ctx);
 }
 
-static void *
-mark_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *mark_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() mark@%p\n", &mod_mark);
 
@@ -107,21 +89,11 @@ mark_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "Set a mark and return an id");
 
   register_lang_function(ctx,
-                         issdl_mark_update,
-                         "mark_update", 0,
-                         "Update the mark to the current state");
-
-
-  register_lang_function(ctx,
                          issdl_mark_cut,
                          "mark_cut", 1,
                          "Red cut from the state where the id was created");
-
-
-  return (NULL);
+  return NULL;
 }
-
-
 
 input_module_t mod_mark = {
   MOD_MAGIC,                /* Magic number */

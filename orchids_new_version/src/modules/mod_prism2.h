@@ -24,14 +24,14 @@
 #define PRISM_VAL(v) \
   ( (v)->data )
 
-#define DECODE_PRISM_VALUE(field, value)        \
-  do {                                          \
-    prismval_t *pv;                             \
-    pv = (value);                               \
-    if ( PRISM_VAL_PRESENT(pv) ) {              \
-      (field) = ovm_uint_new();                 \
-      UINT(field) = PRISM_VAL(pv);              \
-    }                                           \
+#define DECODE_PRISM_VALUE(field, value)		\
+  do {							\
+    prismval_t *pv;					\
+    pv = (value);					\
+    if ( PRISM_VAL_PRESENT(pv) ) {			\
+      val = ovm_uint_new(gc_ctx, PRISM_VAL(pv));	\
+      GC_UPDATE (gc_ctx, (field), val);			\
+    }							\
   } while (0)
 
 typedef struct prismval_s prismval_t;

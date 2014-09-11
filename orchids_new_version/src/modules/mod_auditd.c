@@ -114,19 +114,21 @@ struct action_tree {
 struct action_orchids_ctx {
   orchids_t *ctx;
   mod_entry_t *mod;
-  event_t *event;
+  event_t *in_event;
+  event_t **out_event;
 };
-#define FILL_EVENT(octx, attr,n,len) add_fields_to_event_stride(octx->ctx, octx->mod, &octx->event, (attr), n, n+len)
+#define FILL_EVENT(octx,n,len) add_fields_to_event_stride(octx->ctx, octx->mod, octx->out_event, (ovm_var_t **)GC_DATA(), n, n+len)
 
 struct action_ctx {
+  gc_t *gc_ctx;
   struct action_tree *tree;
-  char *(*action_doer[ACTION_LIMIT]) (struct action_ctx *actx, char *s,
+  char *(*action_doer[ACTION_LIMIT]) (struct action_ctx *actx,
+				      char *s, char *end,
 				      struct action_orchids_ctx *octx,
 				      int n);
 };
 
-static void 
-action_insert (struct action_ctx *actx, struct action* ap)
+static void action_insert (struct action_ctx *actx, struct action* ap)
 {
   char *s, c;
   struct action_tree **atpp = &actx->tree;
@@ -140,25 +142,27 @@ action_insert (struct action_ctx *actx, struct action* ap)
       atp = *atpp;
       if (atp==NULL)
 	{
-	  atp = *atpp = Xmalloc (sizeof (struct action_tree));
+	  atp = *atpp = gc_base_malloc (actx->gc_ctx,
+					sizeof (struct action_tree));
 	  atp->tag = TAG_PROCEED;
 	  for (i=0; i<256; i++)
 	    atp->what.proceed[i] = NULL;
 	}
     }
-  atp = *atpp = Xmalloc (offsetof(struct action_tree, what.code.dummy));
+  atp = *atpp = gc_base_malloc (actx->gc_ctx,
+				offsetof(struct action_tree, what.code.dummy));
   atp->tag = TAG_END;
   atp->what.code.val = ap->code;
   atp->what.code.evtno = ap->evtno;
 }
 
-char *action_atoi_hex (char *s, int *ip)
+char *action_atoi_hex (char *s, char *end, int *ip)
 {
   int i = 0;
   int j;
   char c;
 
-  while (c = *s, isxdigit (c))
+  while (s<end && (c = *s, isxdigit (c)))
     {
       if (isdigit (c))
 	j = ((int)c) - '0';
@@ -170,9 +174,9 @@ char *action_atoi_hex (char *s, int *ip)
   return s;
 }
 
-char *action_atoi_unsigned (char *s, int *ip)
+char *action_atoi_unsigned (char *s, char *end, unsigned int *ip)
 {
-  int i = 0;
+  unsigned int i = 0;
   char c;
 
   c = *s;
@@ -184,7 +188,7 @@ char *action_atoi_unsigned (char *s, int *ip)
           int j;
 
 	  s++;
-          while (c = *s, isxdigit (c))
+          while (s<end && (c = *s, isxdigit (c)))
             {
               if (isdigit (c))
         	j = ((int)c) - '0';
@@ -194,13 +198,13 @@ char *action_atoi_unsigned (char *s, int *ip)
             }
         }
       else // octal
-        while (c = *s, isdigit (c) && c<'8')
+        while (s<end && (c = *s, isdigit (c) && c<'8'))
           {
             i = 8*i + (((int)c) - '0');
             s++;
           }
     }
-  else while (c = *s, isdigit (c))
+  else while (s<end && (c = *s, isdigit (c)))
     {
       i = 10*i + (((int)c) - '0');
       s++;
@@ -209,9 +213,9 @@ char *action_atoi_unsigned (char *s, int *ip)
   return s;
 }
 
-char *action_atoi_signed (char *s, int *ip)
+char *action_atoi_signed (char *s, char *end, int *ip)
 {
-  int i;
+  unsigned int j;
   int negate = 0;
 
   if (*s == '-')
@@ -219,32 +223,12 @@ char *action_atoi_signed (char *s, int *ip)
       negate = 1;
       s++;
     }
-  s = action_atoi_unsigned (s, &i);
-  if (negate)
-    i = -i;
-  *ip = i;
+  s = action_atoi_unsigned (s, end, &j);
+  *ip = negate?(-j):j;
   return s;
 }
 
-char *time_convert(char *str, struct timeval *tv)
-{
-  char c, *s;
-  double secs, floor_part;
-
-  secs = strtod(str,&s);
-  c = *s;
-  if (c==':' || c==')')
-    {
-      *s++ = '\0';
-      floor_part = floor(secs);
-      tv->tv_sec = floor_part;
-      tv->tv_usec = 1000000.0 * (secs - floor_part);
-      return s;
-    }
-  else return s-1;
-}
-
-char *action_doer_audit (struct action_ctx *actx, char *s,
+char *action_doer_audit (struct action_ctx *actx, char *s, char *end,
 			 struct action_orchids_ctx *octx, int n)
 {
   /* s is of the form 12345.678:1234 followed possibly
@@ -253,141 +237,189 @@ char *action_doer_audit (struct action_ctx *actx, char *s,
   */
   char *t;
   struct timeval time;
-  int serial;
-  ovm_var_t *attr[2];
+  unsigned int serial;
+  ovm_var_t *var;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START (gc_ctx, 2);
 
-  t = time_convert(s, &time);
+  t = time_convert(s, end, &time);
   serial = 0;
-  if (*t!='\0') /* found it */
+  if (t<end && *t==':') /* found it */
     {
-      t = action_atoi_unsigned (t+1, &serial);
-      if (*t==')') t++;
+      t = action_atoi_unsigned (t+1, end, &serial);
+      if (t<end && *t==')')
+	t++;
     }
-  attr[0] = ovm_timeval_new();
-  TIMEVAL(attr[0]) = time;
-  attr[0]->flags = TYPE_MONO;
+  var = ovm_timeval_new (gc_ctx);
+  TIMEVAL(var) = time;
+  GC_UPDATE (gc_ctx, 0, var);
 
-  attr[1] = ovm_int_new();
-  INT(attr[1]) = serial;
-  attr[1]->flags |= TYPE_MONO;
+  var = ovm_int_new (gc_ctx, (int)serial);
+  GC_UPDATE (gc_ctx, 1, var);
 
-  FILL_EVENT(octx, attr, F_AUDITD_TIME, 2);
+  FILL_EVENT(octx, F_AUDITD_TIME, 2);
+  GC_END (gc_ctx);
   return t;
 }
 
-char *action_doer_int (struct action_ctx *actx, char *s,
+char *action_doer_int (struct action_ctx *actx, char *s, char *end,
 		       struct action_orchids_ctx *octx, int n)
 {
   int i;
   ovm_var_t *v;
   char *t;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START(gc_ctx, 1);
 
-  t = action_atoi_signed (s, &i);
-  v = ovm_int_new();
-  INT(v) = i;
-  FILL_EVENT(octx, &v, n, 1);
+  t = action_atoi_signed (s, end, &i);
+  v = ovm_int_new(gc_ctx, i);
+  GC_UPDATE(gc_ctx, 0, v);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
   return t;
 }
 
-char *action_doer_unsigned_int (struct action_ctx *actx, char *s,
+char *action_doer_unsigned_int (struct action_ctx *actx, char *s, char *end,
 		                struct action_orchids_ctx *octx, int n)
 {
-  int i;
+  unsigned int i;
   ovm_var_t *v;
   char *t;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START(gc_ctx, 1);
 
-  t = action_atoi_unsigned (s, &i);
-  v = ovm_int_new();
-  INT(v) = i;
-  FILL_EVENT(octx, &v, n, 1);
+  t = action_atoi_unsigned (s, end, &i);
+  v = ovm_int_new(gc_ctx, (int)i);
+  GC_UPDATE(gc_ctx, 0, v);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
   return t;
 }
 
-char *action_doer_hex (struct action_ctx *actx, char *s,
+char *action_doer_hex (struct action_ctx *actx, char *s, char *end,
 		       struct action_orchids_ctx *octx, int n)
 {
   int i;
   ovm_var_t *v;
   char *t;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START(gc_ctx, 1);
 
-  t = action_atoi_hex (s, &i);
-  v = ovm_int_new();
-  INT(v) = i;
-  FILL_EVENT(octx, &v, n, 1);
+  t = action_atoi_hex (s, end, &i);
+  v = ovm_int_new(gc_ctx, i);
+  GC_UPDATE(gc_ctx, 0, v);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
   return t;
 }
 
-char *action_doer_dev (struct action_ctx *actx, char *s,
+char *action_doer_dev (struct action_ctx *actx, char *s, char *end,
                        struct action_orchids_ctx *octx, int n)
 {
-  int major=0, minor=0, i;
+  int major=0, minor=0;
+  unsigned int i;
   ovm_var_t *v;
-  char *t, c;
+  char c;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START(gc_ctx, 1);
 
-  while (c = *s, isdigit (c))
+  while (s<end && (c = *s, isdigit (c)))
     {
       major = 10*major + (((int)c) - '0');
       s++;
     }
-  if (c==':')
+  if (s<end && *s==':')
     {
        s++;
-       while (c = *s, isdigit (c))
+       while (s<end && (c = *s, isdigit (c)))
          {
             minor = 10*minor + (((int)c) - '0');
             s++;
          }
     }
   i = (major << 6) | minor;
-  t = action_atoi_unsigned (s, &i);
-  v = ovm_int_new();
-  INT(v) = i;
-  FILL_EVENT(octx, &v, n, 1);
-  return t;
+  v = ovm_int_new(gc_ctx, (int)i);
+  GC_UPDATE(gc_ctx, 0, v);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
+  return s;
 }
 
 
 
-char *action_doer_id (struct action_ctx *actx, char *s,
+char *action_doer_id (struct action_ctx *actx, char *s, char *end,
 		      struct action_orchids_ctx *octx, int n)
 {
   char c, *t;
   ovm_var_t *v;
+  gc_t *gc_ctx = actx->gc_ctx;
+  GC_START(gc_ctx, 1);
 
-  v = ovm_vstr_new();
+  v = ovm_vstr_new(gc_ctx, octx->in_event->value);
   VSTR(v) = s;
-  for (t=s; c = *t, c!=0 && !isspace (c); t++);
+  for (t=s; t<end && (c = *t, c!=0 && !isspace (c)); t++);
   VSTRLEN(v) = t-s;
-  if (c!=0)
-    *t++ = 0; /* insert end-of-string marker */
-  FILL_EVENT(octx, &v, n, 1);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
   return t;
 }
 
-char *action_doer_string (struct action_ctx *actx, char *s,
+char *action_doer_string (struct action_ctx *actx, char *s, char *end,
 		          struct action_orchids_ctx *octx, int n)
 {
+  gc_t *gc_ctx = actx->gc_ctx;
   char c;
+  char *from;
   char *to;
   ovm_var_t *v;
+  char *str = NULL;
+  size_t str_sz = 0;
 
-  if (*s != '"')
-    return action_doer_id (actx, s, octx, n);
-  to = s++;
-  v = ovm_vstr_new();
-  VSTR(v) = to;
-  while (1)
+  if (s<end && *s != '"')
+    return action_doer_id (actx, s, end, octx, n);
+  from = s++;
+  /* We try to allocate the string as a VSTR, except
+     if we find backslashed characters, in which case we allocate a STR
+     instead.
+  */
+  GC_START(gc_ctx, 1);
+  while (s < end)
+    switch (c = *s++)
+      {
+      case 0: case '"':
+	goto build_vstr;
+      case '\\': /* cannot keep this as a VSTR: */
+	goto scan_str;
+      default:
+	break;
+      }
+ build_vstr:
+  v = ovm_vstr_new (gc_ctx, octx->in_event->value);
+  VSTR(v) = from;
+  VSTRLEN(v) = s-1-from;
+  goto end;
+
+ scan_str:
+  str_sz = end-from; /* string cannot be larger than this */
+  v = ovm_str_new (gc_ctx, str_sz);
+  str = STR(v);
+  s--; /* back up right before the backslash */
+  memcpy (str, from, s-from); /* copy what we have seen so far */
+  to = str + (s - from);
+
+  while (s<end)
     {
       switch (c = *s++)
 	{
-	case 0: s--; goto end;
-	case '"': goto end;
+	case 0: case '"': goto build_str;
 	case '\\':
+	  if (s>=end)
+	    goto build_str; // malformed string, but who cares
 	  c = *s++;
 	  switch (c)
 	    {
 	    case 0: case '"':
-	      goto end;
+	      goto build_str; // malformed string, but who cares
 	    case 'n': *to++ = '\n'; break;
 	    case 'r': *to++ = '\r'; break;
 	    case 't': *to++ = '\t'; break;
@@ -398,12 +430,16 @@ char *action_doer_string (struct action_ctx *actx, char *s,
 		/* start of octal number */
 		int i = (c - '0');
 
+		if (s>=end)
+		  goto build_str; // malformed string, but who cares
 		c = *s++;
 		switch (c)
 		  {
 		  case '0': case '1': case '2': case '3':
 		  case '4': case '5': case '6': case '7':
 		    i = 8*i + (c - '0');
+		    if (s>=end)
+		      goto build_str; // malformed string, but who cares
 		    c = *s++;
 		    switch (c)
 		      {
@@ -427,16 +463,18 @@ char *action_doer_string (struct action_ctx *actx, char *s,
 	  break;
 	}
     }
- end:
-  *to = 0;
-  VSTRLEN(v) = to-VSTR(v);
-  FILL_EVENT(octx, &v, n, 1);
+ build_str:
+  STRLEN(v) = to-str;
+  /* goto end; */
 
+ end:
+  GC_UPDATE(gc_ctx, 0, v);
+  FILL_EVENT(octx, n, 1);
+  GC_END(gc_ctx);
   return s;
 }
 
-static void
-action_init (struct action_ctx *actx)
+static void action_init (gc_t *gc_ctx, struct action_ctx *actx)
 {
   struct action *ap;
 
@@ -444,7 +482,8 @@ action_init (struct action_ctx *actx)
     struct action_tree *atp;
     int i;
 
-    atp = actx->tree = Xmalloc (sizeof (struct action_tree));
+    actx->gc_ctx = gc_ctx;
+    atp = actx->tree = gc_base_malloc (gc_ctx, sizeof (struct action_tree));
     atp->tag = TAG_PROCEED;
     for (i=0; i<256; i++)
       atp->what.proceed[i] = NULL;
@@ -460,14 +499,13 @@ action_init (struct action_ctx *actx)
   actx->action_doer[ACTION_DEV] = action_doer_dev;
 }
 
-void action_parse_event (struct action_ctx *actx, char *data,
+void action_parse_event (struct action_ctx *actx, char *data, char *end,
 			 struct action_orchids_ctx *octx)
 {
   char *s;
   char c;
   int i;
   struct action_tree *atp;
-
 
   atp = actx->tree; /* NULL or with tag=TAG_PROCEED */
   if (atp==NULL)
@@ -477,16 +515,18 @@ void action_parse_event (struct action_ctx *actx, char *data,
      This assumes that atcx->tree does not just store
      the empty word.
   */
-  for (s = data; (c = *s++)!=0; )
+  for (s = data; s<end; )
     {
+      c = *s++;
       /* skip spaces */
       if (isspace (c))
 	continue;
       /* Try to recognize keyword=value (or audit(...)). */
       goto again;
     start:
-      if ((c = *s++)==0)
+      if (s>=end)
 	break;
+      c = *s++;
     again:
       i = (int)(unsigned int)(unsigned char)c;
       atp = atp->what.proceed[i];
@@ -494,7 +534,9 @@ void action_parse_event (struct action_ctx *actx, char *data,
 	atp = actx->tree; /* Ignore this illegal sequence. */
       else if (atp->tag==TAG_END) /* We found something to do! */
 	{
-	  s = (*actx->action_doer[atp->what.code.val]) (actx, s, octx, atp->what.code.evtno);
+	  s = (*actx->action_doer[atp->what.code.val]) (actx, s, end,
+							octx,
+							atp->what.code.evtno);
 	  atp = actx->tree;
 	}
       else goto start;
@@ -509,22 +551,34 @@ dissect_auditd(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
   char *txt_line;
   int txt_len;
   auditd_cfg_t *cfg = mod->config; // (auditd_cfg_t *)data;
-  struct action_orchids_ctx octx = { ctx, mod, event };
+  gc_t *gc_ctx = ctx->gc_ctx;
+  GC_START(gc_ctx, 1);
+  struct action_orchids_ctx octx = { ctx, mod, event, (event_t **)&GC_LOOKUP(0) };
+  GC_UPDATE(gc_ctx, 0, event);
 
   DebugLog(DF_MOD, DS_TRACE, "auditd_callback()\n");
-  // memset(attr, 0, sizeof(attr));
+  if (event->value==NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
+      return -1;
+    }
+  switch (TYPE(event->value))
+    {
+    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+      break;
+    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      return -1;
+    }
 
-  txt_line = STR(event->value);
-  //printf("mod_auditd: %s\n", txt_line);
-  txt_len = STRLEN(event->value);
-
-  action_parse_event (cfg->actx, txt_line, &octx);
-
+  action_parse_event (cfg->actx, txt_line, txt_line+txt_len, &octx);
 //!!! missing dev, rdev
 
   /* then, post the Orchids event */
-  post_event(ctx, mod, octx.event);
-
+  post_event(ctx, mod, *octx.out_event);
+  GC_END(gc_ctx);
   return (0);
 }
 
@@ -578,8 +632,7 @@ static field_t auditd_fields[] = {
 
 
 
-static void *
-auditd_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *auditd_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() auditd@%p\n", &mod_auditd);
  
@@ -587,10 +640,9 @@ auditd_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   auditd_cfg_t *cfg;
 
-  cfg = Xmalloc(sizeof(auditd_cfg_t));
-  cfg->actx = Xmalloc(sizeof(struct action_ctx));
-  memset(cfg->actx, 0, sizeof(struct action_ctx));
-  action_init (cfg->actx);	
+  cfg = gc_base_malloc(ctx->gc_ctx, sizeof(auditd_cfg_t));
+  cfg->actx = gc_base_malloc(ctx->gc_ctx, sizeof(struct action_ctx));
+  action_init (ctx->gc_ctx, cfg->actx);	
   return cfg;
 }
 

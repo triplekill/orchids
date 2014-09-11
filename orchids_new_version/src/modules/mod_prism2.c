@@ -51,50 +51,53 @@ input_module_t mod_prism2;
 static int
 prism2_callback(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
-  ovm_var_t *attr[PRISM2_FIELDS];
   u_int8_t *packet;
   size_t packet_len;
   prism2_hdr_t *prism2_hdr;
-
-  DebugLog(DF_MOD, DS_DEBUG, "Prism2 Callback\n");
-
-  memset(attr, 0, sizeof (attr));
+  ovm_var_t *val;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
   packet_len = BSTRLEN(event->value);
 
-  if (packet_len < sizeof (prism2_hdr_t)) {
-    DebugLog(DF_MOD, DS_ERROR, "Frame is too small to contain Prism2 header\n");
-    return (-1);
-  }
+  if (packet_len < sizeof (prism2_hdr_t))
+    {
+      DebugLog(DF_MOD, DS_ERROR,
+	       "Frame is too small to contain Prism2 header\n");
+      return -1;
+    }
+
+  GC_START(gc_ctx, PRISM2_FIELDS+1);
+  GC_UPDATE(gc_ctx, PRISM2_FIELDS, event);
+
+  DebugLog(DF_MOD, DS_DEBUG, "Prism2 Callback\n");
 
   packet = BSTR(event->value);
   prism2_hdr = (prism2_hdr_t *) packet;
 
-  attr[F_MSGCODE] = ovm_uint_new();
-  UINT(attr[F_MSGCODE]) = prism2_hdr->msgcode;
+  val = ovm_uint_new (gc_ctx, prism2_hdr->msgcode);
+  GC_UPDATE (gc_ctx, F_MSGCODE, val);
 
-  attr[F_MSGLEN] = ovm_uint_new();
-  UINT(attr[F_MSGLEN]) = prism2_hdr->msglen;
+  val = ovm_uint_new (gc_ctx, prism2_hdr->msglen);
+  GC_UPDATE (gc_ctx, F_MSGLEN, val);
 
-  DECODE_PRISM_VALUE(attr[F_HOSTTIME], &prism2_hdr->hosttime);
-  DECODE_PRISM_VALUE(attr[F_MACTIME],  &prism2_hdr->mactime);
-  DECODE_PRISM_VALUE(attr[F_CHANNEL],  &prism2_hdr->channel);
-  DECODE_PRISM_VALUE(attr[F_RSSI],     &prism2_hdr->rssi);
-  DECODE_PRISM_VALUE(attr[F_SQ],       &prism2_hdr->sq);
-  DECODE_PRISM_VALUE(attr[F_SIGNAL],   &prism2_hdr->signal);
-  DECODE_PRISM_VALUE(attr[F_NOISE],    &prism2_hdr->noise);
-  DECODE_PRISM_VALUE(attr[F_RATE],     &prism2_hdr->rate);
-  DECODE_PRISM_VALUE(attr[F_ISTX],     &prism2_hdr->istx);
+  DECODE_PRISM_VALUE(F_HOSTTIME, &prism2_hdr->hosttime);
+  DECODE_PRISM_VALUE(F_MACTIME,  &prism2_hdr->mactime);
+  DECODE_PRISM_VALUE(F_CHANNEL,  &prism2_hdr->channel);
+  DECODE_PRISM_VALUE(F_RSSI,     &prism2_hdr->rssi);
+  DECODE_PRISM_VALUE(F_SQ,       &prism2_hdr->sq);
+  DECODE_PRISM_VALUE(F_SIGNAL,   &prism2_hdr->signal);
+  DECODE_PRISM_VALUE(F_NOISE,    &prism2_hdr->noise);
+  DECODE_PRISM_VALUE(F_RATE,     &prism2_hdr->rate);
+  DECODE_PRISM_VALUE(F_ISTX,     &prism2_hdr->istx);
 
-  attr[F_FRAME] = ovm_vbstr_new();
-  VBSTR(attr[F_FRAME])    = packet     + sizeof (prism2_hdr_t);
-  VBSTRLEN(attr[F_FRAME]) = packet_len - sizeof (prism2_hdr_t);
+  val = ovm_vbstr_new (gc_ctx, event->value);
+  VBSTR(val)    = packet     + sizeof (prism2_hdr_t);
+  VBSTRLEN(val) = packet_len - sizeof (prism2_hdr_t);
+  GC_UPDATE (gc_ctx, F_FRAME, val);
 
-  add_fields_to_event(ctx, mod, &event, attr, PRISM2_FIELDS);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  REGISTER_EVENTS(ctx, mod, PRISM2_FIELDS);
+  GC_END(gc_ctx);
+  return 0;
 }
 
 
@@ -105,7 +108,7 @@ static field_t prism2_fields[] = {
   { "prism2.hosttime",  T_UINT,  "Host time"                             },
   { "prism2.mactime",   T_UINT,  "MAC time"                              },
   { "prism2.channel",   T_UINT,  "Wifi channel"                          },
-  { "prism2.rssi",      T_UINT,  "Receivied Signal Strength Indication"  },
+  { "prism2.rssi",      T_UINT,  "Received Signal Strength Indication"  },
   { "prism2.sq",        T_UINT,  "SQ"                                    },
   { "prism2.signal",    T_UINT,  "Signal"                                },
   { "prism2.noise",     T_UINT,  "Noise"                                 },
@@ -115,8 +118,7 @@ static field_t prism2_fields[] = {
   { "prism2.frame",     T_VBSTR, "Frame"                                 }
 };
 
-static void *
-prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   int *dl;
 
@@ -124,13 +126,13 @@ prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_fields(ctx, mod, prism2_fields, PRISM2_FIELDS);
 
-  dl = Xmalloc(sizeof (int));
+  dl = gc_base_malloc(ctx->gc_ctx, sizeof (int));
   *dl = pcap_datalink_name_to_val("PRISM_HEADER");
   register_conditional_dissector(ctx, mod, "pcap",
                                  (void *)dl, sizeof (int),
                                  prism2_callback, NULL);
 
-  return (NULL);
+  return NULL;
 }
 
 input_module_t mod_prism2 = {

@@ -35,7 +35,7 @@ struct htmlstatecfg_s
   int rule_limit;
   int rule_state_limit;
   int rule_instance_limit;
-  int rule_instence_state_limit;
+  int rule_instance_state_limit;
   int thread_limit;
   int event_limit;
 

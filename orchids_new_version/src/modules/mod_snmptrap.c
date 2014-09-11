@@ -50,7 +50,6 @@ input_module_t mod_snmptrap;
 static int
 snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
-  ovm_var_t *attr[SNMPTRAP_FIELDS];
   unsigned char *packet;
   size_t packet_len;
   netsnmp_pdu pdu;
@@ -58,104 +57,130 @@ snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
   unsigned char type;
   /* long version; */
   int ret;
-  unsigned char community[COMMUNITY_MAX_LEN];
-  size_t community_len = COMMUNITY_MAX_LEN;
   int var;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  ovm_var_t *val;
 
-  packet = BSTR(e->value);
-  packet_len = BSTRLEN(e->value);
   type = 0;
-  memset(attr, 0, sizeof(attr));
+  ret = 0;
 
   DebugLog(DF_MOD, DS_TRACE, "snmptrap_dissector()\n");
 
+  switch (TYPE(e))
+    {
+    case T_BSTR: packet = BSTR(event->value);
+      packet_len = BSTRLEN(event->value);
+      break;
+    case T_VBSTR: packet = VBSTR(event->value);
+      packet_len = VBSTRLEN(event->value);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event not a binary string\n");
+      return -1;
+    }
+
+  GC_START(gc_ctx, SNMPTRAP_FIELDS+1);
+  GC_UPDATE(gc_ctx, SNMPTRAP_FIELDS, e);
+
   /* -0- parse asn.1 sequence */
   packet = asn_parse_sequence(packet, &packet_len, &type,
-                            (ASN_SEQUENCE | ASN_CONSTRUCTOR),
-                            "auth message");
-  if (packet == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "Bad ASN.1 sequence\n");
-    return (1);
-  }
-
+			      (ASN_SEQUENCE | ASN_CONSTRUCTOR),
+			      "auth message");
+  if (packet == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Bad ASN.1 sequence\n");
+      ret = 1;
+      goto end;
+    }
   /* -1- parse asn.1 int version */
-  attr[F_VERSION] = ovm_int_new();
-  packet = asn_parse_int(packet, &packet_len, &type,
-                       &INT(attr[F_VERSION]), sizeof(INT(attr[F_VERSION])));
-  if (packet == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "Bad ASN.1 VERSION\n");
-    free_fields(attr, SNMPTRAP_FIELDS);
-    return (1);
-  }
+  {
+    long ver;
 
-  /* handle only snmptrap v1 */
-  if (INT(attr[F_VERSION]) != SNMP_VERSION_1) {
-    /* && INT(attr[F_VERSION]) != SNMP_VERSION_2c */
-    DebugLog(DF_MOD, DS_ERROR, "Bad SNMP VERSION %li\n", INT(attr[F_VERSION]));
-    free_fields(attr, SNMPTRAP_FIELDS);
-    return (1);
+    packet = asn_parse_int(packet, &packet_len, &type, &ver, sizeof(ver));
+    if (packet == NULL)
+      {
+	DebugLog(DF_MOD, DS_ERROR, "Bad ASN.1 VERSION\n");
+	ret = 1;
+	goto end;
+      }
+    DebugLog(DF_MOD, DS_DEBUG, "Read SNMP VERSION %li\n", ver);
+    /* handle only snmptrap v1 */
+    if (ver != SNMP_VERSION_1)
+      {
+	/* && INT(attr[F_VERSION]) != SNMP_VERSION_2c */
+	DebugLog(DF_MOD, DS_ERROR,
+		 "Bad SNMP VERSION %li\n", ver);
+	ret = 1;
+	goto end;
+      }
+    val = ovm_int_new (gc_ctx, ver);
+    GC_UPDATE (gc_ctx, F_VERSION, val);
   }
-
-  DebugLog(DF_MOD, DS_DEBUG, "Read SNMP VERSION %li\n", INT(attr[F_VERSION]));
 
   /* -3- v1 v2c: read community string object */
-  packet = asn_parse_string(packet, &packet_len, &type, community, &community_len);
-  if (packet == NULL) {
-    DebugLog(DF_MOD, DS_ERROR, "Bad community name\n");
-    free_fields(attr, SNMPTRAP_FIELDS);
-    return (1);
-  }
-  DebugLog(DF_MOD, DS_INFO, "Read community %s\n", community);
-  attr[F_COMMUNITY] = ovm_str_new( community_len );
-  memcpy(STR(attr[F_COMMUNITY]), community, community_len);
+  val = ovm_str_new (gc_ctx, COMMUNITY_MAX_LEN);
+  packet = asn_parse_string(packet, &packet_len, &type,
+			    (unsigned char *)&STR(val), &STRLEN(val));
+  if (packet == NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Bad community name\n");
+      ret = 1;
+      goto end;
+    }
+  DebugLog(DF_MOD, DS_INFO, "Read community %s\n", STR(val));
+  GC_UPDATE (gc_ctx,F_COMMUNITY, val);
 
   /* -4- Parse PDU */
   /* dissect event top attribute here, and add them to it */
   memset(&pdu, 0, sizeof (struct snmp_pdu));
   ret = snmp_pdu_parse(&pdu, packet, &packet_len);
-  if (ret != 0) {
-    DebugLog(DF_MOD, DS_ERROR, "snmp_pdu_parse() error: ret=%i\n", ret);
-    free_fields(attr, SNMPTRAP_FIELDS);
-    return (1);
-  }
+  if (ret != 0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "snmp_pdu_parse() error: ret=%i\n", ret);
+      ret = 1;
+      goto end;
+    }
 
-  attr[F_SEQ] = ovm_int_new();
-  INT(attr[F_SEQ]) = mod->posts;
+  val = ovm_int_new (gc_ctx, mod->posts);
+  GC_UPDATE(gc_ctx, F_SEQ, val);
 
-  attr[F_ENTERPRISE] = ovm_snmpoid_new(pdu.enterprise_length);
-  memcpy(SNMPOID(attr[F_ENTERPRISE]),
+  val = ovm_snmpoid_new(gc_ctx, pdu.enterprise_length);
+  GC_UPDATE(gc_ctx, F_ENTERPRISE, val);
+  memcpy(SNMPOID(val),
          pdu.enterprise,
          pdu.enterprise_length * sizeof (oid_t));
 
-  attr[F_TRAPTYPE] = ovm_int_new();
-  INT(attr[F_TRAPTYPE]) = pdu.trap_type;
+  val = ovm_int_new (gc_ctx, pdu.trap_type);
+  GC_UPDATE(gc_ctx, F_TRAPTYPE, val);
 
-  attr[F_SPECIFIC_TRAPTYPE] = ovm_int_new();
-  INT(attr[F_SPECIFIC_TRAPTYPE]) = pdu.specific_type;
+  val = ovm_int_new (gc_ctx, pdu.specific_type);
+  GC_UPDATE(gc_ctx, F_SPECIFIC_TRAPTYPE, val);
 
-  attr[F_AGENT_ADDR] = ovm_ipv4_new();
-  memcpy(&IPV4(attr[F_AGENT_ADDR]), pdu.agent_addr, sizeof (struct in_addr));
+  val = ovm_ipv4_new (gc_ctx);
+  IPV4(val) = pdu.agent_addr;
+  GC_UPDATE(gc_ctx, F_AGENT_ADDR, val);
 
-  attr[F_TIMESTAMP] = ovm_int_new();
-  INT(attr[F_TIMESTAMP]) = pdu.time;
+  val = ovm_int_new (gc_ctx, pdu.time);
+  GC_UPDATE(gc_ctx, F_TIMESTAMP, val);
 
 /*   for (var = 0, vars = pdu.variables; vars; vars = vars->next_variable) { */
   vars = pdu.variables;
   var = 0;
-  if (vars) {
-    DebugLog(DF_MOD, DS_DEBUG, "Process variable %i\n", var);
+  if (vars!=NULL)
+    {
+      DebugLog(DF_MOD, DS_DEBUG, "Process variables\n");
 
-    attr[F_OBJECTID] = ovm_snmpoid_new( vars->name_length );
-    memcpy(SNMPOID(attr[F_OBJECTID]),
-           vars->name,
-           vars->name_length * sizeof (oid_t));
-  }
+      val = ovm_snmpoid_new (gc_ctx, vars->name_length);
+      memcpy(SNMPOID(val),
+	     vars->name,
+	     vars->name_length * sizeof (oid_t));
+    }
 
   /* then, post resulting event */
-  add_fields_to_event(ctx, mod, &e, attr, SNMPTRAP_FIELDS);
-  post_event(ctx, mod, e);
-
-  return (0);
+  REGISTER_EVENTS(ctx, mod, SNMPTRAP_FIELDS);
+ end:
+  GC_END (gc_ctx);
+  return ret;
 }
 
 static field_t snmptrap_fields[] = {
@@ -196,7 +221,7 @@ snmptrap_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* hard coded callback registration.
   ** optionnal goes in config directives */
-  port = Xzmalloc( sizeof (int) );
+  port = Xzmalloc(ctx->gc_ctx, sizeof (int));
   *port = 162;
   register_conditional_dissector(ctx, mod, "udp", (void *)port, sizeof (int),
                                  snmptrap_dissector, NULL);

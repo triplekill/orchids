@@ -41,12 +41,16 @@ struct string_s {
   size_t len;
 };
 
+static gc_t *gc_ctx_g;
+static ovm_var_t *delegate_g;
 static ovm_var_t **fields_g;
 static char *vstr_base_g;
 extern char *netfiltertext;
 
 extern int netfilterlex(void);
 extern void netfiltererror(char *s);
+void netfilter_set_gc_ctx(gc_t *gc_ctx);
+void netfilter_set_delegate(ovm_var_t *delegate);
 void netfilter_set_attrs(ovm_var_t **attr_fields);
 
 static char *ip_proto_g[5];
@@ -154,41 +158,47 @@ nfline:
   ip_options
   proto_specifics
     {
+      ovm_var_t *val;
+
       DPRINTF( ("LEN=%i TOS=0x%02X PREC=0x%02X TTL=%i ID=%i\n",
                 $22, $26, $30, $34, $38) );
 
       if ($3.len) {
-        fields_g[F_IN] = ovm_vstr_new();
-        VSTR(fields_g[F_IN]) = vstr_base_g + $3.pos;
-        VSTRLEN(fields_g[F_IN]) = $3.len;
+	val = ovm_vstr_new(gc_ctx_g, delegate_g);
+	VSTR(val) = vstr_base_g + $3.pos;
+	VSTRLEN(val) = $3.len;
+	GC_TOUCH (gc_ctx_g, fields_g[F_IN] = val);
       }
 
       if ($8.len) {
-        fields_g[F_OUT] = ovm_vstr_new();
-        VSTR(fields_g[F_OUT]) = vstr_base_g + $8.pos;
-        VSTRLEN(fields_g[F_OUT]) = $8.len;
+	val = ovm_vstr_new(gc_ctx_g, delegate_g);
+	VSTR(val) = vstr_base_g + $8.pos;
+	VSTRLEN(val) = $8.len;
+	GC_TOUCH (gc_ctx_g, fields_g[F_OUT] = val);
       }
 
-      fields_g[F_SRC] = ovm_ipv4_new();
-      IPV4(fields_g[F_SRC]) = $14;
+      val = ovm_ipv4_new (gc_ctx_g);
+      IPV4(val) = $14;
+      GC_TOUCH (gc_ctx_g, fields_g[F_SRC] = val);
 
-      fields_g[F_DST] = ovm_ipv4_new();
-      IPV4(fields_g[F_DST]) = $18;
+      val = ovm_ipv4_new (gc_ctx_g);
+      IPV4(val) = $18;
+      GC_TOUCH (gc_ctx_g, fields_g[F_DST] = val);
 
-      fields_g[F_IPLEN] = ovm_int_new();
-      INT(fields_g[F_IPLEN]) = $22;
+      val = ovm_int_new (gc_ctx_g, $22);
+      GC_TOUCH (gc_ctx_g, fields_g[F_IPLEN] = val);
 
-      fields_g[F_TOS] = ovm_int_new();
-      INT(fields_g[F_TOS]) = $26;
+      val = ovm_int_new (gc_ctx_g, $26);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TOS] = val);
 
-      fields_g[F_PREC] = ovm_int_new();
-      INT(fields_g[F_PREC]) = $30;
+      val = ovm_int_new (gc_ctx_g, $30);
+      GC_TOUCH (gc_ctx_g, fields_g[F_PREC] = val);
 
-      fields_g[F_TTL] = ovm_int_new();
-      INT(fields_g[F_TTL]) = $34;
+      val = ovm_int_new (gc_ctx_g, $34);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TTL] = val);
 
-      fields_g[F_IPID] = ovm_int_new();
-      INT(fields_g[F_IPID]) = $38;
+      val = ovm_int_new (gc_ctx_g, $38);
+      GC_TOUCH (gc_ctx_g, fields_g[F_IPID] = val);
 
       DPRINTF( ("*** good line ***\n") );
     }
@@ -206,9 +216,12 @@ physin:
     { /* do nothing */ ; }
 | NF_PHYSIN '=' STRING ' '
     {
-      fields_g[F_PHYSIN] = ovm_vstr_new();
-      VSTR(fields_g[F_PHYSIN]) = vstr_base_g + $3.pos;
-      VSTRLEN(fields_g[F_PHYSIN]) = $3.len;
+      ovm_var_t *val;
+
+      val = ovm_vstr_new (gc_ctx_g, delegate_g);
+      VSTR(val) = vstr_base_g + $3.pos;
+      VSTRLEN(val) = $3.len;
+      GC_TOUCH (gc_ctx_g, fields_g[F_PHYSIN] = val);
     }
 ;
 
@@ -217,9 +230,12 @@ physout:
     { /* do nothing */ ; }
 | NF_PHYSOUT '=' STRING ' '
     {
-      fields_g[F_PHYSOUT] = ovm_vstr_new();
-      VSTR(fields_g[F_PHYSOUT]) = vstr_base_g + $3.pos;
-      VSTRLEN(fields_g[F_PHYSOUT]) = $3.len;
+      ovm_var_t *val;
+
+      val = ovm_vstr_new (gc_ctx_g, delegate_g);
+      VSTR(val) = vstr_base_g + $3.pos;
+      VSTRLEN(val) = $3.len;
+      GC_TOUCH (gc_ctx_g, fields_g[F_PHYSOUT] = val);
     }
 ;
 
@@ -240,8 +256,10 @@ mac_header:
 ip_flags:
   ecn_congestion_experienced dont_fragment more_fragments
     {
-      fields_g[F_IPFLAGS] = ovm_int_new();
-      INT( fields_g[F_IPFLAGS] ) = $1 | $2 | $3;
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $1 | $2 | $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_IPFLAGS] = val);
     }
 ;
 
@@ -272,8 +290,10 @@ frag_offset:
     { /* do nothing */ ; }
 | NF_FRAG '=' INTEGER ' '
     {
-      fields_g[F_FRAG] = ovm_int_new();
-      INT(fields_g[F_FRAG]) = $3;
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_FRAG] = val);
     }
 ;
 
@@ -318,25 +338,28 @@ proto_tcp:
   NF_URGP '=' INTEGER ' '
   /* XXX ajouter les OPTions tcp */
     {
+      ovm_var_t *val;
+
       DPRINTF( ("SPT=%i DPT=%i WINDOWS=%i URGPP=%i\n", $7, $11, $16, $25) );
-      fields_g[F_PROTO] = ovm_vstr_new();
-      VSTR(fields_g[F_PROTO]) = ip_proto_g[IP_PROTO_TCP];
-      VSTRLEN(fields_g[F_PROTO]) = strlen(ip_proto_g[IP_PROTO_TCP]);
+      val = ovm_vstr_new (gc_ctx_g, delegate_g);
+      VSTR(val) = ip_proto_g[IP_PROTO_TCP];
+      VSTRLEN(val) = strlen(ip_proto_g[IP_PROTO_TCP]);
+      GC_TOUCH (gc_ctx_g, fields_g[F_PROTO] = val);
 
-      fields_g[F_SPT] = ovm_int_new();
-      INT(fields_g[F_SPT]) = $7;
+      val = ovm_int_new (gc_ctx_g, $7);
+      GC_TOUCH (gc_ctx_g, fields_g[F_SPT] = val);
 
-      fields_g[F_DPT] = ovm_int_new();
-      INT(fields_g[F_DPT]) = $11;
+      val = ovm_int_new (gc_ctx_g, $11);
+      GC_TOUCH (gc_ctx_g, fields_g[F_DPT] = val);
 
-      fields_g[F_WINDOW] = ovm_int_new();
-      INT(fields_g[F_WINDOW]) = $16;
+      val = ovm_int_new (gc_ctx_g, $16);
+      GC_TOUCH (gc_ctx_g, fields_g[F_WINDOW] = val);
 
-      fields_g[F_RES] = ovm_int_new();
-      INT(fields_g[F_RES]) = $20;
+      val = ovm_int_new (gc_ctx_g, $20);
+      GC_TOUCH (gc_ctx_g, fields_g[F_RES] = val);
 
-      fields_g[F_URGP] = ovm_int_new();
-      INT(fields_g[F_URGP]) = $25;
+      val = ovm_int_new (gc_ctx_g, $25);
+      GC_TOUCH (gc_ctx_g, fields_g[F_URGP] = val);
     }
 ;
 
@@ -345,21 +368,25 @@ sequence_numbers:
     { /* do nothing */ ; }
 | NF_SEQ '=' INTEGER ' ' NF_ACK '=' INTEGER ' '
     {
+      ovm_var_t *val;
+
       DPRINTF( ("SEQ=%i ACK=%i\n", $3, $7) );
 
-      fields_g[F_SEQ] = ovm_uint_new();
-      UINT(fields_g[F_SEQ]) = $3;
+      val = ovm_uint_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_SEQ] = val);
 
-      fields_g[F_ACK] = ovm_uint_new();
-      UINT(fields_g[F_ACK]) = $7;
+      val = ovm_uint_new (gc_ctx_g, $7);
+      GC_TOUCH (gc_ctx_g, fields_g[F_ACK] = val);
     }
 ;
 
 tcp_flags:
   cwr ece urg ack psh rst syn fin
     {
-      fields_g[F_TCPFLAGS] = ovm_int_new();
-      INT( fields_g[F_TCPFLAGS] ) = $1 | $2 | $3 | $4 | $5 | $6 | $7 | $8;
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $1 | $2 | $3 | $4 | $5 | $6 | $7 | $8);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TCPFLAGS] = val);
     }
 ;
 
@@ -431,14 +458,16 @@ proto_udp:
   NF_SPT '=' INTEGER ' ' NF_DPT '=' INTEGER ' '
   NF_LEN '=' INTEGER ' '
     {
-      fields_g[F_SPT] = ovm_int_new();
-      INT(fields_g[F_SPT]) = $7;
+      ovm_var_t *val;
 
-      fields_g[F_DPT] = ovm_int_new();
-      INT(fields_g[F_DPT]) = $11;
+      val = ovm_int_new (gc_ctx_g, $7);
+      GC_TOUCH (gc_ctx_g, fields_g[F_SPT] = val);
 
-      fields_g[F_UDPLEN] = ovm_int_new();
-      INT(fields_g[F_UDPLEN]) = $15;
+      val = ovm_int_new (gc_ctx_g, $11);
+      GC_TOUCH (gc_ctx_g, fields_g[F_DPT] = val);
+
+      val = ovm_int_new (gc_ctx_g, $15);
+      GC_TOUCH (gc_ctx_g, fields_g[F_UDPLEN] = val);
     }
 ;
 
@@ -454,11 +483,13 @@ proto_icmp:
   NF_CODE '=' INTEGER ' '
   icmp_specific
     {
-      fields_g[F_ICMPTYPE] = ovm_int_new();
-      INT( fields_g[F_ICMPTYPE] ) = $7;
+      ovm_var_t *val;
 
-      fields_g[F_ICMPCODE] = ovm_int_new();
-      INT( fields_g[F_ICMPCODE] ) = $11;
+      val = ovm_int_new (gc_ctx_g, $7);
+      GC_TOUCH (gc_ctx_g, fields_g[F_ICMPTYPE] = val);
+
+      val = ovm_int_new (gc_ctx_g, $11);
+      GC_TOUCH (gc_ctx_g, fields_g[F_ICMPCODE] = val);
     }
 ;
 
@@ -472,11 +503,13 @@ icmp_specific:
 icmp_echo:
   NF_ID '=' INTEGER ' ' NF_SEQ '=' INTEGER ' '
     {
-      fields_g[F_ICMPID] = ovm_int_new();
-      INT( fields_g[F_ICMPID] ) = $3;
+      ovm_var_t *val;
 
-      fields_g[F_ICMPSEQ] = ovm_int_new();
-      INT( fields_g[F_ICMPSEQ] ) = $7;
+      val = ovm_int_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_ICMPID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $7);
+      GC_TOUCH (gc_ctx_g, fields_g[F_ICMPSEQ] = val);
     }
 ;
 
@@ -514,6 +547,16 @@ netfiltererror(char *s)
 {
   DebugLog(DF_MOD, DS_ERROR, "%s at '%s'.\n",
            s, netfiltertext);
+}
+
+void netfilter_set_gc_ctx(gc_t *gc_ctx)
+{
+  gc_ctx_g = gc_ctx;
+}
+
+void netfilter_set_delegate(ovm_var_t *delegate)
+{
+  delegate_g = delegate;
 }
 
 void

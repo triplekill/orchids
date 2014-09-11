@@ -38,12 +38,11 @@ static void monitor_activity(void);
 
 
 /**
- ** Get the next real-time action rtaction_t from the action queue.
+ ** Get the next real-time action heap_entry_t from the action queue.
  ** @param ctx  A pointer to the Orchids application context.
  ** @return The next real-time action in the action queue.
  **/
-static rtaction_t *
-get_next_rtaction(orchids_t *ctx);
+static heap_entry_t *get_next_rtaction(orchids_t *ctx);
 
 
 #else

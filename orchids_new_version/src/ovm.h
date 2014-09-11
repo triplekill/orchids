@@ -21,13 +21,22 @@
 #ifndef OVM_H
 #define OVM_H
 
-#define PUSH_RETURN_TRUE(ctx,state)					\
-    stack_push(ctx->ovm_stack,						\
-	       state->state->rule->static_env[ ctx->rule_compiler->static_1_res_id]);
+#define PUSH_RETURN_TRUE(ctx)					\
+  STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
+	     (gc_header_t *)ctx->one)
 
-#define PUSH_RETURN_FALSE(ctx,state)					\
-    stack_push(ctx->ovm_stack,					\
-	       state->state->rule->static_env[ ctx->rule_compiler->static_0_res_id]);
+#define PUSH_RETURN_FALSE(ctx)					\
+  STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
+	     (gc_header_t *)ctx->zero)
+
+#define PUSH_RETURN_EMPTY(ctx)					\
+  STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
+	     (gc_header_t *)ctx->empty_string)
+
+#define PUSH_VALUE(ctx,value) \
+  STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack, (gc_header_t *)value)
+#define POP_VALUE(ctx) \
+  (ovm_var_t *)(STACK_POP((ctx)->gc_ctx, (ctx)->ovm_stack))
 
 /*
 ** Orchids VM Op Codes Definition
@@ -62,11 +71,6 @@
 */
 
 /**
- ** Number of total opcode.
- **/
-#define OPCODE_NUM 40
-
-/**
  ** End of program. Stop the program execution and return a normal exit.
  **/
 #define OP_END 0
@@ -87,25 +91,34 @@
 #define OP_POP 3
 
 /**
- * Put a static variable on the stack.
+ * Push zero (false) onto the stack.
  **/
-#define OP_PUSHSTATIC 4
+#define OP_PUSHZERO 4
+
+/**
+ * Push one (true) onto the stack.
+ **/
+#define OP_PUSHONE 5
+
+/**
+ * Push data from static zone onto the stack.
+ **/
+#define OP_PUSHSTATIC 6
 
 /**
  * Put a field value on the stack.
  **/
-#define OP_PUSHFIELD 5
+#define OP_PUSHFIELD 7
 
 /**
  * Trash the value on the top of the stack (free it if necessary)
  **/
-#define OP_TRASH 6
+#define OP_TRASH 8
 
 /**
  * Call an ISSDL built-in function.
  **/
-#define OP_CALL 7
-
+#define OP_CALL 9
 
 
 /* Arithmetic */
@@ -117,62 +130,63 @@
 /**
  * Addition.
  **/
-#define OP_ADD 8
+#define OP_ADD 10
 
 /**
  * Subtraction
  **/
-#define OP_SUB 9
+#define OP_SUB 11
+#define OP_OPP 12
 
 /**
  * Multiplication
  **/
-#define OP_MUL 10
+#define OP_MUL 13
 
 /**
  * Division
  **/
-#define OP_DIV 11
+#define OP_DIV 14
 
 /**
  * Modulo
  **/
-#define OP_MOD 12
+#define OP_MOD 15
 
 /**
  * Increase
  **/
-#define OP_INC 13
+#define OP_INC 16
 
 /**
  * Decrease
  **/
-#define OP_DEC 14
+#define OP_DEC 17
 
 /**
  * Logical AND
  **/
-#define OP_AND 15
+#define OP_AND 18
 
 /**
  * Logical OR
  **/
-#define OP_OR 16
+#define OP_OR 19
 
 /**
  * Logical XOR
  **/
-#define OP_XOR 17
+#define OP_XOR 20
 
 /**
- * Logical NEG
+ * Unused opcode. See OP_OPP for negation.
  **/
-#define OP_NEG 18
+#define OP_NEG 21
 
 /**
  * Logical NOT
  **/
-#define OP_NOT 19
+#define OP_NOT 22
 
 
 
@@ -185,12 +199,12 @@
 /**
  * JuMP
  **/
-#define OP_JMP 20
+#define OP_JMP 23
 
 /**
  * POP the last value and jump if this one is true
  **/
-#define OP_POPCJMP 21
+#define OP_POPCJMP 24
 
 
 /* fast real-time evaluation for transition condition
@@ -203,49 +217,49 @@
 /**
  * Continue if EQual
  **/
-#define OP_CEQ 22
+#define OP_CEQ 25
 
 /**
  * Continue if Not EQual
  **/
-#define OP_CNEQ 23
+#define OP_CNEQ 26
 
 /**
  * Continue if Regexp Match
  **/
-#define OP_CRM 24
+#define OP_CRM 27
 
 /**
  * Continue if Not Regexp Match
  **/
-#define OP_CNRM 25
+#define OP_CNRM 28
 
 /**
  * Continue if Less Than
  **/
-#define OP_CLT 26
+#define OP_CLT 29
 
 /**
  * Continue if Greater Than
  **/
-#define OP_CGT 27
+#define OP_CGT 30
 
 /**
  * Continue if Less or Equal
  **/
-#define OP_CLE 28
+#define OP_CLE 31
 
 /**
  * Continue if Greater or Equal
  **/
-#define OP_CGE 29
+#define OP_CGE 32
 
 /**
  * Split a string into substrings using a regular expression.
- * The resultant substrings are pushed on the stack.
- * A complete regsplit operation consist of PUSHing the source
+ * The resulting substrings are pushed on the stack.
+ * A complete regsplit operation consists of PUSHing the source
  * string and the split pattern, execute an OP_REGSPLIT operation
- * and POP resultant substrings into corresponding variables.
+ * and POP the resulting substrings into corresponding variables.
  * (ocode) OP_REGSPLIT []   ..., src, pat => ..., subn ... sub2, sub1
  * compil ex: /"abc:def"/"^\([a-z]*\):\([a-z]*\)"/$a/$b;
  * PUSH "abc:def"
@@ -254,7 +268,7 @@
  * POP $a
  * POP $b
  **/
-#define OP_REGSPLIT 30
+#define OP_REGSPLIT 33
 
 
 /**
@@ -269,9 +283,26 @@
  * set [idx] to val
  * endif
  **/
-#define OP_CESV 31
+#define OP_CESV 34
+
+/**
+ * Build an empty metaevent
+ * OP_EMPTY_EVENT    ==> NULL
+ **/
+#define OP_EMPTY_EVENT 35
+
+/**
+ * Add binding to metaevent
+ * OP_ADD_EVENT [field_id]   event, val ==> event'
+ **/
+#define OP_ADD_EVENT 36
 
 /* XXX Add Past Instruction */
+
+/**
+ ** Number of total opcodes.
+ **/
+#define OPCODE_NUM 37
 
 #endif /* OVM_H */
 

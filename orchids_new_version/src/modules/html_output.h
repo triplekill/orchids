@@ -79,7 +79,7 @@ struct html_output_cfg_s
   int rule_limit;
   int rule_state_limit;
   int rule_instance_limit;
-  int rule_instence_state_limit;
+  int rule_instance_state_limit;
   int thread_limit;
   int event_limit;
 
@@ -98,11 +98,11 @@ html_output_add_menu_entry(orchids_t *ctx,
 
 
 int
-rtaction_html_cache_cleanup(orchids_t *ctx, rtaction_t *e);
+rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he);
 
 
 int
-rtaction_html_regeneration(orchids_t *ctx, rtaction_t *e);
+rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he);
 
 void
 html_output_preconfig(orchids_t *ctx);
@@ -128,8 +128,8 @@ void
 fprintf_html_trailer(FILE *fp);
 
 
-void
-generate_htmlfile_hardlink(html_output_cfg_t  *cfg, char *file, char *link);
+int generate_htmlfile_hardlink(html_output_cfg_t  *cfg,
+			       char *file, char *link);
 
 
 void

@@ -30,13 +30,13 @@
 #define NODE_CONST    3
 #define NODE_CALL     4
 #define NODE_BINOP    5
-#define NODE_REGSPLIT 6
-#define NODE_IFSTMT   7
-#define NODE_ASSOC    8
-#define NODE_COND     9
-
-#define LABELS_MAX	2048
-
+#define NODE_MONOP    6
+#define NODE_REGSPLIT 7
+#define NODE_IFSTMT   8
+#define NODE_ASSOC    9
+#define NODE_COND     10
+#define NODE_CONS     11
+#define NODE_EVENT    12
 
 #define EXIT_IF_BYTECODE_BUFF_FULL(x)		\
   do { \
@@ -52,15 +52,10 @@
 */
 
 typedef struct node_call_s node_call_t;
-typedef union node_expr_u node_expr_t;
+typedef struct node_expr_s node_expr_t;
 typedef struct node_trans_s node_trans_t;
-typedef struct node_translist_s node_translist_t;
 typedef struct node_state_s node_state_t;
-typedef struct node_statelist_s node_statelist_t;
-typedef union node_expr_u node_action_t;
-typedef struct node_actionlist_s node_actionlist_t;
 typedef struct node_rule_s node_rule_t;
-typedef struct node_paramlist_s node_paramlist_t;
 typedef struct symbol_token_s symbol_token_t;
 typedef struct node_varlist_s node_varlist_t;
 typedef struct node_syncvarlist_s node_syncvarlist_t;
@@ -86,11 +81,41 @@ typedef struct node_expr_if_s node_expr_if_t;
 typedef struct node_expr_bin_s node_expr_bin_t;
 struct node_expr_bin_s
 {
+  gc_header_t  gc;
   int          type;
   int          op;
   node_expr_t *lval;
   node_expr_t *rval;
 };
+
+#define BIN_OP(e) ((node_expr_bin_t *)e)->op
+#define BIN_LVAL(e) ((node_expr_bin_t *)e)->lval
+#define BIN_RVAL(e) ((node_expr_bin_t *)e)->rval
+
+/**
+ ** @struct node_expr_mon_s
+ **   Unary expression.
+ **/
+/**   @var node_expr_bin_s::type
+ **     Expression type: NODE_MONOP.
+ **/
+/**   @var node_expr_bin_s::op
+ **     Operator.
+ **/
+/**   @var node_expr_bin_s::val
+ **     Argument value.
+ **/
+typedef struct node_expr_mon_s node_expr_mon_t;
+struct node_expr_mon_s
+{
+  gc_header_t  gc;
+  int          type;
+  int          op;
+  node_expr_t *val;
+};
+
+#define MON_OP(e) ((node_expr_mon_t *)e)->op
+#define MON_VAL(e) ((node_expr_mon_t *)e)->val
 
 
 /**
@@ -112,11 +137,21 @@ struct node_expr_bin_s
 typedef struct node_expr_call_s node_expr_call_t;
 struct node_expr_call_s
 {
+  gc_header_t  gc;
   int               type;
   char             *symbol;
   int               res_id;
-  node_paramlist_t *paramlist;
+  node_expr_t      *paramlist;
 };
+
+#define CALL_SYM(e) ((node_expr_call_t *)e)->symbol
+#define CALL_RES_ID(e) ((node_expr_call_t *)e)->res_id
+#define CALL_PARAMS(e) ((node_expr_call_t *)e)->paramlist
+
+
+
+/* Reverse a NODE_CONS based, NULL-terminated list in place. */
+node_expr_t *expr_cons_reverse(rule_compiler_t *ctx, node_expr_t *l);
 
 
 /**
@@ -135,10 +170,14 @@ struct node_expr_call_s
 typedef struct node_expr_symbol_s node_expr_symbol_t;
 struct node_expr_symbol_s
 {
+  gc_header_t gc;
   int   type;
   int   res_id;
   char *name;
 };
+
+#define SYM_RES_ID(e) ((node_expr_symbol_t *)e)->res_id
+#define SYM_NAME(e) ((node_expr_symbol_t *)e)->name
 
 
 /**
@@ -157,11 +196,14 @@ struct node_expr_symbol_s
 typedef struct node_expr_term_s node_expr_term_t;
 struct node_expr_term_s
 {
+  gc_header_t gc;
   int   type;
   int   res_id;
-  void *data;
+  ovm_var_t *data;
 };
 
+#define TERM_RES_ID(e) ((node_expr_term_t *)e)->res_id
+#define TERM_DATA(e) ((node_expr_term_t *)e)->data
 
 /**
  ** @struct node_expr_regsplit_s
@@ -182,11 +224,16 @@ struct node_expr_term_s
 typedef struct node_expr_regsplit_s node_expr_regsplit_t;
 struct node_expr_regsplit_s
 {
+  gc_header_t     gc;
   int             type;
   node_expr_t    *string;
   node_expr_t    *split_pat;
   node_varlist_t *dest_vars;
 };
+
+#define REGSPLIT_STRING(e) ((node_expr_regsplit_t *)e)->string
+#define REGSPLIT_PAT(e) ((node_expr_regsplit_t *)e)->split_pat
+#define REGSPLIT_DEST_VARS(e) ((node_expr_regsplit_t *)e)->dest_vars
 
 /**
  ** @struct node_expr_if_s
@@ -206,11 +253,16 @@ struct node_expr_regsplit_s
  **/
 struct node_expr_if_s
 {
+  gc_header_t  gc;
   int          type;
   node_expr_t  *cond;
-  node_actionlist_t *then;
-  node_actionlist_t *els;
+  node_expr_t *then;
+  node_expr_t *els;
 };
+
+#define IF_COND(e) ((node_expr_if_t *)e)->cond
+#define IF_THEN(e) ((node_expr_if_t *)e)->then
+#define IF_ELSE(e) ((node_expr_if_t *)e)->els
 
 /**
  ** @union node_expr_u
@@ -233,9 +285,11 @@ struct node_expr_if_s
 /**   @var node_expr_u::regsplit
  **     Regsplit special instruction.
  **/
-union node_expr_u
+struct node_expr_s
 {
+  gc_header_t gc;
   int   type;
+  /* in union with:
   node_expr_bin_t    bin;
   node_expr_bin_t    cond;
   node_expr_call_t   call;
@@ -243,6 +297,7 @@ union node_expr_u
   node_expr_term_t   term;
   node_expr_regsplit_t regsplit;
   node_expr_if_t      	ifstmt;
+  */
 };
 
 /**
@@ -260,6 +315,8 @@ union node_expr_u
  **/
 struct node_trans_s
 {
+  gc_header_t  gc;
+  int type; /* = -1 */
   node_expr_t  *cond;
   char         *dest;
   node_state_t *sub_state_dest;
@@ -290,108 +347,13 @@ struct node_trans_s
  **/
 struct node_state_s
 {
+  gc_header_t        gc;
   int                state_id;
   int                line;
   char              *name;
-  node_actionlist_t *actionlist;
-  node_translist_t  *translist;
+  node_expr_t *actionlist;
+  node_expr_t  *translist;
   unsigned long      flags;
-};
-
-/**
- ** @struct node_actionlist_s
- **   Actionlist dynamic array
- **/
-/**   @var node_actionlist_s::actions_nb
- **     Number of actions.
- **/
-/**   @var node_actionlist_s::size
- **     Allocated size.
- **/
-/**   @var node_actionlist_s::grow
- **     Grow size, for reallocation.
- **/
-/**   @var node_actionlist_s::actions
- **     Actions.
- **/
-struct node_actionlist_s
-{
-  size_t          actions_nb;
-  size_t          size;
-  size_t          grow;
-  node_action_t **actions;
-};
-
-/**
- ** @struct @node_statelist_s
- ** statelist dymanic array
- **/
-/**   @var node_statelist_s::states_nb
- **     Number of states.
- **/
-/**   @var node_statelist_s::size
- **     Allocated size.
- **/
-/**   @var node_statelist_s::grow
- **     Grow size, for reallocation.
- **/
-/**   @var node_statelist_s::states
- **     States.
- **/
-struct node_statelist_s
-{
-  size_t         states_nb;
-  size_t         size;
-  size_t         grow;
-  node_state_t **states;
-};
-
-/**
- ** @struct node_translist_s
- ** Transition list dynamic array
- **/
-/**   @var node_translist_s::trans_nb
- **     Number of transitions.
- **/
-/**   @var node_translist_s::size
- **     Allocated size.
- **/
-/**   @var node_translist_s::grow
- **     Grow size, for reallocation.
- **/
-/**   @var node_translist_s::trans
- **     Transitions.
- **/
-struct node_translist_s
-{
-  size_t         trans_nb;
-  size_t         size;
-  size_t         grow;
-  node_trans_t **trans;
-};
-
-/**
- ** @struct node_paramlist_s
- ** Parameter list dynamic array
- **/
-/**   @var node_paramlist_s::params_nb
- **     Number of parameters.
- **/
-/**   @var node_paramlist_s::size
- **     Allocated size.
- **/
-/**   @var node_paramlist_s::grow
- **     Grow size, for reallocation.
- **/
-/**   @var node_paramlist_s::params
- **     Parameters.
- **/
-struct node_paramlist_s
-{
-  size_t        params_nb;
-  size_t        size;
-  size_t        grow;
-  node_expr_t **params;
 };
 
 
@@ -413,11 +375,12 @@ struct node_paramlist_s
  **/
 struct node_rule_s
 {
+  gc_header_t         gc;
   int                 line;
   char               *file;
   char               *name;
   node_state_t       *init;
-  node_statelist_t   *statelist;
+  node_expr_t   *statelist;
   node_syncvarlist_t *sync_vars;
 };
 
@@ -525,53 +488,60 @@ typedef struct	labels_s {
  ** @def NEW_LABEL(labels)
  **   Return a new label id
  **/
-#define NEW_LABEL(l)  l.labels_nb++;
+#define NEW_LABEL(l)  (l).labels_nb++;
 
 /**
- ** @def SET_LABEL(labels, code, label)
+ ** @def SET_LABEL(ctx, labels, code, label)
  **   Set the label position at the current code position
  **/
-#define SET_LABEL(l, pos, label)					\
+#define SET_LABEL(ctx, l, pos, label)					\
   do {									\
-    if (l.labels_nb >= l.labels_sz)					\
+    if ((l).labels_nb >= (l).labels_sz)					\
     {									\
-      l.labels = Xrealloc(l.labels, (l.labels_sz + LABEL_GROW) * sizeof (unsigned int));	\
-      memset(&(l.labels[l.labels_sz]), 0, LABEL_GROW * sizeof (unsigned int)); \
-      l.labels_sz += LABEL_GROW;					\
+      (l).labels = gc_base_realloc ((ctx)->gc_ctx, (l).labels, ((l).labels_sz + LABEL_GROW) * sizeof (unsigned int)); \
+      (l).labels_sz += LABEL_GROW;					\
     }									\
-    l.labels[label] = pos;} while (0);					\
+    l.labels[label] = pos;} while (0)
 
 /**
- ** @def PUT_LABEL(l, code, label)
+ ** @def PUT_LABEL(ctx, l, code, label)
  **   Add a label after a jmp operator. The jump offset will be
- **   resolved after compitation
+ **   resolved after compilation
  **/
-#define PUT_LABEL(l, code, label)			\
-  do {							\
-    if (l.toset_nb >= l.toset_sz)					\
+#define PUT_LABEL(ctx, l, code, label)					\
+  do {									\
+    if ((l).toset_nb >= (l).toset_sz)					\
     {									\
-      l.toset = Xrealloc(l.toset, (l.toset_sz + LABEL_GROW) * sizeof (unsigned int)); \
-      memset(&(l.toset[l.toset_sz]), 0, LABEL_GROW * sizeof (unsigned int)); \
-      l.toset_sz += LABEL_GROW;					\
+      (l).toset = gc_base_realloc((ctx)->gc_ctx, (l).toset, ((l).toset_sz + LABEL_GROW) * sizeof (unsigned int)); \
+      (l).toset_sz += LABEL_GROW;					\
     }									\
-    l.toset[l.toset_nb++] = code->pos;	\
-    code->bytecode[code->pos++] = label;			\
-  } while(0);
+    (l).toset[(l).toset_nb++] = (code)->pos;				\
+    (code)->bytecode[(code)->pos++] = label;				\
+  } while(0)
 
 /**
  ** @def INIT_LABELS(l)
  **   Initialize the labels_t structure
  **/
-#define INIT_LABELS(l)							\
-  memset(&l, 0, sizeof (labels_t));				\
-  l.labels = Xzmalloc(LABEL_GROW * sizeof (unsigned int));		\
-  l.toset = Xzmalloc(LABEL_GROW * sizeof (unsigned int));		\
-  l.labels_sz = LABEL_GROW;						\
-  l.toset_sz = LABEL_GROW;						\
+#define INIT_LABELS(ctx, l)						\
+  do {									\
+  (l).labels_nb = 0;							\
+  (l).labels = gc_base_malloc((ctx)->gc_ctx, LABEL_GROW * sizeof (unsigned int)); \
+  (l).labels_sz = LABEL_GROW;						\
+  (l).toset_nb = 0;							\
+  (l).toset = gc_base_malloc((ctx)->gc_ctx, LABEL_GROW * sizeof (unsigned int)); \
+  (l).toset_sz = LABEL_GROW;						\
   /* LABEL 0 => JMP (0) */						\
-  NEW_LABEL(l);
+  (l).labels[0] = 0;							\
+  (l).toset[0] = 0;							\
+  NEW_LABEL(l);							\
+  } while(0)
 
-
+#define FREE_LABELS(l)				\
+  do {						\
+  gc_base_free ((l).labels);			\
+  gc_base_free ((l).toset);			\
+  } while (0)
 
 /**
  ** @struct bytecode_buffer_s
@@ -583,25 +553,25 @@ typedef struct	labels_s {
 /**   @var bytecode_buffer_s::bytecode
  **     Byte code buffer.
  **/
-/**   @var bytecode_buffer_s::used_fields_pos
- **     Used fields array position.
+/**   @var bytecode_buffer_s::used_fields_sz
+ **     Number of ints in used_fields bit array.
  **/
 /**   @var bytecode_buffer_s::used_fields
- **     Used field array.
+ **     Used field bit array.
  **/
 
-#define BYTECODE_BUF_SZ 1024
-#define MAX_FIELDS 16
+#define BYTECODE_BUF_SZ 16384
+#define MAX_FIELD_SZ 256
 typedef struct bytecode_buffer_s bytecode_buffer_t;
 struct bytecode_buffer_s
 {
   size_t pos;
   bytecode_t bytecode[BYTECODE_BUF_SZ];
-  size_t used_fields_pos;
-  int used_fields[MAX_FIELDS];
+  size_t used_fields_sz;
+  int used_fields[MAX_FIELD_SZ];
   unsigned long flags;
   labels_t	labels;
-    rule_compiler_t *ctx;
+  rule_compiler_t *ctx;
 };
 
 
@@ -640,8 +610,7 @@ struct filestack_s
  **
  ** @return A compiler context initialised with default values.
  **/
-rule_compiler_t *
-new_rule_compiler_ctx(void);
+rule_compiler_t * new_rule_compiler_ctx(gc_t *gc_ctx);
 
 
 /**
@@ -652,6 +621,10 @@ new_rule_compiler_ctx(void);
 void
 compile_rules(orchids_t *ctx);
 
+#define COMPILE_GC_DEPTH(ctx) ((ctx)->nprotected)
+void compile_gc_protect_drop (rule_compiler_t *ctx, gc_header_t *p,
+			      size_t old_nprotected);
+void compile_gc_protect (rule_compiler_t *ctx, gc_header_t *p);
 
 /**
  * Build a rule node.
@@ -661,29 +634,11 @@ compile_rules(orchids_t *ctx);
  * @param  sync_vars   Synchronization variable list.
  * @return  A new allocated rule node.
  **/
-node_rule_t *
-build_rule(symbol_token_t *sym,
-           node_state_t *init_state,
-           node_statelist_t *states,
-           node_syncvarlist_t *sync_vars);
-
-
-/**
- * Build a 'statelist' node and add the first state.
- * @param first_state The first state to add to the state list.
- * @return An allocated state list node.
- **/
-node_statelist_t *
-build_statelist(node_state_t *first_state);
-
-
-/**
- * Add a state node to a state list node.
- * @param list The state list node.
- * @param state The state to add to the state list.
- **/
-void
-statelist_add(node_statelist_t *list, node_state_t *state);
+node_rule_t *build_rule(rule_compiler_t *ctx,
+			symbol_token_t *sym,
+			node_state_t *init_state,
+			node_expr_t *states,
+			node_syncvarlist_t *sync_vars);
 
 
 /**
@@ -692,9 +647,9 @@ statelist_add(node_statelist_t *list, node_state_t *state);
  * @param transitions Transitions list node.
  * @return A new state node.
  **/
-node_state_t *
-build_state(node_actionlist_t  *actions,
-            node_translist_t *transitions);
+node_state_t *build_state(rule_compiler_t *ctx,
+			  node_expr_t  *actions,
+			  node_expr_t *transitions);
 
 
 /**
@@ -713,40 +668,14 @@ set_state_label(rule_compiler_t *ctx,
 
 
 /**
- * Build an action list node.
- * @param first_action The first parameter to add to the list.
- * @return A new allocated action list node.
- **/
-node_actionlist_t *
-build_actionlist(node_action_t *first_action);
-
-
-/**
- * Add an action to an action list node.
- * @param list The action list node.
- * @param action The action node to add to the action list node.
- **/
-void
-actionlist_add(node_actionlist_t *list, node_action_t *action);
-
-
-/**
- * Build transition list.
- * @param trans The first transition.
- **/
-node_translist_t *
-build_transitionlist(node_trans_t *trans);
-
-
-/**
  * Build a direct transition node.
  * A direct transition is "if (cond) goto somewhere".
  * @param cond The condition expression of the transition.
  * @param dest The name string of the destination state.
  * @return The new transition node.
  **/
-node_trans_t *
-build_direct_transition(node_expr_t *cond, char *dest);
+node_trans_t *build_direct_transition(rule_compiler_t *ctx,
+				      node_expr_t *cond, char *dest);
 
 /**
  * Build a if statement node.
@@ -755,9 +684,9 @@ build_direct_transition(node_expr_t *cond, char *dest);
  * @param els Action code to execute if cond false
  * @return The new if statement node.
  **/
-node_expr_t *
-build_expr_ifstmt(node_expr_t *cond, node_actionlist_t *then,
-		  node_actionlist_t *els);
+node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
+			       node_expr_t *cond, node_expr_t *then,
+			       node_expr_t *els);
 
 
 /**
@@ -767,8 +696,9 @@ build_expr_ifstmt(node_expr_t *cond, node_actionlist_t *then,
  * @param substate The nested sub-state block.
  * @return The new transition node.
  **/
-node_trans_t *
-build_indirect_transition(node_expr_t *cond, node_state_t *substate);
+node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
+					node_expr_t *cond,
+					node_state_t *substate);
 
 
 /**
@@ -776,20 +706,10 @@ build_indirect_transition(node_expr_t *cond, node_state_t *substate);
  * @param dest The name string of the destination state.
  * @return The new unconditional transition node.
  **/
-node_translist_t *
-build_unconditional_transition(char *dest);
-
-
-/**
- * Add a transition to a transition list.
- * @param list The transition list node.
- * @param trans The transition node to add to the transition list node.
- **/
-void
-transitionlist_add(node_translist_t *list, node_trans_t *trans);
-
-node_trans_t *build_unconditional_transition_test(char *dest);
-
+/*
+node_expr_t *build_unconditional_transition(rule_compiler_t *ctx,
+					    char *dest);
+*/
 
 /**
  * Build a binary expression node.
@@ -798,8 +718,26 @@ node_trans_t *build_unconditional_transition_test(char *dest);
  * @param right_node The right part of the binary expression.
  * @return A new allocated expression node.
  **/
-node_expr_t *
-build_expr_binop(int op, node_expr_t *left_node, node_expr_t *right_node);
+node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
+			      node_expr_t *left_node, node_expr_t *right_node);
+
+/**
+ * Build a unary expression node.
+ * @param op The operator identifier.
+ * @param arg_node The argument of the unary expression.
+ * @return A new allocated expression node.
+ **/
+node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
+			      node_expr_t *arg_node);
+
+/**
+ * Build a cons node.
+ * @param left_node The left part of the binary expression.
+ * @param right_node The right part of the binary expression.
+ * @return A new allocated expression node.
+ **/
+node_expr_t *build_expr_cons(rule_compiler_t *ctx,
+			      node_expr_t *left_node, node_expr_t *right_node);
 
 /**
  * Build a logic expression node.
@@ -808,8 +746,8 @@ build_expr_binop(int op, node_expr_t *left_node, node_expr_t *right_node);
  * @param right_node The right part of the binary expression.
  * @return A new allocated expression node.
  **/
-node_expr_t *
-build_expr_cond(int op, node_expr_t *left_node, node_expr_t *right_node);
+node_expr_t *build_expr_cond(rule_compiler_t *ctx, int op,
+			     node_expr_t *left_node, node_expr_t *right_node);
 
 
 /**
@@ -829,10 +767,9 @@ build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr);
  * @param sym The function name (symbol) to call.
  * @param paramlist The parameter list for this function.
  **/
-node_expr_t *
-build_function_call(rule_compiler_t *ctx,
-                    symbol_token_t *sym,
-                    node_paramlist_t *paramlist);
+node_expr_t *build_function_call(rule_compiler_t *ctx,
+				 symbol_token_t *sym,
+				 node_expr_t *paramlist);
 
 
 /**
@@ -841,8 +778,7 @@ build_function_call(rule_compiler_t *ctx,
  * @param fieldname A registered module field name.
  * @return A new allocated expression node.
  **/
-node_expr_t *
-build_fieldname(rule_compiler_t *ctx, char *fieldname);
+node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname);
 
 
 /**
@@ -886,6 +822,16 @@ node_expr_t *
 build_string(rule_compiler_t *ctx, char *str);
 
 /**
+ * Build an event expression node.
+ * @param op The operator identifier.
+ * @param left_node The expression to add fields to, or NULL
+ * @param right_node The NODE_CONS based list of OP_ADD_EVENT binop nodes
+ * @return A new allocated expression node.
+ **/
+node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
+			      node_expr_t *left_node, node_expr_t *right_node);
+
+/**
  * Create a sub-state name for nested anonymous states.
  * state => state_0, state_1, etc...
  * @param refname Reference name.
@@ -895,7 +841,7 @@ build_string(rule_compiler_t *ctx, char *str);
 char *
 build_substate_name(const char *refname, int n);
 
-node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, long ctime);
+node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime);
 node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date);
 
 
@@ -917,34 +863,17 @@ node_expr_t *
 build_timeval_from_string(rule_compiler_t *ctx, char *date, long tv_usec);
 
 
+#ifdef COUNTER_OBSOLETE
 node_expr_t *
 build_counter(rule_compiler_t *ctx, long value);
+#endif
 
 
 node_expr_t *
 build_regex(rule_compiler_t *ctx, char *regex_str);
 
 
-node_expr_t *
-build_split_regex(rule_compiler_t *ctx, char *regex_str);
-
-
-/**
- * Build a function call parameter list node.
- * @param first_param The first parameter to add to the list.
- * @return A new allocated parameter list node.
- **/
-node_paramlist_t *
-build_paramlist(node_expr_t *first_param);
-
-
-/**
- * Add an expression to a parameter list.
- * @param list The parameter list node.
- * @param expr The expression node to add to the parameter list node.
- **/
-void
-paramlist_add(node_paramlist_t *list, node_expr_t *expr);
+node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str);
 
 
 /**
@@ -952,8 +881,7 @@ paramlist_add(node_paramlist_t *list, node_expr_t *expr);
  * @param first_param The first variable to add to the list.
  * @return A new allocated variable list node.
  **/
-node_varlist_t *
-build_varlist(node_expr_t *first_param);
+node_varlist_t *build_varlist(rule_compiler_t *ctx, node_expr_t *first_param);
 
 
 /**
@@ -961,8 +889,7 @@ build_varlist(node_expr_t *first_param);
  * @param list The variable list node.
  * @param expr The expression node to add to the variable list node.
  **/
-void
-varlist_add(node_varlist_t *list, node_expr_t *expr);
+void varlist_add(rule_compiler_t *ctx, node_varlist_t *list, node_expr_t *expr);
 
 
 /**
@@ -970,8 +897,7 @@ varlist_add(node_varlist_t *list, node_expr_t *expr);
  * @param first_syncvar  The first variable to add to the list.
  * @return A new allocated variable list node.
  **/
-node_syncvarlist_t *
-build_syncvarlist(char *first_syncvar);
+node_syncvarlist_t *build_syncvarlist(rule_compiler_t *ctx, char *first_syncvar);
 
 
 /**
@@ -979,14 +905,13 @@ build_syncvarlist(char *first_syncvar);
  * @param list The variable list node.
  * @param syncvar The synchronization variable to add to the list node.
  **/
-node_syncvarlist_t *
-syncvarlist_add(node_syncvarlist_t *list, char *syncvar);
+node_syncvarlist_t *syncvarlist_add(rule_compiler_t *ctx, node_syncvarlist_t *list, char *syncvar);
 
 
-node_expr_t *
-build_string_split(node_expr_t *source,
-                   node_expr_t *pattern,
-                   node_varlist_t *dest_list);
+node_expr_t *build_string_split(rule_compiler_t *ctx,
+				node_expr_t *source,
+				node_expr_t *pattern,
+				node_varlist_t *dest_list);
 
 
 /**
@@ -1016,8 +941,7 @@ compiler_reset(rule_compiler_t *ctx);
  * @param str1 First string.
  * @param str2 Second string.
  **/
-char *
-build_concat_string(char *str1, char *str2);
+char *build_concat_string(rule_compiler_t *ctx, char *str1, char *str2);
 
 
 /* DEBUG */

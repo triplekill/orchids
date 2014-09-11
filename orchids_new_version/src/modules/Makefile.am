@@ -114,7 +114,7 @@ mod_prolog_la_DEPENDENCIES = mod_prolog.prc
 mod_prolog_history_la_SOURCES = mod_prolog_history.c mod_prolog_history.h
 mod_prolog_history_la_LDFLAGS = -module -avoid-version
 
-pkglib_DATA = mod_prolog.prc
+pkgdata_DATA = mod_prolog.prc
 
 # original line was:
 # pl -f none -F none -g true \

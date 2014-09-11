@@ -77,8 +77,7 @@ static const unsigned long crc_table[256] = {
   0x2d02ef8dU
 };
 
-unsigned int
-crc32(unsigned int crc, char *buf, int len)
+unsigned int crc32(unsigned int crc, char *buf, int len)
 {
   if (buf == NULL)
     return (0U);

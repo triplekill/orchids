@@ -47,12 +47,11 @@ static FILE *
 create_udp_socket(const char *host, const int port);
 
 
-static void
-output_console_msg(char *console, char *msg);
+static void output_console_msg(char *console, char *msg, size_t len);
 
 
-static void
-output_console_evt(orchids_t *ctx, char *console, state_instance_t *state);
+static void output_console_evt(orchids_t *ctx, char *console,
+			       state_instance_t *state);
 
 
 static void

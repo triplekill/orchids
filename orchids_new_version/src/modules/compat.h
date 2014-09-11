@@ -88,6 +88,11 @@
 /*
  * NetBSD/FreeBSD defines for file version.
  */
+#ifndef __FBSDID
 #define	__FBSDID(_s)
+#endif
+#ifndef __KERNEL_RCSID
 #define	__KERNEL_RCSID(_n,_s)
+#endif
+
 #endif /* _ATH_COMPAT_H_ */

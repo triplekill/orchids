@@ -52,15 +52,14 @@ clock_add(clockctx_t *ctx,
 #endif
 
 
-static void
-clock_add_float(clockctx_t *ctx,
-                char *name,
-                timefloat_t prec,
-                timefloat_t sync)
+static void clock_add_float(clockctx_t *ctx,
+			    char *name,
+			    timefloat_t prec,
+			    timefloat_t sync)
 {
   myclock_t *clock;
 
-  clock = Xzmalloc(sizeof (myclock_t));
+  clock = gc_base_malloc (ctx->gc_ctx, sizeof (myclock_t));
   clock->name = name;
   clock->prec = prec;
   clock->sync = sync;
@@ -69,8 +68,7 @@ clock_add_float(clockctx_t *ctx,
 }
 
 
-static prob_t
-prob_is_before(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
+static prob_t prob_is_before(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 {
   timefloat_t t1_min;
   timefloat_t t1_max;
@@ -141,7 +139,7 @@ prob_is_before(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
     return (p);
   }
 
-  return (-1.0); /* Shouldn't not append */
+  return (-1.0); /* Should not happen */
 }
 
 
@@ -154,8 +152,7 @@ prob_is_after(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 #endif
 
 
-static prob_t
-prob_is_before_fast(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
+static prob_t prob_is_before_fast(clockctx_t *ctx, clocktime_t *t1, clocktime_t *t2)
 {
   timefloat_t t1_min;
   timefloat_t t1_max;
@@ -243,8 +240,7 @@ new_clocks_ctx(void)
 }
 #endif
 
-static void
-add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   config_directive_t *clock_dir;
   clockctx_t *modcfg;
@@ -252,63 +248,68 @@ add_clock(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   timefloat_t prec;
   timefloat_t sync;
 
-  clock_name = strdup(dir->args);
-  clock_name[ strlen(clock_name) - 1 ] = '\0';
+  clock_name = gc_strdup(ctx->gc_ctx, dir->args);
+  clock_name [strlen(clock_name) - 1] = '\0';
   modcfg = mod->config;
   prec = 0.0;
   sync = 0.0;
 
-  for (clock_dir = dir->first_child; clock_dir; clock_dir = clock_dir->next) {
-    if (!strcmp(clock_dir->directive, "Precision")) {
-      prec = atof(clock_dir->args);
-      DebugLog(DF_MOD, DS_INFO,
-               "Adding prec=%f for clock '%s'\n",prec,clock_name);
-      if (prec <= 0.0) {
-	DebugLog(DF_MOD, DS_ERROR,
-		 "Precision for clock '%s' must be positive (prec=%f)\n",
-		 clock_name, prec);
-	return ;
-      }
+  for (clock_dir = dir->first_child; clock_dir!=NULL;
+       clock_dir = clock_dir->next)
+    {
+      if (!strcmp(clock_dir->directive, "Precision"))
+	{
+	  prec = strtod(clock_dir->args, (char **)NULL);
+	  DebugLog(DF_MOD, DS_INFO,
+		   "Adding prec=%f for clock '%s'\n",prec,clock_name);
+	  if (prec <= 0.0)
+	    {
+	      DebugLog(DF_MOD, DS_ERROR,
+		       "Precision for clock '%s' must be positive (prec=%f)\n",
+		       clock_name, prec);
+	      return;
+	    }
+	}
+      else if (!strcmp(clock_dir->directive, "Synchronization"))
+	{
+	  sync = strtod(clock_dir->args, (char **)NULL);
+	  if (sync <= 0.0)
+	    {
+	      DebugLog(DF_MOD, DS_ERROR,
+		       "Synchronization for clock '%s' must be positive (sync=%f)\n",
+		       clock_name, sync);
+	      return;
+	    }
+	}
+      else
+	{
+	  DebugLog(DF_MOD, DS_ERROR,
+		   "Unknown sub-directive '%s' for clock '%s'\n",
+		   clock_dir->next, clock_name);
+	}
     }
-   else if (!strcmp(clock_dir->directive, "Synchronization")) {
-      sync = atof(clock_dir->args);
-      if (sync <= 0.0) {
-	DebugLog(DF_MOD, DS_ERROR,
-		 "Synchronization for clock '%s' must be positive (sync=%f)\n",
-		 clock_name, sync);
-	return ;
-      }
+  if (prec == 0.0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Undefined precision for clock '%s'\n", clock_name);
+      return;
     }
-    else {
-      DebugLog(DF_MOD, DS_ERROR,
-	       "Unknown sub-directive '%s' for clock '%s'\n",
-	       clock_dir->next, clock_name);
+  if (sync == 0.0)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Undefined synchronization for clock '%s'\n", clock_name);
+      return;
     }
-  }
-
-  if (prec == 0.0) {
-    DebugLog(DF_MOD, DS_ERROR, "Undefined precision for clock '%s'\n", clock_name);
-    return ;
-  }
-
-  if (sync == 0.0) {
-    DebugLog(DF_MOD, DS_ERROR, "Undefined synchronization for clock '%s'\n", clock_name);
-    return ;
-  }
-
   clock_add_float(modcfg, clock_name, prec, sync);
 }
 
 
-static int
-qsort_clockcmp(const void *a, const void *b)
+static int qsort_clockcmp(const void *a, const void *b)
 {
-  return ( strcmp(((myclock_t*)a)->name, ((myclock_t *)b)->name) );
+  return strcmp(((myclock_t*)a)->name, ((myclock_t *)b)->name);
 }
 
 
-static int
-clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
+static int clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
+			     html_output_cfg_t *htmlcfg)
 {
   FILE *fp;
 /*   strhash_elmt_t *helmt; */
@@ -322,6 +323,8 @@ clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   modcfg = mod->config;
 
   fp = create_html_file(htmlcfg, "orchids-clocks.html", NO_CACHE);
+  if (fp==NULL)
+    return -1;
   fprintf_html_header(fp, "Orchids statistics");
 
   fprintf(fp, "<center><h1>Clocks<h1></center>\n");
@@ -331,32 +334,33 @@ clocks_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   fprintf(fp, "<tr class=\"h\"><th colspan=\"3\">Clocks</th></tr>\n");
   fprintf(fp, "<tr class=\"hh\"><th>Clock name</th><th>Precision</th><th>Synchronization</th></tr>\n");
 
-  ctx_array = strhash_to_array(modcfg->clocks);
+  ctx_array = strhash_to_array(ctx->gc_ctx, modcfg->clocks);
   ctx_array_sz = modcfg->clocks->elmts;
   qsort(ctx_array, ctx_array_sz, sizeof (myclock_t *), qsort_clockcmp);
 
-  for (i = 0; i < ctx_array_sz; i++) {
-    fprintf(fp,
-            "<tr><td class=\"e%i\">%s</td><td class=\"v%i\">%f</td><td class=\"v%i\">%f</td>\n",
-            i%2, ctx_array[i]->name,
-            i%2, ctx_array[i]->prec,
-            i%2, ctx_array[i]->sync);
-  }
+  for (i = 0; i < ctx_array_sz; i++)
+    {
+      fprintf(fp,
+	      "<tr><td class=\"e%i\">%s</td><td class=\"v%i\">%f</td><td class=\"v%i\">%f</td>\n",
+	      i%2, ctx_array[i]->name,
+	      i%2, ctx_array[i]->prec,
+	      i%2, ctx_array[i]->sync);
+    }
 
-  Xfree(ctx_array);
+  gc_base_free (ctx_array);
 
   fprintf(fp, "</table>\n");
   fprintf(fp, "</center>\n");
 
   fprintf_html_trailer(fp);
 
-  Xfclose(fp);
+  (void) fclose(fp);
 
   fprintf(menufp,
 	  "<a href=\"orchids-clocks.html\" "
           "target=\"main\">Clocks</a><br/>\n");
 
-  return (0);
+  return 0;
 }
 
 
@@ -378,20 +382,20 @@ issdl_prob_before(orchids_t *ctx, state_instance_t *state)
 #endif
 
 
-static void *
-clocks_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *clocks_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   clockctx_t *modcfg;
 
-  modcfg = Xzmalloc(sizeof (clockctx_t));
-  modcfg->clocks = new_strhash(INITIAL_CLOCK_HASH_SIZE);
+  modcfg = gc_base_malloc (ctx->gc_ctx, sizeof (clockctx_t));
+  modcfg->gc_ctx = ctx->gc_ctx;
+  modcfg->clocks = new_strhash(ctx->gc_ctx, INITIAL_CLOCK_HASH_SIZE);
 
   /* register html output */
   html_output_add_menu_entry(ctx, mod, clocks_htmloutput);
 
   /* register language functions */
 
-  return (modcfg);
+  return modcfg;
 }
 
 static mod_cfg_cmd_t clocks_config_commands[] =

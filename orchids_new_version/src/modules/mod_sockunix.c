@@ -40,8 +40,7 @@
 input_module_t mod_sockunix;
 
 
-static int
-create_sockunix_socket(const char *path)
+static int create_sockunix_socket(const char *path)
 {
   struct sockaddr_un sunx;
   int fd;
@@ -49,15 +48,16 @@ create_sockunix_socket(const char *path)
   size_t len;
 
   if (path[0] == '\0')
-    return (-1);
+    return -1;
 
   ret = unlink(path);
-  if (ret == -1) {
-    fprintf(stderr, "%s:%i:unlink(path=%s): errno=%i: %s\n",
-            __FILE__, __LINE__, path, errno, strerror(errno));
-    if (errno != ENOENT)
-      exit(EXIT_FAILURE);
-  }
+  if (ret == -1)
+    {
+      fprintf(stderr, "%s:%i:unlink(path=%s): errno=%i: %s\n",
+	      __FILE__, __LINE__, path, errno, strerror(errno));
+      if (errno != ENOENT)
+	exit(EXIT_FAILURE);
+    }
 
   fd = Xsocket(AF_UNIX, SOCK_DGRAM, 0);
 
@@ -80,79 +80,81 @@ create_sockunix_socket(const char *path)
   Xchmod(path, 0666);
   // Xconnect(fd, (struct sockaddr *)&sunx, len); // was added by jgl, but does not seen necessary
 
-  return (fd);
+  return fd;
 }
 
+#define MAXSOCKLEN 8192
 
-static int
-sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
+static int sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
 {
-  ovm_var_t *attr[SOCKUNIX_FIELDS];
-  char buf[8194];
+  gc_t *gc_ctx = ctx->gc_ctx;
   socklen_t sz;
   struct sockaddr_un from;
   socklen_t len;
-  event_t *event;
+  ovm_var_t *var;
+
+  GC_START(gc_ctx,SOCKUNIX_FIELDS+1);
+  /* SOCKUNIX_FIELDS fields, plus the event to be built */
 
   DebugLog(DF_MOD, DS_TRACE, "sockunix_callback()\n");
 
-  memset(attr, 0, sizeof(attr));
+  var = ovm_timeval_new (gc_ctx);
+  gettimeofday(&TIMEVAL(var) , NULL);
+  GC_UPDATE(gc_ctx, F_TIME, var);
 
-  sz = Xrecvfrom(fd,buf,8192,0, NULL, NULL);
-  buf[sz] = '\0';
+  var = ovm_int_new (gc_ctx, (long) mod->posts);
+  GC_UPDATE (gc_ctx, F_EVENT, var);
 
-  attr[F_TIME] = ovm_timeval_new();
-  attr[F_TIME]->flags |= TYPE_MONO;
-  gettimeofday( &(TIMEVAL(attr[F_TIME])) , NULL);
-
-  attr[F_EVENT] = ovm_int_new();
-  attr[F_EVENT]->flags |= TYPE_MONO;
-  INT(attr[F_EVENT]) = (long) mod->posts;
+  var = ovm_bstr_new (gc_ctx, MAXSOCKLEN); /* why +2? */
+  GC_UPDATE (gc_ctx, F_MSG, var);
+  sz = Xrecvfrom (fd, BSTR(var), MAXSOCKLEN, 0, NULL, NULL);
+  BSTRLEN(var) = sz;
 
   len = sizeof (struct sockaddr_un);
   memset(&from, 0, sizeof (struct sockaddr_un));
   getsockname(fd, (struct sockaddr *)&from, &len);
   len = strlen(from.sun_path);
-  attr[F_SOCKET] = ovm_str_new(len);
-  memcpy(STR(attr[F_SOCKET]), from.sun_path, len);
+  var = ovm_str_new (gc_ctx, len);
+  memcpy(STR(var), from.sun_path, len);
+  GC_UPDATE (gc_ctx, F_SOCKET, var);
 
-  attr[F_MSG] = ovm_bstr_new(sz);
-  memcpy(BSTR(attr[F_MSG]), buf, sz);
+  REGISTER_EVENTS(ctx, mod, SOCKUNIX_FIELDS);
 
-  event = NULL;
-  add_fields_to_event(ctx, mod, &event, attr, SOCKUNIX_FIELDS);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  GC_END(gc_ctx);
+  return 0;
 }
 
 static field_t sockunix_fields[] = {
   { "sockunix.event",    T_INT,      "event number"        },
   { "sockunix.time",     T_TIMEVAL,  "reception time"      },
-  { "sockunix.socket",   T_STR,     "unix socket name"    },
+  { "sockunix.socket",   T_STR,      "unix socket name"    },
   { "sockunix.msg",      T_BSTR,     "message"             }
 };
 
-static void *
-sockunix_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void * sockunix_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() sockunix@%p\n", (void *) &mod_sockunix);
 
   register_fields(ctx, mod, sockunix_fields, SOCKUNIX_FIELDS);
-
-  return (NULL);
+  return NULL;
 }
 
-static void
-add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
+  ovm_var_t *var;
+  size_t len;
   int sd;
 
   DebugLog(DF_MOD, DS_INFO, "Add unix socket port [%s]\n", dir->args);
 
   sd = create_sockunix_socket(dir->args);
-  add_input_descriptor(ctx, mod, sockunix_callback, sd, (void *)dir->args);
+  GC_START(ctx->gc_ctx, 1);
+  len = strlen(dir->args);
+  var = ovm_str_new (ctx->gc_ctx, len);
+  memcpy (STR(var), dir->args, len);
+  GC_UPDATE(ctx->gc_ctx, 0, var);
+  add_input_descriptor(ctx, mod, sockunix_callback, sd, (void *)var);
+  GC_END(ctx->gc_ctx);
 }
 
 static mod_cfg_cmd_t sockunix_dir[] =

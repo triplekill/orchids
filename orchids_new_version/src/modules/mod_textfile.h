@@ -38,8 +38,6 @@
 #define TXTFILE_CHK_SHA1    0x03
 #define TXTFILE_SAFE_REOPEN 0x04
 
-#define HASH_SIZE 32
-
 #define DEFAULT_MODTEXT_POLL_PERIOD 10
 #define INITIAL_MODTEXT_POLL_DELAY  0
 
@@ -47,12 +45,11 @@ typedef struct textfile_s textfile_t;
 struct textfile_s
 {
   struct textfile_s *next;
-  char *filename;
-  size_t filename_len;
+  ovm_var_t *file_name;
   FILE *fd;
   struct stat file_stat;
   unsigned int line;
-  unsigned char hash[HASH_SIZE];
+  unsigned int hash;
   unsigned char eof;
 };
 
@@ -77,8 +74,7 @@ struct textsock_s
   int flags;
   unsigned int line;
   off_t read_off, write_off;
-  char *filename;
-  size_t filename_len;
+  ovm_var_t *file_name;
   int fd;
 };
 
@@ -118,8 +114,7 @@ static void
 set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
-static int
-rtaction_read_files(orchids_t *ctx, rtaction_t *e);
+static int rtaction_read_files(orchids_t *ctx, heap_entry_t *he);
 
 
 #endif /* MOD_TEXTFILE_H */

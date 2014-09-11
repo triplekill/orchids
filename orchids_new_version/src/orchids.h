@@ -31,6 +31,8 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include "gc.h"
+
 #include "orchids_types.h"
 #include "orchids_defaults.h"
 
@@ -44,7 +46,6 @@
 #include "debuglog.h"
 #include "timer.h"
 #include "slist.h"
-#include "dlist.h"
 
 #ifdef DMALLOC
 #include <dmalloc.h>
@@ -92,7 +93,7 @@ extern unsigned long dmalloc_orchids;
 #define MODE_SYSLOG 1
 #define MODE_SNARE  2
 
-#define BYTECODE_HAVE_PUSHFIELD 0x01
+#define BYTECODE_HAS_PUSHFIELD 0x01
 
 
 /**
@@ -150,6 +151,7 @@ struct config_directive_s
 typedef struct event_s event_t;
 struct event_s
 {
+  gc_header_t gc;
   int32_t    field_id;
   ovm_var_t *value;
   event_t   *next;
@@ -175,6 +177,7 @@ struct event_s
 typedef struct active_event_s active_event_t;
 struct active_event_s
 {
+  gc_header_t    gc;
   event_t        *event;
   active_event_t *next;
   active_event_t *prev;
@@ -182,39 +185,6 @@ struct active_event_s
 };
 
 typedef struct orchids_s orchids_t;
-
-typedef struct rtaction_s rtaction_t;
-
-/**
- ** @typedef rtaction_cb_t
- **   Real-time action callback function prototype.
- **/
-typedef int (*rtaction_cb_t)(orchids_t *ctx, rtaction_t *e);
-
-
-/**
- ** @struct rtaction_s
- **   Real time action structure, element used in the
- **   wait queue orchids_s::rtactionlist.
- **/
-/**   @var rtaction_s::date
- **     Date to execute the registered action.
- **/
-/**   @var rtaction_s::cb
- **     The callback to execute.
- **/
-/**   @var rtaction_s::data
- **     Arbitrary data that may be used by the callback.
- **/
-/**   @var rtaction_s::evtlist
- **     The list elements.
- **/
-struct rtaction_s {
-  timeval_t date;
-  rtaction_cb_t cb;
-  void *data;
-  DLIST_ENTRY(rtaction_t) evtlist;
-};
 
 
 /**
@@ -237,7 +207,7 @@ struct rtaction_s {
  **     Field identifier. Used for reverse field name lookup from hash tables.
  **/
 /**   @var field_record_s::val
- **     Current field value resolution are not thread-safe.
+ **     Current field value resolution is not thread-safe.
  **/
 typedef struct field_record_s field_record_t;
 struct field_record_s
@@ -250,6 +220,25 @@ struct field_record_s
   ovm_var_t  *val;
 };
 
+typedef struct field_record_table_s field_record_table_t;
+struct field_record_table_s
+{
+  gc_header_t gc;
+  size_t num_fields;
+  field_record_t *fields;
+};
+
+
+/* Field arrays: used in some modules (generic, timeout, for example) */
+typedef struct field_table_s field_table_t;
+struct field_table_s
+{
+  gc_header_t gc;
+  size_t nfields;
+  ovm_var_t **field_values;
+};
+
+field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields);
 
 
 
@@ -292,7 +281,6 @@ typedef unsigned long bytecode_t;
 typedef struct wait_thread_s wait_thread_t;
 
 typedef struct input_module_s input_module_t;
-typedef struct polled_input_s polled_input_t;
 typedef struct realtime_input_s realtime_input_t;
 typedef struct rule_compiler_s rule_compiler_t;
 
@@ -421,6 +409,7 @@ struct state_s
  **/
 struct rule_s
 {
+  gc_header_t       gc;
   char             *filename;
   time_t	    file_mtime;
   int32_t           lineno;
@@ -464,6 +453,7 @@ struct rule_s
  **/
 typedef struct sync_lock_list_s sync_lock_list_t;
 struct sync_lock_list_s {
+  gc_header_t gc;
   sync_lock_list_t *next;
   state_instance_t *state;
 };
@@ -504,6 +494,7 @@ struct sync_lock_list_s {
  **/
 struct rule_instance_s
 {
+  gc_header_t gc;
   rule_t *rule;
   state_instance_t *first_state;
   rule_instance_t  *next;
@@ -521,6 +512,43 @@ struct rule_instance_s
   sync_lock_list_t *sync_lock_list;
 };
 
+
+typedef struct env_bind_s env_bind_t;
+struct env_bind_s {
+  gc_header_t gc;
+  int32_t var;
+  ovm_var_t *val;
+};
+
+typedef struct env_split_s env_split_t;
+struct env_split_s {
+  gc_header_t gc;
+  ovm_var_t *left;
+  ovm_var_t *right;
+};
+
+typedef struct heap_s heap_t;
+typedef struct heap_entry_s heap_entry_t;
+
+/**
+ ** @typedef rtaction_cb_t
+ **   Real-time action callback function prototype.
+ **/
+typedef int (*rtaction_cb_t)(orchids_t *ctx, heap_entry_t *he);
+
+struct heap_entry_s {
+  timeval_t date;
+  rtaction_cb_t cb;
+  gc_header_t *gc_data;
+  void *data;
+};
+
+struct heap_s {
+  gc_header_t gc;
+  heap_entry_t *entry;
+  heap_t *left;
+  heap_t *right;
+};
 
 /**
  ** @struct state_instance_s
@@ -547,11 +575,8 @@ struct rule_instance_s
 /**   @var state_instance_s::rule_instance
  **     Reference to the rule instance that contain this state instance.
  **/
-/**   @var state_instance_s::inherit_env
- **     Environment: cumulative inherited environment for all past states.
- **/
-/**   @var state_instance_s::current_env
- **     Environment: value allocated by actions in this state instance.
+/**   @var state_instance_s::env
+ **     Environment: trie of values allocated by actions in this state instance.
  **/
 /**   @var state_instance_s::global_next
  **     Global state instance list by inverse creation order.
@@ -565,16 +590,17 @@ struct rule_instance_s
  **/
 struct state_instance_s
 {
+  gc_header_t gc;
   state_instance_t *first_child;
   state_instance_t *next_sibling;
   state_instance_t *parent;
   active_event_t   *event;
   int32_t           event_level;
   uint32_t          flags;
-  state_t          *state;
+  state_t          *state; /* pointer to some state
+			      in rule_instance->rule->state[] array */
   rule_instance_t  *rule_instance;
-  ovm_var_t       **inherit_env;
-  ovm_var_t       **current_env;
+  ovm_var_t        *env;
   state_instance_t *global_next; /* XXX: UNUSED */
   state_instance_t *retrig_next;
   int32_t           depth; /* XXX: UNUSED (only in create_state_instance()) */
@@ -586,7 +612,7 @@ struct state_instance_s
 
 /**
  ** @struct wait_thread_s
- **   This is a (virtual, not system) thread which wait for
+ **   This is a (virtual, not system) thread that waits for
  **   an event to pass a given transition.
  **/
 /**   @var wait_thread_s::next
@@ -612,14 +638,13 @@ struct state_instance_s
  **/
 struct wait_thread_s
 {
+  gc_header_t gc;
   wait_thread_t    *next;
-  wait_thread_t    *prev; /* XXX: UNUSED */
-  rule_instance_t  *rule_instance; /* XXX: UNUSED (state_instance->rule_instance is used instead) */
-  transition_t     *trans;
+  transition_t     *trans; /* pointer to an already allocated transition */
   state_instance_t *state_instance;
+  wait_thread_t    *next_in_state_instance;
   unsigned long     flags;
   unsigned int      pass;
-  wait_thread_t    *next_in_state_instance; /* XXX: UNUSED */
   time_t            timeout;
 };
 
@@ -644,10 +669,21 @@ struct rulefile_s
   rulefile_t *next;
 };
 
+struct filestack_s;
+
+/*
+** Since the maxline limit is usually 4096 and quoted string can't
+** be defined in multiple lines, we can't have a quoted string
+** bigger than 4096.
+*/
+#define QSTRMAX 4096
 
 /**
  ** @struct rule_compiler_s
  ** The main rule compiler context.
+ **/
+/**   @var rule_compiler_s::gc_ctx
+ **     The garbage collector context.
  **/
 /**   @var rule_compiler_s::currfile
  **     Current file in compilation.
@@ -698,24 +734,24 @@ struct rulefile_s
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
-/**   @var rule_compiler_s::static_1_res_id
- **     Ressource id for const int 1 (used for boolean)
- **/
-/**   @var rule_compiler_s::static_0_res_id
- **     Ressource id for const int 0 (used for boolean)
- **/
-/**   @var rule_compiler_s::static_null_res_id
- **     Ressource id for const null (used for undefined vars / fields)
- **/
-/**   @var rule_compiler_s::static_param_error_res_id
- **     Ressource id for const null (with errno set to param error)
- **/
-/**   @var rule_compiler_s::static_regex_error_res_id
- **     Ressource id for const null (with errno set to regex error)
- **/
 struct rule_compiler_s
 {
+  gc_header_t       gc;
+  gc_t             *gc_ctx;
+  size_t            nprotected;
+  size_t            maxprotected;
+  gc_header_t      **protected;
   char             *currfile;
+  /* For the lex scanner: */
+  void             *scanner;
+  unsigned int      issdllineno;
+  char             *issdlcurrentfile;
+  FILE             *issdlin;
+  SLIST_HEAD(filestack, struct filestack_s) issdlfilestack;
+  char              qstr_buf[QSTRMAX];
+  char             *qstr_ptr;
+  size_t            qstr_sz;
+  /* */
   int32_t           rules;
   strhash_t        *functions_hash;
   strhash_t        *fields_hash;
@@ -730,12 +766,6 @@ struct rule_compiler_s
   int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
-
-  int		static_1_res_id;
-  int		static_0_res_id;
-  int		static_null_res_id;
-  int		static_param_error_res_id;
-  int		static_regex_error_res_id;
 };
 
 
@@ -934,6 +964,23 @@ struct reportmod_s {
  **   Main program context structure.
  **   Contain all needed data for global operation.
  **/
+/**   @var orchids_s::gc_ctx
+ **     The garbage collection context.  Needed when calling
+ **     any function that may allocate memory using gc_alloc().
+ **/
+/**   @var orchids_s::one
+ **     The global constant '1'.  This is used frequently by the
+ **     virtual machine, and should not be reallocated each time.
+ **/
+/**   @var orchids_s::zero
+ **     The global constant '0'.  This is used frequently by the
+ **     virtual machine, and should not be reallocated each time.
+ **/
+/**   @var orchids_s::empty_string
+ **     The empty string, as a global constant.
+ **     This is used frequently by the
+ **     virtual machine, and should not be reallocated each time.
+ **/
 /**   @var orchids_s::start_time
  **     Start time of the program (for uptime and cpu usage statistics).
  **/
@@ -945,9 +992,6 @@ struct reportmod_s {
  **/
 /**   @var orchids_s::loaded_modules
  **     Number of loaded modules.
- **/
-/**   @var orchids_s::poll_handler_list
- **     List of handler for polled data.
  **/
 /**   @var orchids_s::last_poll
  **     Date of the last poll.
@@ -1117,18 +1161,22 @@ struct reportmod_s {
  **/
 struct orchids_s
 {
+  gc_t *gc_ctx;
+  ovm_var_t *one;
+  ovm_var_t *zero;
+  ovm_var_t *empty_string;
   timeval_t    start_time;
   char        *config_file;
   mod_entry_t  mods[MAX_MODULES];
   int32_t      loaded_modules;
-  polled_input_t     *poll_handler_list;
   time_t              last_poll;
   realtime_input_t   *realtime_handler_list;
   int                 maxfd;
   fd_set_t            fds;
   config_directive_t *cfg_tree;
-  int32_t             num_fields;
-  field_record_t     *global_fields;
+  /*int32_t             num_fields; suppressed: now global_fields->num_fields */
+  /* field_record_t     *global_fields; replaced by the following: */
+  field_record_table_t *global_fields;
   uint32_t            events;
   rule_compiler_t    *rule_compiler;
   timeval_t           poll_period;
@@ -1173,7 +1221,7 @@ struct orchids_s
 
   char *runtime_user;
 
-  rusage_t ru;
+  rusage_t ru; /* XXX useless? */
 
   pid_t pid;
 
@@ -1184,7 +1232,7 @@ struct orchids_s
   timeval_t last_rule_act;
   timeval_t last_ruleinst_act;
 
-  DLIST_HEAD(evtlist, rtaction_t) rtactionlist;
+  heap_t *rtactionlist;
 
 #ifdef ENABLE_PREPROC
   char *default_preproc_cmd;
@@ -1206,7 +1254,8 @@ struct orchids_s
  ** @typedef dir_handler_t
  **   Directive handler function pointer type.
  **/
-typedef void (*dir_handler_t)(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+typedef void (*dir_handler_t)(orchids_t *ctx, mod_entry_t *mod,
+			      config_directive_t *dir);
 
 
 /**
@@ -1351,34 +1400,6 @@ typedef int (*poll_callback_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
 
 
 /**
- ** @struct polled_input_s
- **   Contains informations on modules using polled events...
- **/
-/**   @var polled_input_s::next
- **     A pointer to the next polled input.
- **/
-/**   @var polled_input_s::last_call
- **     Date of last call. Used to multiplex w/ select() when events occur.
- **/
-/**   @var polled_input_s::data
- **     Additional module specific data.
- **/
-/**   @var polled_input_s::cb
- **     Module callback supposed to poll data. (and post events).
- **/
-/**   @var polled_input_s::mod
- **     The module which registered this polled input.
- **/
-struct polled_input_s
-{
-  polled_input_t        *next;
-  time_t                 last_call;
-  void                  *data;
-  poll_callback_t        cb;
-  mod_entry_t           *mod;
-};
-
-/**
  ** @struct field_s
  **   Used for field declaration in modules
  **/
@@ -1487,44 +1508,42 @@ fprintf_directives(FILE *fp, orchids_t *ctx);
  **
  ** @return The new computed CRC.
  **/
-unsigned int
-crc32(unsigned int crc, char *buf, int len);
+unsigned int crc32(unsigned int crc, char *buf, int len);
 
 /* string_util.c */
-size_t
-my_strspn(const char *pos, const char *eot, size_t n);
+size_t my_strspn(const char *pos, const char *eot, size_t n);
 
-size_t
-get_next_int(const char *istr, long *i, size_t n);
+size_t get_next_int(const char *istr, long *i, size_t n);
 
-size_t
-get_next_token(const char *pos, int c, size_t n);
+size_t get_next_token(const char *pos, int c, size_t n);
 
 
 /* issdl.l */
+/*
 void
 set_lexer_context(rule_compiler_t *ctx);
+*/
 
 /**
  ** ISSDL lexer entry-point.
  **/
-int
-issdllex(void); /* yylex() */
+union YYSTYPE;
+int issdllex(union YYSTYPE *yylval, rule_compiler_t *ctx, void *yyscanner); // yylex()
 
-void
-issdlerror(char *s); /* yyerror() */
+void issdlerror(rule_compiler_t *ctx, char *s); // yyerror()
 
 /* issdl.y */
+/*
 void
 set_yaccer_context(rule_compiler_t *ctx);
+*/
 
 /**
  ** ISSDL parser (yaccer) entry-point.
  **
  ** @return The error code.
  **/
-int
-issdlparse(void); /* yyparse() */
+int issdlparse(void *__compiler_ctx_g); /* really of type rule_compiler_t * */
 
 /* ovm.h */
 
@@ -1535,10 +1554,22 @@ issdlparse(void); /* yyparse() */
  ** @param s         State instance for the execution context.
  ** @param bytecode  Byte code to execute.
  **
- ** @return  0 for a normal exit (OP_END) or the error code.
+ ** @return  0 if expr is true (= non-zero T_INT), error code otherwise
  **/
 int
-ovm_exec(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
+ovm_exec_expr(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
+
+/**
+ ** Orchids virtual machine entry point.
+ **
+ ** @param ctx       Orchids application context.
+ ** @param s         State instance for the execution context.
+ ** @param bytecode  Byte code to execute.
+ **
+ ** @return  nothing
+ **/
+void
+ovm_exec_stmt(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
 
 /**
  ** Convert an ovm opcode into the mnemonic name.
@@ -1655,6 +1686,13 @@ register_core_functions(orchids_t *ctx);
 # define DPRINTF(args)
 # define DFPRINTF(args)
 #endif /* DEBUG */
+
+/* In orchids_api.c: */
+event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
+		    event_t *event);
+
+/* In lang.c: */
+char *time_convert(char *str, char *end, struct timeval *tv);
 
 #endif /* ORCHID_H */
 

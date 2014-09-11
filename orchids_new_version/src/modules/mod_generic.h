@@ -54,10 +54,10 @@ struct generic_vmod_s
   char *name;
   int mod_id;
   input_module_t mod_entry;
+  size_t nfields;
   field_t *field_array;
-  ovm_var_t **field_values;
   strhash_t *field_hash;
-  int fields;
+  field_table_t *fields;
 };
 
 typedef struct generic_hook_s generic_hook_t;

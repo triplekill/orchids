@@ -27,8 +27,7 @@
 #include "graph_output_priv.h"
 
 
-void
-fprintf_rule_dot(FILE *fp, rule_t *rule)
+void fprintf_rule_dot(FILE *fp, rule_t *rule)
 {
   int s;
 
@@ -55,15 +54,15 @@ fprintf_rule_dot(FILE *fp, rule_t *rule)
 }
 
 
-static void
-fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options, int limit)
+static void fprintf_state_instance_dot(FILE *fp, state_instance_t *state, int options, int limit)
 {
   fprintf_state_instance_dot_sub(fp, state, options, &limit);
 }
 
 
-static void
-fprintf_state_instance_dot_sub(FILE *fp, state_instance_t *state, int options, int *limit)
+static void fprintf_state_instance_dot_sub(FILE *fp,
+					   state_instance_t *state,
+					   int options, int *limit)
 {
   /* Small hack: Use state pointer to identify state instance */
   fprintf(fp, "  \"%s.%p\" [ label=\"%s\" ]\n",
@@ -89,12 +88,11 @@ fprintf_state_instance_dot_sub(FILE *fp, state_instance_t *state, int options, i
 }
 
 
-void
-fprintf_rule_instance_dot(FILE *fp,
-                          rule_instance_t *rule,
-                          int options,
-                          wait_thread_t *tq,
-                          int limit)
+void fprintf_rule_instance_dot(FILE *fp,
+			       rule_instance_t *rule,
+			       int options,
+			       wait_thread_t *tq,
+			       int limit)
 {
   wait_thread_t *t;
   int local_id;

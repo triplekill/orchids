@@ -52,7 +52,6 @@ int netfilterlex(void);
 void netfiltererror(char *s);
 
 extern void netfilter_set_str(char *str, size_t s);
-extern void netfilter_set_attrs(ovm_var_t **attr_fields);
 extern int netfilterparse(void);
 extern void netfilter_reset(void);
 
@@ -135,7 +134,7 @@ int my_yyinput(char *buf, int max_size);
 "bytes" { COUNT_OFFSET(); return (NF_BYTES); }
 
 [0-9]+ {
-  netfilterlval.integer = atoi(netfiltertext);
+  netfilterlval.integer = strtol(netfiltertext, (char **)NULL, 10);
   COUNT_OFFSET();
   return (INTEGER);
 }
@@ -188,7 +187,8 @@ int my_yyinput(char *buf, int max_size);
 %%
 
 /* <ADDRESS>([0-9]{1,3}\.){3}[0-9]{1,3} { snarelval.ipv4addr.s_addr = inet_addr(snaretext); return (INETADDR); } */
-/* <ADDRESS>[0-9]+ { snarelval.integer = atoi(snaretext); return (INTEGER); } */
+/* <ADDRESS>[0-9]+ { snarelval.integer = strtol(snaretext, (char **)NULL, 10);
+                     return (INTEGER); } */
 /* <ADDRESS>\t { BEGIN INITIAL; return (snaretext[0]); } */
 /* <ADDRESS>. { return (snaretext[0]); } */
 

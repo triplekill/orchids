@@ -22,8 +22,7 @@
 
 #include "orchids.h"
 
-size_t
-get_next_token(const char *pos, int c, size_t n)
+size_t get_next_token(const char *pos, int c, size_t n)
 {
   size_t token_size;
 
@@ -34,8 +33,7 @@ get_next_token(const char *pos, int c, size_t n)
   return (token_size);
 }
 
-size_t
-get_next_int(const char *istr, long *i, size_t n)
+size_t get_next_int(const char *istr, long *i, size_t n)
 {
   size_t sz;
 
@@ -49,11 +47,10 @@ get_next_int(const char *istr, long *i, size_t n)
       ++sz;
     }
 
-  return (sz);
+  return sz;
 }
 
-size_t
-my_strspn(const char *pos, const char *eot, size_t n)
+size_t my_strspn(const char *pos, const char *eot, size_t n)
 {
   size_t token_size;
   const char *r;
@@ -68,8 +65,7 @@ my_strspn(const char *pos, const char *eot, size_t n)
   return (token_size);
 }
 
-bool_t
-fnmatch_test(const char *pattern)
+bool_t fnmatch_test(const char *pattern)
 {
   int nesting;
 

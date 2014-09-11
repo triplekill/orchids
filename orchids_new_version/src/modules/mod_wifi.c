@@ -29,7 +29,6 @@
 #include <pcap.h>
 
 #include "orchids.h"
-
 #include "orchids_api.h"
 
 #include "compat.h"
@@ -61,58 +60,70 @@ typedef struct prism2_header_s* prism2_header_t;
 #define ADDR_STR_SZ  17 /* 6 bytes of 2 nibbles plus 5 ':' */
 #define GETADDR(addr, ovmvar)                                           \
   do {                                                                  \
-    char buf_mac[ ADDR_STR_SZ + 1 ];                                    \
-    (ovmvar) = ovm_str_new( ADDR_STR_SZ );                              \
-    sprintf(buf_mac,                                                    \
-            "%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",                            \
-            (addr)[0], (addr)[1], (addr)[2],                            \
-            (addr[3]), (addr[4]), (addr)[5]);                           \
-    memcpy(STR(ovmvar), buf_mac, ADDR_STR_SZ);                          \
+  val = ovm_str_new(gc_ctx, ADDR_STR_SZ+1);				\
+  STRLEN(val) = sprintf(STR(ovmvar),					\
+			"%.2x:%.2x:%.2x:%.2x:%.2x:%.2x",		\
+			(addr)[0], (addr)[1], (addr)[2],		\
+			(addr[3]), (addr[4]), (addr)[5]);		\
+  GC_TOUCH (gc_ctx, (ovmvar) = val);					\
   } while (0)
 
+typedef struct wifi_pcap_s {
+  gc_t *gc_ctx;
+  ovm_var_t **attr;
+} wifi_pcap_t;
 
-void
-wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char * pkt)
+void wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr,
+			const u_char * pkt)
 {
   ieee80211_header_t mac_header;
   prism2_header_t prism2_header;
   u_int8_t dir, type, subtype;
+  wifi_pcap_t *wpt;
   ovm_var_t **attr;
+  gc_t *gc_ctx;
+  ovm_var_t *val;
 
   DebugLog(DF_MOD, DS_TRACE, "wifi_pcap_callback()\n");
 
-  attr = (ovm_var_t **) av;
+  wpt = (wifi_pcap_t *)av;
+  gc_ctx = wpt->gc_ctx;
+  attr = wpt->attr;
 
-  if (datalink_type == DLT_PRISM_HEADER) {
-    prism2_header = (prism2_header_t) pkt;
-    mac_header = (ieee80211_header_t) (pkt + 144);
+  if (datalink_type == DLT_PRISM_HEADER)
+    {
+      prism2_header = (prism2_header_t) pkt;
+      mac_header = (ieee80211_header_t) (pkt + 144);
 
-    attr[F_RSSI] = ovm_int_new();
-    INT(attr[F_RSSI]) = (&(prism2_header->rssi))->data;
-  } else {
-      return ;
-  }
+      val = ovm_int_new (gc_ctx, (&(prism2_header->rssi))->data);
+      GC_TOUCH (gc_ctx, attr[F_RSSI] = val);
+    }
+  else
+    return;
 
   /* fixation du champ .wifi.time */
-  attr[F_TIME] = ovm_timeval_new();
-  attr[F_TIME]->flags |= TYPE_MONO;
-  gettimeofday( &(TIMEVAL(attr[F_TIME])) , NULL);
+  val = ovm_timeval_new (gc_ctx);
+  gettimeofday(&(TIMEVAL(val)), NULL);
+  GC_TOUCH (gc_ctx, attr[F_TIME] = val);
 
   type = mac_header->fc[0] & 0x0c;
   subtype = mac_header->fc[0] & SUBTYPE_MASK;
   dir = mac_header->fc[1] & DIR_MASK;
 
-  switch (type) {
-    /******************** Dans le cas d'une trame de gestion */
+  switch (type)
+    {
+      /******************** Dans le cas d'une trame de gestion */
     case TYPE_MGT:
-
-      attr[F_TYPE] = ovm_str_new(strlen("management"));
-      memcpy(STR(attr[F_TYPE]), "management", STRLEN(attr[F_TYPE]));
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = "management";
+      VSTRLEN(val) = 10;
+      GC_TOUCH (gc_ctx, attr[F_TYPE] = val);
 
       /* fixation du champ .wifi.seqnum */
-      attr[F_SEQNUM] = ovm_int_new();
-      INT(attr[F_SEQNUM]) = (int) (mac_header->seqnum & SEQ_MASK) \
-                               >> SEQ_SHIFT;
+      val = ovm_int_new (gc_ctx,
+			 (int) (mac_header->seqnum & SEQ_MASK)	\
+			 >> SEQ_SHIFT);
+      GC_TOUCH (gc_ctx, attr[F_SEQNUM] = val);
 
       /* addr1 = DA
          addr2 = SA
@@ -125,157 +136,185 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
       switch(subtype)
       {
         case SUBTYPE_ASSOC_REQ:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("assocreq"));
-          memcpy(STR(attr[F_SUBTYPE]), "assocreq", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "assocreq";
+	  VSTRLEN(val) = 8;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_ASSOC_RESP:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("assocresp"));
-          memcpy(STR(attr[F_SUBTYPE]), "assocresp", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "assocresp";
+	  VSTRLEN(val) = 9;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_PROBE_REQ:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("probereq"));
-          memcpy(STR(attr[F_SUBTYPE]), "probereq", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "probereq";
+	  VSTRLEN(val) = 8;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_PROBE_RESP:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("proberesp"));
-          memcpy(STR(attr[F_SUBTYPE]), "proberesp", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "proberesp";
+	  VSTRLEN(val) = 9;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_BEACON:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("beacon"));
-          memcpy(STR(attr[F_SUBTYPE]), "beacon", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "beacon";
+	  VSTRLEN(val) = 6;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_DISASSOC:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("disassoc"));
-          memcpy(STR(attr[F_SUBTYPE]), "disassoc", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "disassoc";
+	  VSTRLEN(val) = 8;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_AUTH:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("auth"));
-          memcpy(STR(attr[F_SUBTYPE]), "auth", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "auth";
+	  VSTRLEN(val) = 4;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         case SUBTYPE_DEAUTH:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("deauth"));
-          memcpy(STR(attr[F_SUBTYPE]), "deauth", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "deauth";
+	  VSTRLEN(val) = 6;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
 
         default:
           DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_mgmt_subtype_0x%.2x\n", subtype);
-          attr[F_SUBTYPE] = ovm_str_new(strlen("unknown_mgmt_subtype"));
-          memcpy(STR(attr[F_SUBTYPE]), "unknown_mgmt_subtype", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "unknown_mgmt_subtype";
+	  VSTRLEN(val) = 20;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
       }  /* end switch(subtype) */
-
       break;
-
 
 
     /******************** Dans le cas d'une trame de controle */
     case TYPE_CTL:
-      attr[F_TYPE] = ovm_str_new(strlen("control"));
-      memcpy(STR(attr[F_TYPE]), "control", STRLEN(attr[F_TYPE]));
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = "control";
+      VSTRLEN(val) = 7;
+      GC_TOUCH (gc_ctx, attr[F_TYPE] = val);
 
       switch(subtype)
       {
         case SUBTYPE_RTS:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("rts"));
-          memcpy(STR(attr[F_SUBTYPE]), "rts", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "rts";
+	  VSTRLEN(val) = 3;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
 
           GETADDR(mac_header->addr1, attr[F_RA]);
           GETADDR(mac_header->addr2, attr[F_TA]);
-
           break;
 
         case SUBTYPE_CTS:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("cts"));
-          memcpy(STR(attr[F_SUBTYPE]), "cts", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "cts";
+	  VSTRLEN(val) = 3;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
 
           GETADDR(mac_header->addr1, attr[F_RA]);
-
           break;
 
         case SUBTYPE_ACK:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("ack"));
-          memcpy(STR(attr[F_SUBTYPE]), "ack", STRLEN(attr[F_SUBTYPE]));
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "ack";
+	  VSTRLEN(val) = 3;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
 
           GETADDR(mac_header->addr1, attr[F_RA]);
-
           break;
 
         default:
           DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_ctl_subtype_0x%.2x\n", subtype);
-          attr[F_SUBTYPE] = ovm_str_new(strlen("unknown_ctl_subtype"));
-          memcpy(STR(attr[F_SUBTYPE]), "unknown_ctl_subtype", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "unknown_ctl_subtype";
+	  VSTRLEN(val) = 19;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
+	  break;
       }; /* end switch(subtype) */
-
       break;
-
-
 
     /******************** Dans le cas d'une trame de donnees */
     case TYPE_DATA:
-
-      attr[F_TYPE] = ovm_str_new(strlen("data"));
-      memcpy(STR(attr[F_TYPE]), "data", STRLEN(attr[F_TYPE]));
+      val = ovm_vstr_new (gc_ctx, NULL);
+      VSTR(val) = "data";
+      VSTRLEN(val) = 4;
+      GC_TOUCH (gc_ctx, attr[F_TYPE] = val);
 
       /* fixation du champ .wifi.iswep */
-      attr[F_ISWEP] = ovm_int_new();
-      INT(attr[F_ISWEP]) = (mac_header->fc[1] & PROT) / 64;
+      val = ovm_int_new (gc_ctx, (mac_header->fc[1] & PROT) / 64);
+      GC_TOUCH (gc_ctx, attr[F_ISWEP] = val);
 
       /* fixation du champ .wifi.seqnum */
-      attr[F_SEQNUM] = ovm_int_new();
-      INT(attr[F_SEQNUM]) = (int) (mac_header->seqnum & SEQ_MASK) \
-                               >> SEQ_SHIFT;
+      val = ovm_int_new (gc_ctx,
+			 (int) (mac_header->seqnum & SEQ_MASK)	\
+			 >> SEQ_SHIFT);
+      GC_TOUCH (gc_ctx, attr[F_SEQNUM] = val);
 
       switch(subtype)
       {
         case SUBTYPE_DATA:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("data"));
-          memcpy(STR(attr[F_SUBTYPE]), "data", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "data";
+	  VSTRLEN(val) = 4;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
         case SUBTYPE_CF_ACK:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("datacfack"));
-          memcpy(STR(attr[F_SUBTYPE]), "datacfack", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "datacfack";
+	  VSTRLEN(val) = 9;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
         case SUBTYPE_CF_POLL:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("datacfpoll"));
-          memcpy(STR(attr[F_SUBTYPE]), "datacfpoll", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "datacfpoll";
+	  VSTRLEN(val) = 10;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
         case SUBTYPE_CF_ACPL:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("datacfacpl"));
-          memcpy(STR(attr[F_SUBTYPE]), "datacfacpl", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "datacfacpl";
+	  VSTRLEN(val) = 10;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
         case SUBTYPE_NODATA:
-          attr[F_SUBTYPE] = ovm_str_new(strlen("nodata"));
-          memcpy(STR(attr[F_SUBTYPE]), "nodata", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "nodata";
+	  VSTRLEN(val) = 6;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
           break;
-
         default:
           DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_data_subtype_0x%.2x\n", subtype);
-          attr[F_SUBTYPE] = ovm_str_new(strlen("unknown_data_subtype"));
-          memcpy(STR(attr[F_SUBTYPE]), "unknown_data_subtype", STRLEN(attr[F_SUBTYPE]));
-
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "unknown_data_subtype";
+	  VSTRLEN(val) = 20;
+	  GC_TOUCH (gc_ctx, attr[F_SUBTYPE] = val);
       } /* end switch(subtype) */
 
       switch(dir)
-      {
+	{
         case DIR_NODS:
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "nods";
+	  VSTRLEN(val) = 4;
+	  GC_TOUCH (gc_ctx, attr[F_DIR] = val);
 
-          attr[F_DIR] = ovm_str_new(strlen("nods"));
-          memcpy(STR(attr[F_DIR]), "nods", STRLEN(attr[F_DIR]));
-
-          attr[F_BODYLENGTH] = ovm_int_new();
-          INT(attr[F_BODYLENGTH]) = pkthdr->caplen - 144 - 28 ;
+	  val = ovm_int_new (gc_ctx, pkthdr->caplen - 144 - 28);
+          GC_TOUCH (gc_ctx, attr[F_BODYLENGTH] = val);
 
 	  /* addr1 = DA
              addr2 = SA
@@ -284,17 +323,16 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           GETADDR(mac_header->addr1, attr[F_DA]);
           GETADDR(mac_header->addr2, attr[F_SA]);
           GETADDR(mac_header->addr3, attr[F_BSSID]);
-
           break;
 
-
         case DIR_TODS:
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "tods";
+	  VSTRLEN(val) = 4;
+	  GC_TOUCH (gc_ctx, attr[F_DIR] = val);
 
-          attr[F_DIR] = ovm_str_new(strlen("tods"));
-          memcpy(STR(attr[F_DIR]), "tods", STRLEN(attr[F_DIR]));
-
-          attr[F_BODYLENGTH] = ovm_int_new();
-          INT(attr[F_BODYLENGTH]) = pkthdr->caplen - 144 - 28 ;
+	  val = ovm_int_new (gc_ctx, pkthdr->caplen - 144 - 28);
+          GC_TOUCH (gc_ctx, attr[F_BODYLENGTH] = val);
 
 	  /* addr1 = BSSID
              addr2 = SA
@@ -303,17 +341,16 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           GETADDR(mac_header->addr1, attr[F_BSSID]);
           GETADDR(mac_header->addr2, attr[F_SA]);
           GETADDR(mac_header->addr3, attr[F_DA]);
-
           break;
 
-
         case DIR_FROMDS:
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "fromds";
+	  VSTRLEN(val) = 6;
+	  GC_TOUCH (gc_ctx, attr[F_DIR] = val);
 
-          attr[F_DIR] = ovm_str_new(strlen("fromds"));
-          memcpy(STR(attr[F_DIR]), "fromds", STRLEN(attr[F_DIR]));
-
-          attr[F_BODYLENGTH] = ovm_int_new();
-          INT(attr[F_BODYLENGTH]) = pkthdr->caplen - 144 - 28 ;
+	  val = ovm_int_new (gc_ctx, pkthdr->caplen - 144 - 28);
+          GC_TOUCH (gc_ctx, attr[F_BODYLENGTH] = val);
 
 	  /* addr1 = DA
              addr2 = BSSID
@@ -322,18 +359,16 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           GETADDR(mac_header->addr1, attr[F_DA]);
           GETADDR(mac_header->addr2, attr[F_BSSID]);
           GETADDR(mac_header->addr3, attr[F_SA]);
-
           break;
 
-
-
         case DIR_DSTODS:
+	  val = ovm_vstr_new (gc_ctx, NULL);
+	  VSTR(val) = "dstods";
+	  VSTRLEN(val) = 6;
+	  GC_TOUCH (gc_ctx, attr[F_DIR] = val);
 
-          attr[F_DIR] = ovm_str_new(strlen("dstods"));
-          memcpy(STR(attr[F_DIR]), "fromds", STRLEN(attr[F_DIR]));
-
-          attr[F_BODYLENGTH] = ovm_int_new();
-          INT(attr[F_BODYLENGTH]) = pkthdr->caplen - 144 - 34 ;
+	  val = ovm_int_new (gc_ctx, pkthdr->caplen - 144 - 34);
+          GC_TOUCH (gc_ctx, attr[F_BODYLENGTH] = val);
 
 	  /* addr1 = RA
              addr2 = TA
@@ -344,50 +379,45 @@ wifi_pcap_callback(u_char* av, const struct pcap_pkthdr * pkthdr, const u_char *
           GETADDR(mac_header->addr2, attr[F_TA]);
           GETADDR(mac_header->addr3, attr[F_DA]);
           GETADDR(mac_header->addr4, attr[F_SA]);
-
           break;
 
-        default: DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_direction_0x%.2x\n", dir);
-
-      } /* end switch(dir) */
-
+        default:
+	  DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_direction_0x%.2x\n", dir);
+	  break;
+	} /* end switch(dir) */
       break;
 
-    default: DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_type_0x%.2x\n", type);
-
-  } /* end switch(type) */
-
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "unknown_80211_frame_type_0x%.2x\n", type);
+      break;
+    } /* end switch(type) */
 }
 
 
 
-static int
-wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
+static int wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
 {
-  event_t *event;
-  ovm_var_t *attr[IEEE80211_FIELDS];
+  int ret = 0;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  GC_START(gc_ctx, IEEE80211_FIELDS+1);
+  wifi_pcap_t data = { gc_ctx, (ovm_var_t **)GC_DATA() };
 
 
   DebugLog(DF_MOD, DS_TRACE, "wifi_callback()\n");
 
-  memset(attr, 0, sizeof(attr));
-
-  if ( pcap_dispatch(cap, 1, wifi_pcap_callback, (u_char*) attr) == -1 )
-  {
-    DebugLog(DF_MOD, DS_ERROR, "pcap_dispatch error: %s\n", pcap_geterr(cap));
-    return (-1);
-  }
-
-  event = NULL;
-
-  add_fields_to_event(ctx, mod, &event, attr, IEEE80211_FIELDS);
-
-  if (event == NULL)
-    return (-1);
-
-  post_event(ctx, mod, event);
-
-  return (0);
+  if ( pcap_dispatch(cap, 1, wifi_pcap_callback, (u_char *)&data) == -1 )
+    {
+      DebugLog(DF_MOD, DS_ERROR, "pcap_dispatch error: %s\n", pcap_geterr(cap));
+      ret = -1;
+    }
+  else
+    {
+      REGISTER_EVENTS(ctx, mod, IEEE80211_FIELDS);
+      if (GC_LOOKUP(IEEE80211_FIELDS)==NULL)
+	ret = -1;
+    }
+  GC_END(gc_ctx);
+  return ret;
 
 }
 

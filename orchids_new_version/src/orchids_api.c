@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/utsname.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 #include <fcntl.h>
@@ -112,94 +113,202 @@ orchids_lock(const char *lockfile)
   }
 }
 
+static void field_record_table_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  size_t i, n;
+  field_record_table_t *frt = (field_record_table_t *)p;
+
+  if (frt->fields!=NULL)
+    for (i=0, n=frt->num_fields; i<n; i++)
+      GC_TOUCH (gc_ctx, frt->fields[i].val);
+}
+
+static void field_record_table_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  field_record_table_t *frt = (field_record_table_t *)p;
+
+  if (frt->fields!=NULL)
+    gc_base_free (frt->fields);
+  /* Nothing else to free; notably, all name and desc fields are
+     static. */
+}
+
+static int field_record_table_traverse (gc_traverse_ctx_t *gtc,
+					gc_header_t *p,
+					void *data)
+{
+  size_t i, n;
+  field_record_table_t *frt = (field_record_table_t *)p;
+  int err = 0;
+
+  if (frt->fields!=NULL)
+    for (i=0, n=frt->num_fields; i<n; i++)
+      {
+	err = (*gtc->do_subfield) (gtc, (gc_header_t *)frt->fields[i].val,
+				   data);
+	if (err)
+	  return err;
+      }
+  return err;
+}
+
+static gc_class_t field_record_table_class = {
+  GC_ID('f','r','c','t'),
+  field_record_table_mark_subfields,
+  field_record_table_finalize,
+  field_record_table_traverse
+};
 
 orchids_t *
 new_orchids_context(void)
 {
   orchids_t *ctx;
 
-  ctx = Xzmalloc(sizeof (orchids_t));
+  ctx = Xmalloc(sizeof (orchids_t));
+  ctx->gc_ctx = gc_init();
+  GC_TOUCH(ctx->gc_ctx, ctx->one = ovm_int_new(ctx->gc_ctx, 1));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->one);
+  GC_TOUCH(ctx->gc_ctx, ctx->zero = ovm_int_new(ctx->gc_ctx, 0));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->zero);
+  GC_TOUCH(ctx->gc_ctx, ctx->empty_string = ovm_str_new(ctx->gc_ctx, 0));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->empty_string);
 
   /* do default initialisation here */
-  ctx->default_preproc_cmd = DEFAULT_PREPROC_CMD;
+  gettimeofday(&ctx->start_time, NULL);
   ctx->config_file = DEFAULT_CONFIG_FILE;
+  ctx->loaded_modules = 0;
+  ctx->last_poll = 0;
+  ctx->realtime_handler_list = NULL;
+  ctx->maxfd = 0;
+  FD_ZERO(&ctx->fds);
+  ctx->cfg_tree = NULL;
+  ctx->global_fields = NULL; /* for now, will be replaced below */
+  ctx->events = 0;
+  ctx->rule_compiler = NULL; /* for now, will be replaced below */
   ctx->poll_period.tv_sec = DEFAULT_IN_PERIOD;
   ctx->poll_period.tv_usec = 0;
-  gettimeofday(&ctx->start_time, NULL);
-  ctx->last_ruleinst_act = ctx->start_time;
+  ctx->rulefile_list = NULL;
+  ctx->last_rulefile = NULL;
+  ctx->first_rule_instance = NULL;
+  ctx->last_rule_instance = NULL;
+  ctx->retrig_list = NULL;
+  ctx->active_events = 0;
+  ctx->rule_instances = 0;
+  ctx->state_instances = 0;
+  ctx->threads = 0;
+  ctx->ovm_stack = NULL; /* for now, will be replaced below */
+  ctx->vm_func_tbl = NULL;
+  ctx->vm_func_tbl_sz = 0;
+  ctx->off_line_mode = 0;
+  ctx->off_line_input_file = NULL;
+  ctx->daemon = 0;
+  ctx->current_tail = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->current_tail);
+  ctx->cur_retrig_qh = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->cur_retrig_qh);
+  ctx->cur_retrig_qt = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->cur_retrig_qt);
+  ctx->new_qh = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->new_qh);
+  ctx->new_qt = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->new_qt);
+  ctx->retrig_qh = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->retrig_qh);
+  ctx->retrig_qt = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->retrig_qt);
+  ctx->active_event_head = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_head);
+  ctx->active_event_tail = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_tail);
+  ctx->active_event_cur = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_cur);
+  ctx->preconfig_time.tv_sec = 0;
+  ctx->preconfig_time.tv_usec = 0;
+  ctx->postconfig_time.tv_sec = 0;
+  ctx->postconfig_time.tv_usec = 0;
+  ctx->compil_time.tv_sec = 0;
+  ctx->compil_time.tv_usec = 0;
+  ctx->postcompil_time.tv_sec = 0;
+  ctx->postcompil_time.tv_usec = 0;
+  ctx->evt_fb_fp = NULL;
+  ctx->temporal = NULL; /* for now, will be replaced below */
+  ctx->runtime_user = NULL;
+  /* ctx->ru not initialized */
+  ctx->pid = getpid();
+  ctx->reports = 0;
   ctx->last_evt_act = ctx->start_time;
+  ctx->last_mod_act.tv_sec = ctx->last_mod_act.tv_usec = 0;
+  ctx->last_rule_act.tv_sec = ctx->last_rule_act.tv_usec = 0;
+  ctx->last_ruleinst_act = ctx->start_time;
+  ctx->rtactionlist = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->rtactionlist);
+#ifdef ENABLE_PREPROC
+  ctx->default_preproc_cmd = DEFAULT_PREPROC_CMD;
+#endif
   ctx->cur_loop_time = ctx->start_time;
+  ctx->modules_dir = DEFAULT_MODULES_DIR;
   ctx->lockfile = DEFAULT_ORCHIDS_LOCKFILE;
+  SLIST_INIT(&ctx->pre_evt_hook_list);
+  SLIST_INIT(&ctx->post_evt_hook_list);
+  SLIST_INIT(&ctx->reportmod_list);
+  /* End of default and non-memory allocating initializations */
 
-  /* initialise a rule compiler context -- XXX: This is not thread safe !
-   * but we don't usually want to parse file in parallel */
-  ctx->rule_compiler = new_rule_compiler_ctx();
+  GC_TOUCH(ctx->gc_ctx,
+	   ctx->global_fields = gc_alloc (ctx->gc_ctx,
+					  sizeof(field_record_table_t),
+					  &field_record_table_class));
+  ctx->global_fields->num_fields = 0;
+  ctx->global_fields->fields = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->global_fields);
+  /* initialise a rule compiler context */
+  GC_TOUCH (ctx->gc_ctx,
+	    ctx->rule_compiler = new_rule_compiler_ctx(ctx->gc_ctx));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->rule_compiler);
 
   /* initialise OVM stack */
-  ctx->ovm_stack = new_stack(128, 128);
+  GC_TOUCH(ctx->gc_ctx, ctx->ovm_stack = new_stack(ctx->gc_ctx, 128));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->ovm_stack);
 
   /* Register core VM functions */
   register_core_functions(ctx);
 
-  /* initialise other stuffs here... */
-  set_lexer_context(ctx->rule_compiler);
-  set_yaccer_context(ctx->rule_compiler);
+  /* initialise other stuff here... */
+  //set_lexer_context(ctx->rule_compiler);
+  //set_yaccer_context(ctx->rule_compiler);
 
-  ctx->temporal = new_strhash(65537);
-
-  ctx->pid = getpid();
-
-  ctx->modules_dir = DEFAULT_MODULES_DIR;
-
-  return (ctx);
+  ctx->temporal = new_strhash(ctx->gc_ctx, 65537);
+  return ctx;
 }
 
 
-void
-add_polled_input_callback(orchids_t *ctx,
-                          mod_entry_t *mod,
-                          poll_callback_t cb,
-                          void *data)
-{
-  polled_input_t *pi;
-
-  pi = Xzmalloc(sizeof (polled_input_t));
-  pi->cb = cb;
-  pi->mod = mod;
-  pi->data = data;
-  pi->next = ctx->poll_handler_list;
-  ctx->poll_handler_list = pi;
-}
-
-
-void
-del_input_descriptor(orchids_t *ctx, int fd)
+void del_input_descriptor(orchids_t *ctx, int fd)
 {
   realtime_input_t *rti;
   realtime_input_t *prev;
 
   prev = NULL;
-  for (rti = ctx->realtime_handler_list; rti; rti = rti->next) {
-    if (rti->fd == fd) {
-      if (prev)
-        prev->next = rti->next;
-      else
-        ctx->realtime_handler_list = rti->next;
-      FD_CLR(fd, &ctx->fds);
-      Xfree(rti);
-      return ;
+  for (rti = ctx->realtime_handler_list; rti!=NULL; rti = rti->next)
+    {
+      if (rti->fd == fd)
+	{
+	  if (prev!=NULL)
+	    prev->next = rti->next;
+	  else
+	    ctx->realtime_handler_list = rti->next;
+	  FD_CLR(fd, &ctx->fds);
+	  gc_base_free(rti);
+	  return;
+	}
+      prev = rti;
     }
-    prev = rti;
-  }
 }
 
 
-void
-add_input_descriptor(orchids_t *ctx,
-                     mod_entry_t *mod,
-		     realtime_callback_t cb,
-                     int fd,
-                     void *data)
+void add_input_descriptor(orchids_t *ctx,
+			  mod_entry_t *mod,
+			  realtime_callback_t cb,
+			  int fd,
+			  void *data)
 {
   realtime_input_t *rti;
 
@@ -207,7 +316,7 @@ add_input_descriptor(orchids_t *ctx,
 
   /* Input fd MUST be a socket (and a fifo ???) XXX - Put sanity checks */
 
-  rti = Xzmalloc(sizeof (realtime_input_t));
+  rti = gc_base_malloc(ctx->gc_ctx, sizeof (realtime_input_t));
   rti->fd = fd;
   rti->data = data;
   rti->mod_id = mod->mod_id;
@@ -318,57 +427,87 @@ register_conditional_dissector(orchids_t *ctx,
 }
 
 
-void
-register_pre_inject_hook(orchids_t *ctx,
-			 mod_entry_t *mod,
-			 hook_cb_t cb,
-			 void *data)
+void register_pre_inject_hook(orchids_t *ctx,
+			      mod_entry_t *mod,
+			      hook_cb_t cb,
+			      void *data)
 {
   hook_list_elmt_t *e;
 
   DebugLog(DF_CORE, DS_INFO, "register pre event injection hook...\n");
 
-  e = Xzmalloc( sizeof (hook_list_elmt_t) );
+  e = gc_base_malloc(ctx->gc_ctx, sizeof (hook_list_elmt_t));
   e->cb = cb;
   e->mod = mod;
   e->data = data;
-
+  SLIST_NEXT(e, hooklist) = NULL;
   SLIST_INSERT_HEAD(&ctx->pre_evt_hook_list, e, hooklist);
 }
 
 
-void
-register_post_inject_hook(orchids_t *ctx,
-                          mod_entry_t *mod,
-                          hook_cb_t cb,
-                          void *data)
+void register_post_inject_hook(orchids_t *ctx,
+			       mod_entry_t *mod,
+			       hook_cb_t cb,
+			       void *data)
 {
   hook_list_elmt_t *e;
 
   DebugLog(DF_CORE, DS_INFO, "register post event injection hook...\n");
 
-  e = Xzmalloc( sizeof (hook_list_elmt_t) );
+  e = gc_base_malloc(ctx->gc_ctx, sizeof (hook_list_elmt_t));
   e->cb = cb;
   e->mod = mod;
   e->data = data;
-
+  SLIST_NEXT(e, hooklist) = NULL;
   SLIST_INSERT_HEAD(&ctx->post_evt_hook_list, e, hooklist);
 }
 
-reportmod_t *
-register_report_output(orchids_t *ctx, mod_entry_t *mod_entry, report_cb_t cb, void *data)
+reportmod_t * register_report_output(orchids_t *ctx, mod_entry_t *mod_entry,
+				     report_cb_t cb, void *data)
 {
   reportmod_t *mod;
 
-  mod = Xzmalloc(sizeof (reportmod_t));
+  mod = gc_base_malloc(ctx->gc_ctx, sizeof (reportmod_t));
   mod->mod = mod_entry;
   mod->cb = cb;
   mod->data = data;
-
+  SLIST_NEXT(mod, list) = NULL;
   SLIST_INSERT_HEAD(&(ctx->reportmod_list), mod, list);
-
-  return (mod);
+  return mod;
 }
+
+static void event_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  event_t *e = (event_t *)p;
+
+  GC_TOUCH (gc_ctx, e->value);
+  GC_TOUCH (gc_ctx, e->next);
+}
+
+static void event_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int event_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			   void *data)
+{
+  event_t *e = (event_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)e->value, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)e->next, data);
+  return err;
+}
+
+static gc_class_t event_class = {
+  GC_ID('e','v','n','t'),
+  event_mark_subfields,
+  event_finalize,
+  event_traverse
+};
 
 void
 execute_pre_inject_hooks(orchids_t *ctx, event_t *event)
@@ -376,7 +515,7 @@ execute_pre_inject_hooks(orchids_t *ctx, event_t *event)
   hook_list_elmt_t *e;
 
   SLIST_FOREACH(e, &ctx->pre_evt_hook_list, hooklist) {
-    e->cb(ctx, e->mod, e->data, event);
+    (*e->cb) (ctx, e->mod, e->data, event);
   }
 }
 
@@ -386,67 +525,106 @@ execute_post_inject_hooks(orchids_t *ctx, event_t *event)
   hook_list_elmt_t *e;
 
   SLIST_FOREACH(e, &ctx->post_evt_hook_list, hooklist) {
-    e->cb(ctx, e->mod, e->data, event);
+    (*e->cb)(ctx, e->mod, e->data, event);
   }
 }
 
-
-void
-register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
+#if 0
+static void field_record_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
-  int i;
-  field_record_t *new_fields;
+  field_record_t *fr = (field_record_t *)p;
 
+  GC_TOUCH (gc_ctx, fr->val);
+}
+
+static void field_record_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return; /* nothing to do: name and desc are pointers to static data */
+}
+
+static int field_record_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				  void *data)
+{
+  field_record_t *fr = (field_record_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)fr->val, data);
+  return err;
+}
+
+static gc_class_t field_record_class = {
+  GC_ID('f','r','e','c'),
+  field_record_mark_subfields,
+  field_record_finalize,
+  field_record_traverse
+};
+#endif
+
+
+void register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_t sz)
+{
+  int i, n;
+  field_record_t *new_fields;
+  gc_t *gc_ctx = ctx->gc_ctx;
+
+gc_check(ctx->gc_ctx);
   DebugLog(DF_CORE, DS_TRACE, "registering fields for module '%s'.\n",
            mod->mod->name);
 
+gc_check(ctx->gc_ctx);
   /* 1 - Allocate some memory in global field list */
   /* Is it the first allocation ?? */
-  if (ctx->global_fields == NULL) {
-    ctx->global_fields =
-      Xmalloc(sz * sizeof(field_record_t));
+  if (ctx->global_fields->fields == NULL) {
+    ctx->global_fields->fields =
+      gc_base_malloc (gc_ctx, sz * sizeof(field_record_t));
+gc_check(ctx->gc_ctx);
   }
   else {
-    ctx->global_fields =
-      Xrealloc(ctx->global_fields,
-               (ctx->num_fields + sz) * sizeof (field_record_t));
+    ctx->global_fields->fields =
+      gc_base_realloc (gc_ctx, ctx->global_fields->fields,
+		       (ctx->global_fields->num_fields + sz)
+		       * sizeof (field_record_t));
+gc_check(ctx->gc_ctx);
   }
 
   /* 2 - index of first module field in global array
   ** (need an offset, because a pointer could be relocated by realloc() ) */
-  mod->first_field_pos = ctx->num_fields;
+  mod->first_field_pos = n = ctx->global_fields->num_fields;
 
   /* 3 - Add entries in global list and update counters */
-  new_fields = &ctx->global_fields[ ctx->num_fields ];
+  new_fields = &ctx->global_fields->fields[n];
   for (i = 0; i < sz; ++i) {
     new_fields[i].active = DEFAULT_FIELD_ACTIVATION;
     new_fields[i].name = field_tab[i].name;
     new_fields[i].type = field_tab[i].type;
     new_fields[i].desc = field_tab[i].desc;
-    new_fields[i].id   = ctx->num_fields + i;
+    new_fields[i].id   = n + i;
+    new_fields[i].val = NULL;
   }
   mod->num_fields = sz;
-  ctx->num_fields += sz;
+  ctx->global_fields->num_fields += sz;
+gc_check(ctx->gc_ctx);
 }
 
 
-void
-free_fields(ovm_var_t **tbl_event, size_t s)
+event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
+		    event_t *event)
 {
-  int i;
+  event_t *new_evt;
 
-  for (i = 0; i < s; ++i)
-    if ((tbl_event[i] != NULL) && (tbl_event[i] != F_NOT_NEEDED))
-      Xfree(tbl_event[i]);
+  new_evt = gc_alloc (gc_ctx, sizeof (event_t), &event_class);
+  new_evt->field_id = field_id;
+  GC_TOUCH (gc_ctx, new_evt->value = val);
+  GC_TOUCH (gc_ctx, new_evt->next = event);
+  return new_evt;
 }
 
-
-void
-add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
-			   event_t **event, ovm_var_t **tbl_event,
-			   size_t from, size_t to)
+void add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
+				event_t **event, ovm_var_t **tbl_event,
+				size_t from, size_t to)
 {
   int i, j;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
   for (i = from; i < to; ++i) {
     /* Handle filled fields */
@@ -455,18 +633,15 @@ add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
       /* This field is activated, so add it to current event */
       /* XXX: add checks here ??? (if module is well coded
          no need to check) */
-      if (ctx->global_fields[ mod->first_field_pos + i].active) {
-        event_t *new_evt;
+      if (ctx->global_fields->fields[ mod->first_field_pos + i].active)
+	{
+	  event_t *new_evt;
 
-        new_evt = Xmalloc(sizeof (event_t));
-        new_evt->field_id = mod->first_field_pos + i;
-        new_evt->value = tbl_event[j];
-        new_evt->next = *event;
-        *event = new_evt;
-      } else { /* drop data */
-        DebugLog(DF_CORE, DS_TRACE, "free disabled attribute.\n");
-        Xfree(tbl_event[j]);
-      }
+	  new_evt = new_event (gc_ctx, mod->first_field_pos + i,
+			       tbl_event[j],
+			       *event);
+	  GC_TOUCH (gc_ctx, *event = new_evt);
+	}
     }
   }
 }
@@ -494,27 +669,14 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
           "---------------------------------\n");
   for ( ; event; event = event->next) {
     fprintf(fp, "%4i | %-24s | ",
-            event->field_id, ctx->global_fields[ event->field_id ].name);
+            event->field_id,
+	    ctx->global_fields->fields[ event->field_id ].name);
     fprintf_issdl_val(fp, event->value);
   }
   fprintf(fp,
           "-----+"
           "--------------------------+"
           "---------------------------------\n");
-}
-
-
-void
-free_event(event_t *event)
-{
-  event_t *e;
-
-  while (event) {
-    e = event->next;
-    FREE_VAR(event->value);
-    Xfree(event);
-    event = e;
-  }
 }
 
 
@@ -530,42 +692,52 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
   /* XXX: add some stats here (correct/incorrect events, posts, injections) */
   sender->posts++;
 
-  if (sender->dissect) {
-    /* check for unconditional dissector */
-    DebugLog(DF_CORE, DS_DEBUG, "Call unconditional sub-dissector.\n");
-    ret = sender->dissect(ctx, sender->dissect_mod, event, NULL);
-    /* Free and optionally inject event if sub-dissector fail */
-    if (ret) {
-      DebugLog(DF_CORE, DS_WARN, "dissection failed.\n");
-      inject_event(ctx, event);
-    }
-  } else if (sender->sub_dissectors) {
-    /* Check for conditional dissectors */
-    DebugLog(DF_CORE, DS_DEBUG, "Resolve conditional dissector\n");
-    /* XXX: Fix this / check if event is present */
-    cond_dissect = hash_get(sender->sub_dissectors,
-                            issdl_get_data(event->next->value),
-                            issdl_get_data_len(event->next->value));
-    if (cond_dissect) {
-      DebugLog(DF_CORE, DS_DEBUG, "call found conditional sub-dissector.\n");
-      ret = cond_dissect->dissect(ctx,
-                                  cond_dissect->mod,
-                                  event,
-                                  cond_dissect->data);
+  if (sender->dissect!=NULL)
+    {
+      /* check for unconditional dissector */
+      DebugLog(DF_CORE, DS_DEBUG, "Call unconditional sub-dissector.\n");
+      ret = (*sender->dissect) (ctx, sender->dissect_mod, event, NULL);
       /* Free and optionally inject event if sub-dissector fail */
-      if (ret) {
-        DebugLog(DF_CORE, DS_DEBUG, "dissection failed.\n");
-        inject_event(ctx, event);
-      }
-    } else {
-      DebugLog(DF_CORE, DS_TRACE, "no sub-dissectors found. --> inject -->\n");
+      if (ret)
+	{
+	  DebugLog(DF_CORE, DS_WARN, "dissection failed.\n");
+	  inject_event(ctx, event);
+	}
+    }
+  else if (sender->sub_dissectors!=NULL)
+    {
+      /* Check for conditional dissectors */
+      DebugLog(DF_CORE, DS_DEBUG, "Resolve conditional dissector\n");
+      /* XXX: Fix this / check if event is present */
+      cond_dissect = hash_get(sender->sub_dissectors,
+			      issdl_get_data(event->next->value),
+			      issdl_get_data_len(event->next->value));
+      if (cond_dissect!=NULL)
+	{
+	  DebugLog(DF_CORE, DS_DEBUG, "call found conditional sub-dissector.\n");
+	  ret = (*cond_dissect->dissect) (ctx,
+					  cond_dissect->mod,
+					  event,
+					  cond_dissect->data);
+	  /* Free and optionally inject event if sub-dissector fail */
+	  if (ret)
+	    {
+	      DebugLog(DF_CORE, DS_DEBUG, "dissection failed.\n");
+	      inject_event(ctx, event);
+	    }
+	}
+      else
+	{
+	  DebugLog(DF_CORE, DS_TRACE, "no sub-dissectors found. --> inject -->\n");
+	  inject_event(ctx, event);
+	}
+    }
+  else
+    {
+      /* If no sub-dissectors is found, then inject into the analysis engine */
+      DebugLog(DF_CORE, DS_TRACE, "--> Injection into analysis engine -->\n");
       inject_event(ctx, event);
     }
-  } else {
-    /* If no sub-dissectors is found, then inject into the analysis engine */
-    DebugLog(DF_CORE, DS_TRACE, "--> Injection into analysis engine -->\n");
-    inject_event(ctx, event);
-  }
 }
 
 #ifndef ORCHIDS_DEMO
@@ -652,13 +824,13 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
   fprintf(fp, "current poll period : %li\n", ctx->poll_period.tv_sec);
-  fprintf(fp, "  registered fields : %i\n", ctx->num_fields);
+  fprintf(fp, "  registered fields : %zd\n", ctx->global_fields->num_fields);
   fprintf(fp, "    injected events : %u\n", ctx->events);
   fprintf(fp, "      active events : %u\n", ctx->active_events);
   fprintf(fp, "     rule instances : %u\n", ctx->rule_instances);
   fprintf(fp, "    state instances : %u\n", ctx->state_instances);
   fprintf(fp, "     active threads : %u\n", ctx->threads);
-  fprintf(fp, "     ovm stack size : %zd\n", ctx->ovm_stack->size);
+  fprintf(fp, "     ovm stack size : %d\n", ctx->ovm_stack->n);
   fprintf(fp, "            reports : %u\n", ctx->reports);
   fprintf(fp,
           "--------------------+"
@@ -747,7 +919,7 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
-  fprintf(fp, "  registered fields : %i\n", ctx->num_fields);
+  fprintf(fp, "  registered fields : %i\n", ctx->global_fields->num_fields);
   fprintf(fp, "    injected events : %lu\n", ctx->events);
   fprintf(fp, "      active events : %lu\n", ctx->active_events);
   fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);
@@ -798,9 +970,9 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
         fprintf(fp, "%3i | %2i | %-20s | %-8s | %-32s\n",
                 gfid,
                 field,
-                ctx->global_fields[base + field].name,
-                str_issdltype(ctx->global_fields[base + field].type),
-                ctx->global_fields[base + field].desc);
+                ctx->global_fields->fields[base + field].name,
+                str_issdltype(ctx->global_fields->fields[base + field].type),
+                ctx->global_fields->fields[base + field].desc);
         gfid++;
       }
     }
@@ -816,29 +988,86 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
 }
 
 
-void
-fprintf_state_env(FILE *fp, const state_instance_t *state)
+void fprintf_state_env(FILE *fp, const state_instance_t *state)
 {
   int i;
+  ovm_var_t *val;
 
   for (i = 0; i < state->rule_instance->rule->dynamic_env_sz; ++i) {
-    if (state->current_env[i]) {
-      fprintf(fp, "    current_env[%i]: ($%s) ",
-              i, state->rule_instance->rule->var_name[i]);
-      fprintf_issdl_val(fp, state->current_env[i]);
-    }
-    else if (state->inherit_env && state->inherit_env[i]) {
-      fprintf(fp, "  inherited_env[%i]: ($%s) ",
-              i, state->rule_instance->rule->var_name[i]);
-      fprintf_issdl_val(fp, state->inherit_env[i]);
-    }
-    else {
-      fprintf(fp, "            env[%i]: ($%s) nil\n",
-              i, state->rule_instance->rule->var_name[i]);
-    }
+    val = ovm_read_value (state->env, i);
+    if (val!=NULL)
+      {
+	fprintf(fp, "    env[%i]: ($%s) ",
+		i, state->rule_instance->rule->var_name[i]);
+	fprintf_issdl_val(fp, val);
+      }
+    else
+      {
+	fprintf(fp, "            env[%i]: ($%s) nil\n",
+		i, state->rule_instance->rule->var_name[i]);
+      }
   }
 }
 
+static void field_table_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  size_t i, n;
+  field_table_t *gft = (field_table_t *)p;
+
+  if (gft->field_values!=NULL)
+    for (i=0, n=gft->nfields; i<n; i++)
+      GC_TOUCH (gc_ctx, gft->field_values[i]);
+}
+
+static void field_table_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  field_table_t *gft = (field_table_t *)p;
+
+  if (gft->field_values!=NULL)
+    gc_base_free (gft->field_values);
+}
+
+static int field_table_traverse (gc_traverse_ctx_t *gtc,
+					gc_header_t *p,
+					void *data)
+{
+  size_t i, n;
+  field_table_t *gft = (field_table_t *)p;
+  int err = 0;
+
+  if (gft->field_values!=NULL)
+    for (i=0, n=gft->nfields; i<n; i++)
+      {
+	err = (*gtc->do_subfield) (gtc, (gc_header_t *)gft->field_values[i],
+				   data);
+	if (err)
+	  return err;
+      }
+  return err;
+}
+
+static gc_class_t field_table_class = {
+  GC_ID('g','f','l','t'),
+  field_table_mark_subfields,
+  field_table_finalize,
+  field_table_traverse
+};
+
+field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields)
+{
+  ovm_var_t **fvals;
+  size_t i;
+  field_table_t *fields;
+
+  fvals = gc_base_malloc (gc_ctx, nfields*sizeof (ovm_var_t *));
+  for (i=0; i<nfields; i++)
+    fvals[i] = NULL;
+  fields = gc_alloc (gc_ctx, sizeof(field_table_t),
+		     &field_table_class);
+  fields->nfields = nfields;
+  fields->field_values = fvals;
+  return fields;
+}
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification

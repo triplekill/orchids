@@ -33,6 +33,13 @@
 #include <dirent.h>
 #include <utime.h>
 #include <limits.h>
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
 
 #include "orchids.h"
 
@@ -73,24 +80,32 @@ cache_gc_compar(
 
   snprintf(path, sizeof (path), "%s/%s",
 	   cache_gc_dir_g, REPA->d_name);
-  Xstat(path, &stat_a);
-
-  snprintf(path, sizeof (path), "%s/%s",
-	   cache_gc_dir_g, REPB->d_name);
-  Xstat(path, &stat_b);
-
-  return (stat_b.st_mtime - stat_a.st_mtime);
+  if (stat(path, &stat_a)==0)
+    {
+      snprintf(path, sizeof (path), "%s/%s",
+	       cache_gc_dir_g, REPB->d_name);
+      if (stat(path, &stat_b)==0)
+	return stat_b.st_mtime - stat_a.st_mtime;
+      else
+	return stat_b.st_mtime;
+    }
+  else
+    {
+      if (stat(path, &stat_b)==0)
+	return -stat_a.st_mtime;
+      else
+	return 0;
+    }
 #undef REPA
 #undef REPB
 }
 
 
-void
-cache_gc(char *dir,
-	 char *prefix,
-	 int file_limit,
-	 size_t size_limit,
-	 time_t time_limit)
+void cache_gc(char *dir,
+	      char *prefix,
+	      int file_limit,
+	      size_t size_limit,
+	      time_t time_limit)
 {
   struct dirent **nl;
   int n;
@@ -106,24 +121,32 @@ cache_gc(char *dir,
   cache_gc_dir_g = dir;
   n = scandir(dir, &nl, cache_gc_select, cache_gc_compar);
   if (n < 0)
-    perror("scandir()");
-  else if (n > 0) {
-    for (i = 0; i < n; i++) {
-      snprintf(buffer, sizeof (buffer), "%s/%s", dir, nl[i]->d_name);
-      Xstat(buffer, &s);
-      total_size += s.st_size;
-/*       printf("count:%i \t file:%s \t date:%lu \t total_size:%lu\n", i, nl[i]->d_name, s.st_mtime, total_size); */
-
-      if ((i >= file_limit) ||
-	  (total_size > size_limit) ||
-	  (cur_time - s.st_mtime > time_limit)) {
-	DebugLog(DF_CORE, DS_INFO, "unlink(pathname=%s)\n", buffer);
-	Xunlink(buffer);
-      }
-      Xfree(nl[i]);
+    {
+      DebugLog (DF_MOD, DS_ERROR, strerror(errno));
     }
-    Xfree(nl);
-  }
+  else if (n > 0)
+    {
+      for (i = 0; i < n; i++)
+	{
+	  snprintf(buffer, sizeof (buffer), "%s/%s", dir, nl[i]->d_name);
+	  if (stat(buffer, &s)==0) /* file may have been deleted by
+				      somebody else since our scandir() */
+	    {
+	      total_size += s.st_size;
+	      /*       printf("count:%i \t file:%s \t date:%lu \t total_size:%lu\n", i, nl[i]->d_name, s.st_mtime, total_size); */
+
+	      if ((i >= file_limit) ||
+		  (total_size > size_limit) ||
+		  (cur_time - s.st_mtime > time_limit))
+		{
+		  DebugLog(DF_CORE, DS_INFO, "unlink(pathname=%s)\n", buffer);
+		  (void) unlink(buffer);
+		}
+	    }
+	  free(nl[i]);
+	}
+      free(nl);
+    }
 }
 
 
@@ -137,27 +160,27 @@ fopen_cached(const char *path)
   ret = stat(path, &stat_buf);
   if (ret) {
     if (errno == ENOENT) {
-      fp = Xfopen(path, "w");
+      fp = fopen(path, "w");
 
       DebugLog(DF_CORE, DS_INFO, "cache MISS for \"%s\"\n", path);
 
-      return (fp);
+      return fp;
     }
     else {
       DebugLog(DF_CORE, DS_ERROR,
 	       "fopen_cached(path=%s): %s\n",
 	       path, strerror(errno));
 
-      return (NULL);
+      return NULL;
     }
   }
 
   DebugLog(DF_CORE, DS_INFO, "cache hit for \"%s\"\n", path);
 
   /* File exists. Touch it and return cache hit. */
-  utime(path, NULL);
+  utimes (path, NULL);
 
-  return (CACHE_HIT);
+  return CACHE_HIT;
 }
 
 

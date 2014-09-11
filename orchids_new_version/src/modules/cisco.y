@@ -15,6 +15,10 @@
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 

@@ -37,6 +37,7 @@ static debug_facility_t debug_facility_g[] = {
   { "ovm", "Orchids Virtual Machine module", DEF_SEV_LVL },
   { "eng", "Orchids engine module", DEF_SEV_LVL },
   { "mod", "Orchids Input module", DEF_SEV_LVL },
+  { "evt", "Orchids Event Manager module", DEF_SEV_LVL },
   { NULL, NULL, 0 }
 };
 

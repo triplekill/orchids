@@ -24,7 +24,7 @@
 #include <stdio.h>
 
 #include "orchids.h"
-
+#include "ovm.h"
 #include "strhash.h"
 
 #include "mod_sharedvars.h"
@@ -35,107 +35,162 @@ input_module_t mod_sharedvars;
 static sharedvars_config_t *mod_sharedvars_cfg_g = NULL;
 
 
-static void
-issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
+static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *varname;
   char *key;
   ovm_var_t *value;
 
-  varname = stack_pop(ctx->ovm_stack);
-  if (TYPE(varname) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-    return ;
-  }
+  varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, NULL);
+      return;
+    }
 
-  key = ovm_strdup(varname);
+  key = ovm_strdup(ctx->gc_ctx, varname);
 
   value = strhash_get(mod_sharedvars_cfg_g->vars_hash, key);
+  /* XXX should really implement a strnhash_get, taking a char * and
+     its len, and eliminate the call to ovm_strdup(). */
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_VALUE(ctx, value);
+  gc_base_free(key);
+}
 
-  if (!value)
-    ISSDL_RETURN_FALSE(ctx, state);
+
+static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *varname;
+  char *key;
+  ovm_var_t *value;
+
+  varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
+
+  key = ovm_strdup(ctx->gc_ctx, varname);
+
+  value = gc_strhash_del(mod_sharedvars_cfg_g->vars_hash, key);
+  //GC_TOUCH (ctx->gc_ctx, mod_sharedvars_cfg_g);
+
+  if (value!=NULL)
+    {
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_TRUE(ctx);
+    }
   else
-  {
-    value = issdl_clone(value);
-    FLAGS(value) |= TYPE_CANFREE | TYPE_NOTBOUND;
-    stack_push(ctx->ovm_stack, value);
-  }
-  Xfree(key);
+    {
+      DebugLog(DF_MOD, DS_ERROR,
+	       "Try to delete an non-existent variable '%s'\n",
+	       key);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+    }
+  gc_base_free(key);
 }
 
 
-static void
-issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
-{
-  ovm_var_t *varname;
-  char *key;
-  ovm_var_t *value;
-
-  varname = stack_pop(ctx->ovm_stack);
-  if (TYPE(varname) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    return ;
-  }
-
-  key = ovm_strdup(varname);
-
-  value = strhash_del(mod_sharedvars_cfg_g->vars_hash, key);
-
-  if (value) {
-    Xfree(value);
-  }
-  else {
-    DebugLog(DF_ENG, DS_ERROR,
-             "Try to delete an non-existent variable '%s'\n",
-             key);
-  }
-
-  Xfree(key);
-  ISSDL_RETURN_TRUE(ctx, state);
-}
-
-
-static void
-issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
+static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *varname;
   ovm_var_t *value;
   char *key;
-  ovm_var_t *old_value;
-  ovm_var_t *new_value;
 
-  varname = stack_pop(ctx->ovm_stack);
-  if (TYPE(varname) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_FALSE(ctx, state);
-    return ;
-  }
+  varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
+    {
+      DebugLog(DF_MOD, DS_ERROR, "shared var name not a string\n");
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
+  value = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (value==NULL || (TYPE(value)!=T_STR && TYPE(value)!=T_VSTR))
+    {
+      DebugLog(DF_MOD, DS_ERROR, "shared value not a string\n");
+      STACK_DROP(ctx->ovm_stack, 2);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
 
-  value = stack_pop(ctx->ovm_stack);
+  key = ovm_strdup(ctx->gc_ctx, varname);
+  DebugLog(DF_MOD, DS_INFO, "Setting shared var '%s'\n", key);
 
-  DebugLog(DF_ENG, DS_INFO,
-           "Setting shared var '%s'\n", STR(varname));
-
-  key = ovm_strdup(varname);
-  new_value = issdl_clone(value);
-  /* This new cloned variable MUST NOT be marked with CANFREE (which
-   * is the default of issdl_clone()) because its memory is not under
-   * the control of the virtual machine.  It is this module which
-   * decide when allocate/deallocate it. */
-  FLAGS(new_value) &= ~TYPE_CANFREE;
-  old_value = strhash_update_or_add(mod_sharedvars_cfg_g->vars_hash,
-                                    new_value, key);
-  if (old_value) {
-    Xfree(old_value);
-    Xfree(key);
-  }
-  ISSDL_RETURN_TRUE(ctx, state);
+  (void) gc_strhash_update_or_add(ctx->gc_ctx,
+				  mod_sharedvars_cfg_g->vars_hash,
+				  value, key);
+  GC_TOUCH (ctx->gc_ctx, mod_sharedvars_cfg_g);
+  PUSH_RETURN_TRUE(ctx);
 }
 
+static int sharedvars_config_mark_hash_walk_func (void *elt, void *data)
+{
+  GC_TOUCH ((gc_t *)data, elt);
+  return 0;
+}
 
-static void *
-sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void sharedvars_config_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  sharedvars_config_t *ctx = (sharedvars_config_t *)p;
+
+  if (ctx->vars_hash!=NULL)
+    (void) strhash_walk (ctx->vars_hash,
+			 sharedvars_config_mark_hash_walk_func,
+			 (void *)gc_ctx);
+}
+
+static void sharedvars_config_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  sharedvars_config_t *ctx = (sharedvars_config_t *)p;
+
+  if (ctx->vars_hash!=NULL)
+    gc_free_strhash (ctx->vars_hash, NULL);
+}
+
+struct shv_data {
+  gc_traverse_ctx_t *gtc;
+  void *data;
+};
+
+static int sharedvars_config_traverse_hash_walk_func (void *elt, void *data)
+{
+  struct shv_data *walk_data = (struct shv_data *)data;
+
+  return (*walk_data->gtc->do_subfield) (walk_data->gtc, (gc_header_t *)elt,
+					 walk_data->data);
+}
+
+static int sharedvars_config_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				   void *data)
+{
+  sharedvars_config_t *ctx = (sharedvars_config_t *)p;
+  int err = 0;
+  struct shv_data walk_data = { gtc, data };
+
+  if (ctx->vars_hash!=NULL)
+    err = strhash_walk (ctx->vars_hash,
+			sharedvars_config_traverse_hash_walk_func,
+			(void *)&walk_data);
+  return err;
+}
+
+static gc_class_t sharedvars_config_class = {
+  GC_ID('s','h','r','d'),
+  sharedvars_config_mark_subfields,
+  sharedvars_config_finalize,
+  sharedvars_config_traverse
+};
+
+
+static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   sharedvars_config_t *cfg;
 
@@ -143,9 +198,12 @@ sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
-  cfg = Xzmalloc(sizeof (sharedvars_config_t));
-  mod_sharedvars_cfg_g = cfg;
+  cfg = gc_alloc(ctx->gc_ctx, sizeof (sharedvars_config_t),
+		 &sharedvars_config_class);
   cfg->hash_size = DEFAULT_SHAREDVARS_HASH_SZ;
+  cfg->vars_hash = NULL;
+  mod_sharedvars_cfg_g = cfg;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&mod_sharedvars_cfg_g);
 
   register_lang_function(ctx,
                          issdl_set_shared_var,
@@ -163,31 +221,29 @@ sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "Delete a shared variable");
 
   /* return config structure, for module manager */
-  return (cfg);
+  return cfg;
 }
 
 
-static void
-sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   sharedvars_config_t *cfg;
 
   cfg = (sharedvars_config_t *)mod->config;
-  cfg->vars_hash = new_strhash( cfg->hash_size );
+  cfg->vars_hash = new_strhash(ctx->gc_ctx, cfg->hash_size);
+  GC_TOUCH (ctx->gc_ctx, cfg);
 }
 
 
-static void
-sharedvars_postcompil(orchids_t *ctx, mod_entry_t *mod)
+static void sharedvars_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ rule compilation. */
 }
 
 
-static void
-set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  mod_sharedvars_cfg_g->hash_size = atoi(dir->args);
+  mod_sharedvars_cfg_g->hash_size = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO,
            "setting some_option to %i\n",
            mod_sharedvars_cfg_g->hash_size);

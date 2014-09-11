@@ -34,7 +34,7 @@ int
 pl_execute(const char *goal);
 
 static char *
-pl_execute_var(const char *goal_str, const char *var_name);
+pl_execute_var(orchids_t *ctx, const char *goal_str, const char *var_name);
 
 static int
 set_prolog_io(const char *in, const char *out, const char *err);

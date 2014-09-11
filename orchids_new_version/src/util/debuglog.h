@@ -36,7 +36,8 @@
 #define DF_OVM  2
 #define DF_ENG  3
 #define DF_MOD  4
-#define DF_MAX  5
+#define DF_EVT  5
+#define DF_MAX  6
 #define DF_ALL  DF_MAX
 
 /* Debug severities */

@@ -22,6 +22,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h> /* for PATH_MAX */
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
+
 #include <sys/types.h> /* for stat() */
 #include <sys/stat.h>
 #include <sys/resource.h>
@@ -80,18 +88,18 @@ extern input_module_t mod_sockunix;
  ** @return                 RETURN_SUCCESS in case of success, an error code
  **                         otherwise.
  **/
-static int
-build_config_tree(const char *config_filepath, config_directive_t **root);
+static int build_config_tree(gc_t *gc_ctx,
+			     const char *config_filepath,
+			     config_directive_t **root);
 
 
 /**
  ** Walk through the configuration tree and execute functions
  ** corresponding to each directives.  This is this function
- ** which really perform the configuration.
+ ** which really performs the configuration.
  ** @param  ctx  A pointer to the Orchids application context.
  **/
-static void
-proceed_config_tree(orchids_t *ctx);
+static void proceed_config_tree(orchids_t *ctx);
 
 
 /**
@@ -107,12 +115,12 @@ proceed_config_tree(orchids_t *ctx);
  **                   being parsed.
  ** @return           RETURN_SUCCESS on success, an error code otherwise.
  **/
-static int
-build_config_tree_sub(FILE *fp,
-                      config_directive_t **sect_root,
-                      config_directive_t *parent,
-                      const char *file,
-                      int *lineno);
+static int build_config_tree_sub(gc_t *gc_ctx,
+				 FILE *fp,
+				 config_directive_t **sect_root,
+				 config_directive_t *parent,
+				 const char *file,
+				 int *lineno);
 
 /**
  ** Split a text line to a directive and its arguments.  This function
@@ -130,8 +138,7 @@ build_config_tree_sub(FILE *fp,
  ** @return           RETURN_SUCCESS on a normal line or
  **                   CONFIG_IGNORE_LINE on a commented line.
  **/
-static int
-split_line(char *line, char **directive, char **argument);
+static int split_line(char *line, char **directive, char **argument);
 
 
 /**
@@ -145,8 +152,7 @@ split_line(char *line, char **directive, char **argument);
  ** @param length  A pointer to the length, which will be updated with the
  **                length of the next token found.
  **/
-static void
-cfg_get_next_token(const char *text, size_t *offset, size_t *length);
+static void cfg_get_next_token(const char *text, size_t *offset, size_t *length);
 
 
 /**
@@ -155,8 +161,7 @@ cfg_get_next_token(const char *text, size_t *offset, size_t *length);
  ** @param list  The list which will be searched.
  ** @return      The last element of the list.
  **/
-static config_directive_t *
-get_last_dir(config_directive_t *list);
+static config_directive_t *get_last_dir(config_directive_t *list);
 
 
 /**
@@ -182,8 +187,9 @@ get_last_dir(config_directive_t *list);
  ** @return        RETURN_SUCCESS on success.  On error, the return error
  **                code of build_config_tree().
  **/
-static int
-proceed_includes(char *pattern, config_directive_t **root, config_directive_t **last);
+static int proceed_includes(gc_t *gc_ctx,
+			    char *pattern, config_directive_t **root,
+			    config_directive_t **last);
 
 
 /**
@@ -193,8 +199,7 @@ proceed_includes(char *pattern, config_directive_t **root, config_directive_t **
  **                 stripping will be made by adding a NULL-character at the
  **                 right place.
  **/
-static void
-strip_trailing_garbage(char *string);
+static void strip_trailing_garbage(char *string);
 
 
 /**
@@ -206,8 +211,8 @@ strip_trailing_garbage(char *string);
  ** @param depth    The depth level from the root.  This parameter is used
  **                 to control the indentation.
  **/
-static void
-fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth);
+static void fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section,
+				 int depth);
 
 
 /**
@@ -216,8 +221,8 @@ fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_poll_period(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir);
 
 
 /**
@@ -226,8 +231,8 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void add_rule_file(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir);
 
 
 /**
@@ -236,8 +241,8 @@ add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir);
 
 
 /**
@@ -246,8 +251,8 @@ add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void module_config(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir);
 
 #ifdef ORCHIDS_STATIC
 /**
@@ -256,8 +261,8 @@ module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void config_add_module(orchids_t *ctx, mod_entry_t *mod,
+			      config_directive_t *dir);
 #endif /* ORCHIDS_STATIC */
 
 /**
@@ -266,8 +271,8 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void config_load_module(orchids_t *ctx, mod_entry_t *mod,
+			       config_directive_t *dir);
 
 /**
  ** Handler for the RuntimeUser configuration directive.
@@ -275,8 +280,8 @@ config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_runtime_user(orchids_t *ctx, mod_entry_t *mod,
+			     config_directive_t *dir);
 
 /**
  ** Handler for the SetDefaultPreprocessorCmd configuration directive.
@@ -284,8 +289,8 @@ set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
+				    config_directive_t *dir);
 
 
 /**
@@ -294,8 +299,8 @@ set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *di
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir);
 
 
 /**
@@ -304,8 +309,8 @@ add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir);
 
 
 /**
@@ -314,8 +319,8 @@ set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_lock_file(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir);
 
 
 /**
@@ -324,8 +329,8 @@ set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
+				 config_directive_t *dir);
 
 
 /**
@@ -334,8 +339,8 @@ set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir);
 
 
 /**
@@ -344,12 +349,10 @@ set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
-static void
-set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
-void
-proceed_pre_config(orchids_t *ctx)
+void proceed_pre_config(orchids_t *ctx)
 {
 #if 0
   input_module_t *mod_textfile;
@@ -361,10 +364,14 @@ proceed_pre_config(orchids_t *ctx)
 
   DebugLog(DF_CORE, DS_NOTICE, "*** beginning ORCHIDS configuration ***\n");
 
-  if (ctx->off_line_mode == MODE_ONLINE) {
-    build_config_tree(ctx->config_file, &ctx->cfg_tree);
-    proceed_config_tree(ctx);
-  } else {
+gc_check(ctx->gc_ctx);
+  if (ctx->off_line_mode == MODE_ONLINE)
+    {
+      build_config_tree(ctx->gc_ctx, ctx->config_file, &ctx->cfg_tree);
+      proceed_config_tree(ctx);
+    }
+  else
+    {
 #if 0
     /* Deprecated */
     switch (ctx->off_line_mode) {
@@ -399,7 +406,7 @@ proceed_pre_config(orchids_t *ctx)
       break;
     }
 #endif
-  }
+    }
 
   gettimeofday(&ctx->preconfig_time, NULL);
   Timer_Sub(&diff_time, &ctx->preconfig_time, &ctx->start_time);
@@ -407,34 +414,30 @@ proceed_pre_config(orchids_t *ctx)
            (diff_time.tv_sec * 1000) + (diff_time.tv_usec) / 1000);
 }
 
-static int
-build_config_tree(const char *config_filepath, config_directive_t **root)
+static int build_config_tree(gc_t *gc_ctx,
+			     const char *config_filepath,
+			     config_directive_t **root)
 {
   FILE *fp;
-  int ret;
   int line;
 
   fp = Xfopen(config_filepath, "r");
   line = 0;
-  ret = build_config_tree_sub(fp, root, NULL, config_filepath, &line);
-
-  return (ret);
+  return build_config_tree_sub(gc_ctx, fp, root, NULL, config_filepath, &line);
 }
 
-static config_directive_t *
-get_last_dir(config_directive_t *list)
+static config_directive_t *get_last_dir(config_directive_t *list)
 {
-  if (list == NULL)
-    return (NULL);
-
+  if (list==NULL)
+    return NULL;
   for ( ; list->next ; list = list->next )
     ;
-
-  return (list);
+  return list;
 }
 
-static int
-proceed_includes(char *pattern, config_directive_t **root, config_directive_t **last)
+static int proceed_includes(gc_t *gc_ctx,
+			    char *pattern, config_directive_t **root,
+			    config_directive_t **last)
 {
   int ret;
   int i;
@@ -444,42 +447,44 @@ proceed_includes(char *pattern, config_directive_t **root, config_directive_t **
   DebugLog(DF_CORE, DS_DEBUG, "Include config file pattern '%s'\n", pattern);
 
   ret = glob(pattern, 0, NULL, &globbuf);
-  if (ret) {
-    if (ret == GLOB_NOMATCH)
-      fprintf(stderr,
-              "WARNING: Pattern returned no match.\n");
-    else
-      fprintf(stderr,
-              "WARNING: glob() error.\n");
-  }
+gc_check(gc_ctx);
+  if (ret)
+    {
+      if (ret == GLOB_NOMATCH)
+	fprintf(stderr,
+		"WARNING: Pattern returned no match.\n");
+      else
+	fprintf(stderr,
+		"WARNING: glob() error.\n");
+    }
 
-  for (i = 0; i < globbuf.gl_pathc; i++) {
-    DebugLog(DF_CORE, DS_DEBUG, "Include config file '%s'\n", globbuf.gl_pathv[i]);
-    new_root = NULL;
-    ret = build_config_tree(globbuf.gl_pathv[i], &new_root);
-    if (ret)
-      return (ret);
-    if (new_root == NULL)
-      continue ;
-    if (*last)
-      (*last)->next = new_root;
-    else
-      (*root) = new_root;
-    *last = get_last_dir(new_root);
-  }
-
+  for (i = 0; i < globbuf.gl_pathc; i++)
+    {
+      DebugLog(DF_CORE, DS_DEBUG, "Include config file '%s'\n",
+	       globbuf.gl_pathv[i]);
+      new_root = NULL;
+      ret = build_config_tree(gc_ctx, globbuf.gl_pathv[i], &new_root);
+      if (ret)
+	return ret;
+      if (new_root == NULL)
+	continue;
+      if (*last!=NULL)
+	(*last)->next = new_root;
+      else
+	*root = new_root;
+      *last = get_last_dir(new_root);
+    }
   globfree(&globbuf);
-
-  return (RETURN_SUCCESS);
+  return RETURN_SUCCESS;
 }
 
 
-static int
-build_config_tree_sub(FILE *fp,
-                      config_directive_t **sect_root,
-                      config_directive_t *parent,
-                      const char *file,
-                      int *lineno)
+static int build_config_tree_sub(gc_t *gc_ctx,
+				 FILE *fp,
+				 config_directive_t **sect_root,
+				 config_directive_t *parent,
+				 const char *file,
+				 int *lineno)
 {
   char line[LINE_MAX];
   char *directive;
@@ -488,11 +493,13 @@ build_config_tree_sub(FILE *fp,
   config_directive_t *last_dir = NULL;
   int skip;
   int ret;
+  size_t len;
 
-  while (!feof(fp)) {
-    line[0] = '\0';
-    Xfgets(line, LINE_MAX, fp);
-    (*lineno)++;
+  while (!feof(fp))
+    {
+      line[0] = '\0';
+      Xfgets(line, LINE_MAX, fp);
+      (*lineno)++;
 
     skip = split_line(line, &directive, &arguments);
 
@@ -500,86 +507,96 @@ build_config_tree_sub(FILE *fp,
     if (skip)
       continue;
 
+    len = strlen(directive);
     /* handle section */
-    if (directive[0] == '<') {
-      if (directive[1] != '/') {
-        /* open a section */
-        new_dir = Xzmalloc(sizeof (config_directive_t));
-        if (directive[ strlen(directive) - 1 ] == '>') {
-          directive[ strlen(directive) - 1 ] = '\0';
-          new_dir->directive = strdup(directive);
-        }
-        else {
-          /* XXX warn if a section is empty ? */
-          new_dir->directive = strdup(directive);
-        }
-        if (arguments)
-          new_dir->args = strdup(arguments);
-        new_dir->parent = parent;
-        new_dir->file = file;
-        new_dir->line = *lineno;
+    if (directive[0] == '<')
+      {
+	if (directive[1] != '/')
+	  {
+	    /* open a section */
+	    new_dir = gc_base_malloc (gc_ctx, sizeof (config_directive_t));
+	    if (directive[len - 1] == '>')
+	      {
+		directive[len - 1 ] = '\0';
+		new_dir->directive = gc_strdup(gc_ctx, directive);
+	      }
+	    else
+	      {
+		/* XXX warn if a section is empty ? */
+		new_dir->directive = gc_strdup(gc_ctx, directive);
+	      }
+	    new_dir->args = gc_strdup(gc_ctx, arguments); // works even if arguments==NULL
+	    new_dir->next = NULL;
+	    new_dir->first_child = NULL;
+	    new_dir->parent = parent;
+	    new_dir->file = file;
+	    new_dir->line = *lineno;
 
-        /* Add the directive to the section */
-        if (last_dir) /* add to current list */
-          last_dir->next = new_dir;
-        else /* special case for first element */
-          *sect_root = new_dir;
-        last_dir = new_dir;
+	    /* Add the directive to the section */
+	    if (last_dir!=NULL) /* add to current list */
+	      last_dir->next = new_dir;
+	    else /* special case for first element */
+	      *sect_root = new_dir;
+	    last_dir = new_dir;
 
-        /* Read section recursively */
-        ret = build_config_tree_sub(fp,
-                                    &new_dir->first_child,
-                                    new_dir,
-                                    file,
-                                    lineno);
-
-        if (ret)
-          return (ret);
-
-        continue ;
-      }
-      else if (    parent
-               && !strncmp((directive + 2),
-                           parent->directive + 1,
-                           strlen(directive) - 3)) {
-        /* close a section */
-        return (RETURN_SUCCESS);
-      }
-      else {
-          DebugLog(DF_CORE, DS_ERROR, "%s:%i error closing '%s', found '%s' instead\n", file, *lineno, parent->directive,  directive);
-        return (ERR_CFG_SECT);
-      }
+	    /* Read section recursively */
+	    ret = build_config_tree_sub(gc_ctx, fp,
+					&new_dir->first_child,
+					new_dir,
+					file,
+					lineno);
+	    if (ret)
+	      return ret;
+	    continue;
+	  }
+	else if (parent!=NULL
+		 && !strncmp(directive + 2,
+			     parent->directive + 1,
+			     len - 3))
+	  {
+	    /* close a section */
+	    return RETURN_SUCCESS;
+	  }
+	else
+	  {
+	    DebugLog(DF_CORE, DS_ERROR,
+		     "%s:%i error closing '%s', found '%s' instead\n",
+		     file, *lineno, parent->directive,  directive);
+	    return ERR_CFG_SECT;
+	  }
     }
 
-    if ( !strcmp("Include", directive) ) {
-      proceed_includes(arguments, sect_root, &last_dir);
-    }
-    else {
-      new_dir = Xzmalloc(sizeof (config_directive_t));
-      new_dir->directive = strdup(directive);
-      if (arguments)
-        new_dir->args = strdup(arguments);
-      new_dir->file = file;
-      new_dir->line = *lineno;
+    if (!strcmp("Include", directive))
+      {
+	proceed_includes(gc_ctx, arguments, sect_root, &last_dir);
+      }
+    else
+      {
+	new_dir = gc_base_malloc (gc_ctx, sizeof (config_directive_t));
+	new_dir->directive = gc_strdup(gc_ctx, directive);
+	new_dir->args = gc_strdup(gc_ctx, arguments); // works even if arguments==NULL
+	new_dir->next = NULL;
+	new_dir->first_child = NULL;
+	new_dir->parent = NULL;
+	new_dir->file = file;
+	new_dir->line = *lineno;
 
-      if (last_dir) /* add to current list */
-        last_dir->next = new_dir;
-      else /* special case for first element */
-        *sect_root = new_dir;
-      last_dir = new_dir;
+	if (last_dir!=NULL) /* add to current list */
+	  last_dir->next = new_dir;
+	else /* special case for first element */
+	  *sect_root = new_dir;
+	last_dir = new_dir;
+      }
     }
-  }
 
   Xfclose(fp);
 
-  if (parent)
-    return (ERR_CFG_PEOF);
-
-  return (RETURN_SUCCESS);
+  if (parent!=NULL)
+    return ERR_CFG_PEOF;
+  return RETURN_SUCCESS;
 }
 
-static void
-strip_trailing_garbage(char *string)
+static void strip_trailing_garbage(char *string)
 {
   char *last_effective;
   int escaping;
@@ -589,65 +606,58 @@ strip_trailing_garbage(char *string)
   in_quote = 0;
   escaping = FALSE;
 
-  for ( last_effective = string; *string && *last_effective; string++ ) {
-
-    c = *string;
-
-    if (escaping) {
-      escaping = FALSE;
-      last_effective = string;
-      continue ;
+  for (last_effective = string; *string!=0 && *last_effective!=0; string++ )
+    {
+      c = *string;
+      if (escaping)
+	{
+	  escaping = FALSE;
+	  last_effective = string;
+	  continue;
+	}
+      switch (c)
+	{
+	case '#':
+	  if (!escaping && !in_quote)
+	    {
+	      *(last_effective+1) = '\0';
+	      return;
+	    }
+	  last_effective = string;
+	  break;
+	case '\n':
+	  *(last_effective+1) = '\0';
+	  return;
+	case '\t':
+	case ' ':
+	  break;
+	case '\\':
+	  last_effective = string;
+	  escaping = TRUE;
+	  break;
+	case '\'':
+	  last_effective = string;
+	  if (in_quote == '\'')
+	    in_quote = 0;
+	  else if (in_quote == 0)
+	    in_quote = '\'';
+	  break;
+	case '"':
+	  last_effective = string;
+	  if (in_quote == '"')
+	    in_quote = 0;
+	  else if (in_quote == 0)
+	    in_quote = '\"';
+	  break;
+	default:
+	  last_effective = string;
+	  break;
+	}
     }
-
-    switch (c) {
-
-    case '#':
-      if ( !escaping && !in_quote) {
-        *(last_effective+1) = '\0';
-        return ;
-      }
-      last_effective = string;
-      break ;
-
-    case '\n':
-      *(last_effective+1) = '\0';
-      return ;
-
-    case '\t':
-    case ' ':
-      break ;
-
-    case '\\':
-      last_effective = string;
-      escaping = TRUE;
-      break ;
-
-    case '\'':
-      last_effective = string;
-      if (in_quote == '\'')
-        in_quote = 0;
-      else if (in_quote == 0)
-        in_quote = '\'';
-      break;
-
-    case '"':
-      last_effective = string;
-      if (in_quote == '"')
-        in_quote = 0;
-      else if (in_quote == 0)
-        in_quote = '\"';
-      break;
-
-    default:
-      last_effective = string;
-      break;
-    }
-  }
 }
 
 
-static int
-split_line(char *line, char **directive, char **argument)
+static int split_line(char *line, char **directive, char **argument)
 {
   size_t offset;
   size_t length;
@@ -670,20 +680,21 @@ split_line(char *line, char **directive, char **argument)
   ptr += offset;
 
   c = *ptr;
-  if (c == '#' || c == '\n' || c == '\0') {
-    *argument = NULL;
-  }
-  else {
-    *argument = ptr;
-    strip_trailing_garbage(ptr);
-  }
+  if (c == '#' || c == '\n' || c == '\0')
+    {
+      *argument = NULL;
+    }
+  else
+    {
+      *argument = ptr;
+      strip_trailing_garbage(ptr);
+    }
 
-  return (RETURN_SUCCESS);
+  return RETURN_SUCCESS;
 }
 
 
-static void
-cfg_get_next_token(const char *text, size_t *offset, size_t *length)
+static void cfg_get_next_token(const char *text, size_t *offset, size_t *length)
 {
   int i;
   int c;
@@ -694,18 +705,19 @@ cfg_get_next_token(const char *text, size_t *offset, size_t *length)
 
   c = *token;
   *offset = i;
-  if (c == '\0' || c == '\n') {
-    *length = 0;
-    return ;
-  }
+  if (c == '\0' || c == '\n')
+    {
+      *length = 0;
+      return;
+    }
 
   i = strcspn(token, " \t\n");
   *length = i;
 }
 
 
-static void
-fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth)
+static void fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section,
+				 int depth)
 {
   int i;
 
@@ -728,28 +740,31 @@ fprintf_cfg_tree_sub(FILE *fp, config_directive_t *section, int depth)
   fprintf(fp, "\n");
 }
 
-void
-fprintf_cfg_tree(FILE *fp, config_directive_t *root)
+void fprintf_cfg_tree(FILE *fp, config_directive_t *root)
 {
   fprintf(fp, "---[ configuration tree ]---\n");
   fprintf_cfg_tree_sub(fp, root, 0);
   fprintf(fp, "---[ end of configuration tree ]---\n\n");
 }
 
-static void
-set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_poll_period(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir)
 {
-  ctx->poll_period.tv_sec = atoi(dir->args);
+  struct timeval time;
 
+  (void) time_convert(dir->args, dir->args+strlen(dir->args), &time);
   /* keep a minimal (reasonable) value of 1 second */
-  if (ctx->poll_period.tv_sec < 1) {
-    DebugLog(DF_CORE, DS_WARN, "Warning, PollPeriod too small, set to 1\n");
-    ctx->poll_period.tv_sec = 1;
-  }
-}
+  if (time.tv_sec < 1)
+    {
+      DebugLog(DF_CORE, DS_WARN, "Warning, PollPeriod too small, set to 1\n");
+      time.tv_sec = 1;
+      time.tv_usec = 0;
+    }
+  ctx->poll_period = time;
+} 
 
-static void
-add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_rule_file(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir)
 {
   rulefile_t *rulefile;
 
@@ -759,17 +774,20 @@ add_rule_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   rulefile->name = dir->args;
   rulefile->next = NULL;
 
-  if (ctx->rulefile_list == NULL) {
-    ctx->rulefile_list = rulefile;
-    ctx->last_rulefile = rulefile;
-  } else {
-    ctx->last_rulefile->next = rulefile;
-    ctx->last_rulefile = rulefile;
-  }
+  if (ctx->rulefile_list == NULL)
+    {
+      ctx->rulefile_list = rulefile;
+      ctx->last_rulefile = rulefile;
+    }
+  else
+    {
+      ctx->last_rulefile->next = rulefile;
+      ctx->last_rulefile = rulefile;
+    }
 }
 
-static void
-add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
 {
   rulefile_t *rulefile;
   int ret;
@@ -779,40 +797,53 @@ add_rule_files(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   DebugLog(DF_CORE, DS_INFO, "adding rule files '%s'\n", dir->args);
 
   ret = glob(dir->args, 0, NULL, &globbuf);
-  if (ret) {
-    if (ret == GLOB_NOMATCH) {
-      DebugLog(DF_CORE, DS_INFO,
-               "Pattern returned no match.\n");
+  if (ret)
+    {
+      if (ret == GLOB_NOMATCH)
+	{
+	  DebugLog(DF_CORE, DS_INFO,
+		   "Pattern returned no match.\n");
+	}
+      else
+	{
+	  DebugLog(DF_CORE, DS_ERROR,
+		   "glob() error..\n");
+	}
     }
-    else {
-      DebugLog(DF_CORE, DS_ERROR,
-               "glob() error..\n");
+
+  for (i = 0; i < globbuf.gl_pathc; i++)
+    {
+      DebugLog(DF_CORE, DS_DEBUG, "Adding rule file '%s'\n",
+	       globbuf.gl_pathv[i]);
+
+      rulefile = gc_base_malloc (ctx->gc_ctx, sizeof (rulefile_t));
+      rulefile->name = globbuf.gl_pathv[i];
+      rulefile->next = NULL;
+
+      /* if it is the first rule file... */
+      if (ctx->rulefile_list == NULL)
+	{
+	  ctx->rulefile_list = rulefile;
+	  ctx->last_rulefile = rulefile;
+	}
+      else
+	{
+	  ctx->last_rulefile->next = rulefile;
+	  ctx->last_rulefile = rulefile;
+	}
     }
-  }
-
-  for (i = 0; i < globbuf.gl_pathc; i++) {
-    DebugLog(DF_CORE, DS_DEBUG, "Adding rule file '%s'\n", globbuf.gl_pathv[i]);
-
-    rulefile = Xmalloc(sizeof (rulefile_t));
-    rulefile->name = globbuf.gl_pathv[i];
-    rulefile->next = NULL;
-
-    /* if it is the first rule file... */
-    if (ctx->rulefile_list == NULL) {
-      ctx->rulefile_list = rulefile;
-      ctx->last_rulefile = rulefile;
-    } else {
-      ctx->last_rulefile->next = rulefile;
-      ctx->last_rulefile = rulefile;
-    }
-  }
-
   globfree(&globbuf);
 }
 
 
-static void
-module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+
+#define MODNAME_MAX 32
+/* Black cpp magic: */
+#define XSTR(s) XXSTR(s)
+#define XXSTR(s) #s
+
+static void module_config(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir)
 {
   char mod_name[MODNAME_MAX];
   mod_entry_t *m;
@@ -820,31 +851,37 @@ module_config(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   config_directive_t *d;
   int i;
 
-  i = sscanf(dir->args, "%32[a-zA-Z]>", mod_name);
+  i = sscanf(dir->args, "%" XSTR(MODNAME_MAX) "[a-zA-Z]>", mod_name);
   DebugLog(DF_CORE, DS_INFO, "Doing module configuration for %s\n", mod_name);
   m = find_module_entry(ctx, mod_name);
-  if (!m) {
-    DebugLog(DF_CORE, DS_WARN, "WARNING: module %s not loaded...\n", mod_name);
-    return ;
-  }
+  if (m==NULL)
+    {
+      DebugLog(DF_CORE, DS_WARN, "WARNING: module %s not loaded...\n", mod_name);
+      return;
+    }
   c = m->mod->cfg_cmds;
-  if (c == NULL) {
-    DebugLog(DF_CORE, DS_INFO, "Module %s have no directive table.\n", m->mod->name);
-    return ;
-  }
-  for (d = dir->first_child; d; d = d->next) {
-    i = 0;
-    while (c[i].name && strcmp(c[i].name, d->directive))
-      i++;
-    if (c[i].cmd) {
-      c[i].cmd(ctx, m, d);
+  if (c == NULL)
+    {
+      DebugLog(DF_CORE, DS_INFO, "Module %s has no directive table.\n",
+	       m->mod->name);
+      return;
     }
-    else {
-      DebugLog(DF_CORE, DS_WARN,
-               "no handler defined in module [%s] for [%s] directive\n",
-               m->mod->name, d->directive);
+  for (d = dir->first_child; d; d = d->next)
+    {
+      i = 0;
+      while (c[i].name!=NULL && strcmp(c[i].name, d->directive))
+	i++;
+      if (c[i].cmd!=NULL)
+	{
+	  (*c[i].cmd) (ctx, m, d);
+	}
+      else
+	{
+	  DebugLog(DF_CORE, DS_WARN,
+		   "no handler defined in module [%s] for [%s] directive\n",
+		   m->mod->name, d->directive);
+	}
     }
-  }
 }
 
 
@@ -877,49 +914,52 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   i = 0;
   while (builtin_mods[i] && strcmp(builtin_mods[i]->name, dir->args) )
     ++i;
-  if (builtin_mods[i]) {
-    add_module(ctx, builtin_mods[i]);
-  } else {
-    DebugLog(DF_CORE, DS_FATAL, "module %s not found.\n", dir->args);
-    exit(EXIT_FAILURE);
-  }
+  if (builtin_mods[i])
+    {
+      add_module(ctx, builtin_mods[i]);
+    }
+  else
+    {
+      DebugLog(DF_CORE, DS_FATAL, "module %s not found.\n", dir->args);
+      exit(EXIT_FAILURE);
+    }
 }
 #endif /* ORCHIDS_STATIC */
 
 
-static void
-config_load_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void config_load_module(orchids_t *ctx, mod_entry_t *mod,
+			       config_directive_t *dir)
 {
   input_module_t *input_mod;
 
   input_mod = load_add_shared_module(ctx, dir->args);
-  if (input_mod == NULL) {
-    DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", dir->args);
-    return ;
-  }
+  if (input_mod == NULL)
+    {
+      DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", dir->args);
+      return;
+    }
 }
 
-static void
-set_runtime_user(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_runtime_user(orchids_t *ctx, mod_entry_t *mod,
+			     config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO,
            "setting RuntimeUser to '%s'\n", dir->args);
-
   ctx->runtime_user = dir->args;
 }
 
 
-static void
-set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
+				    config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting default pre-processor command to '%s'\n", dir->args);
-
+  DebugLog(DF_CORE, DS_INFO,
+	   "setting default pre-processor command to '%s'\n", dir->args);
   ctx->default_preproc_cmd = dir->args;
 }
 
 
-static void
-add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir)
 {
   char suffix[256];
   char cmd[4096];
@@ -927,42 +967,41 @@ add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   preproc_cmd_t *preproc;
 
   ret = sscanf(dir->args, "%256s %4096[^\n]", suffix, cmd);
-  if (ret != 2) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "AddPreprocessorCmd: Bad argument format (suffix preproccmd)\n");
-    return ;
-  }
+  if (ret != 2)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "AddPreprocessorCmd: Bad argument format (suffix preproccmd)\n");
+      return;
+    }
 
   DebugLog(DF_CORE, DS_INFO,
            "Adding the pre-processor command '%s' for file suffix '%s'\n",
            cmd, suffix);
 
-  preproc = Xzmalloc(sizeof (preproc_cmd_t));
-  preproc->suffix = strdup(suffix);
-  preproc->cmd = strdup(cmd);
-
+  preproc = gc_base_malloc (ctx->gc_ctx, sizeof (preproc_cmd_t));
+  preproc->suffix = gc_strdup(ctx->gc_ctx, suffix);
+  preproc->cmd = gc_strdup(ctx->gc_ctx, cmd);
   SLIST_INSERT_HEAD(&ctx->preproclist, preproc, preproclist);
 }
 
 
-static void
-set_modules_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
+			    config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO, "setting modules directory to '%s'\n", dir->args);
-
   ctx->modules_dir = dir->args;
 }
 
-static void
-set_lock_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_lock_file(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO, "setting lock file to '%s'\n", dir->args);
 
   ctx->lockfile = dir->args;
 }
 
-static void
-set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
+				 config_directive_t *dir)
 {
   int ret;
   int l;
@@ -970,40 +1009,42 @@ set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   DebugLog(DF_CORE, DS_INFO, "setting max memory limit '%s'\n", dir->args);
 
-  l = atoi(dir->args);
-
+  l = strtol(dir->args, (char **)NULL, 10);
   ret = getrlimit(RLIMIT_AS, &rl);
-  if (ret) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "getrlimit(): error %i: %s\n",
-             errno, strerror(errno));
-    return ;
-  }
+  if (ret)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "getrlimit(): error %i: %s\n",
+	       errno, strerror(errno));
+      return;
+    }
 
   DebugLog(DF_CORE, DS_INFO, "current memory limit is %i %i\n",
            rl.rlim_cur, rl.rlim_max);
 
-  if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < l) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "can't set memory limit: hard limit already set to %i "
+  if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < l)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "can't set memory limit: hard limit already set to %i "
              "(requesting %i)\n",
-             rl.rlim_max, l);
-    return ;
-  }
+	       rl.rlim_max, l);
+      return;
+    }
 
   rl.rlim_cur = l;
   rl.rlim_max = l;
   ret = setrlimit(RLIMIT_AS, &rl);
-  if (ret) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "setrlimit(): error %i: %s\n",
-             errno, strerror(errno));
-    return ;
-  }
+  if (ret)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "setrlimit(): error %i: %s\n",
+	       errno, strerror(errno));
+      return;
+    }
 }
 
-static void
-set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO, "setting ResolveIP to '%s'\n", dir->args);
 
@@ -1011,42 +1052,45 @@ set_resolve_ip(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
        || !strcasecmp("1",       dir->args)
        || !strcasecmp("yes",     dir->args)
        || !strcasecmp("true",    dir->args)
-       || !strcasecmp("enabled", dir->args) ) {
-    set_ip_resolution(TRUE);
-  }
-  else {
-    set_ip_resolution(FALSE);
-  }
+       || !strcasecmp("enabled", dir->args) )
+    {
+      set_ip_resolution(TRUE);
+    }
+  else
+    {
+      set_ip_resolution(FALSE);
+    }
 }
 
-static void
-set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int nice_value;
   int ret;
 
   DebugLog(DF_CORE, DS_INFO, "setting nice priority to '%s'\n", dir->args);
 
-  nice_value = atoi(dir->args);
-  if (nice_value < -20 || nice_value > 19) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "Ignored invalid Nice priority value %i "
-             "(-20 <= priority <= 19)\n",
-             dir->args);
-    return ;
-  }
+  nice_value = strtol(dir->args, (char **)NULL, 10);
+  if (nice_value < -20 || nice_value > 19)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "Ignored invalid Nice priority value %i "
+	       "(-20 <= priority <= 19)\n",
+	       dir->args);
+      return;
+    }
 
   ret = setpriority(PRIO_PROCESS, 0, nice_value);
-  if (ret != 0) {
-    DebugLog(DF_CORE, DS_ERROR,
-             "setpriority(prio=%i): error %i: %s\n",
-             nice_value, errno, strerror(errno));
-    return ;
-  }
+  if (ret != 0)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "setpriority(prio=%i): error %i: %s\n",
+	       nice_value, errno, strerror(errno));
+      return;
+    }
 }
 
-static void
-add_input_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_input_source(orchids_t *ctx, mod_entry_t *mod,
+			     config_directive_t *dir)
 {
   char	*mod_name;
   mod_entry_t *m;
@@ -1054,13 +1098,13 @@ add_input_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   int i;
 
   mod_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
+  while (*dir->args!=0 && !isblank(*dir->args))
     dir->args++;
 
-  while (*dir->args && isblank(*dir->args))
+  while (*dir->args!=0 && isblank(*dir->args))
     *(dir->args++) = 0;
 
-  if (!*dir->args)
+  if (*dir->args==0)
     return;
 
   DebugLog(DF_CORE, DS_DEBUG,
@@ -1068,29 +1112,31 @@ add_input_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 	   mod_name, dir->args);
 
   m = find_module_entry(ctx, mod_name);
-  if (!m)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "INPUT : unknown module (%s)\n",
-	     mod_name);
-    return;
-  }
+  if (m==NULL)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "INPUT : unknown module (%s)\n",
+	       mod_name);
+      return;
+    }
   c = m->mod->cfg_cmds;
   i = 0;
   while (c[i].name && strcmp(c[i].name, dir->directive))
     i++;
-  if (c[i].cmd) {
-    c[i].cmd(ctx, m, dir);
-  }
-  else {
-    DebugLog(DF_CORE, DS_WARN,
-	     "no handler defined in module [%s] for [%s] directive\n",
-	     m->mod->name, dir->directive);
-  }
+  if (c[i].cmd!=NULL)
+    {
+      (*c[i].cmd) (ctx, m, dir);
+    }
+  else
+    {
+      DebugLog(DF_CORE, DS_WARN,
+	       "no handler defined in module [%s] for [%s] directive\n",
+	       m->mod->name, dir->directive);
+    }
 }
 
-static void
-add_cond_dissector(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
+			       config_directive_t *dir)
 {
   char	*mod_source_name;
   char	*mod_dissect_name;
@@ -1102,45 +1148,45 @@ add_cond_dissector(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   void	*dissect_func;
 
   mod_dissect_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
+  while (*dir->args!=0 && !isblank(*dir->args))
     dir->args++;
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
+  while (*dir->args!=0 && isblank(*dir->args))
+    *dir->args++ = 0;
 
   mod_source_name = dir->args;
-  while (*dir->args && !isblank(*dir->args))
+  while (*dir->args!=0 && !isblank(*dir->args))
     dir->args++;
-  while (*dir->args && isblank(*dir->args))
-    *(dir->args++) = 0;
+  while (*dir->args!=0 && isblank(*dir->args))
+    *dir->args++ = 0;
 
   cond_param_str = dir->args;
-  while (*dir->args && !isblank(*dir->args))
+  while (*dir->args!=0 && !isblank(*dir->args))
     dir->args++;
-  while (*dir->args && isblank(*dir->args))
+  while (*dir->args!=0 && isblank(*dir->args))
     *(dir->args++) = 0;
 
-  if (!*mod_dissect_name || !*mod_source_name || !*cond_param_str)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : ill-formed directive \n");
-    return ;
-  }
+  if (*mod_dissect_name==0 || *mod_source_name==0 || *cond_param_str==0)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "DISSECT : ill-formed directive \n");
+      return;
+    }
 
   if ((m_source = find_module_entry(ctx, mod_source_name)) == NULL)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : unknown module %s\n", mod_source_name);
-    return ;
-  }
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "DISSECT : unknown module %s\n", mod_source_name);
+      return;
+    }
 
   if ((m_dissect = find_module_entry(ctx, mod_dissect_name)) == NULL)
-  {
-    DebugLog(DF_CORE, DS_ERROR,
-	     "DISSECT : unknown module %s\n", mod_dissect_name);
-    return ;
-  }
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "DISSECT : unknown module %s\n", mod_dissect_name);
+      return;
+    }
 
-  switch (ctx->global_fields[m_source->first_field_pos + m_source->num_fields - 2].type)
+  switch (ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type)
   {
     case T_STR:
     case T_VSTR:
@@ -1149,18 +1195,19 @@ add_cond_dissector(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       break;
     case T_INT:
     case T_UINT:
-      cond_param = Xmalloc(sizeof (int));
-      *(int*)cond_param = atoi(cond_param_str);
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (int));
+      *(int *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (int);
       break;
     case T_IPV4:
-      cond_param = Xmalloc(sizeof (in_addr_t));
-      *(int*)cond_param = inet_addr(cond_param_str);
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
+      *(int *)cond_param = inet_addr(cond_param_str);
       cond_param_size = sizeof (in_addr_t);
       break;
     default:
       DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : cannot dissect type %i \n", ctx->global_fields[m_source->first_field_pos + m_source->num_fields - 2].type);
+	       "DISSECT : cannot dissect type %i \n",
+	       ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type);
       return;
   }
 
@@ -1198,67 +1245,76 @@ static mod_cfg_cmd_t config_dir_g[] =
 };
 
 
-static void
-proceed_config_tree(orchids_t *ctx)
+static void proceed_config_tree(orchids_t *ctx)
 {
   config_directive_t *d;
   int i;
 
   DebugLog(DF_CORE, DS_INFO, "*** pre-config (tree interpretation) ***\n");
 
-  for (d = ctx->cfg_tree; d; d = d->next) {
-    i = 0;
-    while (config_dir_g[i].name && strcmp(config_dir_g[i].name, d->directive))
-      i++;
-    if (config_dir_g[i].cmd) {
-      config_dir_g[i].cmd(ctx, NULL, d);
+gc_check(ctx->gc_ctx);
+  for (d = ctx->cfg_tree; d; d = d->next)
+    {
+gc_check(ctx->gc_ctx);
+      i = 0;
+      while (config_dir_g[i].name!=NULL &&
+	     strcmp(config_dir_g[i].name, d->directive))
+	i++;
+gc_check(ctx->gc_ctx);
+      if (config_dir_g[i].cmd)
+	{
+	  (*config_dir_g[i].cmd) (ctx, NULL, d);
+	}
+      else
+	{
+	  DebugLog(DF_CORE, DS_WARN,
+		   "No handler defined for [%s] directive\n", d->directive);
+	}
+gc_check(ctx->gc_ctx);
     }
-    else {
-      DebugLog(DF_CORE, DS_WARN,
-               "No handler defined for [%s] directive\n", d->directive);
-    }
-  }
 }
 
 
 /* ------------------- TEST ----------------------*/
 
-static void
-fprintf_cfg_mib_sub(FILE *f, config_directive_t *section, char *base)
+static void fprintf_cfg_mib_sub(FILE *f, config_directive_t *section, char *base)
 {
   char *newbase;
 
-  for (; section; section = section->next) {
-    if (section->first_child) {
-      /* if (section->args[0] == '\0')
-         fprintf(f, "Section %s>\n", section->directive);
-         else
-         fprintf(f, "Section %s %s\n", section->directive, section->args); */
-      if (base) {
-        /* 3 = ">." + '\0' */
-        newbase = Xmalloc(strlen(base) + strlen(section->directive) + 3);
-        strcpy(newbase, base);
-        strcat(newbase, ">.");
-        strcat(newbase, section->directive);
-      }
-      else
-        newbase = strdup(section->directive);
+  for (; section; section = section->next)
+    {
+      if (section->first_child)
+	{
+	  /* if (section->args[0] == '\0')
+	     fprintf(f, "Section %s>\n", section->directive);
+	     else
+	     fprintf(f, "Section %s %s\n", section->directive, section->args); */
+	  if (base)
+	    {
+	      /* 3 = ">." + '\0' */
+	      newbase = Xmalloc(strlen(base) + strlen(section->directive) + 3);
+	      strcpy(newbase, base);
+	      strcat(newbase, ">.");
+	      strcat(newbase, section->directive);
+	    }
+	  else
+	    newbase = strdup(section->directive);
 
-      fprintf_cfg_mib_sub(f, section->first_child, newbase);
+	  fprintf_cfg_mib_sub(f, section->first_child, newbase);
 
-      /* free(newbase); */
-    }
-    else {
-      if (base)
-        fprintf(f, "%s.%s %s\n", base, section->directive, section->args);
+	  /* free(newbase); */
+	}
       else
-        fprintf(f, "%s %s\n", section->directive, section->args);
+	{
+	  if (base)
+	    fprintf(f, "%s.%s %s\n", base, section->directive, section->args);
+	  else
+	    fprintf(f, "%s %s\n", section->directive, section->args);
+	}
     }
-  }
 }
 
-void
-fprintf_cfg_mib(FILE *f, config_directive_t *section)
+void fprintf_cfg_mib(FILE *f, config_directive_t *section)
 {
   fprintf(f, "---[ config mib test ]---\n");
   fprintf_cfg_mib_sub(f, section, NULL);
@@ -1266,8 +1322,7 @@ fprintf_cfg_mib(FILE *f, config_directive_t *section)
 }
 
 
-void
-fprintf_directives(FILE *fp, orchids_t *ctx)
+void fprintf_directives(FILE *fp, orchids_t *ctx)
 {
   int mod;
   mod_cfg_cmd_t *d;
@@ -1280,21 +1335,22 @@ fprintf_directives(FILE *fp, orchids_t *ctx)
   for (d = config_dir_g; (*d).cmd; d++)
     fprintf(fp, "%20s | %.32s\n", (*d).name, (*d).help);
 
-  for (mod = 0; mod < ctx->loaded_modules; mod++) {
-    fprintf(fp, "\nmod %s directives :\n", ctx->mods[mod].mod->name);
-    fprintf(fp, "---------------------------------------------\n");
-    if (ctx->mods[mod].mod->cfg_cmds) {
-      for (d = ctx->mods[mod].mod->cfg_cmds; d->name; d++)
-        fprintf(fp, "%20s | %.32s\n", d->name, d->help);
+  for (mod = 0; mod < ctx->loaded_modules; mod++)
+    {
+      fprintf(fp, "\nmod %s directives :\n", ctx->mods[mod].mod->name);
+      fprintf(fp, "---------------------------------------------\n");
+      if (ctx->mods[mod].mod->cfg_cmds)
+	{
+	  for (d = ctx->mods[mod].mod->cfg_cmds; d->name; d++)
+	    fprintf(fp, "%20s | %.32s\n", d->name, d->help);
+	}
+      else
+	fprintf(fp, "no directive.\n");
     }
-    else
-      fprintf(fp, "no directive.\n");
-  }
 }
 
 
-void
-proceed_post_config(orchids_t *ctx)
+void proceed_post_config(orchids_t *ctx)
 {
   int mod_id;
   input_module_t *mod;
@@ -1302,11 +1358,12 @@ proceed_post_config(orchids_t *ctx)
 
   DebugLog(DF_CORE, DS_NOTICE, "*** proceeding to post configuration... ***\n");
 
-  for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++) {
-    mod = ctx->mods[mod_id].mod;
-    if (mod->post_config)
-      mod->post_config(ctx, &ctx->mods[mod_id]);
-  }
+  for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++)
+    {
+      mod = ctx->mods[mod_id].mod;
+      if (mod->post_config!=NULL)
+	(*mod->post_config) (ctx, &ctx->mods[mod_id]);
+    }
 
   gettimeofday(&ctx->postconfig_time, NULL);
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
@@ -1317,8 +1374,7 @@ proceed_post_config(orchids_t *ctx)
 }
 
 
-void
-proceed_post_compil(orchids_t *ctx)
+void proceed_post_compil(orchids_t *ctx)
 {
   int mod_id;
   input_module_t *mod;
@@ -1326,11 +1382,12 @@ proceed_post_compil(orchids_t *ctx)
 
   DebugLog(DF_CORE, DS_NOTICE, "*** proceeding to post rule compilation configuration... ***\n");
 
-  for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++) {
-    mod = ctx->mods[mod_id].mod;
-    if (mod->post_compil)
-      mod->post_compil(ctx, &ctx->mods[mod_id]);
-  }
+  for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++)
+    {
+      mod = ctx->mods[mod_id].mod;
+      if (mod->post_compil!=NULL)
+	(*mod->post_compil) (ctx, &ctx->mods[mod_id]);
+    }
 
   gettimeofday(&ctx->postcompil_time, NULL);
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);

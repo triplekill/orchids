@@ -19,98 +19,96 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits.h>
 
 #include "orchids.h"
 
 #include "stack.h"
 
-lifostack_t *
-new_stack(size_t initial_size, size_t grow_size)
+static void stack_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  lifostack_t *stk = (lifostack_t *)p;
+  int i;
+
+  for (i=0; i<stk->n; i++)
+    GC_TOUCH (gc_ctx, stk->data[i]);
+}
+
+static void stack_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  gc_base_free (((lifostack_t *)p)->data);
+}
+
+static int stack_traverse (gc_traverse_ctx_t *gtc,
+			   gc_header_t *p, void *data)
+{
+  lifostack_t *stk = (lifostack_t *)p;
+  int err = 0;
+  int i;
+
+  for (i=0; i<stk->n; i++)
+    {
+      err = (*gtc->do_subfield) (gtc, (gc_header_t *)stk->data[i], data);
+      if (err)
+	return err;
+    }
+  return err;
+}
+gc_class_t stack_class = {
+  GC_ID('s','t','c','k'),
+  stack_mark_subfields,
+  stack_finalize,
+  stack_traverse
+};
+  
+lifostack_t *new_stack(gc_t *gc_ctx, int nmax)
 {
   lifostack_t *s;
 
-  s = Xmalloc(sizeof (lifostack_t));
-
-  s->pos = -1;
-  s->size = initial_size;
-  s->grow = grow_size;
-  s->data = Xmalloc(initial_size * sizeof(void *));
-
-  return (s);
+  GC_START(gc_ctx, 1);
+  s = gc_alloc(gc_ctx, sizeof (lifostack_t), &stack_class);
+  GC_UPDATE(gc_ctx, 0, s);
+  s->n = 0;
+  s->nmax = nmax;
+  s->data = gc_base_malloc(gc_ctx, nmax * sizeof(gc_header_t *));
+  GC_END(gc_ctx);
+  return s;
 }
 
-void
-stack_resize(lifostack_t *stack, size_t newsize)
+void stack_push(gc_t *gc_ctx, lifostack_t *stack, gc_header_t *p)
 {
-  if (newsize <= stack->pos)
+  if (stack->n >= stack->nmax)
     {
-      DPRINTF( ("warning. data loss.\n") );
-      return ;
+      int new_nmax;
+
+      GC_START(gc_ctx, 1);
+      GC_UPDATE(gc_ctx, 0, p);
+      new_nmax = 2*stack->nmax;
+      if (new_nmax<=0) /* overflow */
+	{
+	  new_nmax = INT_MAX;
+	  if (new_nmax==stack->nmax)
+	    {
+	      fprintf(stderr, "stack_push: stack overflow.\n");
+	      exit(EXIT_FAILURE);
+	    }
+	}
+      stack->data = gc_base_realloc(gc_ctx, (void *)stack->data, new_nmax);
+      stack->nmax = new_nmax;
+      GC_END(gc_ctx);
     }
-
-  stack->data = Xrealloc(stack->data, newsize * sizeof (void *));
-  stack->size = newsize;
+  GC_TOUCH (gc_ctx, stack->data[stack->n++] = p);
 }
 
-void
-stack_shrink(lifostack_t *stack)
+gc_header_t *stack_pop(gc_t *gc_ctx, lifostack_t *stack)
 {
-  stack->size = stack->pos - (stack->pos % stack->grow) + stack->grow;
-  stack->data = Xrealloc(stack->data, stack->size * sizeof (void *));
-}
-
-void
-stack_free(lifostack_t *stack)
-{
-  Xfree(stack->data);
-  Xfree(stack);
-}
-
-void
-stack_push(lifostack_t *stack, void *data)
-{
-  /* do we need to grow stack ? */
-  if (stack->pos == (stack->size - 1))
+  if (stack->n <= 0)
     {
-      stack->size += stack->grow;
-      stack->data = Xrealloc(stack->data, stack->size * (sizeof (void *)));
+      fprintf (stderr, "stack_pop: stack underflow.\n");
+      exit(EXIT_FAILURE);
     }
-
-  stack->data[ ++stack->pos ] = data;
+  return stack->data[--stack->n];
 }
-
-void *
-stack_pop(lifostack_t *stack)
-{
-  if (stack->pos < 0)
-    return (NULL);
-
-  return (stack->data[ stack->pos-- ]);
-}
-
-#if 0
-void
-lifostack_test(void)
-{
-  int i, j;
-  lifostack_t *s;
-
-  s = new_stack(100, 100);
-
-  for (i = 0; i < 100000000; ++i)
-    STACK_push(s, (void *) i);
-
-  for (i = 0; i < 86700000; ++i)
-    j = (int) STACK_pop(s);
-
-  printf("size: %i pos: %i.\n", s->size, s->pos);
-  stack_shrink(s);
-  printf("new size: %i pos: %i.\n", s->size, s->pos);
-
-  exit(EXIT_SUCCESS);
-}
-
-#endif
 
 
 

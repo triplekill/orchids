@@ -23,44 +23,44 @@
 #include <string.h>
 
 #include "safelib.h"
-
+#include "gc.h"
 #include "objhash.h"
 
 /*
  * Default behaviour for hashing strings.
  */
-objhash_t *
-new_objhash(size_t hsize)
+objhash_t *new_objhash(gc_t *ctx, size_t hsize)
 {
   objhash_t *h;
+  size_t i;
 
-  h = Xmalloc(sizeof (objhash_t));
+  h = gc_base_malloc (ctx, sizeof (objhash_t));
   h->size = hsize;
   h->elmts = 0;
   h->hash = DEFAULT_OBJHASH_FUNCTION;
   h->cmp = DEFAULT_OBJCMP_FUNCTION;
-  h->htable = Xzmalloc(hsize * sizeof (objhash_elmt_t *));
-
-  return (h);
+  h->htable = gc_base_malloc (ctx, hsize * sizeof (objhash_elmt_t *));
+  for (i=0; i<hsize; i++)
+    h->htable[i] = NULL;
+  return h;
 }
 
-void
-objhash_resize(objhash_t *hash, size_t newsize)
+void objhash_resize(gc_t *ctx, objhash_t *hash, size_t newsize)
 {
   objhash_elmt_t **old_htable;
-  int i;
+  size_t i;
 
   /* XXX: Not tested !!! */
   printf("Not tested !...\n");
 
   old_htable = hash->htable;
-  hash->htable = Xzmalloc(newsize * sizeof (objhash_elmt_t *));
+  hash->htable = gc_base_malloc (ctx, newsize * sizeof (objhash_elmt_t *));
 
   for (i = 0; i < hash->size; ++i)
     {
       objhash_elmt_t *tmp;
 
-      for (tmp = old_htable[i]; tmp; tmp = tmp->next)
+      for (tmp = old_htable[i]; tmp!=NULL; tmp = tmp->next)
         {
           unsigned long hcode;
 
@@ -70,19 +70,41 @@ objhash_resize(objhash_t *hash, size_t newsize)
         }
     }
 
-  Xfree(old_htable);
+  gc_base_free (old_htable);
   hash->size = newsize;
 }
 
-void
-objhash_add(objhash_t *hash, void *data, void *key)
+
+void free_objhash(objhash_t *hash, void (*elmt_free)(void *e))
+{
+  int i;
+  objhash_elmt_t *tmp;
+  objhash_elmt_t *tmp_next;
+
+  for (i = 0; i < hash->size; i++) {
+    tmp = hash->htable[i];
+    while (tmp) {
+      tmp_next = tmp->next;
+      if (elmt_free)
+        (*elmt_free)(tmp->data);
+      gc_base_free(tmp);
+      tmp = tmp_next;
+    }
+  }
+  gc_base_free(hash->htable);
+  gc_base_free(hash);
+}
+
+/* !!! ecrire objhash_free() */
+
+void objhash_add(gc_t *ctx, objhash_t *hash, void *data, void *key)
 {
   objhash_elmt_t *elmt;
   unsigned long hcode;
 
-  elmt = Xmalloc(sizeof (objhash_elmt_t));
-  elmt->key = key;
-  elmt->data = data;
+  elmt = gc_base_malloc (ctx, sizeof (objhash_elmt_t));
+  GC_TOUCH (ctx, elmt->key = key);
+  GC_TOUCH (ctx, elmt->data = data);
 
   hcode = hash->hash(key) % hash->size;
   elmt->next = hash->htable[hcode];
@@ -90,8 +112,7 @@ objhash_add(objhash_t *hash, void *data, void *key)
   hash->elmts++;
 }
 
-void *
-objhash_del(objhash_t *hash, void *key)
+void *objhash_del(objhash_t *hash, void *key)
 {
   objhash_elmt_t **head;
   objhash_elmt_t  *elmt;
@@ -107,35 +128,33 @@ objhash_del(objhash_t *hash, void *key)
         prev->next = elmt->next;
       else
         *head = elmt->next;
-      Xfree(elmt);
-
-      return (data);
+      gc_base_free (elmt);
+      /* elmt->key and elmt->data will be deallocated, if needed,
+	 by the garbage collector */
+      return data;
     }
     prev = elmt;
   }
-
-  return (NULL);
+  return NULL;
 }
 
 
-void *
-objhash_get(objhash_t *hash, void *key)
+void *objhash_get(objhash_t *hash, void *key)
 {
   objhash_elmt_t *elmt;
 
   elmt = hash->htable[hash->hash(key) % hash->size];
   for (; elmt; elmt = elmt->next) {
       if (!hash->cmp(key, elmt->key))
-        return (elmt->data);
+        return elmt->data;
     }
-
-  return (NULL);
+  return NULL;
 }
 
-int
-objhash_walk(objhash_t *hash, int (func)(void *elmt, void *data), void *data)
+int objhash_walk(objhash_t *hash, int (*func)(void *key, void *elmt, void *data),
+		 void *data)
 {
-  int   i;
+  size_t i;
 
   for (i = 0; i < hash->size; i++)
     {
@@ -144,11 +163,11 @@ objhash_walk(objhash_t *hash, int (func)(void *elmt, void *data), void *data)
 
       for (tmp = hash->htable[i]; tmp; tmp = tmp->next)
         {
-          if ((status = func(tmp->data, data)) != 0)
-            return (status);
+          if ((status = (*func) (tmp->key, tmp->data, data)) != 0)
+            return status;
         }
     }
-  return (0);
+  return 0;
 }
 
 
@@ -177,7 +196,7 @@ objhash_pjw(void *key)
 int
 objhash_cmp(void *obj1, void *obj2)
 {
-  return ( strcmp( (char *)obj1, (char *)obj2 ) );
+  return strcmp( (char *)obj1, (char *)obj2 );
 }
 
 

@@ -266,11 +266,12 @@ radm_cmd_dumpinst(FILE *fp, orchids_t *ctx, char *args)
   }
 
   if ((args[0] >= '0') && (args[0] <= '9')) {
-    rid = atoi(args);
+    rid = strtol(args, (char **)NULL, 10);
     for (r = ctx->first_rule_instance; rid > 0 && r; --rid, r = r->next)
       ;
     if (rid) {
-      fprintf(fp, "rule instance %i doesn't exists.\n", atoi(args));
+      fprintf(fp, "rule instance %li doesn't exists.\n",
+	      strtol(args, (char **)NULL, 10));
       show_prompt(fp);
       return ;
     }
@@ -304,7 +305,7 @@ radm_cmd_dumprule(FILE *fp, orchids_t *ctx, char *args)
   }
 
   if (((args[0] - '0') >= 0) && ((args[0] - '0') <= 9)) {
-    rn = atoi(args);
+    rn = strtol(args, (char **)NULL, 10);
     for (r = ctx->rule_compiler->first_rule; rn > 0 && r; --rn, r = r->next)
       ;
   } else {
@@ -383,7 +384,7 @@ radm_cmd_feedback(FILE *fp, orchids_t *ctx, char *args)
   }
 
   memset(&srvaddr, 0, sizeof (struct sockaddr_in));
-  memcpy(&srvaddr.sin_addr, he->h_addr, he->h_length);
+  memcpy(&srvaddr.sin_addr, he->h_addr_list[0], he->h_length);
   srvaddr.sin_family = he->h_addrtype;
   srvaddr.sin_port = htons(port);
 
@@ -463,10 +464,10 @@ radm_preconfig(orchids_t *ctx, mod_entry_t *mod)
   DebugLog(DF_MOD, DS_INFO,
            "loading remoteadm module @ %p\n", (void *) &mod_remoteadm);
 
-  mod_cfg = Xzmalloc(sizeof (radmcfg_t));
+  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (radmcfg_t));
   mod_cfg->listen_port = DEFAULT_RADM_PORT;
 
-  return (mod_cfg);
+  return mod_cfg;
 }
 
 
@@ -485,7 +486,7 @@ set_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int port;
 
-  port = atoi(dir->args);
+  port = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO, "setting tcp listen port on %i\n", port);
 
   if (port > 0)

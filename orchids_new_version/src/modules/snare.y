@@ -87,14 +87,18 @@
 #define O_LARGEFILE    0100000
 #endif
 
+static gc_t *gc_ctx_g;
+static ovm_var_t *delegate_g;
 static ovm_var_t **fields_g;
 static char *linux24_syscall_name_g[256];
-static char *linux24_sockcall_name_g[4];
+//static char *linux24_sockcall_name_g[4];
 
 extern int snarelex(void);
 extern void snareerror(char *s);
 extern char *snaretext;
 
+void snareparse_set_gc_ctx(gc_t *gc_ctx);
+void snareparse_set_delegate(ovm_var_t *delegate);
 void snareparse_set_attrs(ovm_var_t **attr_fields);
 
 #define SOCKET_ACCEPT  0
@@ -204,13 +208,15 @@ snareline:
   TOKEN_EVENT ',' event
   TOKEN_RETURN ',' INTEGER '\t'
   TOKEN_SEQUENCE ',' INTEGER
-    {
-      fields_g[F_RETCODE] = ovm_int_new();
-      INT(fields_g[F_RETCODE]) = $10;
-      fields_g[F_SEQUENCE] = ovm_int_new();
-      INT(fields_g[F_SEQUENCE]) = $14;
-      fields_g[F_SEQUENCE]->flags |= TYPE_MONO;
-    }
+  {
+    ovm_var_t *val;
+
+    val = ovm_int_new(gc_ctx_g, $10);
+    GC_TOUCH (gc_ctx_g, fields_g[F_RETCODE] = val);
+
+    val = ovm_int_new(gc_ctx_g, $14);
+    GC_TOUCH (gc_ctx_g, fields_g[F_SEQUENCE] = val);
+  }
 ;
 
 event:
@@ -228,46 +234,67 @@ io_event:
   SYS_OPEN '(' sys_open_mode sys_open_opts ')' ',' date '\t'
   field_user field_process field_path perm_attributes
     {
-      fields_g[F_MODE] = ovm_int_new();
-      INT(fields_g[F_MODE]) = $3 | $4;
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_open ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_open ] );
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $3 | $4);
+      GC_TOUCH (gc_ctx_g, fields_g[F_MODE] = val);
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[SYS_open];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 | perm_io_syscall '(' ')' ',' date '\t'
   field_user field_process field_path perm_attributes
     {
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      ovm_var_t *val;
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 | SYS_MKNOD '(' sys_mknod_opts ')' ',' date '\t'
   field_user field_process field_path dev_attributes
     {
+      ovm_var_t *val;
+
       DPRINTF( ("set io_event mknod()\n") );
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_mknod ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_mknod ] );
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[SYS_mknod];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
+
       /* XXX set mknod opts */
     }
 | trunc_syscall '(' sys_mknod_opts ')' ',' date '\t'
   field_user field_process field_path
   TOKEN_ATTRIBUTES ',' INTEGER '\t'
     {
+      ovm_var_t *val;
+
       DPRINTF( ("set trunc attributes\n") );
-      fields_g[F_OFFSET] = ovm_int_new();
-      INT(fields_g[F_OFFSET]) = $13;
+
+      val = ovm_int_new (gc_ctx_g, $13);
+      GC_TOUCH (gc_ctx_g, fields_g[F_OFFSET] = val);
+
       DPRINTF( ("set io_event syscall (f)truncate(64)()\n") );
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[ $1 ];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 | io_syscall '(' ')' ',' date '\t'
   field_user field_process field_path
     {
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      ovm_var_t *val;
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[ $1 ];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -296,8 +323,10 @@ perm_attributes:
     { /* do_nothing() */; }
 | TOKEN_ATTRIBUTES ',' UNIXPERM '\t'
     {
-      fields_g[F_CREATEMODE] = ovm_int_new();
-      INT(fields_g[F_CREATEMODE]) = $3;
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_CREATEMODE] = val);
     }
 ;
 
@@ -306,11 +335,15 @@ dev_attributes:
     { /* do_nothing() */; }
 | TOKEN_ATTRIBUTES ',' INTEGER ' ' INTEGER '\t'
     {
+      ovm_var_t *val;
+
       DPRINTF( ("set device attribute") );
-      fields_g[F_DEVMAJ] = ovm_int_new();
-      INT(fields_g[F_DEVMAJ]) = $3;
-      fields_g[F_DEVMIN] = ovm_int_new();
-      INT(fields_g[F_DEVMIN]) = $5;
+
+      val = ovm_int_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_DEVMAJ] = val);
+
+      val = ovm_int_new (gc_ctx_g, $5);
+      GC_TOUCH (gc_ctx_g, fields_g[F_DEVMIN] = val);
     }
 ;
 
@@ -401,13 +434,18 @@ chown_event:
   field_user field_process field_path
   TOKEN_OWNER ',' STRING '(' INTEGER ')' ',' opt_username '(' INTEGER ')' '\t'
     {
-      fields_g[F_OWNERUID] = ovm_int_new();
-      INT(fields_g[F_OWNERUID]) = $14;
-      fields_g[F_OWNERGID] = ovm_int_new();
-      INT(fields_g[F_OWNERGID]) = $19;
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $14);
+      GC_TOUCH (gc_ctx_g, fields_g[F_OWNERUID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $19);
+      GC_TOUCH (gc_ctx_g, fields_g[F_OWNERGID] = val);
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[ $1 ];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -429,12 +467,19 @@ exec_event:
   field_user field_process field_path
   TOKEN_ARGUMENTS ',' DATA_STRING '\t'
     {
-      fields_g[F_CMDLINE] = ovm_str_new( strlen($12) );
-      memcpy( STR(fields_g[F_CMDLINE]), $12, strlen($12));
+      ovm_var_t *val;
+      size_t len;
+
+      len = strlen($12);
+      val = ovm_str_new (gc_ctx_g, len);
+      memcpy(STR(val), $12, len);
+      GC_TOUCH (gc_ctx_g, fields_g[F_CMDLINE] = val);
       free($12); /* XXX: compute offsets and sizes instead of dup()ing strings */
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_execve ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_execve ] );
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[ SYS_execve ];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -442,9 +487,12 @@ proc_event:
   proc_syscall '(' ')' ',' date '\t'
   field_user field_process
     {
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      ovm_var_t *val;
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[ $1 ];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -460,22 +508,31 @@ net_event:
   field_user field_process
   TOKEN_SOCKET ',' INETADDR ',' INETADDR ',' INTEGER ',' INTEGER '\t'
     {
-      fields_g[F_SRCIP] = ovm_ipv4_new();
-      IPV4( fields_g[F_SRCIP] ) = $12;
-      fields_g[F_DSTIP] = ovm_ipv4_new();
-      IPV4( fields_g[F_DSTIP] ) = $14;
-      fields_g[F_SRCPORT] = ovm_int_new();
-      INT(fields_g[F_SRCPORT]) = $16;
-      fields_g[F_DSTPORT] = ovm_int_new();
-      INT(fields_g[F_DSTPORT]) = $18;
+      ovm_var_t *val;
 
-      fields_g[F_SOCKCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SOCKCALL] ) = linux24_sockcall_name_g[ $3 ];
-      VSTRLEN( fields_g[F_SOCKCALL] ) = strlen( linux24_sockcall_name_g[ $3 ] );
+      val = ovm_ipv4_new (gc_ctx_g);
+      IPV4(val) = $12;
+      GC_TOUCH (gc_ctx_g, fields_g[F_SRCIP] = val);
 
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ SYS_socketcall ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ SYS_socketcall ] );
+      val = ovm_ipv4_new (gc_ctx_g);
+      IPV4(val) = $14;
+      GC_TOUCH (gc_ctx_g, fields_g[F_DSTIP] = val);
+
+      val = ovm_int_new (gc_ctx_g, $16);
+      GC_TOUCH (gc_ctx_g, fields_g[F_SRCPORT] = val);
+
+      val = ovm_int_new (gc_ctx_g, $18);
+      GC_TOUCH (gc_ctx_g, fields_g[F_DSTPORT] = val);
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$3];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SOCKCALL] = val);
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[SYS_socketcall];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -493,13 +550,21 @@ copy_event:
   field_user field_process field_path
   TOKEN_DESTPATH ',' DATA_STRING '\t'
     {
+      ovm_var_t *val;
+      size_t len;
+
       DPRINTF( ("set destpath\n") );
-      fields_g[F_DSTPATH] = ovm_str_new(strlen($12));
-      memcpy( STR(fields_g[F_DSTPATH]), $12, strlen($12));
+
+      len = strlen($12);
+      val = ovm_str_new (gc_ctx_g, len);
+      memcpy(STR(val), $12, len);
       free($12); /* XXX: compute offsets and sizes instead of dup()ing strings */
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      GC_TOUCH (gc_ctx_g, fields_g[F_DSTPATH] = val);
+
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -521,30 +586,37 @@ setid_event:
   field_user field_process
   TOKEN_TARGET ',' STRING '(' INTEGER ')' '\t'
     {
+      ovm_var_t *val;
+
       /* DPRINTF( ("set token target\n") ); */
-      fields_g[F_TARGETID] = ovm_int_new();
-      INT(fields_g[F_TARGETID]) = $13;
+      val = ovm_int_new (gc_ctx_g, $13);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETID] = val);
       /* XXX */
 
       /* DPRINTF( ("setid_event\n") ); */
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 | setreid_syscall '(' ')' ',' date '\t'
   field_user field_process
   TOKEN_TARGET ',' STRING '(' INTEGER ')' ',' opt_username '(' INTEGER ')' '\t'
     {
+      ovm_var_t *val;
+
       /* DPRINTF( ("set token target\n") ); */
-      fields_g[F_TARGETID] = ovm_int_new();
-      INT(fields_g[F_TARGETID]) = $13;
-      fields_g[F_TARGETRID] = ovm_int_new();
-      INT(fields_g[F_TARGETRID]) = $18;
+      val = ovm_int_new (gc_ctx_g, $13);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $18);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETRID] = val);
 
       /* DPRINTF( ("setreid_event\n") ); */
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 | setresid_syscall '(' ')' ',' date '\t'
   field_user field_process
@@ -552,18 +624,23 @@ setid_event:
              opt_username '(' INTEGER ')' ','
              opt_username '(' INTEGER ')' '\t'
     {
+      ovm_var_t *val;
+
       /* DPRINTF( ("set token target\n") ); */
-      fields_g[F_TARGETID] = ovm_int_new();
-      INT(fields_g[F_TARGETID]) = $13;
-      fields_g[F_TARGETRID] = ovm_int_new();
-      INT(fields_g[F_TARGETRID]) = $18;
-      fields_g[F_TARGETSID] = ovm_int_new();
-      INT(fields_g[F_TARGETSID]) = $23;
+      val = ovm_int_new (gc_ctx_g, $13);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $18);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETRID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $23);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TARGETSID] = val);
 
       /* DPRINTF( ("setresid_event\n") ); */
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -611,10 +688,13 @@ kern_event:
   kern_syscall '(' ')' ',' date '\t'
   field_user field_process field_path '\t'
     {
+      ovm_var_t *val;
+
       DPRINTF( ("kern_event\n") );
-      fields_g[F_SYSCALL] = ovm_vstr_new();
-      VSTR( fields_g[F_SYSCALL] ) = linux24_syscall_name_g[ $1 ];
-      VSTRLEN( fields_g[F_SYSCALL] ) = strlen( linux24_syscall_name_g[ $1 ] );
+      val = ovm_vstr_new (gc_ctx_g, NULL);
+      VSTR(val) = linux24_syscall_name_g[$1];
+      VSTRLEN(val) = strlen(VSTR(val));
+      GC_TOUCH (gc_ctx_g, fields_g[F_SYSCALL] = val);
     }
 ;
 
@@ -628,20 +708,31 @@ kern_syscall:
 field_path:
   TOKEN_PATH ',' DATA_STRING '\t'
     {
-      fields_g[F_PATH] = ovm_str_new(strlen($3));
-      memcpy( STR(fields_g[F_PATH]), $3, strlen($3));
+      ovm_var_t *val;
+      size_t len;
+
+      len = strlen($3);
+      val = ovm_str_new (gc_ctx_g, len);
+      memcpy(STR(val), $3, len);
       free($3); /* XXX: compute offsets and sizes instead of dup()ing strings */
+      GC_TOUCH (gc_ctx_g, fields_g[F_PATH] = val);
     }
 ;
 
 field_process:
   TOKEN_PROCESS ',' INTEGER ',' STRING '\t'
     {
-      fields_g[F_PID] = ovm_int_new();
-      INT(fields_g[F_PID]) = $3;
-      fields_g[F_PROCNAME] = ovm_str_new( strlen($5) );
-      memcpy( STR(fields_g[F_PROCNAME]), $5, strlen($5));
+      ovm_var_t *val;
+      size_t len;
+
+      val = ovm_int_new (gc_ctx_g, $3);
+      GC_TOUCH (gc_ctx_g, fields_g[F_PID] = val);
+
+      len = strlen($5);
+      val = ovm_str_new (gc_ctx_g, len);
+      memcpy(STR(val), $5, len);
       free($5); /* XXX: compute offsets and sizes instead of dup()ing strings */
+      GC_TOUCH (gc_ctx_g, fields_g[F_PROCNAME] = val);
     }
 ;
 
@@ -652,27 +743,43 @@ field_user:
   STRING '(' INTEGER ')' ','
   STRING '(' INTEGER ')' '\t'
     {
-      fields_g[F_RUID] = ovm_int_new();
-      INT(fields_g[F_RUID]) = $5;
-      fields_g[F_RGID] = ovm_int_new();
-      INT(fields_g[F_RGID]) = $10;
-      fields_g[F_EUID] = ovm_int_new();
-      INT(fields_g[F_EUID]) = $15;
-      fields_g[F_EGID] = ovm_int_new();
-      INT(fields_g[F_EGID]) = $20;
+      ovm_var_t *val;
+
+      val = ovm_int_new (gc_ctx_g, $5);
+      GC_TOUCH (gc_ctx_g, fields_g[F_RUID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $10);
+      GC_TOUCH (gc_ctx_g, fields_g[F_RGID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $15);
+      GC_TOUCH (gc_ctx_g, fields_g[F_EUID] = val);
+
+      val = ovm_int_new (gc_ctx_g, $20);
+      GC_TOUCH (gc_ctx_g, fields_g[F_EGID] = val);
     }
 ;
 
 date:
   TOKEN_DATE
     {
-      fields_g[F_TIME] = ovm_ctime_new();
-      CTIME(fields_g[F_TIME]) = $1;
-      fields_g[F_TIME]->flags |= TYPE_MONO;
+      ovm_var_t *val;
+
+      val = ovm_ctime_new (gc_ctx_g, $1);
+      GC_TOUCH (gc_ctx_g, fields_g[F_TIME] = val);
     }
 ;
 
 %%
+
+void snareparse_set_gc_ctx(gc_t *gc_ctx)
+{
+  gc_ctx_g = gc_ctx;
+}
+
+void snareparse_set_delegate(ovm_var_t *delegate)
+{
+  delegate_g = delegate;
+}
 
 void
 snareparse_set_attrs(ovm_var_t **attr_fields)
@@ -935,12 +1042,14 @@ static char *linux24_syscall_name_g[256] = {
   NULL
 };
 
+/*
 static char *linux24_sockcall_name_g[4] = {
   "(5) SYS_ACCEPT",
   "(3) SYS_CONNECT",
   "(0) Unknown",
   NULL
 };
+*/
 
 
 

@@ -23,32 +23,38 @@ struct lifostack_s
   /*
   ** pos: position in stack. points on top stack elements
   */
-  int pos;
-  size_t size;
-  size_t grow;
-  void **data;
+  gc_header_t gc;
+  int n; /* current number of elements in data[] */
+  int nmax; /* max number of elements in data[]; should be >0. */
+  gc_header_t **data; /* pointer to array[nmax] */
 };
 
 /* macro version of stack_push and stack_pop -- really faster */
 
-#define STACK_pop(stack) \
-  ((stack)->pos < 0 ? NULL : (stack)->data[ stack->pos--] )
+#define STACK_POP(gc_ctx,stack) \
+  (((stack)->n > 0) ? \
+   (stack)->data[--(stack)->n] :		\
+   stack_pop (gc_ctx,stack))
+#define STACK_ELT(stack,i) (stack)->data[(stack)->n-(i)]
+#define STACK_DROP(stack,k)		 \
+  (stack)->n -= (k)
+#define STACK_DEPTH(stack) (stack)->n
+#define STACK_PUSH_NOTOUCH(gc_ctx, stack, value) \
+  do {									\
+  if ((stack)->n < (stack)->nmax) \
+    { (stack)->data[(stack)->n++] = value; } \
+  else stack_push(gc_ctx, stack, value); \
+  } while (0)
+#define STACK_PUSH(gc_ctx, stack, value) \
+  do {									\
+  if ((stack)->n < (stack)->nmax) \
+    { GC_TOUCH(gc_ctx, value); (stack)->data[(stack)->n++] = value; } \
+  else stack_push(gc_ctx, stack, value); \
+  } while (0)
 
-#define STACK_push(stack, value)                                             \
-do {                                                                         \
-  if ((stack)->pos == (stack)->size - 1) {                                   \
-    (stack)->size += (stack)->grow;                                          \
-    (stack)->data = xrealloc((stack)->data, (stack)->size*(sizeof(void *))); \
-  }                                                                          \
-  stack->data[ ++stack->pos ] = value;                                       \
-} while (0)
-
-lifostack_t *new_stack(size_t initial_size, size_t grow_size);
-void stack_push(lifostack_t *stack, void *data);
-void *stack_pop(lifostack_t *stack);
-void stack_resize(lifostack_t *stack, size_t newsize);
-void stack_shrink(lifostack_t *stack);
-void stack_free(lifostack_t *stack);
+lifostack_t *new_stack(gc_t *gc_ctx, int nmax);
+void stack_push(gc_t *gc_ctx, lifostack_t *stack, gc_header_t *p);
+gc_header_t *stack_pop(gc_t *gc_ctx, lifostack_t *stack);
 
 #endif /* STACK_H */
 

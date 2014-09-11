@@ -61,56 +61,51 @@
 #define F_KILLSIG 34
 
 
-static int
-read_io(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+static int read_io(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_pc(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_exec(gc_t *gc_ctx,
+		     ovm_var_t *delegate,
+		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_net(gc_t *gc_ctx,
+		    ovm_var_t *delegate,
+		    ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_pt(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_kill(gc_t *gc_ctx,
+		     ovm_var_t *delegate,
+		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_ch(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_cp(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_su(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+
+static int read_ad(gc_t *gc_ctx,
+		   ovm_var_t *delegate,
+		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
 
 
-static int
-read_pc(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
+static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			    void *data);
 
-
-static int
-read_exec(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_net(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_pt(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_kill(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_ch(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_cp(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_su(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-read_ad(ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int
-rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
-
-
-static void *
-rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-add_udp_source(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void *rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
 

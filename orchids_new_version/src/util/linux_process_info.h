@@ -17,6 +17,7 @@
 #ifndef _LIN_PROC_INFO_H_
 #define _LIN_PROC_INFO_H_
 
+#define MAX_COMM_SIZE 16
 /*
 ** linux (2.4) process informations in /proc/<pid>/stat
 ** see manpage proc(5) more informations
@@ -25,7 +26,7 @@ typedef struct linux_process_info_s linux_process_info_t;
 struct linux_process_info_s
 {
   pid_t         pid;
-  char          comm[16];
+  char          comm[MAX_COMM_SIZE];
   char          pad_for_state[3];
   char          state;
   pid_t         ppid;

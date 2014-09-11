@@ -15,7 +15,7 @@ orchids_SOURCES = \
         issdl.yy.c issdl.tab.c issdl.tab.h                \
  \
         util/array.c               util/array.h           \
-                                   util/queue.c           \
+        util/gc.c utils/gc.h       util/queue.c           \
         util/crc32.c               util/queue.h           \
         util/debuglog.c            util/debuglog.h        \
         util/safelib.c             util/safelib.h         \

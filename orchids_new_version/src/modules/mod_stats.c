@@ -40,7 +40,7 @@ set_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int port;
 
-  port = atoi(dir->args);
+  port = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO, "setting tcp listen port on %i\n", port);
 
   if (port > 0)

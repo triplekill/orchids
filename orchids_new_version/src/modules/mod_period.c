@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "orchids.h"
+#include "ovm.h"
 
 #include "file_cache.h"
 #include "period.h"
@@ -32,14 +33,13 @@
 
 input_module_t mod_period;
 
-static int
-qsort_strcmp(const void *a, const void *b)
+static int qsort_strcmp(const void *a, const void *b)
 {
   return ( strcmp(*(char **)a, *(char **)b) );
 }
 
-static int
-period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg)
+static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
+			     FILE *menufp, html_output_cfg_t *htmlcfg)
 {
   FILE *fp;
   int i;
@@ -52,20 +52,25 @@ period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
           "target=\"main\">Periods</a><br/>\n");
 
   fp = create_html_file(htmlcfg, "orchids-period.html", NO_CACHE);
+  if (fp==NULL)
+    return -1;
   fprintf_html_header(fp, "Orchids frequencies / phases tables");
 
   fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
 
   ctx_array = NULL;
   ctx_array_sz = 0;
-  for (i = 0; i < ctx->temporal->size; i++) {
-    for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next) {
-      ctx_array_sz++;
-      ctx_array = Xrealloc(ctx_array, ctx_array_sz * sizeof (char *));
-      ctx_array[ ctx_array_sz - 1 ] = helmt->key;
-/*       period_output_gnuplot(); */
+  for (i = 0; i < ctx->temporal->size; i++)
+    {
+      for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next)
+	{
+	  ctx_array_sz++;
+	  ctx_array = gc_base_realloc(ctx->gc_ctx, ctx_array,
+				      ctx_array_sz * sizeof (char *));
+	  ctx_array[ctx_array_sz - 1] = helmt->key;
+	  /*       period_output_gnuplot(); */
+	}
     }
-  }
   qsort(ctx_array, ctx_array_sz, sizeof (char *), qsort_strcmp);
 
   fprintf(fp, "%zd context%s<br/><br/><br/>\n",
@@ -74,53 +79,49 @@ period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
   for (i = 0; i < ctx_array_sz; i++)
     fprintf(fp, "%i: %s<br/>\n", i, ctx_array[i]);
 
-  if (ctx_array_sz > 0)
-    Xfree(ctx_array);
+  if (ctx_array!=NULL)
+    gc_base_free(ctx_array);
 
   fprintf_html_trailer(fp);
-  Xfclose(fp);
-
-  return (0);
+  return fclose(fp);
 }
 
 
-static void
-issdl_temporal(orchids_t *ctx, state_instance_t *state)
+static void issdl_temporal(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *str;
   void *temp_ctx;
   char *key;
 
-  /* XXX: if str is temp, clone ! */
-  str = stack_pop(ctx->ovm_stack);
-  if (TYPE(str) != T_STR) {
-    DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
-    ISSDL_RETURN_PARAM_ERROR(ctx, state);
-    return ;
-  }
-
-  DebugLog(DF_ENG, DS_INFO, "Updating temporal information for container %s\n", STR(str));
-
-  key = ovm_strdup(str);
+  str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (str==NULL || (TYPE(str)!=T_STR && TYPE(str)!=T_VSTR))
+    {
+      DebugLog(DF_MOD, DS_ERROR, "parameter type error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
+  key = ovm_strdup(ctx->gc_ctx, str);
+  DebugLog(DF_MOD, DS_INFO,
+	   "Updating temporal information for container %s\n", key);
 
   temp_ctx = strhash_get(ctx->temporal, key);
-
-  if (temp_ctx == NULL) {
-    DebugLog(DF_ENG, DS_INFO, "New container %s\n", key);
-    /* create container ctx */
-    /* add to hash */
-    strhash_add(ctx->temporal, (void *)1, key);
-  }
-  else {
-    Xfree(key);
-  }
+  if (temp_ctx == NULL)
+    {
+      DebugLog(DF_ENG, DS_INFO, "New container %s\n", key);
+      /* create container ctx */
+      /* add to hash */
+      strhash_add(ctx->temporal, (void *)1, key);
+    }
+  else
+    gc_base_free(key);
 
   /* update temporal info */
-  ISSDL_RETURN_TRUE(ctx, state);
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_RETURN_TRUE(ctx);
 }
 
-static void *
-period_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   period_config_t *cfg;
 
@@ -128,27 +129,24 @@ period_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
-  cfg = Xzmalloc(sizeof (period_config_t));
-  cfg->contexts = new_strhash(65537);
+  cfg = gc_base_malloc (ctx->gc_ctx, sizeof (period_config_t));
+  cfg->contexts = new_strhash(ctx->gc_ctx, 65537);
 
   register_lang_function(ctx, issdl_temporal,
                          "temporal", 1, "update a temporal context");
 
   html_output_add_menu_entry(ctx, mod, period_htmloutput);
-
   /* return config structure, for module manager */
-  return (cfg);
+  return cfg;
 }
 
-static void
-period_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void period_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ module configuration.
   ** (register configurable callbacks for examples) */
 }
 
-static void
-period_postcompil(orchids_t *ctx, mod_entry_t *mod)
+static void period_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   /* Do all thing needed _AFTER_ rule compilation. */
 }
@@ -159,7 +157,7 @@ set_some_option(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int someoption;
 
-  someoption = atoi(dir->args);
+  someoption = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO, "setting some_option to %i\n", someoption);
 
 /*   ((period_config_t *)mod->config)->some_option = someoption; */
