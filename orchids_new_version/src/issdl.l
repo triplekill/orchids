@@ -103,6 +103,7 @@ static size_t qstr_sz_g;
 "^"        { return (O_XOR);    }
 "&&"       { return (ANDAND);   }
 "&"        { return (O_AND);    }
+"!"        { return (BANG);    }
 "~"        { return (O_NOT);    }
 "=="       { return (EQCOMPARE); }
 "!="       { return (NOTEQUAL); }

@@ -273,7 +273,7 @@ expr:
 | expr OROR expr
   { RESULT($$, build_expr_cond(compiler_ctx_g, OROR, $1, $3)); }
 | BANG expr
-  { RESULT($$, build_expr_cond(compiler_ctx_g, BANG, NULL, $3)); }
+  { RESULT($$, build_expr_cond(compiler_ctx_g, BANG, NULL, $2)); }
 | expr O_AND expr
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_AND, $1, $3)); }
 | expr O_OR expr
