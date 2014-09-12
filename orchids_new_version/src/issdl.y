@@ -70,7 +70,7 @@ extern int display_func(void *data, void *param);
 %left GREATER LESS GREATER_EQ LESS_EQ
 %left O_PLUS O_PLUS_EVENT O_MINUS
 %left O_TIMES O_DIV O_MOD
-%right PLUSPLUS MINUSMINUS O_NOT
+%right PLUSPLUS MINUSMINUS O_NOT BANG
 
 %token RULE STATE IF ELSE EXPECT GOTO /* Special keywords */
 %token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT EQ /* Punctuation */
@@ -272,6 +272,8 @@ expr:
   { RESULT($$, build_expr_cond(compiler_ctx_g, ANDAND, $1, $3)); }
 | expr OROR expr
   { RESULT($$, build_expr_cond(compiler_ctx_g, OROR, $1, $3)); }
+| BANG expr
+  { RESULT($$, build_expr_cond(compiler_ctx_g, BANG, NULL, $3)); }
 | expr O_AND expr
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_AND, $1, $3)); }
 | expr O_OR expr

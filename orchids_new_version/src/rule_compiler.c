@@ -2496,6 +2496,14 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	    compile_bytecode_cond(BIN_RVAL(expr), code, label_then, label_else);
 	    return;
 	  }
+	case BANG:
+	  {
+	    unsigned int label_i = NEW_LABEL(code->labels); 
+
+	    compile_bytecode_cond(BIN_LVAL(expr), code, label_else, label_then); 
+	    SET_LABEL (code->ctx, code->labels, code->pos, label_i);
+	    return;
+	  }
 	default:
 	  DPRINTF( ("Rule compiler cond : unknown op (%i)\n", BINOP(expr)) );
 	  return;
@@ -2837,6 +2845,12 @@ void fprintf_expr_infix(FILE *fp, node_expr_t *expr)
 	  break;
 	case ANDAND:
 	  fprintf(fp, "&& ");
+	  break;
+	case OROR:
+	  fprintf(fp, "|| ");
+	  break;
+	case BANG:
+	  fprintf(fp, "! ");
 	  break;
 	}
       fprintf_expr_infix(fp, BIN_RVAL(expr));
