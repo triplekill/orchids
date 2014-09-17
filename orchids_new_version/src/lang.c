@@ -1826,9 +1826,9 @@ static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_printevent()\n");
   PUSH_RETURN_TRUE(ctx);
-  for ( ; state && state->event == NULL; state = state->parent)
+  for ( ; state!=NULL && state->event == NULL; state = state->parent)
     ;
-  if (state && state->event)
+  if (state!=NULL && state->event!=NULL)
     fprintf_event(stdout, ctx, state->event->event);
   else
     fprintf(stdout, "no event to display.\n");
@@ -2366,6 +2366,7 @@ static void issdl_report(orchids_t *ctx, state_instance_t *state)
 static void issdl_noop(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_ENG, DS_INFO, "No-Operation called\n");
+  PUSH_VALUE(ctx, NULL);
 }
 
 static void

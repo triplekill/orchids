@@ -27,6 +27,7 @@
 #include "evt_mgr.h"
 #include "mod_mgr.h"
 #include "orchids_api.h"
+#include "ovm.h"
 #include "mod_metaevent.h"
 
 
@@ -49,6 +50,7 @@ static void issdl_inject_event(orchids_t *ctx, state_instance_t *state)
 			   0);
     }
   STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_VALUE(ctx, NULL);
 }
 
 static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
@@ -67,6 +69,21 @@ static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
 }
 
 
+static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
+{
+  DebugLog(DF_OVM, DS_DEBUG, "issdl_current_event()\n");
+  for ( ; state!=NULL && state->event == NULL; state = state->parent)
+    ;
+  if (state!=NULL && state->event!=NULL)
+    {
+      PUSH_VALUE(ctx, state->event);
+    }
+  else
+    {
+      PUSH_VALUE(ctx, NULL);
+    }
+}
+
 static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   metaevent_config_t *cfg;
@@ -81,7 +98,11 @@ static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx,
 			 issdl_inject_event,
 			 "inject_event", 1,
-			 "Inject the event into the orchids engine");
+			 "inject the event into the orchids engine");
+  register_lang_function(ctx,
+			 issdl_current_event,
+			 "current_event", 1,
+			 "get the current event");
   return cfg;
 }
 
