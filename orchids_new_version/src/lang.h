@@ -31,7 +31,8 @@
 #include "orchids.h"
 
 /* Minimal native types */
-#define T_NULL        0 /* obsolete */
+#define T_NULL        0 /* Type of things not handled by the ovm, or
+			 for which we don't care about the type */
 #define T_FNCT        1
 #define T_INT         2
 #define T_BSTR        3

@@ -300,6 +300,7 @@ rule_compiler_t *new_rule_compiler_ctx(gc_t *gc_ctx)
 
   GC_START (gc_ctx, 1);
   ctx = gc_alloc (gc_ctx, sizeof (rule_compiler_t), &rule_compiler_class);
+  ctx->gc.type = T_NULL;
   ctx->gc_ctx = gc_ctx;
   ctx->nprotected = 0;
   ctx->maxprotected = NPROTECTED;
@@ -866,6 +867,7 @@ node_state_t *build_state(rule_compiler_t *ctx,
 
   s = gc_alloc (ctx->gc_ctx, sizeof(node_state_t),
 		&node_state_class);
+  s->gc.type = T_NULL;
   s->state_id = 0; /* not set */
   s->line = 0; /* not set: will be set by set_state_label() */
   s->name = NULL; /* not set: will be set by set_state_label() */
@@ -977,6 +979,7 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
 
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
+  trans->gc.type = T_NULL;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   trans->dest = dest;
@@ -993,6 +996,7 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
 
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
+  trans->gc.type = T_NULL;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   trans->dest = NULL; /* not set */
@@ -1011,6 +1015,7 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
 
   new_rule = gc_alloc (ctx->gc_ctx, sizeof(node_rule_t),
 		       &node_rule_class);
+  new_rule->gc.type = T_NULL;
   new_rule->name = sym->name;
   new_rule->file = sym->file;
   new_rule->line = sym->line;
@@ -1033,6 +1038,7 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 
   n = gc_alloc (ctx->gc_ctx, sizeof (node_expr_t),
 		&node_expr_regsplit_class);
+  n->gc.type = T_NULL;
   n->type = NODE_REGSPLIT;
   GC_TOUCH (ctx->gc_ctx, n->string = source);
   GC_TOUCH (ctx->gc_ctx, n->split_pat = pattern);
@@ -1052,6 +1058,7 @@ node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
+  n->gc.type = T_NULL;
   n->type = NODE_BINOP;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -1066,6 +1073,7 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
 		&node_expr_mon_class);
+  n->gc.type = T_NULL;
   n->type = NODE_MONOP;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->val = arg_node);
@@ -1081,6 +1089,7 @@ node_expr_t *build_expr_cons(rule_compiler_t *ctx,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONS;
   n->op = 0;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -1112,6 +1121,7 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
+  n->gc.type = T_NULL;
   n->type = NODE_COND;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -1129,6 +1139,7 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, char *varname, node_expr_t *expr)
   GC_UPDATE(ctx->gc_ctx, 0, var);
   n = (node_expr_bin_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 				   &node_expr_bin_class);
+  n->gc.type = T_NULL;
   n->type = NODE_ASSOC;
   n->op = EQ;
   GC_TOUCH (ctx->gc_ctx, n->lval = var);
@@ -1159,7 +1170,8 @@ gc_check(ctx->gc_ctx);
   call_node = (node_expr_call_t *)gc_alloc (ctx->gc_ctx,
 					    sizeof(node_expr_call_t),
 					    &node_expr_call_class);
-call_node->paramlist = NULL;
+  call_node->gc.type = T_NULL;
+  call_node->paramlist = NULL;
 gc_check(ctx->gc_ctx); 
   call_node->type = NODE_CALL;
   call_node->symbol = sym->name;
@@ -1177,6 +1189,7 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
 
   i = gc_alloc (ctx->gc_ctx, sizeof(node_expr_if_t),
 		&node_expr_ifstmt_class);
+  i->gc.type = T_NULL;
   i->type = NODE_IFSTMT;
   GC_TOUCH (ctx->gc_ctx, i->cond = cond);
   GC_TOUCH (ctx->gc_ctx, i->then = then);
@@ -1198,6 +1211,7 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   }
   n = (node_expr_symbol_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_symbol_t),
 				      &node_expr_sym_class);
+  n->gc.type = T_NULL;
   n->type = NODE_FIELD;
   n->name = fieldname;
   n->res_id = f->id;
@@ -1219,6 +1233,7 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
 
   n = (node_expr_symbol_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_symbol_t),
 				      &node_expr_sym_class);
+  n->gc.type = T_NULL;
   n->type = NODE_VARIABLE;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
@@ -1244,6 +1259,7 @@ node_expr_t *build_integer(rule_compiler_t *ctx, int i)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = integer);
   n->res_id = ctx->statics_nb;
@@ -1266,6 +1282,7 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = fpdouble);
   n->res_id = ctx->statics_nb;
@@ -1294,6 +1311,7 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH(ctx->gc_ctx, n->data = string);
   n->res_id = ctx->statics_nb;
@@ -1312,6 +1330,7 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
+  n->gc.type = T_NULL;
   n->type = NODE_EVENT;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -1343,6 +1362,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
@@ -1365,6 +1385,7 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -1420,6 +1441,7 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -1443,6 +1465,7 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -1473,6 +1496,7 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -1507,6 +1531,7 @@ node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -1536,6 +1561,7 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
+  n->gc.type = T_NULL;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -1884,6 +1910,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
+  rule->gc.type = T_NULL;
   rule->filename = NULL;
   rule->name = NULL;
   rule->state = NULL;

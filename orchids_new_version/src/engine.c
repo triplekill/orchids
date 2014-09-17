@@ -245,6 +245,7 @@ static int simulate_state_and_create_threads(orchids_t        *ctx,
 			    state, state);
 		lock_elmt = gc_alloc (gc_ctx, sizeof (sync_lock_list_t),
 				      &sync_lock_list_class);
+		lock_elmt->gc.type = T_NULL;
 		GC_TOUCH (gc_ctx, lock_elmt->state = state);
 		GC_TOUCH (gc_ctx, lock_elmt->next =
 			  state->rule_instance->sync_lock_list);
@@ -297,6 +298,7 @@ static int simulate_state_and_create_threads(orchids_t        *ctx,
     } else { /* we have a blocking trans, so create a new thread if needed */
       thread = gc_alloc (gc_ctx, sizeof (wait_thread_t),
 			 &wait_thread_class);
+      thread->gc.type = T_NULL;
       thread->next = NULL;
       thread->trans = &state->state->trans[t];
       GC_TOUCH (gc_ctx, thread->state_instance = state);
@@ -405,6 +407,7 @@ static void create_rule_initial_threads(orchids_t *ctx,
 
     new_rule = gc_alloc(gc_ctx, sizeof (rule_instance_t),
 			&rule_instance_class);
+    new_rule->gc.type = T_NULL;
     GC_TOUCH (gc_ctx, new_rule->rule = r);
     GC_TOUCH (gc_ctx, new_rule->first_state = init);
     new_rule->next = NULL;
@@ -576,6 +579,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   /* prepare an active event record */
   active_event = gc_alloc(gc_ctx, sizeof (active_event_t),
 			  &active_event_class);
+  active_event->gc.type = T_NULL;
   GC_TOUCH (gc_ctx, active_event->event = event);
   active_event->next = NULL;
   active_event->prev = NULL;

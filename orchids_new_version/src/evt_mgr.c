@@ -118,6 +118,7 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
 	}
     }
   rt = gc_alloc (gc_ctx, sizeof(heap_t), &heap_class);
+  rt->gc.type = T_HEAP;
   rt->entry = he; // no need to GC_TOUCH he->gc_data since rt is white and will only become grey below, not black
   rt->left = NULL;
   rt->right = NULL;

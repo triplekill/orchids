@@ -257,6 +257,7 @@ new_orchids_context(void)
 	   ctx->global_fields = gc_alloc (ctx->gc_ctx,
 					  sizeof(field_record_table_t),
 					  &field_record_table_class));
+  ctx->global_fields->gc.type = T_NULL;
   ctx->global_fields->num_fields = 0;
   ctx->global_fields->fields = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->global_fields);
@@ -613,6 +614,7 @@ event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
   event_t *new_evt;
 
   new_evt = gc_alloc (gc_ctx, sizeof (event_t), &event_class);
+  new_evt->gc.type = T_EVENT;
   new_evt->field_id = field_id;
   GC_TOUCH (gc_ctx, new_evt->value = val);
   GC_TOUCH (gc_ctx, new_evt->next = event);
@@ -1064,6 +1066,7 @@ field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields)
     fvals[i] = NULL;
   fields = gc_alloc (gc_ctx, sizeof(field_table_t),
 		     &field_table_class);
+  fields->gc.type = T_NULL;
   fields->nfields = nfields;
   fields->field_values = fvals;
   return fields;
