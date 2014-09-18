@@ -3139,13 +3139,13 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_shutdown, 8, "shutdown", 0, "shutdown orchids" },
 
   { issdl_random, 9, "random", 0, "return a random number" },
-  { issdl_system, 10, "system", 0, "execute a system command" },
+  { issdl_system, 10, "system", 1, "execute a system command" },
   { issdl_stats, 11, "show_stats", 0, "show orchids internal statistics" },
-  { issdl_str_from_int, 12, "str_from_int", 0, "convert an integer to a string" },
-  { issdl_int_from_str, 13, "int_from_str", 0, "convert a string to an integer" },
-  { issdl_float_from_str, 14, "float_from_str", 0, "convert a string to a float" },
-  { issdl_str_from_float, 15, "str_from_float", 0, "convert a float to a string" },
-  { issdl_str_from_ipv4, 16, "str_from_ipv4", 0, "convert an ipv4 address to a string" },
+  { issdl_str_from_int, 12, "str_from_int", 1, "convert an integer to a string" },
+  { issdl_int_from_str, 13, "int_from_str", 1, "convert a string to an integer" },
+  { issdl_float_from_str, 14, "float_from_str", 1, "convert a string to a float" },
+  { issdl_str_from_float, 15, "str_from_float", 1, "convert a float to a string" },
+  { issdl_str_from_ipv4, 16, "str_from_ipv4", 1, "convert an ipv4 address to a string" },
   { issdl_kill_threads, 17, "kill_threads", 0, "kill threads of a rule instance" },
   { issdl_cut, 18, "cut", 1, "special cut" },
   { issdl_sendmail, 19, "sendmail", 4, "Send a mail" },
@@ -3160,7 +3160,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_str_from_timeval, 28, "str_from_timeval", 1, "convert a timeval to a string" },
   { issdl_time_from_str, 29, "time_from_str", 1, "convert a string to a time" },
   { issdl_timeval_from_str, 30, "timeval_from_str", 1, "convert a string to a timeval" },
-  { issdl_str_from_ipv6, 31, "str_from_ipv6", 0, "convert an ipv6 address to a string" },
+  { issdl_str_from_ipv6, 31, "str_from_ipv6", 1, "convert an ipv6 address to a string" },
   { NULL, 0, NULL, 0, NULL }
 };
 

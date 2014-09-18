@@ -1390,7 +1390,7 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
     exit(EXIT_FAILURE);
   }
   /* resolve host name */
-  IPV6(addr).s_addr = *(in6_addr_t *)(hptr->h_addr_list[0]);
+  IPV6(addr) = *(struct in6_addr *)(hptr->h_addr_list[0]);
   GC_UPDATE(ctx->gc_ctx, 0, addr);
 
   gc_base_free(hostname); /* free string memory allocated by the lexer */
