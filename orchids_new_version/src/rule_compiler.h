@@ -961,10 +961,10 @@ fprintf_expr_infix(FILE *fp, node_expr_t *expr);
 /**
  * Display the current rule environment in the compiler context.
  * @param fp Output stream.
- * @param ctx Rule compiler context.
+ * @param ctx Global Orchids context.
  **/
 void
-fprintf_rule_environment(FILE *fp, rule_compiler_t *ctx);
+fprintf_rule_environment(FILE *fp, orchids_t *ctx);
 
 
 /**

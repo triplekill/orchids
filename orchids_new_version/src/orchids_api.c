@@ -673,7 +673,7 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
     fprintf(fp, "%4i | %-24s | ",
             event->field_id,
 	    ctx->global_fields->fields[ event->field_id ].name);
-    fprintf_issdl_val(fp, event->value);
+    fprintf_issdl_val(fp, ctx, event->value);
   }
   fprintf(fp,
           "-----+"
@@ -990,7 +990,8 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
 }
 
 
-void fprintf_state_env(FILE *fp, const state_instance_t *state)
+void fprintf_state_env(FILE *fp, const orchids_t *ctx,
+		       const state_instance_t *state)
 {
   int i;
   ovm_var_t *val;
@@ -1001,7 +1002,7 @@ void fprintf_state_env(FILE *fp, const state_instance_t *state)
       {
 	fprintf(fp, "    env[%i]: ($%s) ",
 		i, state->rule_instance->rule->var_name[i]);
-	fprintf_issdl_val(fp, val);
+	fprintf_issdl_val(fp, ctx, val);
       }
     else
       {

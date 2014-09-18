@@ -2698,17 +2698,18 @@ void compiler_reset(rule_compiler_t *ctx)
 
 
 void
-fprintf_rule_environment(FILE *fp, rule_compiler_t *ctx)
+fprintf_rule_environment(FILE *fp, orchids_t *ctx)
 {
   int i;
 
   fprintf(fp, "--- rule environment ---\n");
   fprintf(fp, "  static resources:\n");
-  for (i = 0; i < ctx->statics_nb; i++) {
+  for (i = 0; i < ctx->rule_compiler->statics_nb; i++) {
     fprintf(fp, "res_id: %3i: ", i);
-    fprintf_issdl_val(fp, ctx->statics[i]);
+    fprintf_issdl_val(fp, ctx, ctx->rule_compiler->statics[i]);
   }
-  fprintf(fp, "  dynamic environment size : %i\n", ctx->rule_env->elmts);
+  fprintf(fp, "  dynamic environment size : %i\n",
+	  ctx->rule_compiler->rule_env->elmts);
 }
 
 

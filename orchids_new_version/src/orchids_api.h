@@ -414,7 +414,8 @@ fprintf_fields(FILE *fp, const orchids_t *ctx);
  ** @param fp    The output stream.
  ** @param state The state instance which contains the environment to print.
  **/
-void fprintf_state_env(FILE *fp, const state_instance_t *state);
+void fprintf_state_env(FILE *fp, const orchids_t *ctx,
+		       const state_instance_t *state);
 
 
 #endif /* ORCHIDS_API_H */

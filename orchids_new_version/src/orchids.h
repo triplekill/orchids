@@ -1440,7 +1440,7 @@ typedef int (*mod_func_t)(orchids_t *ctx, mod_entry_t *mod, void *params);
 ** functions                                                                 **
 *----------------------------------------------------------------------------*/
 
-/* ochids_cfg.c */
+/* orchids_cfg.c */
 
 /**
  ** Display a configuration tree on a stream.
@@ -1631,6 +1631,13 @@ snprintf_uptime_short(char *str, size_t size, time_t uptime);
 issdl_function_t *
 get_issdl_functions(void);
 
+/**
+ ** Print an Orchids value.
+ ** @param fp  The file on which printing must occur
+ ** @param ctx The global Orchids context
+ ** @param val The value to print
+ **/
+void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val);
 
 /**
  ** Register a new function in the Orchids language.

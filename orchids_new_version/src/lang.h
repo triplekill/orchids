@@ -699,9 +699,6 @@ char *str_issdltype(int type);
 void *issdl_get_data(ovm_var_t *val);
 size_t issdl_get_data_len(ovm_var_t *val);
 
-
-void fprintf_issdl_val(FILE *fp, ovm_var_t *val);
-
 void set_ip_resolution(int value);
 
 ovm_var_t *ovm_int_new(gc_t *gc_ctx, long val);

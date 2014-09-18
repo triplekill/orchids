@@ -1674,10 +1674,10 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	 }
 }
 
-void fprintf_issdl_val(FILE *fp, ovm_var_t *val)
+void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
 {
   int i; /* for STRINGs */
-  char asc_time[32]; /* for dates conversions */
+  char asc_time[32]; /* for date conversions */
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
 
@@ -1775,6 +1775,9 @@ void fprintf_issdl_val(FILE *fp, ovm_var_t *val)
       }
       fputc('\n', fp);
       break;
+    case T_EVENT:
+      fprintf_event(fp, ctx, (event_t *)val);
+      break;
     default:
       fprintf(fp, "type %i doesn't support display\n", val->gc.type);
     }
@@ -1791,7 +1794,7 @@ issdl_print(orchids_t *ctx, state_instance_t *state)
 
   DebugLog(DF_OVM, DS_DEBUG, "issdl_print()\n");
   param = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  fprintf_issdl_val(stdout, param);
+  fprintf_issdl_val(stdout, ctx, param);
   STACK_DROP(ctx->ovm_stack, 1);
   PUSH_RETURN_TRUE(ctx);
 }
@@ -1813,7 +1816,7 @@ static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
   while (state)
     {
       fprintf(stdout, "***** state: %s *****\n", state->state->name);
-      fprintf_state_env(stdout, state);
+      fprintf_state_env(stdout, ctx, state);
       if (state->event)
         fprintf_event(stdout, ctx, state->event->event);
       else
@@ -2633,7 +2636,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
         fprintf_event(ftmp, ctx, report_events->event->event);
       else
         fprintf(ftmp, "no event.\n");
-      fprintf_state_env(ftmp, report_events);
+      fprintf_state_env(ftmp, ctx, report_events);
     }
   rewind(ftmp);
   /* Now call sendmail */
