@@ -103,7 +103,7 @@ static size_t qstr_sz_g;
 "^"        { return (O_XOR);    }
 "&&"       { return (ANDAND);   }
 "&"        { return (O_AND);    }
-"!"        { return (BANG);    }
+"!"        { return (BANG);     }
 "~"        { return (O_NOT);    }
 "=="       { return (EQCOMPARE); }
 "!="       { return (NOTEQUAL); }
@@ -124,6 +124,7 @@ static size_t qstr_sz_g;
 "<="       { return (LESS_EQ);  }
 "_CTIME"   { return (KW_CTIME); }
 "_IPV4"    { return (KW_IPV4); }
+"_IPV6"    { return (KW_IPV6); }
 "_TIMEVAL" { return (KW_TIMEVAL); }
 "_REGEX"   { return (KW_REGEX); }
 

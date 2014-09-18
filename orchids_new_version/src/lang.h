@@ -31,35 +31,36 @@
 #include "orchids.h"
 
 /* Minimal native types */
-#define T_NULL        0 /* Type of things not handled by the ovm, or
-			 for which we don't care about the type */
-#define T_FNCT        1
-#define T_INT         2
-#define T_BSTR        3
-#define T_VBSTR       4
-#define T_STR         5
-#define T_VSTR        6
-#define T_ARRAY       7
-#define T_HASH        8
+#define T_NULL            0 /* Type of things not handled by the ovm, or
+			       for which we don't care about the type    */
+#define T_FNCT            1
+#define T_INT             2
+#define T_BSTR            3
+#define T_VBSTR           4
+#define T_STR             5
+#define T_VSTR            6
+#define T_ARRAY           7
+#define T_HASH            8
 
 /* Extended types */
-#define T_CTIME       9
-#define T_IPV4       10
-#define T_TIMEVAL    11
-#define T_REGEX      12
-#define T_UINT       13
-#define T_SNMPOID    14
-#define T_FLOAT      15
-#define T_EVENT      16
-#define T_STATE_INSTANCE 17
+#define T_CTIME           9
+#define T_IPV4            10
+#define T_TIMEVAL         11
+#define T_REGEX           12
+#define T_UINT            13
+#define T_SNMPOID         14
+#define T_FLOAT           15
+#define T_EVENT           16
+#define T_STATE_INSTANCE  17
 
-#define T_EXTERNAL	 18
+#define T_EXTERNAL	  18
+
+#define T_IPV6            19
 
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
 #define T_TCPPORT 0
 #define T_IPV4PEER 0
-#define T_IPV6ADDR 0
 #define T_IPV6PEER 0
 
 /* Extra types, not used for constant values */
@@ -100,6 +101,7 @@
 #define      VBSTR(var)    (((ovm_vbstr_t *)(var))->str)
 #define   VBSTRLEN(var)    (((ovm_vbstr_t *)(var))->len)
 #define       IPV4(var)     (((ovm_ipv4_t *)(var))->ipv4addr)
+#define       IPV6(var)     (((ovm_ipv6_t *)(var))->ipv6addr)
 #define      REGEX(var)    (((ovm_regex_t *)(var))->regex)
 #define   REGEXSTR(var)    (((ovm_regex_t *)(var))->regex_str)
 #define   REGEXNUM(var)   (((ovm_regex_t *)(var))->splits)
@@ -411,7 +413,7 @@ struct ovm_ctime_s
  **   (as defined in <netinet/in.h> header file).
  **/
 /**   @var ovm_ipv4_s::type
- **     Data type identifier: T_IPV4ADDR.
+ **     Data type identifier: T_IPV4.
  **/
 /**   @var ovm_ipv4_s::flags
  **     Data access flags.
@@ -424,6 +426,28 @@ struct ovm_ipv4_s
 {
   gc_header_t gc;
   struct in_addr ipv4addr;
+};
+
+
+/**
+ ** @struct ovm_ipv6_s
+ **   ISSDL ipv6addr data type. It contains an unix in6_addr structure
+ **   (as defined in <netinet/in.h> header file).
+ **/
+/**   @var ovm_ipv6_s::type
+ **     Data type identifier: T_IPV6.
+ **/
+/**   @var ovm_ipv6_s::flags
+ **     Data access flags.
+ **/
+/**   @var ovm_ipv6_s::ipv6addr
+ **     IP address value.
+ **/
+typedef struct ovm_ipv6_s ovm_ipv6_t;
+struct ovm_ipv6_s
+{
+  gc_header_t gc;
+  struct in6_addr ipv6addr;
 };
 
 
@@ -718,6 +742,9 @@ void ovm_ctime_fprintf(FILE *fp, ovm_ctime_t *time);
 
 ovm_var_t *ovm_ipv4_new(gc_t *gc_ctx);
 void ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr);
+
+ovm_var_t *ovm_ipv6_new(gc_t *gc_ctx);
+void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr);
 
 ovm_var_t *ovm_timeval_new(gc_t *gc_ctx);
 void ovm_timeval_fprintf(FILE *fp, ovm_timeval_t *time);

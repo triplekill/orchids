@@ -855,6 +855,16 @@ node_expr_t *
 build_ipv4(rule_compiler_t *ctx, char *hostname);
 
 
+/**
+ * Build a constant ipv6addr expression node.
+ * @param ctx Rule compiler context.
+ * @param hostname The hostname string.
+ * @return A new allocated ipv6addr expression node.
+ **/
+node_expr_t *
+build_ipv6(rule_compiler_t *ctx, char *hostname);
+
+
 node_expr_t *
 build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec);
 

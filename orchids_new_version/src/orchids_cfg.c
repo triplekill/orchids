@@ -1204,6 +1204,13 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       *(int *)cond_param = inet_addr(cond_param_str);
       cond_param_size = sizeof (in_addr_t);
       break;
+    case T_IPV6:
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (__u6_addr));
+      /* inet_addr is not IPv6 aware. Use inet_pton instead.
+	See IPv4 case for the old code line.                 */
+      inet_pton(AF_INET6, cond_param_str, cond_param);
+      cond_param_size = sizeof (__u6_addr);
+      break;
     default:
       DebugLog(DF_CORE, DS_ERROR,
 	       "DISSECT : cannot dissect type %i \n",

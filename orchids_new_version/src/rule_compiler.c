@@ -1373,6 +1373,40 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
   return (node_expr_t *)n;
 }
 
+node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
+{
+  ovm_var_t *addr;
+  node_expr_term_t *n;
+  struct hostent  *hptr;
+
+  /* XXX Add hash for constant sharing here */
+
+  GC_START(ctx->gc_ctx, 1);
+  addr = ovm_ipv6_new(ctx->gc_ctx);
+  hptr = gethostbyname(hostname);
+  if (hptr == NULL) {
+    DebugLog(DF_OLC, DS_FATAL,
+             "hostname %s doesn't exist\n");
+    exit(EXIT_FAILURE);
+  }
+  /* resolve host name */
+  IPV6(addr).s_addr = *(in6_addr_t *)(hptr->h_addr_list[0]);
+  GC_UPDATE(ctx->gc_ctx, 0, addr);
+
+  gc_base_free(hostname); /* free string memory allocated by the lexer */
+
+  n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
+				     &node_expr_term_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_CONST;
+  GC_TOUCH (ctx->gc_ctx, n->data = addr);
+  n->res_id = ctx->statics_nb;
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+
+  statics_add(ctx, addr);
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
 
 node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 {
@@ -2525,10 +2559,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	  }
 	case BANG:
 	  {
-	    unsigned int label_i = NEW_LABEL(code->labels); 
-
 	    compile_bytecode_cond(BIN_LVAL(expr), code, label_else, label_then); 
-	    SET_LABEL (code->ctx, code->labels, code->pos, label_i);
 	    return;
 	  }
 	default:

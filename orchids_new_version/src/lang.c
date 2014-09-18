@@ -55,48 +55,51 @@
  ** Table of data types natively recognized in the Orchids language.
  **/
 static struct issdl_type_s issdl_types_g[] = {
-  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Null type for error/exception management" },
-  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Function reference" },
-  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_opp, int_mul, int_div, int_mod, int_clone, int_and,int_or,int_xor,int_not,
+  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_opp, int_mul, int_div, int_mod, int_clone, int_and, int_or, int_xor, int_not,
     "Integer numbers (32-bits signed int)" },
-  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, NULL,NULL,NULL,NULL,
+  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, NULL, NULL, NULL, NULL,
     "Binary string, allocated, (unsigned char *)" },
-  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, NULL,NULL,NULL,NULL,
+  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, NULL, NULL, NULL, NULL,
     "Virtual binary string, not allocated, only pointer/offset reference" },
-  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, string_clone, NULL,NULL,NULL,NULL,
+  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, string_clone, NULL, NULL, NULL, NULL,
     "Character string, allocated, (char *)" },
-  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, vstr_clone,  NULL,NULL,NULL,NULL,
+  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, vstr_clone, NULL, NULL, NULL, NULL,
     "Virtual string, not allocated, only pointer/offset reference" },
-  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Array" },
-  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Hash table" },
-  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, NULL, NULL, NULL, NULL, ctime_clone, NULL,NULL,NULL,NULL,
+  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, NULL, NULL, NULL, NULL, ctime_clone, NULL, NULL, NULL, NULL,
     "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
-  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, NULL, ipv4_clone, ipv4_and,ipv4_or,ipv4_xor,ipv4_not,
+  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, NULL, ipv4_clone, ipv4_and, ipv4_or, ipv4_xor, ipv4_not,
     "IPv4 address (struct in_addr)" },
-  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, NULL, NULL, NULL, NULL, timeval_clone, NULL,NULL,NULL,NULL,
+  { "ipv6",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    "IPv6 address (struct in6_addr)" },
+  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, NULL, NULL, NULL, NULL, timeval_clone, NULL, NULL, NULL, NULL,
     "Seconds and microseconds since Epoch, (struct timeval)" },
-  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Posix Extended Regular Expression, with substring addressing" },
-  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, NULL, uint_mul, uint_div, uint_mod, uint_clone, uint_and,uint_or,uint_xor,uint_not,
+  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, NULL, uint_mul, uint_div, uint_mod, uint_clone, uint_and, uint_or, uint_xor, uint_not,
     "Non negative integer (32-bits unsigned int)" },
-  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "SNMP Object Identifier" },
-  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_opp, float_mul, float_div, NULL, float_clone, NULL,NULL,NULL,NULL,
+  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_opp, float_mul, float_div, NULL, float_clone, NULL, NULL, NULL, NULL,
     "IEEE 32-bit floating point number (float)" },
-  { "event", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "event", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Meta event" },
-  { "state_instance", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "state_instance", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "State instance/cut mark" },
-  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL,
+  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "External data (provided by a plugin)" },
-  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL,NULL,NULL, "" }
+  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
 
 static int resolve_ipv4_g = 0;
+static int resolve_ipv6_g = 0;
 
 char *
 str_issdltype(int type)
@@ -1020,6 +1023,57 @@ void ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr)
 }
 
 /*
+** IPv6
+** store a sockaddr_in6 structure
+*/
+
+ovm_var_t *ovm_ipv6_new(gc_t* gc_ctx)
+{
+  ovm_ipv6_t *addr;
+
+  addr = gc_alloc (gc_ctx, sizeof (ovm_ipv6_t), NULL);
+  addr->gc.type = T_IPV6;
+  return OVM_VAR(addr);
+}
+
+void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr)
+{
+  struct hostent *hptr;
+  char **pptr;
+  char dst[INET6_ADDRSTRLEN];
+
+  if (addr==NULL || addr->gc.type != T_IPV6)
+    {
+      fprintf(fp, "Wrong object type.\n");
+      return;
+    }
+
+  /* inet_ntoa is not IPv6 aware. Use inet_ntop (defined in 
+     arpa/inet.h) instead. */
+  inet_ntop (AF_INET6, &addr->ipv6addr, dst, sizeof(dst));
+  fprintf(fp, "ipv6 : %s", dst);
+
+  /* address resolution */
+  hptr = gethostbyaddr((char *)&addr->ipv6addr,
+                       sizeof (struct in6_addr), AF_INET6);
+  if (hptr == NULL)
+    {
+      fprintf(fp, "\n");
+      return;
+    }
+  else if (hptr->h_name != NULL)
+    fprintf(fp, " (name=%s", hptr->h_name);
+  else
+    {
+      fprintf(fp, "\n");
+      return ;
+    }
+  for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+    fprintf(fp, " alias=%s", *pptr);
+  fprintf(fp, ")\n");
+}
+
+/*
 ** Timeval
 ** store a timeval struct
 */
@@ -1533,6 +1587,7 @@ int snprintf_ovm_var(char *buff, unsigned int buff_length, ovm_var_t *val)
   char asc_time[32]; /* for date conversions */
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
+  char dst[INET6_ADDRSTRLEN]; /* for IPV6 */
   int offset = 0; /* for chars */
 
   /* display data */
@@ -1581,6 +1636,24 @@ int snprintf_ovm_var(char *buff, unsigned int buff_length, ovm_var_t *val)
 			   ", %s", *pptr);
       offset += snprintf(buff + offset, buff_length - offset, ")");
       return offset;
+    case T_IPV6:
+      inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+      offset += snprintf(buff, buff_length, "%s", dst);
+      hptr = gethostbyaddr((char *) &IPV6(val),
+			   sizeof (struct in6_addr), AF_INET6);
+      if (hptr == NULL) {
+	return offset;
+      } else if (hptr->h_name != NULL) {
+	offset += snprintf(buff + offset, buff_length - offset,
+			   " (%s", hptr->h_name);
+      } else {
+	return offset;
+      }
+      for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+	offset += snprintf(buff + offset, buff_length - offset,
+			   ", %s", *pptr);
+      offset += snprintf(buff + offset, buff_length - offset, ")");
+      return offset;
     case T_TIMEVAL:
       strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
 	       localtime(&TIMEVAL(val).tv_sec));
@@ -1609,6 +1682,7 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
   char asc_time[32]; /* for dates conversions */
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
+  char dst[INET6_ADDRSTRLEN];
 
   if (val==NULL)
     fprintf(fp, "(null)\n");
@@ -1654,6 +1728,22 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	     fprintf(fp, ", %s", *pptr);
 	   fprintf(fp, ")");
 	   break;
+	 case T_IPV6:
+           inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+	   fprintf(fp, "%s", dst);
+	   hptr = gethostbyaddr((char *) &IPV6(val),
+				sizeof (struct in6_addr), AF_INET6);
+	   if (hptr == NULL) {
+	     break;
+	   } else if (hptr->h_name != NULL) {
+	     fprintf(fp, " (%s", hptr->h_name);
+	   } else {
+	     break;
+	   }
+	   for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+	     fprintf(fp, ", %s", *pptr);
+	   fprintf(fp, ")");
+	   break;
 	 case T_TIMEVAL:
 	   strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
 		    localtime(&TIMEVAL(val).tv_sec));
@@ -1680,6 +1770,7 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
   char asc_time[32]; /* for date conversions */
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
+  char dst[INET6_ADDRSTRLEN];
 
   if (val==NULL)
     fprintf (fp, "null\n");
@@ -1733,6 +1824,31 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
       if (resolve_ipv4_g) {
         hptr = gethostbyaddr((char *) &IPV4(val),
                              sizeof (struct in_addr), AF_INET);
+      }
+      else {
+        hptr = NULL;
+      }
+      if (hptr == NULL) {
+        fputc('\n', fp);
+        return ;
+      }
+      else if (hptr->h_name != NULL) {
+        fprintf(fp, " (name=%s", hptr->h_name);
+      }
+      else {
+        fputc('\n', fp);
+        return ;
+      }
+      for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+        fprintf(fp, " alias=%s", *pptr);
+      fputs(")\n", fp);
+      break;
+    case T_IPV6:
+      inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+      fprintf(fp, "ipv6: %s", dst);
+      if (resolve_ipv6_g) {
+        hptr = gethostbyaddr((char *) &IPV6(val),
+                             sizeof (struct in6_addr), AF_INET6);
       }
       else {
         hptr = NULL;
@@ -1964,7 +2080,28 @@ static void issdl_str_from_ipv4(orchids_t *ctx, state_instance_t *state)
     PUSH_VALUE(ctx, str);
   }
   else {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_int(): param error\n");
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_ipv4(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
+static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state)
+{
+  char buff[INET6_ADDRSTRLEN];
+  ovm_var_t *str;
+  ovm_var_t *i;
+  size_t len;
+
+  i = POP_VALUE(ctx);
+  if (i!=NULL && i->gc.type == T_IPV6) {
+    inet_ntop(AF_INET6, &IPV6(i), buff, sizeof(buff));
+    len = strlen (buff);
+    str = ovm_str_new(ctx->gc_ctx, len);
+    memcpy(STR(str), buff, len);
+    PUSH_VALUE(ctx, str);
+  }
+  else {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_ipv6(): param error\n");
     PUSH_VALUE(ctx, NULL);
   }
 }
@@ -3023,6 +3160,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_str_from_timeval, 28, "str_from_timeval", 1, "convert a timeval to a string" },
   { issdl_time_from_str, 29, "time_from_str", 1, "convert a string to a time" },
   { issdl_timeval_from_str, 30, "timeval_from_str", 1, "convert a string to a timeval" },
+  { issdl_str_from_ipv6, 31, "str_from_ipv6", 0, "convert an ipv6 address to a string" },
   { NULL, 0, NULL, 0, NULL }
 };
 

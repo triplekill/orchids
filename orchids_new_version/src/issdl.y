@@ -75,7 +75,7 @@ extern int display_func(void *data, void *param);
 %token RULE STATE IF ELSE EXPECT GOTO /* Special keywords */
 %token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT EQ /* Punctuation */
 %token SEMICOLUMN SYNCHRONIZE
-%token KW_CTIME KW_IPV4 KW_TIMEVAL KW_REGEX
+%token KW_CTIME KW_IPV4 KW_IPV6 KW_TIMEVAL KW_REGEX
 %token <sym> SYMNAME
 %token <string> FIELD VARIABLE /* Raw data types */
 %token <integer> NUMBER
@@ -314,6 +314,8 @@ expr:
   { RESULT_DROP($$,$2, build_ctime_from_string(compiler_ctx_g, $3)); }
 | KW_IPV4 O_PARENT string C_PARENT
     { $$ = build_ipv4(compiler_ctx_g, $3); }
+| KW_IPV6 O_PARENT string C_PARENT
+    { $$ = build_ipv6(compiler_ctx_g, $3); }
 | KW_TIMEVAL o_parent NUMBER COMMA NUMBER C_PARENT
   { RESULT_DROP($$,$2, build_timeval_from_int(compiler_ctx_g, $3, $5)); }
 | KW_TIMEVAL o_parent string COMMA NUMBER C_PARENT
