@@ -3130,7 +3130,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "noop", 0, "No Operation function" },
   { issdl_print, 1, "print", 1, "display a string (TEST FUNCTION)" },
   { issdl_dumpstack, 2, "dump_stack", 0, "dump the stack of the current rule" },
-  { issdl_printevent, 3, "print_event", 0, "print the event associated with state" },
+  { issdl_printevent, 3, "print_event", 0, "print the event associated with state" }, // OBSOLETE, use print(current_event())
   { issdl_dumppathtree, 4, "dump_dot_pathtree", 0, "dump the rule instance path tree in the GraphViz Dot format"},
   { issdl_drop_event, 5, "drop_event", 0, "Drop event" },
   { issdl_set_event_level, 6, "set_event_level", 1, "Set event level" },
@@ -3223,7 +3223,7 @@ void fprintf_issdl_functions(FILE *fp, orchids_t *ctx)
 
 void set_ip_resolution(int value)
 {
-  resolve_ipv4_g = value ? TRUE : FALSE;
+  resolve_ipv6_g = resolve_ipv4_g = value ? TRUE : FALSE;
 }
 
 
