@@ -129,15 +129,8 @@ static int dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 	  ret = 1;
 	  goto end;
 	}
-      val = ovm_vstr_new (gc_ctx, NULL);
-      VSTR(val) = syslog_facility_g[syslog_priority >> 3];
-      VSTRLEN(val)= strlen(VSTR(val));
-      GC_UPDATE(gc_ctx, F_FACILITY, val);
-
-      val = ovm_vstr_new (gc_ctx, NULL);
-      VSTR(val) = syslog_severity_g[syslog_priority & 0x07];
-      VSTRLEN(val)= strlen(VSTR(val));
-      GC_UPDATE(gc_ctx, F_SEVERITY, val);
+      GC_UPDATE(gc_ctx, F_FACILITY, ((syslog_data_t *)data)->syslog_facility[syslog_priority >> 3]);
+      GC_UPDATE(gc_ctx, F_SEVERITY, ((syslog_data_t *)data)->syslog_severity[syslog_priority & 0x07]);
 
       txt_line += token_size + 2; /* number size and '<' '>' */
       txt_len -= token_size + 2;
@@ -223,9 +216,7 @@ static int dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       txt_line += token_size;
       txt_len -= token_size;
 
-      val = ovm_str_new (gc_ctx, 6);
-      strcpy(STR(val), "syslog");
-      GC_UPDATE(gc_ctx, F_PROG, val);
+      GC_UPDATE (gc_ctx, F_PROG, ((syslog_data_t *)data)->syslog_str);
 
       REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
       goto end;
@@ -315,11 +306,41 @@ field_t syslog_fields[] = {
 static void *
 syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  DebugLog(DF_MOD, DS_INFO, "load() syslog@%p\n", (void *) &mod_syslog);
+  syslog_data_t *data;
+  int i;
+  size_t len;
+  ovm_var_t *val;
 
+  DebugLog(DF_MOD, DS_INFO, "load() syslog@%p\n", (void *) &mod_syslog);
+ 
+  data = Xmalloc (sizeof(syslog_data_t));
+  GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
+  VSTR(val) = "syslog";
+  VSTRLEN(val) = strlen(VSTR(val));
+  data->syslog_str = val;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&data->syslog_str);
+
+  for (i=0; i<SYSLOG_MAX_SEVERITY; i++)
+    {
+      len = strlen(syslog_severity_g[i]);
+      GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
+      VSTR(val) = syslog_severity_g[i];
+      VSTRLEN(val) = strlen(VSTR(val));
+      data->syslog_severity[i] = val;
+      gc_add_root(ctx->gc_ctx, (gc_header_t **)&data->syslog_severity[i]);
+    }
+  for (i=0; i<SYSLOG_MAX_FACILITY; i++)
+    {
+      len = strlen(syslog_facility_g[i]);
+      GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
+      VSTR(val) = syslog_facility_g[i];
+      VSTRLEN(val) = strlen(VSTR(val));
+      data->syslog_facility[i] = val;
+      gc_add_root(ctx->gc_ctx, (gc_header_t **)&data->syslog_facility[i]);
+    }
   register_fields(ctx, mod, syslog_fields, SYSLOG_FIELDS);
 
-  return (NULL);
+  return data;
 }
 
 #ifdef UNUSED

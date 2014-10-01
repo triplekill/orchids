@@ -43,6 +43,14 @@
 #define MOD_SYSLOG_NOV 10
 #define MOD_SYSLOG_DEC 11
 
+typedef struct syslog_data_s syslog_data_t;
+struct syslog_data_s {
+  ovm_var_t *syslog_str; /* = "syslog" */
+#define SYSLOG_MAX_SEVERITY 8
+  ovm_var_t *syslog_severity[SYSLOG_MAX_SEVERITY];
+#define SYSLOG_MAX_FACILITY 24
+  ovm_var_t *syslog_facility[SYSLOG_MAX_FACILITY];
+};
 
 struct tm *
 syslog_getdate(const char *date);
