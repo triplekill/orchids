@@ -90,6 +90,15 @@ static ovm_var_t *ipv4_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ipv4_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ipv4_not(gc_t *gc_ctx, ovm_var_t *var);
 
+
+static void *ipv6_get_data(ovm_var_t *addr);
+static size_t ipv6_get_data_len(ovm_var_t *addr);
+static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *ipv6_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *ipv6_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *ipv6_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *ipv6_not(gc_t *gc_ctx, ovm_var_t *var);
+
 static void *timeval_get_data(ovm_var_t *str);
 static size_t timeval_get_data_len(ovm_var_t *str);
 static ovm_var_t *timeval_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);

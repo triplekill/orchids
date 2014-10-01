@@ -77,7 +77,7 @@ static struct issdl_type_s issdl_types_g[] = {
     "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
   { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, NULL, ipv4_clone, ipv4_and, ipv4_or, ipv4_xor, ipv4_not,
     "IPv4 address (struct in_addr)" },
-  { "ipv6",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "ipv6",    0, ipv6_get_data, ipv6_get_data_len, ipv6_cmp, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ipv6_and, ipv6_or, ipv6_xor, ipv6_not,
     "IPv6 address (struct in6_addr)" },
   { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, NULL, NULL, NULL, NULL, timeval_clone, NULL, NULL, NULL, NULL,
     "Seconds and microseconds since Epoch, (struct timeval)" },
@@ -1001,9 +1001,9 @@ void ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr)
       fprintf(fp, "Wrong object type.\n");
       return;
     }
-  fprintf(fp, "ipv4 : %s", inet_ntoa(addr->ipv4addr));
+  fprintf(fp, "ipv4 : %s", inet_ntoa(IPV4(addr)));
   /* address resolution */
-  hptr = gethostbyaddr((char *)&addr->ipv4addr,
+  hptr = gethostbyaddr((char *)&IPV4(addr),
                        sizeof (struct in_addr), AF_INET);
   if (hptr == NULL)
     {
@@ -1036,6 +1036,73 @@ ovm_var_t *ovm_ipv6_new(gc_t* gc_ctx)
   return OVM_VAR(addr);
 }
 
+static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2)
+{
+  if (var2 == NULL)
+    return (int)IPV6(var1).s6_addr;
+  if (TYPE(var2) != T_IPV6)
+    return TYPE(var1) - TYPE(var2);
+  return IPV6(var1).s6_addr - IPV6(var2).s6_addr;
+}
+
+static void *ipv6_get_data(ovm_var_t *addr)
+{
+  return &IPV6(addr);
+}
+
+static size_t ipv6_get_data_len(ovm_var_t *addr)
+{
+  return sizeof (struct in6_addr);
+}
+
+static ovm_var_t *ipv6_and (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
+{
+  ovm_var_t *res;
+
+  if ((var2 == NULL) || (TYPE(var2) != T_IPV6))
+    return NULL;
+
+  res = ovm_ipv6_new(gc_ctx);
+  *IPV6(res).s6_addr = *IPV6(var1).s6_addr & *IPV6(var2).s6_addr;
+  return res;
+}
+
+static ovm_var_t *ipv6_or (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
+{
+  ovm_var_t *res;
+
+  if ((var2 == NULL) || (TYPE(var2) != T_IPV6))
+    return NULL;
+
+  res = ovm_ipv6_new(gc_ctx);
+  *IPV6(res).s6_addr = *IPV6(var1).s6_addr | *IPV6(var2).s6_addr;
+  return res;
+}
+
+static ovm_var_t *ipv6_xor (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
+{
+  ovm_var_t *res;
+
+  if ((var2 == NULL) || (TYPE(var2) != T_IPV6))
+    return NULL;
+
+  res = ovm_ipv6_new(gc_ctx);
+  *IPV6(res).s6_addr = *IPV6(var1).s6_addr ^ *IPV6(var2).s6_addr;
+  return res;
+}
+
+static ovm_var_t *ipv6_not(gc_t *gc_ctx, ovm_var_t *var)
+{
+  ovm_var_t *res;
+
+  if (var==NULL || TYPE(var) != T_IPV6)
+    return NULL;
+
+  res = ovm_ipv6_new(gc_ctx);
+  *IPV6(res).s6_addr = ~ *IPV6(var).s6_addr;
+  return res;
+}
+
 void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr)
 {
   struct hostent *hptr;
@@ -1050,11 +1117,11 @@ void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr)
 
   /* inet_ntoa is not IPv6 aware. Use inet_ntop (defined in 
      arpa/inet.h) instead. */
-  inet_ntop (AF_INET6, &addr->ipv6addr, dst, sizeof(dst));
+  inet_ntop (AF_INET6, &IPV6(addr), dst, sizeof(dst));
   fprintf(fp, "ipv6 : %s", dst);
 
   /* address resolution */
-  hptr = gethostbyaddr((char *)&addr->ipv6addr,
+  hptr = gethostbyaddr((char *)&IPV6(addr),
                        sizeof (struct in6_addr), AF_INET6);
   if (hptr == NULL)
     {

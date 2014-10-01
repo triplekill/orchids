@@ -61,7 +61,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   {
     // Delete the waiting threads from the previous state
     mark_cut($mark);
-    mark_update($mark);
+    $mark = mark();
 
     $count = $count + 1;
     if ($begin != TIME_FIELD)
