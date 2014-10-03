@@ -461,7 +461,7 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
   DebugLog(DF_MOD, DS_DEBUG, "end\n");
 }
 
-static void add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void generic_add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   generic_hook_t *h;
   config_directive_t *vmod_dir;
@@ -512,7 +512,7 @@ static void add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
 static mod_cfg_cmd_t generic_config_commands[] = 
 {
-  { "<hook", add_hook, "Begin a (conditionnal or unconditional) hook section" },
+  { "<hook", generic_add_hook, "Begin a (conditionnal or unconditional) hook section" },
   { NULL, NULL, NULL }
 };
 

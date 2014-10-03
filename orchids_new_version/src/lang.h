@@ -45,17 +45,17 @@
 /* Extended types */
 #define T_CTIME           9
 #define T_IPV4            10
-#define T_TIMEVAL         11
-#define T_REGEX           12
-#define T_UINT            13
-#define T_SNMPOID         14
-#define T_FLOAT           15
-#define T_EVENT           16
-#define T_STATE_INSTANCE  17
+#define T_IPV6            11
+#define T_TIMEVAL         12
+#define T_REGEX           13
+#define T_UINT            14
+#define T_SNMPOID         15
+#define T_FLOAT           16
+#define T_EVENT           17
+#define T_STATE_INSTANCE  18
 
-#define T_EXTERNAL	  18
+#define T_EXTERNAL	  19
 
-#define T_IPV6            19
 
 /* ToDo -- coming soon */
 #define T_NTPTIMESTAMP 0
