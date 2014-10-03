@@ -38,6 +38,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/types.h>
 
 #include "orchids.h"
 #include "lang.h"
@@ -1351,7 +1352,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
   hptr = gethostbyname(hostname);
   if (hptr == NULL) {
     DebugLog(DF_OLC, DS_FATAL,
-             "hostname %s doesn't exist\n");
+             "hostname %s doesn't exist\n", hostname);
     exit(EXIT_FAILURE);
   }
   /* resolve host name */
@@ -1377,23 +1378,23 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 {
   ovm_var_t *addr;
   node_expr_term_t *n;
-  struct hostent  *hptr;
+  struct addrinfo *htpr;
 
   /* XXX Add hash for constant sharing here */
 
   GC_START(ctx->gc_ctx, 1);
   addr = ovm_ipv6_new(ctx->gc_ctx);
-  hptr = gethostbyname(hostname);
-  if (hptr == NULL) {
-    DebugLog(DF_OLC, DS_FATAL,
-             "hostname %s doesn't exist\n");
+  if (getaddrinfo(hostname, NULL, NULL, &htpr) != 0)
+  {
+    DebugLog(DF_OLC, DS_FATAL, "hostname %s doesn't exist\n", hostname);
     exit(EXIT_FAILURE);
   }
   /* resolve host name */
-  IPV6(addr) = *(struct in6_addr *)(hptr->h_addr_list[0]);
+  IPV6(addr) = ((struct sockaddr_in6 *)(htpr->ai_addr))->sin6_addr;
   GC_UPDATE(ctx->gc_ctx, 0, addr);
 
   gc_base_free(hostname); /* free string memory allocated by the lexer */
+  freeaddrinfo(htpr);
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
