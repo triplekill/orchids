@@ -628,7 +628,8 @@ input_module_t mod_textfile = {
   textfile_dir,
   textfile_preconfig,
   textfile_postconfig,
-  textfile_postcompil
+  textfile_postcompil,
+  NULL
 };
 
 

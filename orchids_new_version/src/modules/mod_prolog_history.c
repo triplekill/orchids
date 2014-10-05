@@ -230,6 +230,7 @@ input_module_t mod_prolog_history = {
   prolog_history_preconfig,         /* called just after module registration */
   prolog_history_postconfig,        /* called after all mods preconfig,
                                        and after all module configuration*/
+  NULL,
   NULL
 };
 

@@ -56,8 +56,7 @@ struct tm *
 syslog_getdate(const char *date);
 
 
-static int
-dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
+static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
 
 
 static void *

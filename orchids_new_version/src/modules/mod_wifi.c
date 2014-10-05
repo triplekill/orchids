@@ -51,6 +51,7 @@
 #define F_RSSI           12
 
 input_module_t mod_wifi;
+
 int datalink_type = 0;
 
 typedef struct ieee80211_header_s* ieee80211_header_t;
@@ -491,6 +492,7 @@ input_module_t mod_wifi = {
   NULL,
   wifi_dir,
   wifi_preconfig,
+  NULL,
   NULL,
   NULL
 };

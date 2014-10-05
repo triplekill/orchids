@@ -479,8 +479,7 @@ static int (*read_class[])(gc_t *gc_ctx,
 };
 
 
-static int
-rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
   header_token_t *snare_hdr;
   ovm_var_t *val;
@@ -594,12 +593,13 @@ rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (NULL);
 }
 
+/*
 int
 generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
   return rawsnare_dissect(ctx, mod, event, data);
 }
-
+*/
 
 static char *rawsnare_deps[] = {
   "udp",
@@ -615,7 +615,8 @@ input_module_t mod_rawsnare = {
   NULL,
   rawsnare_preconfig,
   NULL,
-  NULL
+  NULL,
+  rawsnare_dissect
 };
 
 /*

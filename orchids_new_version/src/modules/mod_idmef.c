@@ -210,7 +210,7 @@ static char *my_strnstr (char *text, size_t len, char *pattern)
   return NULL;
 }
 
-static int dissect_idmef(orchids_t *ctx,
+static int idmef_dissect(orchids_t *ctx,
 			 mod_entry_t *mod,
 			 event_t *event,
 			 void *data)
@@ -265,11 +265,13 @@ static int dissect_idmef(orchids_t *ctx,
   return 1;
 }
 
+/*
 int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		    void *data)
 {
-  return dissect_idmef(ctx, mod, event, data);
+  return idmef_dissect(ctx, mod, event, data);
 }
+*/
 
 static void add_analyzer_node(xmlNode *alert_root,
 			      idmef_cfg_t *cfg)
@@ -608,7 +610,8 @@ input_module_t mod_idmef = {
   idmef_cfgcmds,
   idmef_preconfig,
   idmef_postconfig,
-  NULL
+  NULL,
+  idmef_dissect
 };
 
 /*

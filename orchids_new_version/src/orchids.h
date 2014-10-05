@@ -1350,6 +1350,7 @@ struct input_module_s
   pre_config_t           pre_config;
   post_config_t          post_config;
   post_compil_t          post_compil;
+  dissect_t		 dissect_fun;
 };
 
 

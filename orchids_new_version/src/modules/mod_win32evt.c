@@ -398,9 +398,7 @@ read_record(const char *file)
 #endif
 
 
-#if WIN32EVT
-static int
-win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   DebugLog(DF_MOD, DS_TRACE, "win32evt_dissector()\n");
 
@@ -411,7 +409,6 @@ win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 
   return (0);
 }
-#endif
 
 static field_t win32evt_fields[] = {
   { "win32evt.rec_num",    T_INT,     "Event record number"      },
@@ -474,7 +471,8 @@ input_module_t mod_win32evt = {
   win32evt_preconfig,       /* called just after module registration */
   win32evt_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
-  win32evt_postcompil
+  win32evt_postcompil,
+  win32evt_dissector
 };
 
 

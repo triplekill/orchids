@@ -126,6 +126,7 @@ input_module_t mod_htmlstate = {
   htmlstate_dir,
   htmlstate_preconfig,
   htmlstate_postconfig,
+  NULL,
   NULL
 };
 

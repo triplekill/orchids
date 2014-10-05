@@ -582,11 +582,13 @@ dissect_auditd(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
   return (0);
 }
 
+/*
 int
 generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
   return dissect_auditd(ctx, mod, event, data);
 }
+*/
 
 static field_t auditd_fields[] = {
   {"auditd.node",     T_VSTR,     "auditd node"                         },
@@ -656,7 +658,8 @@ input_module_t mod_auditd = {
   NULL,
   auditd_preconfig,         /* called just after module registration */
   NULL,
-  NULL
+  NULL,
+  dissect_auditd	    /* auditd conditional dissector */
 };
 
 #endif /* HAVE_LIBAUDIT_H */

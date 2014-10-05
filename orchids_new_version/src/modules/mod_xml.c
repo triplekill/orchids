@@ -466,6 +466,7 @@ input_module_t mod_xml = {
   NULL,
   mod_xml_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

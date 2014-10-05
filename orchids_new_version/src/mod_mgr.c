@@ -42,12 +42,12 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
   void *mod_handle;
   input_module_t *mod;
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   snprintf(mod_fname, sizeof (mod_fname),
            "%s/mod_%s.so", ctx->modules_dir, name);
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   mod_handle = dlopen(mod_fname, RTLD_NOW | RTLD_GLOBAL);
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   if (mod_handle == NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
@@ -55,10 +55,10 @@ gc_check(ctx->gc_ctx);
       return NULL;
     }
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   snprintf(mod_fname, sizeof (mod_fname), "mod_%s", name);
   mod = dlsym(mod_handle, mod_fname);
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   if (mod == NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
@@ -66,7 +66,7 @@ gc_check(ctx->gc_ctx);
       return NULL;
     }
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   DebugLog(DF_CORE, DS_NOTICE,
 	   "module [%s] successfully loaded: symbol mod_%s found at %x\n",
 	   name, name, mod);

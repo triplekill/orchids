@@ -180,7 +180,8 @@ input_module_t mod_period = {
   period_preconfig,         /* called just after module registration */
   period_postconfig,        /* called after all mods preconfig,
                                and after all module configuration*/
-  period_postcompil
+  period_postcompil,
+  NULL
 };
 
 

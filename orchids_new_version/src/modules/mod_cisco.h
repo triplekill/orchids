@@ -28,8 +28,7 @@
 #define F_DPT        7
 #define F_PACKETS    8
 
-static int
-cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data);
+static int cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data);
 
 static void *
 cisco_preconfig(orchids_t *ctx, mod_entry_t *mod);

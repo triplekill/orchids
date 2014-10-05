@@ -1,7 +1,7 @@
 /**
  ** @file mod_prism2.c
  ** Wifi Prism2 header decoding.
- ** This include some code of the initial mod_wifi module made by Romdhane.
+ ** This includes some code of the initial mod_wifi module made by Romdhane.
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** 
@@ -143,6 +143,7 @@ input_module_t mod_prism2 = {
   NULL,
   NULL,
   prism2_preconfig,
+  NULL,
   NULL,
   NULL
 };

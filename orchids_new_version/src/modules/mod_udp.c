@@ -36,7 +36,6 @@
 
 input_module_t mod_udp;
 
-
 static int create_udp_socket(int udp_port)
 {
   int fd, on = 1;
@@ -161,6 +160,7 @@ input_module_t mod_udp = {
   NULL,
   udp_dir,
   udp_preconfig,
+  NULL,
   NULL,
   NULL
 };

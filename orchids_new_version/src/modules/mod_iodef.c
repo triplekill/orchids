@@ -653,6 +653,7 @@ input_module_t mod_iodef = {
   iodef_dir,
   iodef_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

@@ -77,14 +77,15 @@ static char *syslog_facility_g[] = {
   NULL
 };
 
-
+/*
 int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
-  return dissect_syslog(ctx, mod, event, data);
+  return syslog_dissect(ctx, mod, event, data);
 }
+*/
 
 
-static int dissect_syslog(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 			  void *data)
 {
   struct tm *t;
@@ -360,7 +361,8 @@ input_module_t mod_syslog = {
   NULL,
   syslog_preconfig,
   NULL,
-  NULL
+  NULL,
+  syslog_dissect
 };
 
 

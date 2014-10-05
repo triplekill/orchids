@@ -29,8 +29,7 @@
 
 input_module_t mod_cisco;
 
-static int
-cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   DebugLog(DF_MOD, DS_DEBUG, "cisco_dissector()\n");
 
@@ -101,6 +100,7 @@ input_module_t mod_cisco = {
   cisco_postconfig,         /* called after all mods preconfig,
                                and after all module configuration*/
   cisco_postcompil,
+  cisco_dissector
 };
 
 

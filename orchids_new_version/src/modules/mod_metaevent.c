@@ -309,7 +309,8 @@ input_module_t mod_metaevent = {
   metaevent_preconfig,       /* called just after module registration */
   metaevent_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
-  metaevent_postcompil
+  metaevent_postcompil,
+  NULL
 };
 
 

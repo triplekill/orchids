@@ -158,11 +158,13 @@ static void * netfilter_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return NULL;
 }
 
+/*
 int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		    void *data)
 {
   return netfilter_dissect(ctx, mod, event, data);
 }
+*/
 
 static void add_hook(orchids_t *ctx, mod_entry_t *mod,
 		     config_directive_t *dir)
@@ -205,7 +207,8 @@ input_module_t mod_netfilter = {
   netfilter_cfgcmds,
   netfilter_preconfig,
   netfilter_postconfig,
-  NULL
+  NULL,
+  netfilter_dissect
 };
 
 

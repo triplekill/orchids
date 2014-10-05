@@ -52,6 +52,7 @@
 #include "orchids.h"
 
 #ifdef ORCHIDS_STATIC
+/*!!! no longer really up to date */
 /* declare built-in modules */
 extern input_module_t mod_remoteadm;
 extern input_module_t mod_textfile;
@@ -1222,7 +1223,8 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       return;
   }
 
-  if ((dissect_func = dlsym(m_dissect->dlhandle, "generic_dissect")) != NULL)
+  if ((dissect_func = m_dissect->mod->dissect_fun) != NULL)
+    //if ((dissect_func = dlsym(m_dissect->dlhandle, "generic_dissect")) != NULL)
     register_conditional_dissector(ctx, m_dissect, mod_source_name,
 				   cond_param, cond_param_size,
 				   dissect_func, NULL);

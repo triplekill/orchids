@@ -54,8 +54,7 @@ typedef struct idmef_buf_t
     char*	message;
 }		idmef_buf_t;
 
-static int
-dissect_idmef(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
+static int idmef_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
 
 
 static void *

@@ -28,8 +28,7 @@
  **
  ** @return mod_id if module was successfully added, or -1 if an error occurred.
  **/
-int
-add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
+int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
 
 
 /**
@@ -41,8 +40,7 @@ add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle);
  ** @return A pointer to the information structure of the module, or
  **   NULL if an error occurs.
  **/
-input_module_t *
-load_add_shared_module(orchids_t *ctx, const char *name);
+input_module_t *load_add_shared_module(orchids_t *ctx, const char *name);
 
 
 /**
@@ -54,8 +52,7 @@ load_add_shared_module(orchids_t *ctx, const char *name);
  ** @return A pointer to the information structure of the module, or
  **   NULL if an error occurs.
  **/
-/* input_module_t * */
-/* load_add_module(orchids_t *ctx, const char *name); */
+/* input_module_t *load_add_module(orchids_t *ctx, const char *name); */
 
 
 /**
@@ -79,8 +76,7 @@ remove_module(orchids_t *ctx, char *name);
  ** @return      A pointer to a input_module_s structure, or NULL if the module
  **              was not found.
  **/
-input_module_t *
-find_module(orchids_t *ctx, const char *name);
+input_module_t *find_module(orchids_t *ctx, const char *name);
 
 
 /**
@@ -149,8 +145,7 @@ fprintf_loaded_modules(orchids_t *ctx, FILE *fp);
  **
  ** @return A function pointer of the resolved directive handler.
  **/
-dir_handler_t
-dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir);
+dir_handler_t dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir);
 
 
 #endif /*MOD_MGR_H */

@@ -108,8 +108,7 @@ static void
 add_vmod(orchids_t *ctx, generic_hook_t *h, config_directive_t *vmod_dir);
 
 
-static void
-add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void generic_add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 

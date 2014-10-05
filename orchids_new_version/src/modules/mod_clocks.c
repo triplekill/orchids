@@ -413,6 +413,7 @@ input_module_t mod_clocks = {
   clocks_config_commands,
   clocks_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

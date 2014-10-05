@@ -162,6 +162,7 @@ input_module_t mod_timeout = {
   NULL,
   timeout_preconfig,
   NULL,
+  NULL,
   NULL
 };
 

@@ -47,8 +47,7 @@ input_module_t mod_snmptrap;
 
 /* static long seq_g = 0; */
 
-static int
-snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   unsigned char *packet;
   size_t packet_len;
@@ -220,7 +219,7 @@ snmptrap_preconfig(orchids_t *ctx, mod_entry_t *mod)
 #endif /* ORCHIDS_DEBUG */
 
   /* hard coded callback registration.
-  ** optionnal goes in config directives */
+  ** optional goes in config directives */
   port = Xzmalloc(ctx->gc_ctx, sizeof (int));
   *port = 162;
   register_conditional_dissector(ctx, mod, "udp", (void *)port, sizeof (int),
@@ -301,9 +300,10 @@ input_module_t mod_snmptrap = {
   snmptrap_config_commands, /* module configuration commands,
                                for core config parser */
   snmptrap_preconfig,       /* called just after module registration */
-  snmptrap_postconfig,       /* called after all mods preconfig,
+  snmptrap_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
-  NULL
+  NULL,
+  snmptrap_dissector
 };
 
 #endif /* HAVE_SNMP */

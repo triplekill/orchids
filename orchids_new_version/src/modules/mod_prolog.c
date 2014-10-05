@@ -439,8 +439,9 @@ input_module_t mod_prolog = {
   prolog_config_commands,   /* module configuration commands,
                                for core config parser */
   prolog_preconfig,         /* called just after module registration */
-  NULL             ,        /* called after all mods preconfig,
+  NULL,                     /* called after all mods preconfig,
                                and after all module configuration*/
+  NULL,
   NULL
 };
 
