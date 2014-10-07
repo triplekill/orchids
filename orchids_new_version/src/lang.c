@@ -2191,6 +2191,65 @@ static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state)
   }
 }
 
+static void issdl_ipv4_from_ipv6(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *addr4;
+  ovm_var_t *addr6;
+  size_t len = sizeof(in_addr_t); 
+  uint8_t buff[len];
+  
+  addr6  = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+
+  if ((addr6 == NULL) || (addr6->gc.type != T_IPV6))
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_ipv4_from_ipv6(): param error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, NULL);
+    }
+  else
+    { 
+      int index = sizeof(struct in6_addr) - len;
+      int i;
+      for (i = 0; i < len ; i++)
+        buff[i] = *(IPV6(addr6).s6_addr + index + i); 
+
+      addr4 = ovm_ipv4_new(ctx->gc_ctx);
+      memcpy(&IPV4(addr4), buff, len);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, addr4);
+    }
+}
+
+
+
+static void issdl_ipv6_from_ipv4(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *addr4;
+  ovm_var_t *addr6;
+  size_t len = sizeof(struct in6_addr); 
+  uint8_t buff[len];
+
+  addr4  = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+
+  if ((addr4 == NULL) || (addr4->gc.type != T_IPV4))
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_ipv6_from_ipv4(): param error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, NULL);
+    }
+  else
+    {
+      memset(buff, 0, 10);
+      memset(&buff[10], 0xff, 2);
+      memcpy(&buff[12], &IPV4(addr4), 4); 
+
+      addr6 = ovm_ipv6_new(ctx->gc_ctx); 
+      memcpy(&IPV6(addr6), buff, len);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, addr6);
+    }
+}
+
 unsigned long orchids_atoui (char *str, size_t len)
 {
   char *end = str+len;
@@ -3246,6 +3305,8 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_time_from_str, 29, "time_from_str", 1, "convert a string to a time" },
   { issdl_timeval_from_str, 30, "timeval_from_str", 1, "convert a string to a timeval" },
   { issdl_str_from_ipv6, 31, "str_from_ipv6", 1, "convert an ipv6 address to a string" },
+  { issdl_ipv4_from_ipv6, 32, "ipv4_from_ipv6", 1, "convert an ipv6 address to an ipv4 address" },
+  { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4", 1, "convert an ipv4 address to an ipv6 address" },
   { NULL, 0, NULL, 0, NULL }
 };
 
