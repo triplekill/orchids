@@ -30,7 +30,8 @@ pkglib_LTLIBRARIES = \
   mod_auditd.la \
   mod_htmlstate.la \
   mod_metaevent.la \
-  mod_mark.la
+  mod_mark.la \
+  mod_openbsm.la
 
 
 
@@ -225,5 +226,14 @@ mod_snmptrap_la_LDFLAGS = -module -avoid-version
 mod_snmptrap_la_LIBADD = $(NETSNMP_LDFLAGS)
 pkglib_LTLIBRARIES += mod_snmptrap.la
 endif
+
+mod_openbsm_la_SOURCES = mod_openbsm.c mod_openbsm.h defs_openbsm.h
+mod_openbsm_la_LDFLAGS = -module -avoid-version
+
+defs_openbsm.h: gen_mod_openbsm
+	./gen_mod_openbsm >$$
+
+gen_mod_openbsm: gen_mod_openbsm.c
+	$(CC) $< -o $$
 
 # End-of-file

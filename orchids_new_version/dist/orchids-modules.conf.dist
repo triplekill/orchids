@@ -17,6 +17,7 @@ LoadModule syslog
 LoadModule rawsnare
 LoadModule snare
 LoadModule auditd
+LoadModule openbsm
 LoadModule generic
 LoadModule netfilter
 LoadModule cisco
