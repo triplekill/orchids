@@ -260,7 +260,7 @@
   { "openbsm.argname127", T_STR, "openbsm argument name 127" },
   { "openbsm.arg128", T_UINT, "openbsm argument 128" },
   { "openbsm.argname128", T_STR, "openbsm argument name 128" },
-#define F_OPENBSM_ARG_END (F_OPENBSM_ARG_START+128)
+#define F_OPENBSM_ARG_END (F_OPENBSM_ARG_START+256)
 #define F_OPENBSM_EXECARG_START F_OPENBSM_ARG_END
   { "bsm.execarg_num", T_UINT, "bsm exec argument number" },
 #define F_OPENBSM_EXECARG_NUM 0

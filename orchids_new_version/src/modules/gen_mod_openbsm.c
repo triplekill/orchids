@@ -12,7 +12,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <bsm/libbsm.h>
+// #include <bsm/libbsm.h>
 
 int main (int argc, char *argv[])
 {
@@ -37,7 +37,7 @@ int main (int argc, char *argv[])
 	     " \"openbsm argument name %d\" },\n",
 	     i, i);
     }
-  printf("#define F_OPENBSM_ARG_END (F_OPENBSM_ARG_START+%d)\n", max_args);
+  printf("#define F_OPENBSM_ARG_END (F_OPENBSM_ARG_START+%d)\n", 2*max_args);
 
   printf("#define F_OPENBSM_EXECARG_START F_OPENBSM_ARG_END\n");
   printf("  { \"bsm.execarg_num\", T_UINT,"

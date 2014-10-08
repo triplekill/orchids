@@ -79,20 +79,21 @@ input_module_t mod_openbsm;
    We do not use htonl(), htons(), ntohl(), ntohs() since the latter
    may assume aligned data
  */
+/*
 #define INT64_FROM_CHARS(bytes)						\
   ((((uint64_t)INT32_FROM_CHARS(bytes))<<32) | (uint64_t)INT32_FROM_CHARS(bytes+4))
-/*
+*/
+
 #define INT64_FROM_CHARS(bytes)	(					\
   (((uint64_t)(unsigned char)(bytes)[0])<<56) |			\
   (((uint64_t)(unsigned char)(bytes)[1])<<48) |			\
   (((uint64_t)(unsigned char)(bytes)[2])<<40) |			\
-  (((uint64_t)(unsigned char)(bytes)[3])<<32)			\
+  (((uint64_t)(unsigned char)(bytes)[3])<<32) |			\
   (((uint64_t)(unsigned char)(bytes)[4])<<24) |			\
   (((uint64_t)(unsigned char)(bytes)[5])<<16) |			\
   (((uint64_t)(unsigned char)(bytes)[6])<<8) |			\
    ((uint64_t)(unsigned char)(bytes)[7])				\
    )
-*/
 #define INT32_FROM_CHARS(bytes)	(					\
   (((uint32_t)(unsigned char)(bytes)[0])<<24) |			\
   (((uint32_t)(unsigned char)(bytes)[1])<<16) |			\
@@ -116,7 +117,7 @@ static size_t openbsm_compute_length (unsigned char *first_bytes, size_t n_first
   switch (*state)
     {
     case BLOX_INIT: /* then n_first_bytes==1 */
-      c = (int)(unsigned int)(unsigned char)first_bytes[0];
+      c = (int)(unsigned int)first_bytes[0];
       switch (c)
 	{
 	case AUT_HEADER32:
@@ -239,6 +240,7 @@ static field_t openbsm_fields[] = {
   { "openbsm.socket_rport", T_UINT, "socket remote port (in socket token)" },
   { "openbsm.socket_raddr", T_IPV6, "socket IPv6 (or IPv4 encoded as IPv6) remote address (in socket token)" },
   { "openbsm.text", T_STR, "text (in text token)" },
+  { "openbsm.zonename", T_STR, "zone name (in zonename token)" },
   // The following file generated automatically by gen_mod_openbsm.c
   // handles the bsm.arg<n> fields, etc.
 #include "defs_openbsm.h"
@@ -280,7 +282,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
     for (with_size_n=1; with_size_n; stream += (n), with_size_n=0)
   while (stream < stream_end)
     {
-      c = (int)(unsigned int)(unsigned char)*stream++;
+      c = (int)(unsigned int)*stream++;
       switch (c)
 	{
 	case AUT_HEADER32:
@@ -292,7 +294,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  WITH_SIZE(1,hdr_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_HDR_VERSION,
-			ovm_uint_new (gc_ctx, (int)(unsigned int)(unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(2,hdr_wrap)
 	    {
@@ -327,8 +329,8 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 		  break;
 		default: goto hdr_wrap;
 		}
+	      GC_UPDATE(gc_ctx, F_OPENBSM_HDR_IP, val);
 	    }
-	  GC_UPDATE(gc_ctx, F_OPENBSM_HDR_IP, val);
 	  GC_UPDATE(gc_ctx, F_OPENBSM_HDR_TIME, val = ovm_timeval_new (gc_ctx));
 	  if (c==AUT_HEADER64 || c==AUT_HEADER64_EX)
 	    {
@@ -391,7 +393,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	     I assume this text is the name of the argument.
 	  */
 	  WITH_SIZE(1,arg_end)
-	    num = (int)(unsigned int)(unsigned char)stream[0];
+	    num = (int)(unsigned int)stream[0];
 	  if (num<=0 || num>OPENBSM_MAX_ARGS)
 	    goto arg_end;
 	  GC_START(gc_ctx, 2);
@@ -562,9 +564,10 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  for (i=0; i<size; )
 	    {
 	      for (s=(char *)stream; s<(char *)stream_end && *s!='\0'; s++);
-	      GC_UPDATE(gc_ctx, i+1, val = ovm_str_new (gc_ctx, s-(char *)stream));
-	      memcpy (STR(val), stream, s-(char *)stream);
-	      STRLEN(val) = s-(char *)stream;
+              width = s-(char *)stream;
+	      GC_UPDATE(gc_ctx, i+1, val = ovm_str_new (gc_ctx, width));
+	      memcpy (STR(val), stream, width);
+	      STRLEN(val) = width;
 	      i++;
 	      if (s>=(char *)stream_end)
 		break;
@@ -678,12 +681,12 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  WITH_SIZE(1,ip_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_IP_VERSION,
-			ovm_uint_new (gc_ctx, (unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(1,ip_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_IP_TOS,
-			ovm_uint_new (gc_ctx, (unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(2,ip_wrap)
 	    {
@@ -703,12 +706,12 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  WITH_SIZE(1,ip_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_IP_TTL,
-			ovm_uint_new (gc_ctx, (unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(1,ip_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_IP_PROTOCOL,
-			ovm_uint_new (gc_ctx, (unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(2,ip_wrap)
 	    {
@@ -735,7 +738,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  WITH_SIZE(1,ipc_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_IPC_TYPE,
-			ovm_uint_new (gc_ctx, (unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  WITH_SIZE(4,ipc_wrap)
 	    {
@@ -938,7 +941,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  WITH_SIZE(1,ret_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_RETURN_ERRNO,
-			ovm_uint_new (gc_ctx, (unsigned int)(unsigned char)stream[0]));
+			ovm_uint_new (gc_ctx, (unsigned int)stream[0]));
 	    }
 	  if (c==AUT_RETURN64)
 	    {

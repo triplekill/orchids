@@ -230,10 +230,10 @@ endif
 mod_openbsm_la_SOURCES = mod_openbsm.c mod_openbsm.h defs_openbsm.h
 mod_openbsm_la_LDFLAGS = -module -avoid-version
 
-defs_openbsm.h: gen_mod_openbsm
-	./gen_mod_openbsm >$$
-
-gen_mod_openbsm: gen_mod_openbsm.c
-	$(CC) $< -o $$
+# defs_openbsm.h: gen_mod_openbsm
+# 	./gen_mod_openbsm >$$
+#
+# gen_mod_openbsm: gen_mod_openbsm.c
+# 	$(CC) $< -o $$
 
 # End-of-file

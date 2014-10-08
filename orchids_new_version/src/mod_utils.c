@@ -145,18 +145,20 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       DebugLog(DF_MOD, DS_DEBUG, "event value not a binary string\n");
       return -1;
     }
-  if (hook->remaining==NULL)
-    remlen = 0;
-  else
-    switch (TYPE(hook->remaining))
-      {
-      case T_BSTR: remstream = BSTR(hook->remaining);
-	remlen = BSTRLEN(hook->remaining);
-	break;
-      case T_VBSTR: remstream = VBSTR(hook->remaining);
-	remlen = VBSTRLEN(hook->remaining);
-	break;
-      }
+  remstream = NULL;
+  remlen = 0;
+  if (hook->remaining!=NULL)
+    {
+      switch (TYPE(hook->remaining))
+        {
+        case T_BSTR: remstream = BSTR(hook->remaining);
+	  remlen = BSTRLEN(hook->remaining);
+	  break;
+        case T_VBSTR: remstream = VBSTR(hook->remaining);
+	  remlen = VBSTRLEN(hook->remaining);
+	  break;
+        }
+    }
   /* By default, concatenate hook->remaining and stream. */
   if (remlen==0) /* unless no character remained */
     ;
