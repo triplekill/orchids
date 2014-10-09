@@ -2252,24 +2252,65 @@ static void issdl_ipv6_from_ipv4(orchids_t *ctx, state_instance_t *state)
 
 unsigned long orchids_atoui (char *str, size_t len)
 {
-  char *end = str+len;
-  unsigned long n=0;
+  char *end = str + len;
+  unsigned long n = 0;
 
-  while (str<end && isspace(*str)) str++;
-  while (str<end && isdigit(*str)) n = 10*n + ((*str++)-'0');
-  return n;
-}
+  while ((str < end) && isspace(*str))
+    str++;
+
+  /* octal or hex ? */
+  if (*str == '0')
+    {
+      str++;
+      /* hex ? */
+      if (*str == 'x')
+        {
+          str++;
+          int i;
+
+          while ((str < end) && isxdigit (*str))
+            {
+              if (isdigit (*str))
+                i = ((int) *str++) - '0';
+              else 
+                i = (((int) *str++) - 'A' + 10) & 0x1f;
+              
+              n = 16*n + i;
+            }
+        }
+      /* octal */
+      else
+        {
+          while ((str < end) && isdigit(*str) && (*str < '8'))
+              n = 8*n + (((int) *str++) - '0');
+        }
+    }
+  /* decimal */
+  else
+    {
+      while ((str < end) && isdigit(*str))
+        n = 10*n + (((int) *str++) -'0');
+    }
+
+  return n; 
+} 
 
 long orchids_atoi (char *str, size_t len)
 {
-  char *end = str+len;
-  long n=0;
-  int negate=0;
+  char *end = str + len;
+  long n = 0;
+  int negate = 0;
 
-  while (str<end && isspace(*str)) str++;
-  if (str < end && *str=='-') { negate=1; str++; }
-  while (str<end && isspace(*str)) str++;
-  while (str<end && isdigit(*str)) n = 10*n + ((*str++)-'0');
+  while ((str < end) && isspace(*str)) 
+    str++;
+  
+  if ((str < end) && (*str=='-')) 
+    { 
+      negate = 1; 
+      str++;
+    }
+
+  n = orchids_atoui(str, len);
   return negate?(-n):n;
 }
 
