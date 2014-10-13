@@ -69,6 +69,8 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
  *** can parse sequences of <keyword><data>, as used e.g. in mod_newauditd.c
  ***/
 
+typedef struct action_orchids_ctx_s action_orchids_ctx_t;
+
 typedef char *(*action_doer) (action_orchids_ctx_t *octx,
 			      char *s, char *end,
 			      int field_num);
@@ -82,7 +84,8 @@ struct action_s {
 			    purposes */
 };
 
-typedef struct action_orchids_ctx_s action_orchids_ctx_t;
+typedef struct action_tree_s action_tree_t;
+
 struct action_orchids_ctx_s {
   orchids_t *ctx;
   mod_entry_t *mod; /* module into which events must be injected */
@@ -90,8 +93,6 @@ struct action_orchids_ctx_s {
   event_t *in_event;
   event_t **out_event;
 };
-
-typedef struct action_tree_s action_tree_t;
 
 /* Build a simple parser from a table of actions
    (terminated by one action with a NULL name ) */

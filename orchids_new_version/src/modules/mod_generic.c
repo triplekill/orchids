@@ -142,8 +142,11 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  VSTRLEN(res) = res_sz;
 		  break;
 		case T_INT:
-		  res = ovm_int_new(ctx->gc_ctx,
-				    orchids_atoi(buff, res_sz));
+		  {
+		    long i;
+		    (void) orchids_atoi(buff, res_sz, &i);
+		    res = ovm_int_new(ctx->gc_ctx, i);
+		  }
 		  break;
 		case T_IPV4:
 		  res = ovm_ipv4_new(ctx->gc_ctx);

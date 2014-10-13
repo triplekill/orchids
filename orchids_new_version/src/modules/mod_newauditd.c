@@ -69,13 +69,12 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
 static struct action newauditd_actions[] = {
   /* !!! Don't put any empty word here, or any word
      that is prefix of another one! */
-  { "audit(", F_OPENBSM_HDR_TIME, action_doer_audit },
+  { "audit(", F_AUDITD_TIME, action_doer_audit },
+  { "node=", F_OPENBSM_HDR_FILE, action_doer_string },
   //!!!
 
 
-  { "node=", F_AUDITD_NODE, ACTION_STRING },
   { "type=", F_AUDITD_TYPE, ACTION_STRING },
-  { "msg=audit(", 0 /*unused*/, ACTION_AUDIT }, // this is what we get in 'string' format
   { "arch=", F_AUDITD_ARCH, ACTION_INT },
   { "syscall=", F_AUDITD_SYSCALL, ACTION_INT },
   { "success=", F_AUDITD_SUCCESS, ACTION_STRING },
@@ -119,7 +118,7 @@ input_module_t mod_newauditd = {
   ORCHIDS_VERSION,          /* Module version */
   "newauditd",              /* module name */
   "CeCILL2",                /* module license */
-  { "openbsm" },            /* dependencies */
+  NULL,                     /* dependencies */
   NULL,
   newauditd_preconfig,      /* called just after module registration */
   NULL,

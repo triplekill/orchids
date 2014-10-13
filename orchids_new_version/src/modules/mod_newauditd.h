@@ -15,6 +15,50 @@
  * See end of file for LICENSE and COPYRIGHT informations.
  */
 
+#define F_AUDITD_NODE      0
+#define F_AUDITD_TYPE      1
+// The numbers F_AUDITD_TIME and F_AUDITD_SERIAL should be n and n+1,
+// due to the fact that they are handled in action_doer_audit()
+#define F_AUDITD_TIME      2
+#define F_AUDITD_SERIAL    (F_AUDITD_TIME+1)
+#define F_AUDITD_ARCH      4
+#define F_AUDITD_SYSCALL   5
+#define F_AUDITD_SUCCESS   6
+#define F_AUDITD_EXIT      7
+#define F_AUDITD_A0        8
+#define F_AUDITD_A1        9
+#define F_AUDITD_A2        10
+#define F_AUDITD_A3        11
+#define F_AUDITD_ITEMS     12
+#define F_AUDITD_PPID      13
+#define F_AUDITD_PID       14
+#define F_AUDITD_AUID      15
+#define F_AUDITD_UID       16
+#define F_AUDITD_GID       17
+#define F_AUDITD_EUID      18
+#define F_AUDITD_SUID      19
+#define F_AUDITD_FSUID     20
+#define F_AUDITD_EGID      21
+#define F_AUDITD_SGID      22
+#define F_AUDITD_FSGID     23
+#define F_AUDITD_TTY       24
+#define F_AUDITD_SES       25
+#define F_AUDITD_COMM      26
+#define F_AUDITD_EXE       27
+#define F_AUDITD_SUBJ      28
+#define F_AUDITD_KEY       29
+#define F_AUDITD_ITEM      30
+#define F_AUDITD_NAME      31
+#define F_AUDITD_INODE     32
+#define F_AUDITD_MODE      33
+#define F_AUDITD_DEV       34
+#define F_AUDITD_OUID      35
+#define F_AUDITD_OGID      36
+#define F_AUDITD_RDEV      37
+#define F_AUDITD_CWD       38
+
+#define AUDITD_FIELDS 39
+
 /*
 ** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ and Pierre-Arnaud SENTUCQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.

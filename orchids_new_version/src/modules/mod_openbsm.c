@@ -563,7 +563,8 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  GC_START(gc_ctx, OPENBSM_MAX_ARGS+1); /* really only size+1 */
 	  for (i=0; i<size; )
 	    {
-	      for (s=(char *)stream; s<(char *)stream_end && *s!='\0'; s++);
+	      for (s=(char *)stream; s<(char *)stream_end && *s!='\0'; s++)
+		;
               width = s-(char *)stream;
 	      GC_UPDATE(gc_ctx, i+1, val = ovm_str_new (gc_ctx, width));
 	      memcpy (STR(val), stream, width);
