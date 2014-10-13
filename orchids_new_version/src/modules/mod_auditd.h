@@ -22,23 +22,6 @@
 
 #include "orchids.h"
 
-#ifdef OBSOLETE
-#include "auditd_queue.h"
-#endif
-
-
-#define ACTION_AUDIT 1
-// #define ACTION_UNSIGNED_INT 2
-#define ACTION_INT 2
-#define ACTION_HEX 3
-#define ACTION_STRING 4
-#define ACTION_ID ACTION_STRING
-#define ACTION_SUBJ ACTION_STRING
-#define ACTION_DEV 5
-/* The last ACTION_* must always be the following (dummy) one: */
-#define ACTION_LIMIT 6
-
-
 #define F_AUDITD_NODE      0
 #define F_AUDITD_TYPE      1
 // The numbers F_AUDITD_TIME and F_AUDITD_SERIAL should be n and n+1,
@@ -83,24 +66,10 @@
 
 #define AUDITD_FIELDS 39
 
-typedef struct auditd_cfg_s {
-  struct action_ctx *actx; // internal context data used by auditd_callback()
-} auditd_cfg_t;
-
 /***********************************************/
-
-#ifdef OBSOLETE
-static int
-auditd_callback(orchids_t *ctx, mod_entry_t *mod, int sd, void *data);
-#endif
 
 static void *
 auditd_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-#ifdef OBSOLETE
-static void
-auditd_postconfig(orchids_t *ctx, mod_entry_t *mod);
-#endif
 
 
 #endif /* MOD_AUDITD_H */

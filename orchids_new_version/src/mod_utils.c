@@ -19,8 +19,10 @@
 #endif
 
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "orchids.h"
 #include "orchids_api.h"
@@ -365,8 +367,8 @@ void action_parse_event (action_orchids_ctx_t *octx, char *data, char *end)
 	atp = octx->atree; /* Ignore this illegal sequence. */
       else if (atp->tag==TAG_END) /* We found something to do! */
 	{
-	  s = (*atp->action_do) (octx, s, end,
-				 atp->what.code.field_num);
+	  s = (*atp->what.code.action_do) (octx, s, end,
+					   atp->what.code.field_num);
 	  atp = octx->atree;
 	}
       else goto start;
@@ -375,10 +377,10 @@ void action_parse_event (action_orchids_ctx_t *octx, char *data, char *end)
 
 #define FILL_EVENT(octx,n,len) add_fields_to_event_stride(octx->ctx, octx->mod, octx->out_event, (ovm_var_t **)GC_DATA(), n, n+len)
 
-char *orchids_atoui_hex (char *s, char *end, int *ip)
+char *orchids_atoui_hex (char *s, char *end, unsigned long *ip)
 {
-  int i = 0;
-  int j;
+  unsigned long i = 0;
+  unsigned long j;
   char c;
 
   while (s<end && (c = *s, isxdigit (c)))
@@ -405,7 +407,7 @@ char *action_doer_int (action_orchids_ctx_t *octx, char *s, char *end,
   t = orchids_atoi (s, end-s, &i);
   v = ovm_int_new(gc_ctx, i);
   GC_UPDATE(gc_ctx, 0, v);
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return t;
 }
@@ -422,7 +424,7 @@ char *action_doer_uint (action_orchids_ctx_t *octx, char *s, char *end,
   t = orchids_atoui (s, end-s, &i);
   v = ovm_uint_new(gc_ctx, i);
   GC_UPDATE(gc_ctx, 0, v);
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return t;
 }
@@ -439,7 +441,7 @@ char *action_doer_uint_hex (action_orchids_ctx_t *octx, char *s, char *end,
   t = orchids_atoui_hex (s, end, &i);
   v = ovm_uint_new(gc_ctx, i);
   GC_UPDATE(gc_ctx, 0, v);
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return t;
 }
@@ -471,7 +473,7 @@ char *action_doer_dev (action_orchids_ctx_t *octx, char *s, char *end,
   i = (major << 6) | minor;
   v = ovm_uint_new(gc_ctx, i);
   GC_UPDATE(gc_ctx, 0, v);
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return s;
 }
@@ -488,7 +490,7 @@ char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
   VSTR(v) = s;
   for (t=s; t<end && (c = *t, c!=0 && !isspace (c)); t++);
   VSTRLEN(v) = t-s;
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return t;
 }
@@ -505,7 +507,7 @@ char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
   size_t str_sz = 0;
 
   if (s<end && *s != '"')
-    return action_doer_id (octx, s, end, n);
+    return action_doer_id (octx, s, end, field_num);
   from = s++;
   /* We try to allocate the string as a VSTR, except
      if we find backslashed characters, in which case we allocate a STR
@@ -598,7 +600,7 @@ char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
 
  end:
   GC_UPDATE(gc_ctx, 0, v);
-  FILL_EVENT(octx, n, 1);
+  FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return s;
 }

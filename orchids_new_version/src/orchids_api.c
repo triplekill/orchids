@@ -350,12 +350,11 @@ void reincarnate_fd(orchids_t *ctx, int oldfd, int newfd)
   FD_SET(newfd, &ctx->fds);
 }
 
-void
-register_dissector(orchids_t *ctx,
-                   mod_entry_t *mod,
-                   char *parent_modname,
-                   dissect_t dissect,
-                   void *data)
+void register_dissector(orchids_t *ctx,
+			mod_entry_t *mod,
+			char *parent_modname,
+			dissect_t dissect,
+			void *data)
 {
   mod_entry_t *parent_mod;
 
@@ -698,8 +697,9 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
     {
       /* check for unconditional dissector */
       DebugLog(DF_CORE, DS_DEBUG, "Call unconditional sub-dissector.\n");
-      ret = (*sender->dissect) (ctx, sender->dissect_mod, event, NULL);
-      /* Free and optionally inject event if sub-dissector fail */
+      ret = (*sender->dissect) (ctx, sender->dissect_mod, event,
+				sender->data);
+      /* Free and optionally inject event if sub-dissector failed */
       if (ret)
 	{
 	  DebugLog(DF_CORE, DS_WARN, "dissection failed.\n");

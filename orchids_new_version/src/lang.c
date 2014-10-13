@@ -2289,7 +2289,7 @@ char *orchids_atoui (char *s, size_t len, unsigned long *result)
       i = 10*i + (((int)c) - '0');
       s++;
     }
-  *ip = i;
+  *result = i;
   return s;
 }
 
@@ -2298,6 +2298,7 @@ char *orchids_atoi (char *str, size_t len, long *result)
   char *end = str + len;
   char *s;
   int negate = 0;
+  unsigned long ures;
 
   while ((str < end) && isspace(*str)) 
     str++;
@@ -2308,9 +2309,8 @@ char *orchids_atoi (char *str, size_t len, long *result)
       str++;
     }
 
-  s = orchids_atoui(str, len, result);
-  if (negate)
-    *result = -*result;
+  s = orchids_atoui(str, len, &ures);
+  *result = negate?-(long)ures:(long)ures;
   return s;
 }
 

@@ -1293,13 +1293,11 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
   GC_END(gc_ctx);
 }
 
-/*
-static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			   void *data)
+static int openbsm_dissect (orchids_t *ctx, mod_entry_t *mod,
+			    event_t *event, void *data)
 {
-  return blox_dissect (ctx, mod, event, data);
+  return blox_dissect (ctx, mod, event, mod->config);
 }
-*/
 
 static void *openbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -1324,7 +1322,7 @@ input_module_t mod_openbsm = {
   openbsm_preconfig,
   NULL,
   NULL,
-  blox_dissect
+  openbsm_dissect
 };
 
 /*

@@ -1705,8 +1705,8 @@ char *orchids_atoi (char *str, size_t len, long *result);
 char *orchids_atoui (char *str, size_t len, unsigned long *result);
 char *orchids_atof (char *str, size_t len, double *result);
 
-/* In mod_utils.h */
-char *orchids_atoui_hex (char *s, char *end, int *ip);
+/* In mod_utils.c */
+char *orchids_atoui_hex (char *s, char *end, unsigned long *ip);
 
 #endif /* ORCHID_H */
 
