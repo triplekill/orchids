@@ -1701,6 +1701,12 @@ event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
 
 /* In lang.c: */
 char *time_convert(char *str, char *end, struct timeval *tv);
+char *orchids_atoi (char *str, size_t len, long *result);
+char *orchids_atoui (char *str, size_t len, unsigned long *result);
+char *orchids_atof (char *str, size_t len, double *result);
+
+/* In mod_utils.h */
+char *orchids_atoui_hex (char *s, char *end, int *ip);
 
 #endif /* ORCHID_H */
 

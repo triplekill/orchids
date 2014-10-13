@@ -17,9 +17,9 @@
 #ifndef MOD_UTILS_H
 #define MOD_UTILS_H
 
-/* Utility functions to create subdissectors for streams
-   of data coming typically from network connections in binary format
-*/
+/*** Utility functions to create subdissectors for streams
+ *** of data coming typically from network connections in binary format
+ ***/
 
 typedef struct blox_hook_s blox_hook_t;
 
@@ -64,6 +64,53 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
 			    );
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data);
+
+/*** Quick parser functions
+ *** can parse sequences of <keyword><data>, as used e.g. in mod_newauditd.c
+ ***/
+
+typedef char *(*action_doer) (action_orchids_ctx_t *octx,
+			      char *s, char *end,
+			      int field_num);
+
+typedef struct action_s action_t;
+struct action_s {
+  char *name; /* <keyword> */
+  int field_num; /* orchids field number in given module */
+  action_doer action_do; /* one of the action_doer_* functions below,
+			    or one that you would write for specific
+			    purposes */
+};
+
+typedef struct action_orchids_ctx_s action_orchids_ctx_t;
+struct action_orchids_ctx_s {
+  orchids_t *ctx;
+  mod_entry_t *mod; /* module into which events must be injected */
+  action_tree_t *atree; /* build using compile_actions() below */
+  event_t *in_event;
+  event_t **out_event;
+};
+
+typedef struct action_tree_s action_tree_t;
+
+/* Build a simple parser from a table of actions
+   (terminated by one action with a NULL name ) */
+action_tree_t *compile_actions(gc_t *gc_ctx, action_t *actions);
+
+void action_parse_event(action_orchids_ctx_t *octx, char *data, char *end);
+char *action_doer_int (action_orchids_ctx_t *octx, char *s, char *end,
+		       int field_num);
+char *action_doer_uint (action_orchids_ctx_t *octx, char *s, char *end,
+			int field_num);
+char *action_doer_uint_hex (action_orchids_ctx_t *octx, char *s, char *end,
+			    int field_num);
+char *action_doer_dev (action_orchids_ctx_t *octx, char *s, char *end,
+		       int field_num); /* device number (64*major+minor) */
+char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
+		      int field_num);
+char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
+			  int field_num);
+
 
 #endif /* MOD_UTILS_H */
 

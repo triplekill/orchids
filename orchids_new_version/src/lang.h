@@ -797,10 +797,6 @@ char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str);
 
 ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var);
 
-long orchids_atoi (char *str, size_t len);
-unsigned long orchids_atoui (char *str, size_t len);
-double orchids_atof (char *str, size_t len);
-
 
 #endif /* LANG_H */
 

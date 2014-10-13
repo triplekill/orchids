@@ -156,8 +156,12 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		    }
 		  break;
 		case T_FLOAT:
-		  res = ovm_float_new(ctx->gc_ctx,
-				      orchids_atof (buff, res_sz));
+		  {
+		    double x;
+
+		    (void) orchids_atof (buff, res_sz, &x);
+		    res = ovm_float_new(ctx->gc_ctx, x);
+		  }
 		  break;
 		default:
 		  DebugLog(DF_MOD, DS_ERROR, "Unknown field type\n", field->type);

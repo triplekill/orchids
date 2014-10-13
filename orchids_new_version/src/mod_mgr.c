@@ -81,7 +81,7 @@ int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
   int mod_id;
   void *mod_cfg;
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   if (ctx->loaded_modules >= MAX_MODULES)
     {
       fprintf(stderr, "module limit reached.\n");
@@ -97,7 +97,7 @@ gc_check(ctx->gc_ctx);
       return -1;
     }
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   /* 1 - Check if already registered */
   if (find_module(ctx, mod->name) != NULL)
     {
@@ -105,7 +105,7 @@ gc_check(ctx->gc_ctx);
       return -1;
     }
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   /* 2 - Check dependencies */
   if (mod->dependencies!=NULL)
     {
@@ -121,7 +121,7 @@ gc_check(ctx->gc_ctx);
 	  }
     }
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   /* 3 - Add to core list (and hashlist ?) */
   mod_id = ctx->loaded_modules;
   ctx->mods[mod_id].mod_id = mod_id;
@@ -129,7 +129,7 @@ gc_check(ctx->gc_ctx);
   ctx->mods[mod_id].dlhandle = dlhandle;
   /* dyn realloc mod array ? remove mod limit ? */
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   /* 4 - Proceed to initialisation */
   if (mod->pre_config!=NULL)
     {

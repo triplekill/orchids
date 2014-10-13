@@ -2250,55 +2250,53 @@ static void issdl_ipv6_from_ipv4(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-unsigned long orchids_atoui (char *str, size_t len)
+char *orchids_atoui (char *s, size_t len, unsigned long *result)
 {
-  char *end = str + len;
-  unsigned long n = 0;
+  char *end = s + len;
+  unsigned int i = 0;
+  char c;
 
-  while ((str < end) && isspace(*str))
-    str++;
+  while ((s < end) && isspace(*s))
+    s++;
 
-  /* octal or hex ? */
-  if (*str == '0')
+  c = *s;
+  if (c=='0') // octal or hex
     {
-      str++;
-      /* hex ? */
-      if (*str == 'x')
+      c = *++s;
+      if (c=='x') // hex
         {
-          str++;
-          int i;
+          int j;
 
-          while ((str < end) && isxdigit (*str))
+	  s++;
+          while (s<end && (c = *s, isxdigit (c)))
             {
-              if (isdigit (*str))
-                i = ((int) *str++) - '0';
-              else 
-                i = (((int) *str++) - 'A' + 10) & 0x1f;
-              
-              n = 16*n + i;
+              if (isdigit (c))
+        	j = ((int)c) - '0';
+              else j = (((int)c) - 'A' + 10) & 0x1f;
+              i = 16*i + j;
+              s++;
             }
         }
-      /* octal */
-      else
-        {
-          while ((str < end) && isdigit(*str) && (*str < '8'))
-              n = 8*n + (((int) *str++) - '0');
-        }
+      else // octal
+        while (s<end && (c = *s, isdigit (c) && c<'8'))
+          {
+            i = 8*i + (((int)c) - '0');
+            s++;
+          }
     }
-  /* decimal */
-  else
+  else while (s<end && (c = *s, isdigit (c)))
     {
-      while ((str < end) && isdigit(*str))
-        n = 10*n + (((int) *str++) -'0');
+      i = 10*i + (((int)c) - '0');
+      s++;
     }
+  *ip = i;
+  return s;
+}
 
-  return n; 
-} 
-
-long orchids_atoi (char *str, size_t len)
+char *orchids_atoi (char *str, size_t len, long *result)
 {
   char *end = str + len;
-  long n = 0;
+  char *s;
   int negate = 0;
 
   while ((str < end) && isspace(*str)) 
@@ -2310,25 +2308,30 @@ long orchids_atoi (char *str, size_t len)
       str++;
     }
 
-  n = orchids_atoui(str, len);
-  return negate?(-n):n;
+  s = orchids_atoui(str, len, result);
+  if (negate)
+    *result = -*result;
+  return s;
 }
 
 static void issdl_int_from_str(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *str;
   ovm_var_t *i;
+  long n;
 
   str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (str!=NULL && str->gc.type == T_STR)
     {
-      i = ovm_int_new(ctx->gc_ctx, orchids_atoi(STR(str), STRLEN(str)));
+      (void) orchids_atoi(STR(str), STRLEN(str), &n);
+      i = ovm_int_new(ctx->gc_ctx, n);
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_VALUE(ctx,i);
     }
   else if (str && str->gc.type == T_VSTR)
     {
-      i = ovm_int_new(ctx->gc_ctx, orchids_atoi(VSTR(str), VSTRLEN(str)));
+      (void) orchids_atoi(VSTR(str), VSTRLEN(str), &n);
+      i = ovm_int_new(ctx->gc_ctx, n);
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_VALUE(ctx,i);
     }
@@ -2457,7 +2460,7 @@ static double ldexp10 (double x, long y)
   return x;
 }
 
-double orchids_atof(char *str, size_t str_sz)
+char *orchids_atof(char *str, size_t str_sz, double *result)
 {
   double x;
   int neg;
@@ -2470,7 +2473,10 @@ double orchids_atof(char *str, size_t str_sz)
   end = s+str_sz;
   x = 0.0;
   if (s>=end)
-    return x;
+    {
+      *result = x;
+      return end;
+    }
   c = *s;
   if (c=='-')
     {
@@ -2496,7 +2502,8 @@ double orchids_atof(char *str, size_t str_sz)
 	}
     }
  neg:
-  return neg?(-x):x;
+  *result = neg?(-x):x;
+  return s;
  dot:
   mask = 1.0;
   while (s<end && (c = *s, isdigit(c)))
@@ -2511,7 +2518,7 @@ double orchids_atof(char *str, size_t str_sz)
   if (c!='e' && c!='E')
     goto neg;
  exp:
-  expo = orchids_atoi (s, end-s);
+  s = orchids_atoi (s, end-s, &expo);
   x = ldexp10 (x, expo);
   goto neg;
 }
@@ -2521,17 +2528,20 @@ static void issdl_float_from_str(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *str;
   ovm_var_t *i;
+  double x;
 
   str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (str!=NULL && TYPE(str) == T_STR)
     {
-      i = ovm_float_new(ctx->gc_ctx, orchids_atof(STR(str), STRLEN(str)));
+      (void) orchids_atof(STR(str), STRLEN(str), &x);
+      i = ovm_float_new(ctx->gc_ctx, x);
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_VALUE(ctx,i);
     }
   else if (str && TYPE(str) == T_VSTR)
     {
-      i = ovm_float_new(ctx->gc_ctx, orchids_atof(VSTR(str), VSTRLEN(str)));
+      (void) orchids_atof(VSTR(str), VSTRLEN(str), &x);
+      i = ovm_float_new(ctx->gc_ctx, x);
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_VALUE(ctx,i);
     }
