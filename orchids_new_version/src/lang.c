@@ -1044,7 +1044,7 @@ static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2)
   int i = 0;
   for (i = 0 ; i < 16 ; i++)
   {
-    if (*(IPV6(var1).s6_addr + i) != *(IPV6(var2).s6_addr + i)) 
+    if (IPV6(var1).s6_addr[i] != IPV6(var2).s6_addr[i]) 
       return 1; 
   }
 
@@ -1072,7 +1072,7 @@ static ovm_var_t *ipv6_and (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
   
   int i = 0;
   for (i = 0 ; i < 16 ; i++)
-    *(IPV6(res).s6_addr + i) = *(IPV6(var1).s6_addr + i) & *(IPV6(var2).s6_addr + i);
+    IPV6(res).s6_addr[i] = IPV6(var1).s6_addr[i] & IPV6(var2).s6_addr[i];
   return res;
 }
 
@@ -1087,7 +1087,7 @@ static ovm_var_t *ipv6_or (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
   
   int i = 0;
   for (i = 0 ; i < 16 ; i++)
-    *(IPV6(res).s6_addr + i) = *(IPV6(var1).s6_addr + i) | *(IPV6(var2).s6_addr + i);
+    IPV6(res).s6_addr[i] = IPV6(var1).s6_addr[i] | IPV6(var2).s6_addr[i];
   return res;
 }
 
@@ -1102,7 +1102,7 @@ static ovm_var_t *ipv6_xor (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
   int i = 0;
   for (i = 0 ; i < 16 ; i++)
-    *(IPV6(res).s6_addr + i) = *(IPV6(var1).s6_addr + i) ^ *(IPV6(var2).s6_addr + i);
+    IPV6(res).s6_addr[i] = IPV6(var1).s6_addr[i] ^ IPV6(var2).s6_addr[i];
   return res;
 }
 
@@ -1117,7 +1117,7 @@ static ovm_var_t *ipv6_not(gc_t *gc_ctx, ovm_var_t *var)
 
   int i = 0;
   for (i = 0 ; i < 16 ; i++)
-    *(IPV6(res).s6_addr + i) = ~ *(IPV6(var).s6_addr + i);
+    IPV6(res).s6_addr[i] = ~ IPV6(var).s6_addr[i];
   return res;
 }
 
