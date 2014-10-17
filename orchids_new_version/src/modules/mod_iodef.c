@@ -598,6 +598,14 @@ static void set_csirt_name(orchids_t *ctx, mod_entry_t *mod,
   cfg->CSIRT_name = dir->args;
 }
 
+static type_t t_iodef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+
+static const type_t *iodef_new_report_sig[] = { &t_iodef };
+static const type_t **iodef_new_report_sigs[] = { iodef_new_report_sig, NULL };
+
+static const type_t *iodef_write_report_sig[] = { &t_int, &t_iodef };
+static const type_t **iodef_write_report_sigs[] = { iodef_write_report_sig, NULL };
+
 static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   iodef_cfg_t *mod_cfg;
@@ -612,13 +620,15 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
 			issdl_generate_report,
-			"iodef_new_report", 0,
+			"iodef_new_report",
+			 0, iodef_new_report_sigs,
 			"generate a report using the iodef template");
 
   register_lang_function(ctx,
 			issdl_iodef_write_report,
-			"iodef_write_report", 0,
-			"write iodef report in the report folder");
+			"iodef_write_report",
+			 0, iodef_write_report_sigs,
+			"write iodef report into the report folder");
 
 
   mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (iodef_cfg_t));

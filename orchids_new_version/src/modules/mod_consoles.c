@@ -104,6 +104,11 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+static const type_t *console_msg_sig[] = { &t_int, &t_str, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **console_msg_sigs[] = { console_msg_sig, NULL };
+
+static const type_t *console_evt_sig[] = { &t_int, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **console_evt_sigs[] = { console_evt_sig, NULL };
 
 static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -111,10 +116,12 @@ static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   DebugLog(DF_MOD, DS_INFO,
            "loading consoles module @ %p\n", (void *) &mod_consoles);
-  register_lang_function(ctx, issdl_console_msg,
-                         "console_msg", 2, "Console message output");
-  register_lang_function(ctx, issdl_console_evt,
-                         "console_evt", 1, "Console event output");
+  register_lang_function(ctx, issdl_console_msg, "console_msg",
+			 2, console_msg_sigs,
+			 "Console message output");
+  register_lang_function(ctx, issdl_console_evt, "console_evt",
+			 1, console_evt_sigs,
+			 "Console event output");
   mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
   mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);
   conscfg_g = mod_cfg;

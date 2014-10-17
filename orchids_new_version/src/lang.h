@@ -71,7 +71,6 @@
 #define T_HEAP 253
 /* T_HEAP is for skew heaps, as used in register_rtaction() and others in evt_mgr.c */
 
-
 /* monotony flags */
 /*
 #define MONOTONY_MASK 3
@@ -80,6 +79,20 @@
 #define TYPE_ANTI     2
 #define TYPE_CONST    (TYPE_MONO|TYPE_ANTI)
 */
+
+/* Types, for the type checker.
+   Not to be confused with the run-time type tags T_*
+*/
+typedef struct type_s type_t;
+struct type_s {
+  char *name;
+  unsigned char tag;
+};
+
+extern type_t t_null, t_int, t_uint, t_float,
+  t_bstr, t_str, t_ctime, t_timeval, t_ipv4, t_ipv6,
+  t_regex, t_snmpoid, t_event, t_mark,
+  t_any, t_noret;
 
 #define STR_PAD_LEN 4
 

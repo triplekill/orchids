@@ -38,13 +38,13 @@ static mod_entry_t *mod_entry_g = NULL;
 
 
 static field_t timeout_fields[] = {
-  { "timeout.date",        T_TIMEVAL,  "Date when the timeout triggered"   },
-  { "timeout.regdate",     T_TIMEVAL,  "Registration date of the timeout"   },
-  { "timeout.name",        T_VSTR,     "Name of the timeout"   },
-  { "timeout.rule",        T_VSTR,     "Name of the registration rule" },
-  { "timeout.rule_inst",   T_INT,      "Instance ID of the registration rule instance" },
-  { "timeout.state",       T_VSTR,     "Name of the registration state" },
-  { "timeout.state_inst",  T_INT,      "Instance ID of the registration state instance" },
+  { "timeout.date",        &t_timeval,  "Date when the timeout triggered"   },
+  { "timeout.regdate",     &t_timeval,  "Registration date of the timeout"   },
+  { "timeout.name",        &t_str,     "Name of the timeout"   },
+  { "timeout.rule",        &t_str,     "Name of the registration rule" },
+  { "timeout.rule_inst",   &t_int,      "Instance ID of the registration rule instance" },
+  { "timeout.state",       &t_str,     "Name of the registration state" },
+  { "timeout.state_inst",  &t_int,      "Instance ID of the registration state instance" },
 };
 
 
@@ -135,6 +135,8 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+static const type_t *timeout_sig[] = { &t_int, &t_str, &t_int };
+static const type_t **timeout_sigs[] = { timeout_sig, NULL };
 
 static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -144,7 +146,8 @@ static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
                          issdl_timeout,
-                         "timeout", 2,
+                         "timeout",
+			 2, timeout_sigs,
                          "Register a real-time timeout.");
 
   mod_entry_g = mod;

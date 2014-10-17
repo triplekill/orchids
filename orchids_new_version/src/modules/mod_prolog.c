@@ -296,6 +296,9 @@ static void issdl_prolog(orchids_t *ctx, state_instance_t *state)
 }
 
 
+static const type_t *prolog_sig[] = { &t_str, &t_str, &t_str };
+static const type_t **prolog_sigs[] = { prolog_sig, NULL };
+
 static void *
 prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -328,7 +331,9 @@ prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* register language functions */
   register_lang_function(ctx, issdl_prolog,
-                         "prolog", 2, "query the prolog engine");
+                         "prolog",
+			 2, prolog_sigs,
+			 "query the prolog engine");
 
   /* if (have_module("htmloutput"))*/
   html_output_add_menu_entry(ctx, mod, prolog_htmloutput);

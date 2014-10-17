@@ -121,6 +121,9 @@ static void issdl_temporal(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+static const type_t *temporal_sig[] = { &t_int, &t_str };
+static const type_t **temporal_sigs[] = { temporal_sig, NULL };
+
 static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   period_config_t *cfg;
@@ -132,8 +135,9 @@ static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
   cfg = gc_base_malloc (ctx->gc_ctx, sizeof (period_config_t));
   cfg->contexts = new_strhash(ctx->gc_ctx, 65537);
 
-  register_lang_function(ctx, issdl_temporal,
-                         "temporal", 1, "update a temporal context");
+  register_lang_function(ctx, issdl_temporal, "temporal",
+			 1, temporal_sigs,
+			 "update a temporal context");
 
   html_output_add_menu_entry(ctx, mod, period_htmloutput);
   /* return config structure, for module manager */

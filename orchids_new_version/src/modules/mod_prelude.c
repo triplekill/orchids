@@ -29,8 +29,10 @@ input_module_t mod_prelude;
 #define RETURN_OVM_INT(x) return ovm_int_new(gc_ctx, x)
 #define RETURN_OVM_UINT(x) return ovm_uint_new(gc_ctx, x)
 
+static type_t t_prelude = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+
 field_t prelude_fields[MAX_PRELUDE_FIELDS] = {
-{ "prelude.ptr",		    T_EXTERNAL,"prelude alert ptr"           }
+{ "prelude.ptr",		   &t_prelude, "prelude alert pointer"           }
 };
 
 static ovm_var_t *ovm_var_from_prelude_value(gc_t *gc_ctx,
@@ -446,6 +448,20 @@ static void *mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return prelude_data;
 }
 
+static const type_t *prelude_new_sig[] = { &t_prelude };
+static const type_t **prelude_new_sigs[] = { prelude_new_sig, NULL };
+
+static const type_t *prelude_set_sig[] = { &t_int, &t_prelude, &t_str, T_ANY };
+static const type_t **prelude_set_sigs[] = { prelude_set_sig, NULL };
+
+static const type_t *prelude_send_sig[] = { &t_int, &t_prelude };
+static const type_t **prelude_send_sigs[] = { prelude_send_sig, NULL };
+
+static const type_t *prelude_get_sig[] = { &t_str, &t_prelude, &t_str };
+static const type_t **prelude_get_sigs[] = { prelude_get_sig, NULL };
+
+static const type_t *prelude_print_sig[] = { &t_int, &t_prelude };
+static const type_t **prelude_print_sigs[] = { prelude_print_sig, NULL };
 
 static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -568,27 +584,32 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
                          issdl_idmef_message_new,
-                         "prelude_message_new", 0,
+                         "prelude_message_new",
+			 0, prelude_new_sigs,
                          "Create a new prelude idmef report");
 
   register_lang_function(ctx,
                          issdl_idmef_message_set,
-                         "prelude_message_set", 3,
-                         "Set a value in the idmef report");
+                         "prelude_message_set",
+			 3, prelude_set_sigs,
+                         "set a value in the idmef report");
 
   register_lang_function(ctx,
                          issdl_idmef_message_send,
-                         "prelude_message_send", 1,
+                         "prelude_message_send",
+			 1, prelude_send_sigs,
                          "send message to the prelude manager");
 
   register_lang_function(ctx,
                          issdl_idmef_message_get_string,
-                         "prelude_message_get_string", 2,
+                         "prelude_message_get_string",
+			 2, prelude_get_sigs,
                          "get a string from an idmef message using an xpath request");
 
   register_lang_function(ctx,
                          issdl_idmef_message_print,
-                         "prelude_message_print", 2,
+                         "prelude_message_print",
+			 1, prelude_print_sigs,
                          "Debug function : print the idmef alert on stderr");
 
 }

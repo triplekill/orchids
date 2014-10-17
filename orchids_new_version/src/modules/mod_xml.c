@@ -427,31 +427,50 @@ issdl_dump_xml(orchids_t *ctx, state_instance_t *state)
 }
 #endif
 
-static void *
-mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static type_t t_xmldoc = { "xmldoc", T_EXTERNAL };
+
+static const type_t *xml_set_str_sig[] = { &t_int, &t_xmldoc, &t_str, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **xml_set_str_sigs[] = { xml_set_str_sig, NULL };
+
+static const type_t *xml_get_str_sig[] = { &t_str, &t_xmldoc, &t_str };
+static const type_t **xml_get_str_sigs[] = { xml_get_str_sig, NULL };
+
+static const type_t *xml_set_prop_sig[] = { &t_int, &t_xmldoc, &t_str, &t_str, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **xml_set_prop_sigs[] = { xml_set_prop_sig, NULL };
+
+#if 0
+static const type_t *xml_dump_sig[] = { &t_int, &t_xmldoc }; /* returns 0 or 1, in fact */
+static const type_t **xml_dump_sigs[] = { xml_dump_sig, NULL };
+#endif
+
+static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() mod_xml@%p\n", (void *) &mod_xml);
 
 #if 0
   register_lang_function(ctx,
                          issdl_dump_xml,
-                         "xml_dump", 1,
+                         "xml_dump",
+			 1, xml_dump_sigs,
                          "dump xml doc on stderr");
 #endif
 
   register_lang_function(ctx,
                          issdl_xml_get_string,
-                         "xml_get_str", 2,
+                         "xml_get_str",
+			 2, xml_get_str_sigs,
                          "get a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_string,
-                         "xml_set_str", 3,
+                         "xml_set_str",
+			 3, xml_set_str_sigs,
                          "set a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_attr_string,
-                         "xml_set_prop", 4,
+                         "xml_set_prop",
+			 4, xml_set_prop_sigs,
                          "set a node property following an xpath request");
 
   return NULL;

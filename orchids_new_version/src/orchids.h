@@ -198,7 +198,7 @@ typedef struct orchids_s orchids_t;
  **     Full field name (ex. ".module.fieldname").
  **/
 /**   @var field_record_s::type
- **     ISSDL data type (@see lang.h).
+ **     static data type (@see lang.h).
  **/
 /**   @var field_record_s::desc
  **     Description text field.
@@ -214,7 +214,7 @@ struct field_record_s
 {
   int32_t     active;
   char       *name;
-  int32_t     type;
+  type_t     *type;
   char       *desc;
   int32_t     id;
   ovm_var_t  *val;
@@ -793,6 +793,14 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
 /**   @var issdl_function_s::args_nb
  **     Number of argument (for a little type/prototype checking).
  **/
+/**   @var issdl_function_s::sigs
+ **     List of typing signatures, ending in NULL
+ **     Each signature is a table [return-type, arg-type1, ..., arg-typen]
+ **     where n = arg_nb
+ **     Types are &t_null, &t_int, &t_bstr, &t_str, etc.,
+ **     plus &t_any (wildcard arg type)
+ **     and &t_noret (functions that do not return)
+ **/
 /**   @var issdl_function_s::desc
  **     Function description (for a little help).
  **/
@@ -803,6 +811,7 @@ struct issdl_function_s
   int32_t    id;
   char      *name;
   int32_t    args_nb;
+  type_t  ***sigs;
   char      *desc;
 };
 
@@ -1417,7 +1426,7 @@ typedef struct field_s field_t;
 struct field_s
 {
   char    *name;
-  int32_t  type;
+  type_t  *type;
   char    *desc;
 };
 
@@ -1651,12 +1660,12 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val);
  ** @param arity The number of arguments of the function.
  ** @param desc  A short description of the function.
  **/
-void
-register_lang_function(orchids_t *ctx,
-                       ovm_func_t func,
-                       const char *name,
-                       int arity,
-                       const char *desc);
+void register_lang_function(orchids_t *ctx,
+			    ovm_func_t func,
+			    const char *name,
+			    int arity,
+			    const type_t ***sigs,
+			    const char *desc);
 
 /**
  ** Print the table of all registered functions on a stream.

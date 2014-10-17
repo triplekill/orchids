@@ -98,11 +98,29 @@ static struct issdl_type_s issdl_types_g[] = {
   { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
 
+type_t t_int = { "int", T_INT };
+type_t t_uint = { "uint", T_UINT };
+type_t t_float = { "float", T_FLOAT };
+type_t t_bstr = { "bstr", T_BSTR };
+type_t t_str = { "str", T_STR };
+type_t t_ctime = { "ctime", T_CTIME };
+type_t t_ipv4 = { "ipv4", T_IPV4 };
+type_t t_ipv6 = { "ipv6", T_IPV4 };
+type_t t_timeval = { "timeval", T_TIMEVAL };
+type_t t_regex = { "regex", T_REGEX };
+type_t t_snmpoid = { "snmpoid", T_SNMPOID };
+type_t t_event = { "event", T_EVENT };
+type_t t_mark = { "mark", T_STATE_INSTANCE };
+
+/* Special types */
+type_t t_null = { "null", T_NULL };
+type_t t_any = { "*", 128 };
+type_t t_noret = { "void", 128 };
+
 static int resolve_ipv4_g = 0;
 static int resolve_ipv6_g = 0;
 
-char *
-str_issdltype(int type)
+char *str_issdltype(int type)
 {
   return issdl_types_g[type].name;
 }
@@ -2026,6 +2044,7 @@ static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+#if 0
 static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_printevent()\n");
@@ -2037,6 +2056,7 @@ static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
   else
     fprintf(stdout, "no event to display.\n");
 }
+#endif
 
 static void issdl_shutdown(orchids_t *ctx, state_instance_t *state)
 {
@@ -3321,44 +3341,190 @@ ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var)
  ** used at startup by the function register_core_functions() to
  ** register them.
  **/
+static type_t *null_sig[] = { &t_null };
+static type_t **null_sigs[] = { null_sig, NULL };
+
+static type_t *int_sig[] = { &t_int };
+static type_t **int_sigs[] = { int_sig, NULL };
+
+static type_t *int_of_any_sig[] = { &t_int, &t_any };
+static type_t **int_of_any_sigs[] = { int_of_any_sig, NULL };
+
+static type_t *int_of_int_sig[] = { &t_int, &t_int };
+static type_t **int_of_int_sigs[] = { int_of_int_sig, NULL };
+
+static type_t *int_of_str_sig[] = { &t_int, &t_str };
+static type_t **int_of_str_sigs[] = { int_of_str_sig, NULL };
+
+static type_t *str_of_int_sig[] = { &t_str, &t_int };
+static type_t **str_of_int_sigs[] = { str_of_int_sig, NULL };
+
+static type_t *float_of_str_sig[] = { &t_float, &t_str };
+static type_t **float_of_str_sigs[] = { float_of_str_sig, NULL };
+
+static type_t *str_of_float_sig[] = { &t_str, &t_float };
+static type_t **str_of_float_sigs[] = { str_of_float_sig, NULL };
+
+static type_t *str_of_ipv4_sig[] = { &t_str, &t_ipv4 };
+static type_t **str_of_ipv4_sigs[] = { str_of_ipv4_sig, NULL };
+
+static type_t *str_of_ipv6_sig[] = { &t_str, &t_ipv6 };
+static type_t **str_of_ipv6_sigs[] = { str_of_ipv6_sig, NULL };
+
+static type_t *sendmail_sig[] = { &t_int, &t_str, &t_str, &t_str, &t_str };
+static type_t **sendmail_sigs[] = { sendmail_sig, NULL };
+
+static type_t *int_cmp_sig[] = { &t_int, &t_int, &t_int };
+static type_t *uint_cmp_sig[] = { &t_int, &t_uint, &t_uint };
+static type_t *ipv4_cmp_sig[] = { &t_int, &t_ipv4, &t_ipv4 };
+static type_t *ipv6_cmp_sig[] = { &t_int, &t_ipv6, &t_ipv6 };
+static type_t *str_cmp_sig[] = { &t_int, &t_str, &t_str };
+static type_t *bstr_cmp_sig[] = { &t_int, &t_bstr, &t_bstr };
+static type_t *ctime_cmp_sig[] = { &t_int, &t_ctime, &t_ctime };
+static type_t *timeval_cmp_sig[] = { &t_int, &t_timeval, &t_timeval };
+static type_t *float_cmp_sig[] = { &t_int, &t_float, &t_float };
+static type_t **cmp_sigs[] = {
+  int_cmp_sig, uint_cmp_sig, ipv4_cmp_sig, ipv6_cmp_sig,
+  str_cmp_sig, bstr_cmp_sig, ctime_cmp_sig, timeval_cmp_sig,
+  float_cmp_sig, NULL
+};
+
+static type_t *regex_of_str_sig[] = { &t_regex, &t_str };
+static type_t **regex_of_str_sigs[] = { regex_of_str_sig, NULL };
+
+static type_t *str_of_regex_sig[] = { &t_str, &t_regex };
+static type_t **str_of_regex_sigs[] = { str_of_regex_sig, NULL };
+
+static type_t *difftime_sig[] = { &t_int, &t_ctime, &t_ctime };
+static type_t **difftime_sigs[] = { difftime_sig, NULL };
+
+static type_t *str_of_ctime_sig[] = { &t_str, &t_ctime };
+static type_t **str_of_ctime_sigs[] = { str_of_ctime_sig, NULL };
+
+static type_t *str_of_timeval_sig[] = { &t_str, &t_timeval };
+static type_t **str_of_timeval_sigs[] = { str_of_timeval_sig, NULL };
+
+static type_t *ctime_of_str_sig[] = { &t_ctime, &t_str };
+static type_t **ctime_of_str_sigs[] = { ctime_of_str_sig, NULL };
+
+static type_t *timeval_of_str_sig[] = { &t_timeval, &t_str };
+static type_t **timeval_of_str_sigs[] = { timeval_of_str_sig, NULL };
+
+static type_t *ipv4_of_ipv6_sig[] = { &t_ipv4, &t_ipv6 };
+static type_t **ipv4_of_ipv6_sigs[] = { ipv4_of_ipv6_sig, NULL };
+
+static type_t *ipv6_of_ipv4_sig[] = { &t_ipv6, &t_ipv4 };
+static type_t **ipv6_of_ipv4_sigs[] = { ipv6_of_ipv4_sig, NULL };
+
 static issdl_function_t issdl_function_g[] = {
-  { issdl_noop, 0, "noop", 0, "No Operation function" },
-  { issdl_print, 1, "print", 1, "display a string (TEST FUNCTION)" },
-  { issdl_dumpstack, 2, "dump_stack", 0, "dump the stack of the current rule" },
-  { issdl_printevent, 3, "print_event", 0, "print the event associated with state" }, // OBSOLETE, use print(current_event())
-  { issdl_dumppathtree, 4, "dump_dot_pathtree", 0, "dump the rule instance path tree in the GraphViz Dot format"},
-  { issdl_drop_event, 5, "drop_event", 0, "Drop event" },
-  { issdl_set_event_level, 6, "set_event_level", 1, "Set event level" },
-  { issdl_report, 7, "report", 0, "generate report" },
-
-  { issdl_shutdown, 8, "shutdown", 0, "shutdown orchids" },
-
-  { issdl_random, 9, "random", 0, "return a random number" },
-  { issdl_system, 10, "system", 1, "execute a system command" },
-  { issdl_stats, 11, "show_stats", 0, "show orchids internal statistics" },
-  { issdl_str_from_int, 12, "str_from_int", 1, "convert an integer to a string" },
-  { issdl_int_from_str, 13, "int_from_str", 1, "convert a string to an integer" },
-  { issdl_float_from_str, 14, "float_from_str", 1, "convert a string to a float" },
-  { issdl_str_from_float, 15, "str_from_float", 1, "convert a float to a string" },
-  { issdl_str_from_ipv4, 16, "str_from_ipv4", 1, "convert an ipv4 address to a string" },
-  { issdl_kill_threads, 17, "kill_threads", 0, "kill threads of a rule instance" },
-  { issdl_cut, 18, "cut", 1, "special cut" },
-  { issdl_sendmail, 19, "sendmail", 4, "Send a mail" },
-  { issdl_sendmail_report, 20, "sendmail_report", 4, "Send a report by mail" },
-  { issdl_bindist, 21, "bitdist", 2, "Number of different bits" },
-  { issdl_bytedist, 22, "bytedist", 2, "Number of different bytes" },
-  { issdl_vstr_from_regex, 23, "str_from_regex", 1, "Return the source string of a compiled regex" },
-  { issdl_regex_from_str, 24, "regex_from_str", 1, "Compile a regex from a string" },
-  { issdl_defined, 25, "defined", 1, "Return if a field is defined" },
-  { issdl_difftime, 26, "difftime", 2, "The difftime() function shall return the difference expressed in seconds as a type int."},
-  { issdl_str_from_time, 27, "str_from_time", 1, "convert a time to a string" },
-  { issdl_str_from_timeval, 28, "str_from_timeval", 1, "convert a timeval to a string" },
-  { issdl_time_from_str, 29, "time_from_str", 1, "convert a string to a time" },
-  { issdl_timeval_from_str, 30, "timeval_from_str", 1, "convert a string to a timeval" },
-  { issdl_str_from_ipv6, 31, "str_from_ipv6", 1, "convert an ipv6 address to a string" },
-  { issdl_ipv4_from_ipv6, 32, "ipv4_from_ipv6", 1, "convert an ipv6 address to an ipv4 address" },
-  { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4", 1, "convert an ipv4 address to an ipv6 address" },
-  { NULL, 0, NULL, 0, NULL }
+  { issdl_noop, 0, "null",
+    0, null_sigs,
+    "returns null (the undefined object)" },
+  { issdl_print, 1, "print",
+    1, int_of_any_sigs, /* always returns true, in fact */
+    "display a string (TEST FUNCTION)" },
+  { issdl_dumpstack, 2, "dump_stack",
+    0, int_sigs, /* returns 0 or 1, in fact */
+    "dump the stack of the current rule" },
+#if 0
+  { issdl_printevent, 3, "print_event",
+    0, int_sigs,  /* always returns true, in fact */
+    "print the event associated with state" },
+  // OBSOLETE, use print(current_event())
+#endif
+  { issdl_dumppathtree, 4, "dump_dot_pathtree",
+    0, int_sigs, /* always returns true, in fact */
+    "dump the rule instance path tree in the GraphViz Dot format"},
+  { issdl_drop_event, 5, "drop_event",
+    0, int_sigs, /* returns 0 or 1, in fact */
+    "Drop event" },
+  { issdl_set_event_level, 6, "set_event_level",
+    1, int_of_int_sigs, /* returns 0 or 1, in fact */
+    "Set event level" },
+  { issdl_report, 7, "report",
+    0, int_sigs, /* returns 0 or 1, in fact */
+    "generate report" },
+  { issdl_shutdown, 8, "shutdown",
+    0, null_sigs, /* does not return */
+    "shutdown orchids" },
+  { issdl_random, 9, "random",
+    0, int_sigs,
+    "return a random number" },
+  { issdl_system, 10, "system",
+    1, int_of_str_sigs,
+    "execute a system command" },
+  { issdl_stats, 11, "show_stats",
+    0, int_sigs, /* always returns true, in fact */
+    "show orchids internal statistics" },
+  { issdl_str_from_int, 12, "str_from_int",
+    1, str_of_int_sigs,
+    "convert an integer to a string" },
+  { issdl_int_from_str, 13, "int_from_str",
+    1, int_of_str_sigs,
+    "convert a string to an integer" },
+  { issdl_float_from_str, 14, "float_from_str",
+    1, float_of_str_sigs,
+    "convert a string to a float" },
+  { issdl_str_from_float, 15, "str_from_float",
+    1, str_of_float_sigs,
+    "convert a float to a string" },
+  { issdl_str_from_ipv4, 16, "str_from_ipv4",
+    1, str_of_ipv4_sigs,
+    "convert an ipv4 address to a string" },
+  { issdl_kill_threads, 17, "kill_threads",
+    0, int_sigs, /* always returns true, in fact */
+    "kill threads of a rule instance" },
+  { issdl_cut, 18, "cut",
+    1, int_of_str_sigs, /* returns 0 or 1, in fact */
+    "special cut" },
+  { issdl_sendmail, 19, "sendmail",
+    4, sendmail_sigs,
+     /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
+    "Send an email" },
+  { issdl_sendmail_report, 20, "sendmail_report",
+    4, sendmail_sigs,
+     /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
+    "Send a report by email" },
+  { issdl_bindist, 21, "bitdist",
+    2, cmp_sigs,
+    "Number of different bits" },
+  { issdl_bytedist, 22, "bytedist",
+    2, cmp_sigs,
+    "Number of different bytes" },
+  { issdl_vstr_from_regex, 23, "str_from_regex",
+    1, str_of_regex_sigs,
+    "Return the source string of a compiled regex" },
+  { issdl_regex_from_str, 24, "regex_from_str",
+    1, regex_of_str_sigs,
+    "Compile a regex from a string" },
+  { issdl_defined, 25, "defined",
+    1, int_of_any_sigs, /* returns 0 or 1, in fact */
+    "Return if a field is defined" },
+  { issdl_difftime, 26, "difftime",
+    2, difftime_sigs,
+    "difference expressed in seconds as an int"},
+  { issdl_str_from_time, 27, "str_from_time",
+    1, str_of_ctime_sigs,
+    "convert a time to a string" },
+  { issdl_str_from_timeval, 28, "str_from_timeval",
+    1, str_of_timeval_sigs,
+    "convert a timeval to a string" },
+  { issdl_time_from_str, 29, "time_from_str",
+    1, ctime_of_str_sigs,
+    "convert a string to a time" },
+  { issdl_timeval_from_str, 30, "timeval_from_str",
+    1, timeval_of_str_sigs,
+    "convert a string to a timeval" },
+  { issdl_str_from_ipv6, 31, "str_from_ipv6",
+    1, str_of_ipv6_sigs,
+    "convert an ipv6 address to a string" },
+  { issdl_ipv4_from_ipv6, 32, "ipv4_from_ipv6",
+    1, ipv4_of_ipv6_sigs,
+    "convert an ipv6 address to an ipv4 address" },
+  { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4",
+    1, ipv6_of_ipv4_sigs,
+    "convert an ipv4 address to an ipv6 address" },
+  { NULL, 0, NULL, 0, NULL, NULL }
 };
 
 void register_core_functions(orchids_t *ctx)
@@ -3366,18 +3532,19 @@ void register_core_functions(orchids_t *ctx)
   issdl_function_t *f;
 
   for (f = issdl_function_g; f->func!=NULL; f++)
-    register_lang_function(ctx, f->func, f->name, f->args_nb, f->desc);
+    register_lang_function(ctx, f->func, f->name,
+			   f->args_nb, (const type_t ***)f->sigs, f->desc);
 }
 
 void register_lang_function(orchids_t *ctx,
 			    ovm_func_t func,
 			    const char *name,
 			    int arity,
+			    const type_t ***sigs,
 			    const char *desc)
 {
   issdl_function_t *f;
   size_t array_size;
-  size_t len;
 
   DebugLog(DF_ENG, DS_INFO,
            "Registering language function %s/%i @ %p\n",
@@ -3388,13 +3555,10 @@ void register_lang_function(orchids_t *ctx,
   f = &ctx->vm_func_tbl[ctx->vm_func_tbl_sz];
   f->func = func;
   f->id = ctx->vm_func_tbl_sz;
-  len = strlen (name);
-  f->name = gc_base_malloc (ctx->gc_ctx, len+1);
-  strcpy (f->name, name);
+  f->name = (char *)name;
   f->args_nb = arity;
-  len = strlen (desc);
-  f->desc = gc_base_malloc (ctx->gc_ctx, len+1);
-  strcpy (f->desc, desc);
+  f->sigs = (type_t ***)sigs;
+  f->desc = (char *)desc;
   ctx->vm_func_tbl_sz++;
 }
 

@@ -35,7 +35,7 @@ input_module_t mod_metaevent;
 
 static void issdl_inject_event(orchids_t *ctx, state_instance_t *state)
 {
-  static mod_entry_t		*mod = NULL;
+  static mod_entry_t	*mod = NULL;
   ovm_var_t		*ptr;
 
   if (mod==NULL)
@@ -84,6 +84,12 @@ static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+static const type_t *inject_event_sig[] = { &t_null, &t_event };
+static const type_t **inject_event_sigs[] = { inject_event_sig, NULL };
+
+static const type_t *current_event_sig[] = { &t_event };
+static const type_t **current_event_sigs[] = { current_event_sig, NULL };
+
 static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   metaevent_config_t *cfg;
@@ -97,11 +103,13 @@ static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
 			 issdl_inject_event,
-			 "inject_event", 1,
+			 "inject_event",
+			 1, inject_event_sigs,
 			 "inject the event into the orchids engine");
   register_lang_function(ctx,
 			 issdl_current_event,
-			 "current_event", 1,
+			 "current_event",
+			 1, current_event_sigs,
 			 "get the current event");
   return cfg;
 }
@@ -182,16 +190,19 @@ static void add_field(orchids_t *ctx,
   f->description = NULL;
 
   if ( !strcmp(field_dir->directive, "str_field") ) {
-    f->type = T_VSTR;
+    f->type = &t_str;
   }
   else if ( !strcmp(field_dir->directive, "int_field") ) {
-    f->type = T_INT;
+    f->type = &t_int;
   }
   else if ( !strcmp(field_dir->directive, "ip4_field") ) {
-    f->type = T_IPV4;
+    f->type = &t_ipv4;
+  }
+  else if ( !strcmp(field_dir->directive, "ip6_field") ) {
+    f->type = &t_ipv6;
   }
   else if ( !strcmp(field_dir->directive, "flt_field") ) {
-    f->type = T_FLOAT;
+    f->type = &t_float;
   }
   else {
     DebugLog(DF_MOD, DS_FATAL,

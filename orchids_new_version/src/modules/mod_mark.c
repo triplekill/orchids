@@ -79,19 +79,27 @@ static void issdl_mark_cut(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+static const type_t *mark_sig[] = { &t_mark };
+static const type_t **mark_sigs[] = { mark_sig, NULL };
+
+static const type_t *mark_cut_sig[] = { &t_int, &t_mark }; /* returns 0 or 1, in fact */
+static const type_t **mark_cut_sigs[] = { mark_cut_sig, NULL };
+
 static void *mark_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() mark@%p\n", &mod_mark);
 
   register_lang_function(ctx,
                          issdl_mark,
-                         "mark", 0,
-                         "Set a mark and return an id");
+                         "mark",
+			 0, mark_sigs,
+                         "get current mark");
 
   register_lang_function(ctx,
                          issdl_mark_cut,
-                         "mark_cut", 1,
-                         "Red cut from the state where the id was created");
+                         "mark_cut",
+			 1, mark_cut_sigs,
+                         "red cut from the mark");
   return NULL;
 }
 

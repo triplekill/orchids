@@ -48,8 +48,10 @@
 
 input_module_t mod_idmef;
 
+static type_t t_idmef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+
 field_t idmef_fields[MAX_IDMEF_FIELDS] = {
-  { "idmef.ptr",		    T_EXTERNAL,"idmef xml doc"   }
+  { "idmef.ptr",		    &t_idmef ,"idmef xml doc"   }
 };
 
 static ovm_var_t* parse_idmef_datetime(gc_t *gc_ctx, char *datetime)
@@ -448,6 +450,12 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+static const type_t *idmef_new_alert_sig[] = { &t_idmef };
+static const type_t **idmef_new_alert_sigs[] = { idmef_new_alert_sig, NULL };
+
+static const type_t *idmef_write_alert_sig[] = { &t_int, &t_idmef };
+static const type_t **idmef_write_alert_sigs[] = { idmef_write_alert_sig, NULL };
+
 static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   idmef_cfg_t*	cfg;
@@ -471,13 +479,15 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
 			 issdl_idmef_new_alert,
-			 "idmef_new_alert", 0,
+			 "idmef_new_alert",
+			 0, idmef_new_alert_sigs,
 			 "generate an idmef alert");
 
   register_lang_function(ctx,
 			 issdl_idmef_write_alert,
-			 "idmef_write_alert", 0,
-			 "write idmef alert in the report folder");
+			 "idmef_write_alert",
+			 0, idmef_write_alert_sigs,
+			 "write idmef alert into the report folder");
 
   return cfg;
 }

@@ -189,6 +189,14 @@ static gc_class_t sharedvars_config_class = {
   sharedvars_config_traverse
 };
 
+static const type_t *shget_sig[] = { &t_str, &t_str };
+static const type_t **shget_sigs[] = { shget_sig, NULL };
+
+static const type_t *shdel_sig[] = { &t_int, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **shdel_sigs[] = { shdel_sig, NULL };
+
+static const type_t *shset_sig[] = { &t_int, &t_str, &t_str }; /* returns 0 or 1, in fact */
+static const type_t **shset_sigs[] = { shset_sig, NULL };
 
 static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -207,17 +215,20 @@ static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx,
                          issdl_set_shared_var,
-                         "set_shared_var", 2,
+                         "set_shared_var",
+			 2, shset_sigs,
                          "Set or update a shared variable");
 
   register_lang_function(ctx,
                          issdl_get_shared_var,
-                         "get_shared_var", 1,
+                         "get_shared_var",
+			 1, shget_sigs,
                          "Get a shared variable");
 
   register_lang_function(ctx,
                          issdl_del_shared_var,
-                         "del_shared_var", 1,
+                         "del_shared_var",
+			 1, shdel_sigs,
                          "Delete a shared variable");
 
   /* return config structure, for module manager */
