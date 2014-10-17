@@ -29,7 +29,7 @@ struct meta_field_s
   STAILQ_ENTRY(meta_field_t) fields;
   STAILQ_ENTRY(meta_field_t) globfields;
   int field_id;
-  int type;
+  type_t *type;
   char *name;
   char *description;
 };

@@ -1202,13 +1202,16 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       break;
     case T_IPV4:
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
-      *(int *)cond_param = inet_addr(cond_param_str);
+      if(inet_pton(AF_INET, cond_param_str, cond_param) != 1)
+      {
+	DebugLog(DF_CORE, DS_ERROR,
+		"Cannot convert string %s into struct in_addr\n", cond_param_str);
+      }
       cond_param_size = sizeof (in_addr_t);
       break;
     case T_IPV6:
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (struct in6_addr));
-      /* inet_addr is not IPv6 aware. Use inet_pton instead.
-	See IPv4 case for the old code line.                 */
+      /* inet_addr is not IPv6 aware. Use inet_pton instead */
       if(inet_pton(AF_INET6, cond_param_str, cond_param) != 1)
       {
 	DebugLog(DF_CORE, DS_ERROR,

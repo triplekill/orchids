@@ -42,15 +42,15 @@ static int cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *d
 }
 
 static field_t cisco_fields[] = {
-  { "cisco.msg_type", T_INT,  "Cisco message type"   },
-  { "cisco.acl",      T_VSTR, "Access control list" },
-  { "cisco.action",   T_VSTR, "Action (permitted/denied)" },
-  { "cisco.proto",    T_VSTR, "Protocol" },
-  { "cisco.sip",      T_IPV4, "Source IP address" },
-  { "cisco.dip",      T_IPV4, "Destiantion IP address" },
-  { "cisco.spt",      T_INT,  "Source port" },
-  { "cisco.dpt",      T_INT,  "Destination port" },
-  { "cisco.packets",  T_INT,  "Number of packets" },
+  { "cisco.msg_type", &t_int,  "Cisco message type"   },
+  { "cisco.acl",      &t_str, "Access control list" },
+  { "cisco.action",   &t_str, "Action (permitted/denied)" },
+  { "cisco.proto",    &t_str, "Protocol" },
+  { "cisco.sip",      &t_ipv4, "Source IP address" },
+  { "cisco.dip",      &t_ipv4, "Destiantion IP address" },
+  { "cisco.spt",      &t_int,  "Source port" },
+  { "cisco.dpt",      &t_int,  "Destination port" },
+  { "cisco.packets",  &t_int,  "Number of packets" },
 };
 
 static void *

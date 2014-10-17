@@ -134,9 +134,9 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
                  "field '%s' %i (%i)\n",
 		       field->name, field->substring, field->field_id);
 
-	      switch (field->type)
+	      switch (field->type->tag)
 		{
-		case T_VSTR:
+		case T_STR:
 		  res = ovm_vstr_new(ctx->gc_ctx, event->value);
 		  VSTR(res) = &txt_line[regmatch[ field->substring ].rm_so];
 		  VSTRLEN(res) = res_sz;
@@ -150,10 +150,20 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  break;
 		case T_IPV4:
 		  res = ovm_ipv4_new(ctx->gc_ctx);
-		  if ( inet_aton(buff, &IPV4(res)) == 0)
+		  if (inet_pton(AF_INET, buff, &IPV4(res)) != 1)
 		    {
 		      DebugLog(DF_MOD, DS_ERROR,
-			       "Error in IPV4 convertion\n");
+			       "Error in IPV4 conversion\n");
+		      err = 1;
+		      goto end;
+		    }
+		  break;
+		case T_IPV6:
+		  res = ovm_ipv6_new(ctx->gc_ctx);
+		  if (inet_pton(AF_INET6, buff, &IPV4(res)) != 1)
+		    {
+		      DebugLog(DF_MOD, DS_ERROR,
+			       "Error in IPV6 conversion\n");
 		      err = 1;
 		      goto end;
 		    }
@@ -167,7 +177,7 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  }
 		  break;
 		default:
-		  DebugLog(DF_MOD, DS_ERROR, "Unknown field type\n", field->type);
+		  DebugLog(DF_MOD, DS_ERROR, "Unknown field type %s\n", field->type->name);
 		  /* Reset the written to fields to NULL */
 		  STAILQ_FOREACH(field2, &match->field_list, fields)
 		    {
@@ -307,13 +317,15 @@ static void add_field(orchids_t *ctx,
   f->description = NULL;
 
   if (!strcmp(field_dir->directive, "str_field"))
-    f->type = T_VSTR;
+    f->type = &t_str;
   else if (!strcmp(field_dir->directive, "int_field"))
-    f->type = T_INT;
+    f->type = &t_int;
   else if (!strcmp(field_dir->directive, "ip4_field"))
-    f->type = T_IPV4;
+    f->type = &t_ipv4;
+  else if (!strcmp(field_dir->directive, "ip6_field"))
+    f->type = &t_ipv6;
   else if (!strcmp(field_dir->directive, "flt_field"))
-    f->type = T_FLOAT;
+    f->type = &t_float;
   else
     {
       DebugLog(DF_MOD, DS_FATAL,

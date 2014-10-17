@@ -25,7 +25,7 @@ struct generic_field_s
   STAILQ_ENTRY(generic_field_t) fields;
   STAILQ_ENTRY(generic_field_t) globfields;
   int field_id;
-  int type;
+  type_t *type;
   char *name;
   int substring;
   char *description;

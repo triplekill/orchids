@@ -567,24 +567,24 @@ void register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_
   field_record_t *new_fields;
   gc_t *gc_ctx = ctx->gc_ctx;
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   DebugLog(DF_CORE, DS_TRACE, "registering fields for module '%s'.\n",
            mod->mod->name);
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   /* 1 - Allocate some memory in global field list */
   /* Is it the first allocation ?? */
   if (ctx->global_fields->fields == NULL) {
     ctx->global_fields->fields =
       gc_base_malloc (gc_ctx, sz * sizeof(field_record_t));
-gc_check(ctx->gc_ctx);
+    //gc_check(ctx->gc_ctx);
   }
   else {
     ctx->global_fields->fields =
       gc_base_realloc (gc_ctx, ctx->global_fields->fields,
 		       (ctx->global_fields->num_fields + sz)
 		       * sizeof (field_record_t));
-gc_check(ctx->gc_ctx);
+    //gc_check(ctx->gc_ctx);
   }
 
   /* 2 - index of first module field in global array
@@ -603,7 +603,7 @@ gc_check(ctx->gc_ctx);
   }
   mod->num_fields = sz;
   ctx->global_fields->num_fields += sz;
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
 }
 
 

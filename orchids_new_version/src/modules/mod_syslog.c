@@ -293,14 +293,14 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 }
 
 field_t syslog_fields[] = {
-  { "syslog.facility", T_VSTR,  "source of the message"          },
-  { "syslog.severity", T_VSTR,  "severity of the message"        },
-  { "syslog.time",     T_CTIME, "date of the event"              },
-  { "syslog.host",     T_VSTR,  "host"                           },
-  { "syslog.repeat",   T_INT,   "message repetition"             },
-  { "syslog.pid",      T_INT,   "process id of the event source" },
-  { "syslog.prog",     T_VSTR,  "program name"                   },
-  { "syslog.msg",      T_VSTR,  "the message"                    }
+  { "syslog.facility", &t_str,  "source of the message"          },
+  { "syslog.severity", &t_str,  "severity of the message"        },
+  { "syslog.time",     &t_ctime, "date of the event"              },
+  { "syslog.host",     &t_str,  "host"                           },
+  { "syslog.repeat",   &t_int,   "message repetition"             },
+  { "syslog.pid",      &t_int,   "process id of the event source" },
+  { "syslog.prog",     &t_str,  "program name"                   },
+  { "syslog.msg",      &t_str,  "the message"                    }
 };
 
 

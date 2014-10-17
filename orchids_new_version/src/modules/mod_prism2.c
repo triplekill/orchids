@@ -102,20 +102,20 @@ prism2_callback(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 
 
 static field_t prism2_fields[] = {
-  { "prism2.msgcode",   T_UINT,  "Prism message code"                    },
-  { "prism2.msglen",    T_UINT,  "Prism message length"                  },
-  { "prism2.devname",   T_VSTR,  "Device name (interface)"               },
-  { "prism2.hosttime",  T_UINT,  "Host time"                             },
-  { "prism2.mactime",   T_UINT,  "MAC time"                              },
-  { "prism2.channel",   T_UINT,  "Wifi channel"                          },
-  { "prism2.rssi",      T_UINT,  "Received Signal Strength Indication"  },
-  { "prism2.sq",        T_UINT,  "SQ"                                    },
-  { "prism2.signal",    T_UINT,  "Signal"                                },
-  { "prism2.noise",     T_UINT,  "Noise"                                 },
-  { "prism2.rate",      T_UINT,  "Rate"                                  },
-  { "prism2.istx",      T_UINT,  "IsTX"                                  },
-  { "prism2.framelen",  T_UINT,  "Frame length"                          },
-  { "prism2.frame",     T_VBSTR, "Frame"                                 }
+  { "prism2.msgcode",   &t_uint,  "Prism message code"                    },
+  { "prism2.msglen",    &t_uint,  "Prism message length"                  },
+  { "prism2.devname",   &t_str,  "Device name (interface)"               },
+  { "prism2.hosttime",  &t_uint,  "Host time"                             },
+  { "prism2.mactime",   &t_uint,  "MAC time"                              },
+  { "prism2.channel",   &t_uint,  "Wifi channel"                          },
+  { "prism2.rssi",      &t_uint,  "Received Signal Strength Indication"  },
+  { "prism2.sq",        &t_uint,  "SQ"                                    },
+  { "prism2.signal",    &t_uint,  "Signal"                                },
+  { "prism2.noise",     &t_uint,  "Noise"                                 },
+  { "prism2.rate",      &t_uint,  "Rate"                                  },
+  { "prism2.istx",      &t_uint,  "IsTX"                                  },
+  { "prism2.framelen",  &t_uint,  "Frame length"                          },
+  { "prism2.frame",     &t_bstr, "Frame"                                 }
 };
 
 static void *prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)

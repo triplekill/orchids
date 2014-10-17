@@ -184,25 +184,25 @@ static int snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void
 
 static field_t snmptrap_fields[] = {
   /* common fields */
-  { "snmptrap.seq",          T_INT, "Sequence number" },
-  { "snmptrap.bind",         T_INT, "Index of binding" },
-  { "snmptrap.version",      T_INT, "Protocol version" },
-  { "snmptrap.community",    T_STR, "Community name" },
-  { "snmptrap.pdu_type",     T_VSTR, "Protocol Data Unit type" },
-  { "snmptrap.object_id",    T_SNMPOID, "Object identifier" },
-  { "snmptrap.value",        T_VBSTR, "Object value" },
+  { "snmptrap.seq",          &t_int, "Sequence number" },
+  { "snmptrap.bind",         &t_int, "Index of binding" },
+  { "snmptrap.version",      &t_int, "Protocol version" },
+  { "snmptrap.community",    &t_str, "Community name" },
+  { "snmptrap.pdu_type",     &t_str, "Protocol Data Unit type" },
+  { "snmptrap.object_id",    &t_snmpoid, "Object identifier" },
+  { "snmptrap.value",        &t_bstr, "Object value" },
 
   /* Version 1 Specific */
-  { "snmptrap.enterprise",   T_SNMPOID, "Identifies the trap source" },
-  { "snmptrap.agent_addr",   T_IPV4, "Source address" },
-  { "snmptrap.trap_type",    T_INT, "Trap type" },
-  { "snmptrap.specific_trap_type",    T_INT, "Specific trap type" },
-  { "snmptrap.timestamp",    T_INT, "Timestamp" },
+  { "snmptrap.enterprise",   &t_snmpoid, "Identifies the trap source" },
+  { "snmptrap.agent_addr",   &t_ipv4, "Source address" },
+  { "snmptrap.trap_type",    &t_int, "Trap type" },
+  { "snmptrap.specific_trap_type",    &t_int, "Specific trap type" },
+  { "snmptrap.timestamp",    &t_int, "Timestamp" },
 
   /* Version 2 Specific */
-  { "snmptrap.request_id",   T_UINT, "Request ID" },
-  { "snmptrap.error_status", T_UINT, "Error status" },
-  { "snmptrap.error_index",  T_UINT, "Error index" },
+  { "snmptrap.request_id",   &t_uint, "Request ID" },
+  { "snmptrap.error_status", &t_uint, "Error status" },
+  { "snmptrap.error_index",  &t_uint, "Error index" },
 };
 
 static void *

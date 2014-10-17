@@ -129,12 +129,12 @@ static int modpcap_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data
 }
 
 static field_t pcap_fields[] = {
-  { "pcap.time", T_TIMEVAL, "Time of the reception of the frame"},
-  { "pcap.len", T_INT, "Length of the packet on the wire"},
-  { "pcap.caplen", T_INT, "Length of data captured" },
-  { "pcap.interface", T_VSTR, "Interface name where the packet was captured"},
-  { "pcap.datalink", T_INT, "Datalink type" },
-  { "pcap.packet", T_BSTR, "The raw bytes of the captured frame"}
+  { "pcap.time", &t_timeval, "Time of the reception of the frame"},
+  { "pcap.len", &t_int, "Length of the packet on the wire"},
+  { "pcap.caplen", &t_int, "Length of data captured" },
+  { "pcap.interface", &t_str, "Interface name where the packet was captured"},
+  { "pcap.datalink", &t_int, "Datalink type" },
+  { "pcap.packet", &t_bstr, "The raw bytes of the captured frame"}
 };
 
 

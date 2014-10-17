@@ -411,14 +411,14 @@ static int win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void
 }
 
 static field_t win32evt_fields[] = {
-  { "win32evt.rec_num",    T_INT,     "Event record number"      },
-  { "win32evt.gen_time",   T_CTIME,   "Generation date"          },
-  { "win32evt.wri_time",   T_CTIME,   "Writing date"             },
-  { "win32evt.event_id",   T_INT,     "Event identifier"         },
-  { "win32evt.event_type", T_INT,     "Event type"               },
-  { "win32evt.event_cat",  T_INT,     "Event category"           },
-  { "win32evt.user_sid",   T_VBSTR,   "User security identifier" },
-  { "win32evt.data",       T_VBSTR,   "Event data"               },
+  { "win32evt.rec_num",    &t_int,     "Event record number"      },
+  { "win32evt.gen_time",   &t_ctime,   "Generation date"          },
+  { "win32evt.wri_time",   &t_ctime,   "Writing date"             },
+  { "win32evt.event_id",   &t_int,     "Event identifier"         },
+  { "win32evt.event_type", &t_int,     "Event type"               },
+  { "win32evt.event_cat",  &t_int,     "Event category"           },
+  { "win32evt.user_sid",   &t_bstr,   "User security identifier" },
+  { "win32evt.data",       &t_bstr,   "Event data"               },
 };
 
 

@@ -348,9 +348,9 @@ static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
 }
 
 static field_t tf_fields[] = {
-  { "textfile.line_num", T_INT,  "line number"                },
-  { "textfile.file",     T_VSTR, "source filename"            },
-  { "textfile.line",     T_STR,  "a line of a given textfile" }
+  { "textfile.line_num", &t_int,  "line number"                },
+  { "textfile.file",     &t_str, "source filename"            },
+  { "textfile.line",     &t_str,  "a line of a given textfile" }
 };
 
 

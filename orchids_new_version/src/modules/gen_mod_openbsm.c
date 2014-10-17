@@ -30,43 +30,43 @@ int main (int argc, char *argv[])
   printf("#define F_OPENBSM_ARG_START F_OPENBSM_REGULAR_END\n");
   for (i=0; ++i<=max_args; )
     {
-      printf("  { \"openbsm.arg%d\", T_UINT,"
+      printf("  { \"openbsm.arg%d\", &t_uint,"
 	     " \"openbsm argument %d\" },\n",
 	     i, i);
-      printf("  { \"openbsm.argname%d\", T_STR,"
+      printf("  { \"openbsm.argname%d\", &t_str,"
 	     " \"openbsm argument name %d\" },\n",
 	     i, i);
     }
   printf("#define F_OPENBSM_ARG_END (F_OPENBSM_ARG_START+%d)\n", 2*max_args);
 
   printf("#define F_OPENBSM_EXECARG_START F_OPENBSM_ARG_END\n");
-  printf("  { \"bsm.execarg_num\", T_UINT,"
+  printf("  { \"bsm.execarg_num\", &t_uint,"
 	 " \"bsm exec argument number\" },\n");
   printf("#define F_OPENBSM_EXECARG_NUM 0\n");
   for (i=0; ++i<=max_args; )
-    printf("  { \"bsm.execarg%d\", T_STR,"
+    printf("  { \"bsm.execarg%d\", &t_str,"
 	   " \"openbsm exec argument %d\" },\n",
 	   i, i);
   printf("#define F_OPENBSM_EXECARG_END (F_OPENBSM_EXECARG_START+%d)\n",
 	 max_args+1);
 
   printf("#define F_OPENBSM_EXECENV_START F_OPENBSM_EXECARG_END\n");
-  printf("  { \"bsm.execenv_num\", T_UINT,"
+  printf("  { \"bsm.execenv_num\", &t_uint,"
 	 " \"bsm exec number of environment variables\" },\n");
   printf("#define F_OPENBSM_EXECENV_NUM 0\n");
   for (i=0; ++i<=max_env; )
-    printf("  { \"bsm.execenv%d\", T_STR,"
+    printf("  { \"bsm.execenv%d\", &t_str,"
 	   " \"openbsm exec environment variable %d\" },\n",
 	   i, i);
   printf("#define F_OPENBSM_EXECENV_END (F_OPENBSM_EXECENV_START+%d)\n",
 	 max_env+1);
 
   printf("#define F_OPENBSM_NEWGROUPS_START F_OPENBSM_EXECENV_END\n");
-  printf("  { \"bsm.newgroups_num\", T_UINT,"
+  printf("  { \"bsm.newgroups_num\", &t_uint,"
 	 " \"bsm number of new groups\" },\n");
   printf("#define F_OPENBSM_NEWGROUPS_NUM 0\n");
   for (i=0; ++i<=max_groups; )
-    printf("  { \"bsm.newgroup%d\", T_UINT,"
+    printf("  { \"bsm.newgroup%d\", &t_uint,"
 	   " \"openbsm new group %d\" },\n",
 	   i, i);
   printf("#define F_OPENBSM_NEWGROUPS_END (F_OPENBSM_NEWGROUPS_START+%d)\n",

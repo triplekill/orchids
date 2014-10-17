@@ -54,8 +54,8 @@ static int sunbsm_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
 }
 
 static field_t sunbsm_fields[] = {
-  { "sunbsm.field_demoint", T_INT,  "an int field"   },
-  { "sunbsm.field_demostr", T_VSTR, "a string field" },
+  { "sunbsm.field_demoint", &t_int,  "an int field"   },
+  { "sunbsm.field_demostr", &t_str, "a string field" },
 };
 
 static void *

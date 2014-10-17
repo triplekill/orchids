@@ -423,19 +423,19 @@ static int wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
 }
 
 static field_t wifi_fields[] = {
-  { "wifi.type",       T_STR,      "frame type"                             },
-  { "wifi.subtype",    T_STR,      "frame subtype"                          },
-  { "wifi.time",       T_TIMEVAL,  "reception time"                         },
-  { "wifi.da",         T_STR,      "destination address"                    },
-  { "wifi.sa",         T_STR,      "source address"                         },
-  { "wifi.bssid",      T_STR,      "basic service set identifier"           },
-  { "wifi.ta",         T_STR,      "transmitter address"                    },
-  { "wifi.ra",         T_STR,      "receiver address"                       },
-  { "wifi.dir",        T_STR,      "direction of the frame"                 },
-  { "wifi.seqnum",     T_INT,      "sequence number"                        },
-  { "wifi.iswep",      T_INT,      "1 if it is an encrypted frame, 0 else." },
-  { "wifi.bodylength", T_INT,      "body length"                            },
-  { "wifi.rssi",       T_INT,      "rssi"                                   }
+  { "wifi.type",       &t_str,      "frame type"                             },
+  { "wifi.subtype",    &t_str,      "frame subtype"                          },
+  { "wifi.time",       &t_timeval,  "reception time"                         },
+  { "wifi.da",         &t_str,      "destination address"                    },
+  { "wifi.sa",         &t_str,      "source address"                         },
+  { "wifi.bssid",      &t_str,      "basic service set identifier"           },
+  { "wifi.ta",         &t_str,      "transmitter address"                    },
+  { "wifi.ra",         &t_str,      "receiver address"                       },
+  { "wifi.dir",        &t_str,      "direction of the frame"                 },
+  { "wifi.seqnum",     &t_int,      "sequence number"                        },
+  { "wifi.iswep",      &t_int,      "1 if it is an encrypted frame, 0 else." },
+  { "wifi.bodylength", &t_int,      "body length"                            },
+  { "wifi.rssi",       &t_int,      "rssi"                                   }
 };
 
 static void *

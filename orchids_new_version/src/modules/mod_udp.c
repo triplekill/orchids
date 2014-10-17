@@ -102,13 +102,13 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
 
 
 static field_t udp_fields[] = {
-  { "udp.event",    T_INT,      "event number"        },
-  { "udp.time",     T_TIMEVAL,  "reception time"      },
-  { "udp.src_addr", T_IPV4,     "source adress"       },
-  { "udp.src_port", T_UINT,      "source port"         },
-  { "udp.dst_addr", T_IPV4,     "destination address" }, /* never used? */
-  { "udp.dst_port", T_UINT,      "destination port"    },
-  { "udp.msg",      T_BSTR,     "message"             }
+  { "udp.event",    &t_int,      "event number"        },
+  { "udp.time",     &t_timeval,  "reception time"      },
+  { "udp.src_addr", &t_ipv4,     "source adress"       },
+  { "udp.src_port", &t_uint,      "source port"         },
+  { "udp.dst_addr", &t_ipv4,     "destination address" }, /* never used? */
+  { "udp.dst_port", &t_uint,      "destination port"    },
+  { "udp.msg",      &t_bstr,     "message"             }
 };
 
 
