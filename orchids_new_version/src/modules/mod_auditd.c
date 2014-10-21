@@ -38,8 +38,8 @@
 #include <errno.h>
 
 #include "orchids.h"
-
 #include "orchids_api.h"
+#include "mod_utils.h"
 
 #include "mod_auditd.h"
 
@@ -68,7 +68,7 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   serial = 0;
   if (t<end && *t==':') /* found it */
     {
-      t = action_atoi_unsigned (t+1, end, &serial);
+      t = orchids_atoui (t+1, end, &serial);
       if (t<end && *t==')')
 	t++;
     }
@@ -134,7 +134,7 @@ static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
 {
   char *txt_line;
   int txt_len;
-  actions_orchids_ctx_t *octx = mod->config; // data
+  action_orchids_ctx_t *octx = mod->config; // data
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START(gc_ctx, 1);
@@ -162,7 +162,7 @@ static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
   action_parse_event (octx, txt_line, txt_line+txt_len);
 
   /* then, post the Orchids event */
-  post_event(ctx, mod, *octx.out_event);
+  post_event(ctx, mod, *octx->out_event);
   GC_END(gc_ctx);
   return (0);
 }

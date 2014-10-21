@@ -1286,7 +1286,7 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 	fprintf (stderr, "%s:", STR(n->file));
       /* printing STR(n->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: split regex produces %lu substrings, bound to %lu variables.\n",
+      fprintf (stderr, "%u: split regex produces %zd substrings, bound to %zd variables.\n",
 	       n->lineno,
 	       REGEX(TERM_DATA(pattern)).re_nsub,
 	       dest_list->vars_nb);
@@ -1812,7 +1812,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
     {
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file)); // NUL-terminated by construction
-      fprintf (stderr, "%u: function %s expects %d arguments, but is applied to %lu arguments.\n",
+      fprintf (stderr, "%u: function %s expects %d arguments, but is applied to %zd arguments.\n",
 	       myself->lineno, f->name, f->args_nb, nparams);
       ctx->nerrors++;
       set_type (ctx, myself, NULL);
