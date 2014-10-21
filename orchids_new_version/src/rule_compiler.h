@@ -61,6 +61,19 @@ typedef struct node_varlist_s node_varlist_t;
 typedef struct node_syncvarlist_s node_syncvarlist_t;
 typedef struct node_expr_if_s node_expr_if_t;
 
+#define NODE_EXPR_S							\
+  gc_header_t gc;							\
+  int   type; /* node type: NODE_FIELD, or NODE_VARIABLE, or ... */	\
+  ovm_var_t *file; /* really a NUL-terminated ovm_str_t * */		\
+  unsigned int lineno;							\
+  type_t *stype; /* static type, used in static type checking (&t_int,	\
+		    &t_str, etc.) */					\
+  void (*compute_stype) (rule_compiler_t *ctx, node_expr_t *myself);	\
+  size_t npending_argtypes; /* number of argument types we still need	\
+			       to know before we can call compute_stype	\
+			       below */					\
+  node_expr_t *parents; /* list of nodes of which this node is an	\
+			   argument, for type checking */
 
 /**
  ** @struct node_expr_bin_s
@@ -81,8 +94,7 @@ typedef struct node_expr_if_s node_expr_if_t;
 typedef struct node_expr_bin_s node_expr_bin_t;
 struct node_expr_bin_s
 {
-  gc_header_t  gc;
-  int          type;
+  NODE_EXPR_S
   int          op;
   node_expr_t *lval;
   node_expr_t *rval;
@@ -108,8 +120,7 @@ struct node_expr_bin_s
 typedef struct node_expr_mon_s node_expr_mon_t;
 struct node_expr_mon_s
 {
-  gc_header_t  gc;
-  int          type;
+  NODE_EXPR_S
   int          op;
   node_expr_t *val;
 };
@@ -137,15 +148,14 @@ struct node_expr_mon_s
 typedef struct node_expr_call_s node_expr_call_t;
 struct node_expr_call_s
 {
-  gc_header_t  gc;
-  int               type;
+  NODE_EXPR_S
   char             *symbol;
-  int               res_id;
+  issdl_function_t *f;
   node_expr_t      *paramlist;
 };
 
 #define CALL_SYM(e) ((node_expr_call_t *)e)->symbol
-#define CALL_RES_ID(e) ((node_expr_call_t *)e)->res_id
+#define CALL_RES_ID(e) ((node_expr_call_t *)e)->f->id
 #define CALL_PARAMS(e) ((node_expr_call_t *)e)->paramlist
 
 
@@ -170,8 +180,7 @@ node_expr_t *expr_cons_reverse(rule_compiler_t *ctx, node_expr_t *l);
 typedef struct node_expr_symbol_s node_expr_symbol_t;
 struct node_expr_symbol_s
 {
-  gc_header_t gc;
-  int   type;
+  NODE_EXPR_S
   int   res_id;
   char *name;
 };
@@ -196,8 +205,7 @@ struct node_expr_symbol_s
 typedef struct node_expr_term_s node_expr_term_t;
 struct node_expr_term_s
 {
-  gc_header_t gc;
-  int   type;
+  NODE_EXPR_S
   int   res_id;
   ovm_var_t *data;
 };
@@ -224,8 +232,7 @@ struct node_expr_term_s
 typedef struct node_expr_regsplit_s node_expr_regsplit_t;
 struct node_expr_regsplit_s
 {
-  gc_header_t     gc;
-  int             type;
+  NODE_EXPR_S
   node_expr_t    *string;
   node_expr_t    *split_pat;
   node_varlist_t *dest_vars;
@@ -253,8 +260,7 @@ struct node_expr_regsplit_s
  **/
 struct node_expr_if_s
 {
-  gc_header_t  gc;
-  int          type;
+  NODE_EXPR_S
   node_expr_t  *cond;
   node_expr_t *then;
   node_expr_t *els;
@@ -287,8 +293,7 @@ struct node_expr_if_s
  **/
 struct node_expr_s
 {
-  gc_header_t gc;
-  int   type;
+  NODE_EXPR_S
   /* in union with:
   node_expr_bin_t    bin;
   node_expr_bin_t    cond;
@@ -739,6 +744,9 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
 node_expr_t *build_expr_cons(rule_compiler_t *ctx,
 			      node_expr_t *left_node, node_expr_t *right_node);
 
+node_expr_t *build_expr_action(rule_compiler_t *ctx,
+			       node_expr_t *action, node_expr_t *rest);
+
 /**
  * Build a logic expression node.
  * @param op The operator identifier.
@@ -753,12 +761,12 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx, int op,
 /**
  * Build an association (affectation).
  * @param ctx Rule compiler context. Needed to resolve the variable name.
- * @param var The variable name (left value).
+ * @param var The variable (left value).
  * @param expr The expression to associate to the variable (right value).
  * @return A new allocated expression node.
  **/
-node_expr_t *
-build_assoc(rule_compiler_t *ctx, char *var, node_expr_t *expr);
+node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
+			 node_expr_t *expr);
 
 
 /**
@@ -798,8 +806,7 @@ build_varname(rule_compiler_t *ctx, char *varname);
  * @param i The integer value.
  * @return A new allocated integer expression node.
  **/
-node_expr_t *
-build_integer(rule_compiler_t *ctx, int i);
+node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i);
 
 
 /**

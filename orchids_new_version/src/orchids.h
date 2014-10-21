@@ -741,7 +741,7 @@ struct rule_compiler_s
   size_t            nprotected;
   size_t            maxprotected;
   gc_header_t      **protected;
-  char             *currfile;
+  ovm_var_t *currfile; /* really ovm_str_t * */
   /* For the lex scanner: */
   void             *scanner;
   unsigned int      issdllineno;
@@ -766,6 +766,9 @@ struct rule_compiler_s
   int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
+  /* Type-checking: */
+  struct node_expr_s *type_stack; /* stack of nodes whose type we now know */
+  int nerrors;
 };
 
 
@@ -797,9 +800,8 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
  **     List of typing signatures, ending in NULL
  **     Each signature is a table [return-type, arg-type1, ..., arg-typen]
  **     where n = arg_nb
- **     Types are &t_null, &t_int, &t_bstr, &t_str, etc.,
+ **     Types are NULL, &t_int, &t_bstr, &t_str, etc.,
  **     plus &t_any (wildcard arg type)
- **     and &t_noret (functions that do not return)
  **/
 /**   @var issdl_function_s::desc
  **     Function description (for a little help).

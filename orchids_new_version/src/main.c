@@ -134,6 +134,13 @@ main(int argc, char *argv[])
   proceed_post_config(ctx);
   compile_rules(ctx);
   proceed_post_compil(ctx);
+  if (ctx->rule_compiler->nerrors)
+    {
+      fprintf (stderr, "That makes %d errors: stop.\n",
+	       ctx->rule_compiler->nerrors);
+      fflush (stderr);
+      exit (10);
+    }
 
   /* change run id here */
   if (ctx->runtime_user)

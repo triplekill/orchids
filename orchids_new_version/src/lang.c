@@ -83,7 +83,7 @@ static struct issdl_type_s issdl_types_g[] = {
     "Seconds and microseconds since Epoch, (struct timeval)" },
   { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Posix Extended Regular Expression, with substring addressing" },
-  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, NULL, uint_mul, uint_div, uint_mod, uint_clone, uint_and, uint_or, uint_xor, uint_not,
+  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_opp, uint_mul, uint_div, uint_mod, uint_clone, uint_and, uint_or, uint_xor, uint_not,
     "Non negative integer (32-bits unsigned int)" },
   { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "SNMP Object Identifier" },
@@ -113,9 +113,7 @@ type_t t_event = { "event", T_EVENT };
 type_t t_mark = { "mark", T_STATE_INSTANCE };
 
 /* Special types */
-type_t t_null = { "null", T_NULL };
 type_t t_any = { "*", 128 };
-type_t t_noret = { "void", 128 };
 
 static int resolve_ipv4_g = 0;
 static int resolve_ipv6_g = 0;
@@ -337,6 +335,11 @@ static ovm_var_t *uint_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 		       (UINT(var1) - UINT(var2)):0);
 }
 
+static ovm_var_t *uint_opp (gc_t *gc_ctx, ovm_var_t *var)
+{
+  return ovm_int_new (gc_ctx, -(long)UINT(var));
+}
+
 static ovm_var_t *uint_mul (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
   if (var2==NULL || var2->gc.type != T_UINT)
@@ -417,7 +420,7 @@ static ovm_var_t *uint_not(gc_t *gc_ctx, ovm_var_t *var)
 {
   if (var==NULL || TYPE(var) != T_UINT)
     return NULL;
-  return ovm_int_new (gc_ctx, ~UINT(var));
+  return ovm_uint_new (gc_ctx, ~UINT(var));
 }
 
 /*
@@ -3341,7 +3344,7 @@ ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var)
  ** used at startup by the function register_core_functions() to
  ** register them.
  **/
-static type_t *null_sig[] = { &t_null };
+static type_t *null_sig[] = { NULL };
 static type_t **null_sigs[] = { null_sig, NULL };
 
 static type_t *int_sig[] = { &t_int };

@@ -84,7 +84,7 @@ static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static const type_t *inject_event_sig[] = { &t_null, &t_event };
+static const type_t *inject_event_sig[] = { NULL, &t_event };
 static const type_t **inject_event_sigs[] = { inject_event_sig, NULL };
 
 static const type_t *current_event_sig[] = { &t_event };

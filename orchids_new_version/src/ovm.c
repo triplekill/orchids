@@ -871,11 +871,38 @@ static int ovm_popcjmp(isn_param_t *param)
   ovm_var_t *res;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_POPCJMP\n");
-  res = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (issdl_test(res))
-    param->ip += param->ip[1];
+  res = POP_VALUE(ctx);
+#if 0
+  if (res!=NULL) /* Formerly, we used issdl_test(); inlining is faster */
+    switch (TYPE(res))
+      {
+      case T_INT:
+	if (INT(res)!=0)
+	  {
+	    param->ip += param->ip[1];
+	    return 0;
+	  }
+	break;
+      case T_UINT:
+	if (UINT(res)!=0)
+	  {
+	    param->ip += param->ip[1];
+	    return 0;
+	  }
+	break;
+      default:
+	param->ip += param->ip[1];
+	return 0;
+      }
+#else
+  /* Type-checker guarantees res is NULL or a T_INT */
+  if (res!=NULL && INT(res)!=0)
+    {
+      param->ip += param->ip[1];
+      return 0;
+    }
+#endif
   param->ip += 2;
-  STACK_DROP(ctx->ovm_stack, 1);
   return 0;
 }
 

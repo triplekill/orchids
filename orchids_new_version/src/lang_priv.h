@@ -72,6 +72,7 @@ static ovm_var_t *uint_clone (gc_t *gc_ctx, ovm_var_t *var);
 static int uint_cmp(ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *uint_opp(gc_t *gc_ctx, ovm_var_t *var);
 static ovm_var_t *uint_mul (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_div (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_mod (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);

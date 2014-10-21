@@ -1187,18 +1187,22 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       return;
     }
 
-  switch (ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type)
-  {
+  switch ((int)(unsigned int)(ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type->tag))
+    {
     case T_STR:
-    case T_VSTR:
+    case T_VSTR: // subsumed by T_STR, actually
       cond_param = cond_param_str;
       cond_param_size = strlen(cond_param_str);
       break;
-    case T_INT:
     case T_UINT:
-      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (int));
-      *(int *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
-      cond_param_size = sizeof (int);
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (unsigned long));
+      *(unsigned long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
+      cond_param_size = sizeof (unsigned long);
+      break;
+    case T_INT:
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (long));
+      *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
+      cond_param_size = sizeof (long);
       break;
     case T_IPV4:
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
@@ -1222,7 +1226,7 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
     default:
       DebugLog(DF_CORE, DS_ERROR,
 	       "DISSECT : cannot dissect type %i \n",
-	       ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type);
+	       ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type->name);
       return;
   }
 

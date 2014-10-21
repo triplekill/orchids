@@ -231,8 +231,8 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 
  /* Integer numbers */
 [0-9]+ {
-  issdllval.integer = strtol(issdltext, (char **)NULL, 10);
-  /* printf("NUMBER %i\n", issdllval.integer); */
+  issdllval.integer = strtoul(issdltext, (char **)NULL, 10);
+  /* printf("NUMBER %lu\n", issdllval.integer); */
   return (NUMBER);
 }
 

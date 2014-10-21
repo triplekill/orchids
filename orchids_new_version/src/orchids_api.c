@@ -973,7 +973,7 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
                 gfid,
                 field,
                 ctx->global_fields->fields[base + field].name,
-                str_issdltype(ctx->global_fields->fields[base + field].type),
+                ctx->global_fields->fields[base + field].type->name,
                 ctx->global_fields->fields[base + field].desc);
         gfid++;
       }

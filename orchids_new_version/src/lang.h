@@ -89,10 +89,10 @@ struct type_s {
   unsigned char tag;
 };
 
-extern type_t t_null, t_int, t_uint, t_float,
+extern type_t t_int, t_uint, t_float,
   t_bstr, t_str, t_ctime, t_timeval, t_ipv4, t_ipv6,
   t_regex, t_snmpoid, t_event, t_mark,
-  t_any, t_noret;
+  t_any;
 
 #define STR_PAD_LEN 4
 

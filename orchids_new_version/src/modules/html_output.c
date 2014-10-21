@@ -412,7 +412,7 @@ static int generate_html_orchids_fields(orchids_t *ctx,
 		      p, gfid,
 		      p, f,
 		      p, ctx->global_fields->fields[base + f].name,
-		      p, str_issdltype(ctx->global_fields->fields[base + f].type),
+		      p, ctx->global_fields->fields[base + f].type->name,
 		      p, (ctx->global_fields->fields[base + f].desc ?
 			  ctx->global_fields->fields[base + f].desc : ""));
 	    }

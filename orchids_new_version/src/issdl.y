@@ -45,7 +45,7 @@ extern int display_func(void *data, void *param);
 %pure-parser
 
 %union {
-  int integer;
+  unsigned long integer;
   char *string;
   unsigned long flags;
   double fp_double;
@@ -205,9 +205,9 @@ actions:
 
 actionlist: /* returns reversed list of actions */
   actionlist action
-  { RESULT($$, build_expr_cons(compiler_ctx_g, $2, $1)); }
+  { RESULT($$, build_expr_action(compiler_ctx_g, $2, $1)); }
 | action
-  { RESULT($$, build_expr_cons(compiler_ctx_g, $1, NULL)); }
+  { RESULT($$, build_expr_action(compiler_ctx_g, $1, NULL)); }
 ;
 
 
@@ -254,7 +254,7 @@ o_minus : O_MINUS { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 expr:
   o_parent expr C_PARENT
   { RESULT_DROP($$,$1, $2); }
-| VARIABLE eq expr %prec EQ
+| var eq expr %prec EQ
   { RESULT_DROP($$,$2, build_assoc(compiler_ctx_g, $1, $3)); }
 | expr O_PLUS expr
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_ADD, $1, $3)); }
@@ -396,7 +396,7 @@ actionblock:
 | o_brace C_BRACE
   { $$ = NULL; }
 | action
-  {  RESULT($$, build_expr_cons(compiler_ctx_g, $1, NULL)); }
+  {  RESULT($$, build_expr_action(compiler_ctx_g, $1, NULL)); }
 
 ifkw : IF { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
