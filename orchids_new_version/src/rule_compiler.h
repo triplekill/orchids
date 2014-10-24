@@ -155,7 +155,7 @@ struct node_expr_call_s
 };
 
 #define CALL_SYM(e) ((node_expr_call_t *)e)->symbol
-#define CALL_RES_ID(e) ((node_expr_call_t *)e)->f->id
+#define CALL_RES_ID(e) (((node_expr_call_t *)e)->f==NULL?0:((node_expr_call_t *)e)->f->id)
 #define CALL_PARAMS(e) ((node_expr_call_t *)e)->paramlist
 
 

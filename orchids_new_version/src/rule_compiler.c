@@ -490,9 +490,9 @@ static void node_expr_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_expr_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  node_expr_t *n = (node_expr_t *)p;
+  //node_expr_t *n = (node_expr_t *)p;
 
-  gc_base_free (n->file);
+  return;
 }
 
 static int node_expr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -1121,7 +1121,8 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
   trans->dest = dest;
   trans->sub_state_dest = NULL; /* not set */
   GC_UPDATE(ctx->gc_ctx, 0, trans);
-  add_boolean_check (ctx, cond);
+  if (cond!=NULL)
+    add_boolean_check (ctx, cond);
   GC_END(ctx->gc_ctx);
   return trans;
 }
@@ -1849,11 +1850,11 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
       for (l=CALL_PARAMS(n); l!=NULL; l=BIN_RVAL(l))
 	{
 	  fputs (delim, stderr);
-	  delim = ",";
 	  arg = BIN_LVAL(l);
 	  if (arg->stype==NULL)
-	    fprintf (stderr, "%snull", delim);
-	  else fprintf (stderr, "%s%s", delim, arg->stype->name);
+	    fputs ("null", stderr);
+	  else fputs (arg->stype->name, stderr);
+	  delim = ",";
 	}
       fprintf (stderr, ").\n");
       ctx->nerrors++;
@@ -1872,7 +1873,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   size_t n;
   node_expr_t *l;
 
-  //gc_check(ctx->gc_ctx);
   GC_START(ctx->gc_ctx, 2);
   currfile = NULL;
   if (sym->file!=NULL)
@@ -1885,7 +1885,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
       GC_UPDATE (ctx->gc_ctx, 0, currfile);
       gc_base_free (sym->file);
     }
-  //gc_check(ctx->gc_ctx); 
   
   call_node = (node_expr_call_t *)gc_alloc (ctx->gc_ctx,
 					    sizeof(node_expr_call_t),
@@ -1896,7 +1895,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   call_node->paramlist = NULL;
   GC_UPDATE(ctx->gc_ctx, 1, call_node);
   
-  //gc_check(ctx->gc_ctx); 
   call_node->type = NODE_CALL;
   GC_TOUCH (ctx->gc_ctx, call_node->file = currfile);
   call_node->lineno = sym->line;
@@ -1921,7 +1919,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
       ctx->nerrors++;
     }
   call_node->f = func;
-  //gc_check(ctx->gc_ctx);
   if (n==0) /* if no pending arg types, call compute_stype directly */
     compute_stype_call (ctx, (node_expr_t *)call_node);
   GC_END(ctx->gc_ctx);
