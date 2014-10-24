@@ -178,8 +178,9 @@ static int read_net(gc_t *gc_ctx,
   VSTRLEN(val) = strlen(net->t_process.name);
   GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-/*   attr[F_SOCKCALL] = ovm_int_new(); */
-/*   INT(attr[F_SOCKCALL]) = net->syscall; */
+  val = ovm_uint_new (gc_ctx, net->syscall);
+  GC_TOUCH (gc_ctx, attr[F_SOCKCALL] = val);
+#if 0
   /* XXX -- For demo only */
   if (net->syscall < 20)
     {
@@ -188,6 +189,7 @@ static int read_net(gc_t *gc_ctx,
       VSTRLEN(val) = strlen(linux24_socketcall_name_g[net->syscall]);
       GC_TOUCH (gc_ctx, attr[F_SOCKCALL] = val);
   }
+#endif
 
   val = ovm_ipv4_new (gc_ctx);
   IPV4(val).s_addr = inet_addr(net->t_connection.src_ip);
@@ -495,6 +497,9 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
   val = ovm_int_new (gc_ctx, snare_hdr->event_class);
   GC_UPDATE(gc_ctx, F_CLASS, val);
 
+  val = ovm_uint_new (gc_ctx, snare_hdr->event_id);
+  GC_UPDATE(gc_ctx, F_SYSCALL, val);
+#if 0
   if (snare_hdr->event_id < LIN24_SYSCALL_MAX)
     {
       /* XXX -- Text for demo !!! */
@@ -503,6 +508,7 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
       VSTRLEN(val) = strlen(VSTR(val));
       GC_UPDATE(gc_ctx, F_SYSCALL, val);
   }
+#endif
 
   val = ovm_timeval_new (gc_ctx);
   TIMEVAL(val) = snare_hdr->time;
@@ -547,7 +553,7 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
 static field_t rawsnare_fields[] = {
   { "rawsnare.time",       &t_timeval,  "event time"           },
   { "rawsnare.class",      &t_int,      "snare event class"    },
-  { "rawsnare.syscall",    &t_int,      "system call number"   },
+  { "rawsnare.syscall",    &t_uint,     "system call number"   },
   { "rawsnare.ruid",       &t_int,      "user id"              },
   { "rawsnare.rgid",       &t_int,      "main group id"        },
   { "rawsnare.euid",       &t_int,      "effective user id"    },
@@ -563,7 +569,7 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.cmdline",    &t_str,     "command line"         },
   { "rawsnare.src_path",   &t_str,     "source path"          },
   { "rawsnare.dst_path",   &t_str,     "destination path"     },
-  { "rawsnare.sockcall",   &t_int,      "socket_call number"   },
+  { "rawsnare.sockcall",   &t_uint,     "socket_call number"   },
   { "rawsnare.dst_ip",     &t_ipv4,     "destination ip"       },
   { "rawsnare.dst_port",   &t_int,      "destination port"     },
   { "rawsnare.src_ip",     &t_ipv4,     "source ip"            },
