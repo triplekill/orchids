@@ -36,6 +36,7 @@
 
 input_module_t mod_rawsnare;
 
+#if 0
 static char *linux24_syscall_name_g[256];
 
 static char *linux24_socketcall_name_g[19];
@@ -43,6 +44,7 @@ static char *linux24_socketcall_name_g[19];
 static char *linux24_ptrace_reqname_g[26];
 
 static char *linux24_signal_g[32];
+#endif
 
 static int read_io(gc_t *gc_ctx,
 		   ovm_var_t *delegate,
@@ -232,8 +234,9 @@ static int read_pt(gc_t *gc_ctx,
   VSTRLEN(val) = strlen(pt->t_process.name);
   GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-/*   attr[F_PTRACEREQ] = ovm_int_new(); */
-/*   INT(attr[F_PTRACEREQ]) = pt->request; */
+  val = ovm_uint_new (gc_ctx, pt->request);
+  GC_TOUCH (gc_ctx, attr[F_PTRACEREQ] = val);
+#if 0
   /* XXX -- For demo only */
   if (pt->request < 25)
     {
@@ -242,6 +245,7 @@ static int read_pt(gc_t *gc_ctx,
       VSTRLEN(val) = strlen(linux24_ptrace_reqname_g[pt->request]);
       GC_TOUCH (gc_ctx, attr[F_PTRACEREQ] = val);
     }
+#endif
 
   val = ovm_int_new (gc_ctx, pt->pid);
   GC_TOUCH (gc_ctx, attr[F_PTRACEPID] = val);
@@ -279,6 +283,9 @@ static int read_kill(gc_t *gc_ctx,
   VSTRLEN(val) = strlen(kill->t_process.name);
   GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
+  val = ovm_uint_new (gc_ctx, kill->sig);
+  GC_TOUCH (gc_ctx, attr[F_KILLSIG] = val);
+#if 0
   if (kill->sig < 32)
     {
       val = ovm_vstr_new (gc_ctx, NULL);
@@ -286,6 +293,7 @@ static int read_kill(gc_t *gc_ctx,
       VSTRLEN(val) = strlen(linux24_signal_g[kill->sig]);
       GC_TOUCH (gc_ctx, attr[F_KILLSIG] = val);
     }
+#endif
 
   val = ovm_int_new (gc_ctx, kill->pid);
   GC_TOUCH (gc_ctx, attr[F_KILLPID] = val);
@@ -580,12 +588,12 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.target_rid", &t_int,      "real user/group id"   },
   { "rawsnare.target_sid", &t_int,      "saved user/group id"  },
   { "rawsnare.mod_name",   &t_str,     "module name"          },
-  { "rawsnare.ptrace_req", &t_str,     "ptrace request"       },
+  { "rawsnare.ptrace_req", &t_uint,     "ptrace request"       },
   { "rawsnare.ptrace_pid", &t_int,      "ptrace pid"           },
   { "rawsnare.ptrace_addr",&t_uint,     "ptrace address"       },
   { "rawsnare.ptrace_data",&t_uint,     "ptrace data"          },
   { "rawsnare.kill_pid",   &t_int,      "kill dest pid"        },
-  { "rawsnare.kill_sig",   &t_str,     "signal to send"       },
+  { "rawsnare.kill_sig",   &t_uint,     "signal to send"       },
 };
 
 
@@ -625,7 +633,7 @@ input_module_t mod_rawsnare = {
   rawsnare_dissect
 };
 
-/*
+#if 0
 static char *linux24_syscall_name_g[255] = {
   "",
   "SYS_exit",
@@ -970,8 +978,6 @@ static char *linux24_ptrace_reqname_g[25] = {
 "(24) PTRACE_SYSCALL"
 }
 
-*/
-
 static char *linux24_syscall_name_g[256] = {
   "(0) ***",
   "(1) SYS_exit",
@@ -1270,7 +1276,6 @@ static char *linux24_ptrace_reqname_g[26] = {
   NULL
 };
 
-
 static char *linux24_signal_g[32] = {
   "(0) N/A",
   "(1) SIGHUP",
@@ -1305,6 +1310,7 @@ static char *linux24_signal_g[32] = {
   "(30) SIGPWR",
   "(31) SIGSYS",
 };
+#endif
 
 
 /*

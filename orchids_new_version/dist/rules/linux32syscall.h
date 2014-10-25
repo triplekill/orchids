@@ -1,5 +1,5 @@
 /**
- ** Linux 32 but system calls, from asm/unistd32.h
+ ** Linux 32 bit system calls
  **/
 
 #define SYS_restart_syscall     0

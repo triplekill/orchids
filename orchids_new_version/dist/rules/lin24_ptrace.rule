@@ -3,13 +3,15 @@
 */
 
 #include "linux32syscall.h"
+#include "linuxptrace.h"
+/* #include "linuxsignal.h" */
 
 rule ptrace
 {
   state init
   {
     expect (.rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(16) PTRACE_ATTACH" &&
+        .rawsnare.ptrace_req == PTRACE_ATTACH &&
         .rawsnare.euid != 0 &&
         .rawsnare.egid != 0)
        goto ptrace_attach;
@@ -32,7 +34,7 @@ rule ptrace
   {
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(24) PTRACE_SYSCALL" &&
+        .rawsnare.ptrace_req == PTRACE_SYSCALL &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_syscall;
   }
@@ -41,14 +43,14 @@ rule ptrace
   {
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(12) PTRACE_GETREGS" &&
+        .rawsnare.ptrace_req == PTRACE_GETREGS &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_getregs;
 
     /* if regs are guessed, attacker don't use GETREGS */
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_req == PTRACE_POKETEXT &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_poketext;
 
@@ -58,7 +60,7 @@ rule ptrace
   {
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_req == PTRACE_POKETEXT &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_poketext;
   }
@@ -70,14 +72,14 @@ rule ptrace
     /* get all repetitions of poketext */
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(4) PTRACE_POKETEXT" &&
+        .rawsnare.ptrace_req == PTRACE_POKETEXT &&
         .rawsnare.ptrace_pid == $target_pid &&
         $counter < 10)
       goto ptrace_poketext;
 
     expect (.rawsnare.pid == $attack_pid &&
         .rawsnare.syscall == SYS_ptrace &&
-        .rawsnare.ptrace_req == "(17) PTRACE_DETACH" &&
+        .rawsnare.ptrace_req == PTRACE_DETACH &&
         .rawsnare.ptrace_pid == $target_pid)
       goto ptrace_detach;
   }
