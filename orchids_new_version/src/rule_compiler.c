@@ -2993,12 +2993,15 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->state = gc_base_malloc (ctx->gc_ctx,
 				rule->state_nb * sizeof (state_t));
   for (s=0, m=rule->state_nb; s<m; s++)
-    rule->state[s].trans = NULL; /* to prevent garbage collector bugs:
-				   in case the allocations below
-				   call the garbage collector, which
-				   may call rule_finalize() on
-				   rule->state[i], which should be
-				   filled with valid pointers---or NULL. */
+    {
+       rule->state[s].trans_nb = 0;
+      rule->state[s].trans = NULL; /* to prevent garbage collector bugs:
+				     in case the allocations below
+				     call the garbage collector, which
+				     may call rule_finalize() on
+				     rule->state[i], which should be
+				     filled with valid pointers---or NULL. */
+    }
   compile_state_ast(ctx, rule, &(rule->state[0]), node_rule->init);
   rule->state[0].id = 0; /* set state id */
 
@@ -3664,6 +3667,8 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
   else
     {
       /* Terminal state */
+      state->trans_nb = 0;
+      state->trans = NULL;
       DebugLog(DF_OLC, DS_TRACE,
 	       "state \"%s\" has no transition (TERMINAL STATE)\n",
 	       state->name);
