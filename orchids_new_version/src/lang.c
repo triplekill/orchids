@@ -2149,6 +2149,29 @@ static void issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+static void issdl_str_from_uint(orchids_t *ctx, state_instance_t *state)
+{
+  char buff[64];
+  ovm_var_t *str;
+  ovm_var_t *i;
+  size_t len;
+
+  i = POP_VALUE(ctx);
+  if (i!=NULL && TYPE(i)==T_UINT)
+    {
+      snprintf(buff, sizeof(buff), "%lu", UINT(i));
+      len = strlen(buff);
+      str = ovm_str_new(ctx->gc_ctx, len);
+      memcpy(STR(str), buff, len);
+      PUSH_VALUE(ctx,str);
+    }
+  else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_str_from_uint(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
+}
+
 static void issdl_str_from_float(orchids_t *ctx, state_instance_t *state)
 {
   char buff[64];
@@ -3362,6 +3385,9 @@ static type_t **int_of_str_sigs[] = { int_of_str_sig, NULL };
 static type_t *str_of_int_sig[] = { &t_str, &t_int };
 static type_t **str_of_int_sigs[] = { str_of_int_sig, NULL };
 
+static type_t *str_of_uint_sig[] = { &t_str, &t_uint };
+static type_t **str_of_uint_sigs[] = { str_of_uint_sig, NULL };
+
 static type_t *float_of_str_sig[] = { &t_float, &t_str };
 static type_t **float_of_str_sigs[] = { float_of_str_sig, NULL };
 
@@ -3527,6 +3553,9 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4",
     1, ipv6_of_ipv4_sigs,
     "convert an ipv4 address to an ipv6 address" },
+  { issdl_str_from_uint, 34, "str_from_uint",
+    1, str_of_uint_sigs,
+    "convert an unsigned integer to a string" },
   { NULL, 0, NULL, 0, NULL, NULL }
 };
 

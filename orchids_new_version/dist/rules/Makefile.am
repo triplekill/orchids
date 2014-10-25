@@ -3,6 +3,9 @@ orchidsruledir = $(orchidsconfdir)/rules
 
 orchidsrule_DATA = \
   linux32syscall.h \
+  linux64syscall.h \
+  linuxsignal.h \
+  linuxptrace.h \
   pid_tracker.rule \
   apachessl.rule \
   portscan.rule \

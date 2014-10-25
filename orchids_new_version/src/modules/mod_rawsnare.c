@@ -348,10 +348,10 @@ static int read_ch(gc_t *gc_ctx,
   VSTRLEN(val) = strlen(ch->t_pwd.path);
   GC_TOUCH (gc_ctx, attr[F_WORKDIR] = val);
 
-  val = ovm_int_new (gc_ctx, ch->t_owner.owner);
+  val = ovm_uint_new (gc_ctx, ch->t_owner.owner);
   GC_TOUCH (gc_ctx, attr[F_OWNERUID] = val);
 
-  val = ovm_int_new (gc_ctx, ch->t_owner.group);
+  val = ovm_uint_new (gc_ctx, ch->t_owner.group);
   GC_TOUCH (gc_ctx, attr[F_OWNERGID] = val);
 
   return 0;
@@ -522,16 +522,16 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
   TIMEVAL(val) = snare_hdr->time;
   GC_UPDATE(gc_ctx, F_TIME, val);
 
-  val = ovm_int_new(gc_ctx, snare_hdr->user_id);
+  val = ovm_uint_new(gc_ctx, snare_hdr->user_id);
   GC_UPDATE(gc_ctx, F_RUID, val);
 
-  val = ovm_int_new(gc_ctx, snare_hdr->group_id);
+  val = ovm_uint_new(gc_ctx, snare_hdr->group_id);
   GC_UPDATE(gc_ctx, F_RGID, val);
 
-  val = ovm_int_new(gc_ctx, snare_hdr->euser_id);
+  val = ovm_uint_new(gc_ctx, snare_hdr->euser_id);
   GC_UPDATE(gc_ctx, F_EUID, val);
 
-  val = ovm_int_new(gc_ctx, snare_hdr->egroup_id);
+  val = ovm_uint_new(gc_ctx, snare_hdr->egroup_id);
   GC_UPDATE(gc_ctx, F_EGID, val);
 
   if (snare_hdr->event_class > NUMCLASS)
@@ -562,10 +562,10 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.time",       &t_timeval,  "event time"           },
   { "rawsnare.class",      &t_int,      "snare event class"    },
   { "rawsnare.syscall",    &t_uint,     "system call number"   },
-  { "rawsnare.ruid",       &t_int,      "user id"              },
-  { "rawsnare.rgid",       &t_int,      "main group id"        },
-  { "rawsnare.euid",       &t_int,      "effective user id"    },
-  { "rawsnare.egid",       &t_int,      "effective id"         },
+  { "rawsnare.ruid",       &t_uint,      "user id"              },
+  { "rawsnare.rgid",       &t_uint,      "main group id"        },
+  { "rawsnare.euid",       &t_uint,      "effective user id"    },
+  { "rawsnare.egid",       &t_uint,      "effective id"         },
   { "rawsnare.pid",        &t_int,      "process id"           },
   { "rawsnare.ppid",       &t_int,      "parent process id"    },
   { "rawsnare.procname",   &t_str,     "process name"         },
@@ -582,8 +582,8 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.dst_port",   &t_int,      "destination port"     },
   { "rawsnare.src_ip",     &t_ipv4,     "source ip"            },
   { "rawsnare.src_port",   &t_int,      "source port"          },
-  { "rawsnare.owner_uid",  &t_int,      "owner user id"        },
-  { "rawsnare.owner_gid",  &t_int,      "owner group id"       },
+  { "rawsnare.owner_uid",  &t_uint,      "owner user id"        },
+  { "rawsnare.owner_gid",  &t_uint,      "owner group id"       },
   { "rawsnare.target_id",  &t_int,      "caller user/group id" },
   { "rawsnare.target_rid", &t_int,      "real user/group id"   },
   { "rawsnare.target_sid", &t_int,      "saved user/group id"  },

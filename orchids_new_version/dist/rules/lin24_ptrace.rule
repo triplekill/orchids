@@ -89,7 +89,7 @@ rule ptrace
     print("Preliminary report :");
 
     $str = "ssh root@10.0.0.100 'echo You have been kicked by OrchIDS... | write user ; kill -9 $(ps -u " +
-           str_from_int($attacker_uid) +
+           str_from_uint($attacker_uid) +
            " -o pid= | xargs) ; chsh -s /sbin/nologin user ' >/dev/null 2>/dev/null &";
     /* system($str); */
     dump_dot_pathtree();
