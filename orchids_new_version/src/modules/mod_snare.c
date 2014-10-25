@@ -126,11 +126,13 @@ static char *snare_deps[] = {
 input_module_t mod_snare = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "snare",
   "CeCILL2",
   snare_deps,
   NULL,
   snare_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

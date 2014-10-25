@@ -479,11 +479,13 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
 input_module_t mod_xml = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "xml",
   "CeCILL2",
   NULL,
   NULL,
   mod_xml_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

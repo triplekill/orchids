@@ -138,11 +138,13 @@ static void *prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)
 input_module_t mod_prism2 = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "prism2",
   NULL,
   NULL,
   NULL,
   prism2_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

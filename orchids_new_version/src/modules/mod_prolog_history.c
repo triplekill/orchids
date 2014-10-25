@@ -222,6 +222,7 @@ static char *prolog_history_deps[] = {
 input_module_t mod_prolog_history = {
   MOD_MAGIC,		            /* Magic number */
   ORCHIDS_VERSION,		    /* Module version */
+  0,			    /* flags */
   "prolog_history",                  /* module name */
   "CeCILL2",                        /* module license */
   prolog_history_deps,              /* module dependencies */
@@ -230,6 +231,7 @@ input_module_t mod_prolog_history = {
   prolog_history_preconfig,         /* called just after module registration */
   prolog_history_postconfig,        /* called after all mods preconfig,
                                        and after all module configuration*/
+  NULL,
   NULL,
   NULL
 };

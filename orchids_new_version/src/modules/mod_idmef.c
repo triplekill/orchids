@@ -614,6 +614,7 @@ static char *idmef_deps[] = {
 input_module_t mod_idmef = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "idmef",
   "CeCILL2",
   idmef_deps,
@@ -621,7 +622,8 @@ input_module_t mod_idmef = {
   idmef_preconfig,
   idmef_postconfig,
   NULL,
-  idmef_dissect
+  idmef_dissect,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 /*

@@ -623,6 +623,7 @@ static char *rawsnare_deps[] = {
 input_module_t mod_rawsnare = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "rawsnare",
   "CeCILL2",
   rawsnare_deps,
@@ -630,7 +631,8 @@ input_module_t mod_rawsnare = {
   rawsnare_preconfig,
   NULL,
   NULL,
-  rawsnare_dissect
+  rawsnare_dissect,
+  &t_bstr		    /* type of fields it expects to dissect */
 };
 
 #if 0

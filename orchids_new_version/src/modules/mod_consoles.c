@@ -250,6 +250,7 @@ static mod_cfg_cmd_t cons_dir[] =
 input_module_t mod_consoles = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "consoles",
   "CeCILL2",
   NULL,
@@ -257,7 +258,8 @@ input_module_t mod_consoles = {
   cons_preconfig,
   NULL, /* cons_postconfig */
   NULL, /* cons_postcompil */
-  NULL /* cons_dissector */
+  NULL, /* cons_dissector */
+  NULL
 };
 
 

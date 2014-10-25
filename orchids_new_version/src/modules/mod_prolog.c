@@ -438,6 +438,7 @@ prolog_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cf
 input_module_t mod_prolog = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "prolog",                 /* module name */
   "CeCILL2",                /* module license */
   NULL,                     /* module dependencies */
@@ -446,6 +447,7 @@ input_module_t mod_prolog = {
   prolog_preconfig,         /* called just after module registration */
   NULL,                     /* called after all mods preconfig,
                                and after all module configuration*/
+  NULL,
   NULL,
   NULL
 };

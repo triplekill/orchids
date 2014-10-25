@@ -47,7 +47,7 @@ input_module_t mod_snmptrap;
 
 /* static long seq_g = 0; */
 
-static int snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   unsigned char *packet;
   size_t packet_len;
@@ -63,7 +63,7 @@ static int snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void
   type = 0;
   ret = 0;
 
-  DebugLog(DF_MOD, DS_TRACE, "snmptrap_dissector()\n");
+  DebugLog(DF_MOD, DS_TRACE, "snmptrap_dissect()\n");
 
   switch (TYPE(e))
     {
@@ -223,7 +223,7 @@ snmptrap_preconfig(orchids_t *ctx, mod_entry_t *mod)
   port = Xzmalloc(ctx->gc_ctx, sizeof (int));
   *port = 162;
   register_conditional_dissector(ctx, mod, "udp", (void *)port, sizeof (int),
-                                 snmptrap_dissector, NULL);
+                                 snmptrap_dissect, NULL);
 
   register_fields(ctx, mod, snmptrap_fields, SNMPTRAP_FIELDS);
 
@@ -303,7 +303,8 @@ input_module_t mod_snmptrap = {
   snmptrap_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
   NULL,
-  snmptrap_dissector
+  snmptrap_dissect,
+  &t_bstr		    /* type of fields it expects to dissect */
 };
 
 #endif /* HAVE_SNMP */

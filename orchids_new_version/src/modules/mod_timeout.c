@@ -159,11 +159,13 @@ static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
 input_module_t mod_timeout = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "timeout",
   "CeCILL2",
   NULL,
   NULL,
   timeout_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

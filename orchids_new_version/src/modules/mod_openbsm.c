@@ -1315,6 +1315,7 @@ static void *openbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 input_module_t mod_openbsm = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "openbsm",
   "CeCILL2",
   NULL,
@@ -1322,7 +1323,8 @@ input_module_t mod_openbsm = {
   openbsm_preconfig,
   NULL,
   NULL,
-  openbsm_dissect
+  openbsm_dissect,
+  &t_bstr		    /* type of fields it expects to dissect */
 };
 
 /*

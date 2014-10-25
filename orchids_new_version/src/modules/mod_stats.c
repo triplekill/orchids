@@ -55,10 +55,12 @@ static mod_cfg_cmd_t stats_dir[] = {
 input_module_t mod_remoteadm = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "stats",
   "CeCILL2",
   NULL,
   stats_dir,
+  NULL,
   NULL,
   NULL,
   NULL,

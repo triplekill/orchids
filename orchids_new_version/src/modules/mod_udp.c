@@ -155,11 +155,13 @@ static mod_cfg_cmd_t udp_dir[] = {
 input_module_t mod_udp = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "udp",
   "CeCILL2",
   NULL,
   udp_dir,
   udp_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

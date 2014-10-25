@@ -487,11 +487,13 @@ static mod_cfg_cmd_t wifi_dir[] =
 input_module_t mod_wifi = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "wifi",
   NULL,
   NULL,
   wifi_dir,
   wifi_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

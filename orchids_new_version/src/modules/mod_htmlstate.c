@@ -120,12 +120,14 @@ static mod_cfg_cmd_t htmlstate_dir[] =
 input_module_t mod_htmlstate = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "htmlstate",
   "CeCILL2",
   NULL,
   htmlstate_dir,
   htmlstate_preconfig,
   htmlstate_postconfig,
+  NULL,
   NULL,
   NULL
 };

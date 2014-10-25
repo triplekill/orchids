@@ -376,12 +376,14 @@ static mod_cfg_cmd_t ruletrace_config_commands[] =
 input_module_t mod_ruletrace = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "ruletrace",
   "CeCILL2",
   NULL,
   ruletrace_config_commands,
   ruletrace_preconfig,
   ruletrace_postconfig,
+  NULL,
   NULL,
   NULL
 };

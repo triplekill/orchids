@@ -398,7 +398,7 @@ read_record(const char *file)
 #endif
 
 
-static int win32evt_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int win32evt_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   DebugLog(DF_MOD, DS_TRACE, "win32evt_dissector()\n");
 
@@ -463,6 +463,7 @@ static mod_cfg_cmd_t win32evt_config_commands[] = {
 input_module_t mod_win32evt = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  MODULE_DISSECTABLE,       /* flags */
   "win32evt",               /* module name */
   "CeCILL2",                /* module license */
   NULL,                     /* module dependencies */
@@ -472,7 +473,8 @@ input_module_t mod_win32evt = {
   win32evt_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
   win32evt_postcompil,
-  win32evt_dissector
+  win32evt_dissect,
+  &t_bstr		    /* type of fields it expects to dissect */
 };
 
 

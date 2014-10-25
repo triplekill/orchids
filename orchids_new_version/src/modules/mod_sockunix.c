@@ -167,11 +167,13 @@ static mod_cfg_cmd_t sockunix_dir[] =
 input_module_t mod_sockunix = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "sockunix",
   "CeCILL2",
   NULL,
   sockunix_dir,
   sockunix_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

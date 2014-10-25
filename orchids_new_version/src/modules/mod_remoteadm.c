@@ -503,12 +503,14 @@ static mod_cfg_cmd_t radm_dir[] = {
 input_module_t mod_remoteadm = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "remoteadm",
   "CeCILL2",
   NULL,
   radm_dir,
   radm_preconfig,
   radm_postconfig,
+  NULL,
   NULL,
   NULL
 };

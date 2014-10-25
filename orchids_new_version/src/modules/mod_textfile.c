@@ -622,6 +622,7 @@ static mod_cfg_cmd_t textfile_dir[] =
 input_module_t mod_textfile = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "textfile",
   "CeCILL2",
   NULL,
@@ -629,6 +630,7 @@ input_module_t mod_textfile = {
   textfile_preconfig,
   textfile_postconfig,
   textfile_postcompil,
+  NULL,
   NULL
 };
 

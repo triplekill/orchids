@@ -176,6 +176,7 @@ static mod_cfg_cmd_t period_config_commands[] =
 input_module_t mod_period = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "period",                 /* module name */
   "CeCILL2",                /* module license */
   NULL               ,      /* module dependencies */
@@ -185,6 +186,7 @@ input_module_t mod_period = {
   period_postconfig,        /* called after all mods preconfig,
                                and after all module configuration*/
   period_postcompil,
+  NULL,
   NULL
 };
 

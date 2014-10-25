@@ -201,6 +201,7 @@ static char *netfilter_deps[] = {
 input_module_t mod_netfilter = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "netfilter",
   "CeCILL2",
   netfilter_deps,
@@ -208,7 +209,8 @@ input_module_t mod_netfilter = {
   netfilter_preconfig,
   netfilter_postconfig,
   NULL,
-  netfilter_dissect
+  netfilter_dissect,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 

@@ -91,6 +91,7 @@ cisco_postcompil(orchids_t *ctx, mod_entry_t *mod)
 input_module_t mod_cisco = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "cisco",                  /* module name */
   "CeCILL2",                /* module license */
   NULL,                     /* module dependencies */
@@ -100,7 +101,8 @@ input_module_t mod_cisco = {
   cisco_postconfig,         /* called after all mods preconfig,
                                and after all module configuration*/
   cisco_postcompil,
-  cisco_dissector
+  cisco_dissector,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 

@@ -355,6 +355,7 @@ static char *syslog_deps[] = {
 input_module_t mod_syslog = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "syslog",
   "CeCILL2",
   NULL,
@@ -362,7 +363,8 @@ input_module_t mod_syslog = {
   syslog_preconfig,
   NULL,
   NULL,
-  syslog_dissect
+  syslog_dissect,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 

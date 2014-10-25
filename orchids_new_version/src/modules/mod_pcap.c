@@ -212,11 +212,13 @@ static mod_cfg_cmd_t pcap_dir[] =
 input_module_t mod_pcap = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  MODULE_DISSECTABLE,
   "pcap",
   NULL,
   NULL,
   pcap_dir,
   pcap_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

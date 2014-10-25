@@ -41,7 +41,7 @@ struct sunbsm_config_s
   int some_option;
 };
 
-static int sunbsm_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int sunbsm_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
 {
   DebugLog(DF_MOD, DS_TRACE, "sunbsm_dissector()\n");
 
@@ -73,7 +73,7 @@ sunbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* hard coded callback registration.
   ** optionnal goes in config directives */
-  //register_dissector(ctx, mod, "parent", sunbsm_dissector, NULL);
+  //register_dissector(ctx, mod, "parent", sunbsm_dissect, NULL);
   //register_conditional_dissector(ctx, mod, "parent", (void *)"messages", 8,
   //                               dissect_syslog, NULL);
 
@@ -83,7 +83,7 @@ sunbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   do {
     dissect_t dummy;
-    dummy = sunbsm_dissector;
+    dummy = sunbsm_dissect;
   } while (0);
 
   return (cfg);
@@ -138,6 +138,7 @@ static char *sunbsm_dependencies[] = {
 input_module_t mod_sunbsm = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "sunbsm",                 /* module name */
   "CeCILL2",                /* module license */
   sunbsm_dependencies,      /* module dependencies */
@@ -147,7 +148,8 @@ input_module_t mod_sunbsm = {
   sunbsm_postconfig,         /* called after all mods preconfig,
                                and after all module configuration*/
   sunbsm_postcompil,
-  sunbsm_dissector
+  sunbsm_dissect,
+  &t_bstr		    /* type of fields it expects to dissect */
 };
 
 

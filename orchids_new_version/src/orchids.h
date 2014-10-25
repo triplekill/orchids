@@ -1323,6 +1323,14 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
 /**   @var input_module_s::version
  **     Version of Orchids. See ORCHIDS_VERSION.
  **/
+/**   @var input_module_s::flags
+ **     Input module flags
+ **     only MODULE_DISSECTABLE provided for now, means
+ **     that the last two fields defined by the module
+ **     are: (next-to-last) a string, used as a key for
+ **     conditional dissection; (last) a string, uint, int,
+ **     ipv4, or ipv6 field to be dissected.
+ **/
 /**   @var input_module_s::name
  **     Module name.
  **/
@@ -1350,10 +1358,18 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **     Function to be executed after the rule compilation.
  **     This field may be NULL if there is nothing to execute.
  **/
+/**   @var input_module_s::dissect_fun
+ **     Dissection function for module; can be NULL if no dissector
+ **/
+/**   @var input_module_s::dissect_type
+ **     Expected input type for dissection function
+ **/
 struct input_module_s
 {
   uint32_t               magic;
   uint32_t               version;
+  uint32_t               flags;
+#define MODULE_DISSECTABLE 0x1
   char                  *name;
   char                  *license;
   char                 **dependencies;
@@ -1362,6 +1378,7 @@ struct input_module_s
   post_config_t          post_config;
   post_compil_t          post_compil;
   dissect_t		 dissect_fun;
+  type_t                *dissect_type;
 };
 
 

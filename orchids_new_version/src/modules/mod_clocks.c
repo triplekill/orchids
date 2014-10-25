@@ -407,11 +407,13 @@ static mod_cfg_cmd_t clocks_config_commands[] =
 input_module_t mod_clocks = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "clocks",
   "CeCILL2",
   NULL,
   clocks_config_commands,
   clocks_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL

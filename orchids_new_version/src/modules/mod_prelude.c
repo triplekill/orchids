@@ -721,12 +721,14 @@ static mod_cfg_cmd_t prelude_dir[] =
 input_module_t mod_prelude = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "prelude",
   "CeCILL2",
   NULL,
   prelude_dir,
   mod_prelude_preconfig,
   mod_prelude_postconfig,
+  NULL,
   NULL,
   NULL
 };

@@ -538,6 +538,7 @@ static mod_cfg_cmd_t generic_config_commands[] =
 input_module_t mod_generic = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "generic",
   "CeCILL2",
   NULL,
@@ -545,7 +546,8 @@ input_module_t mod_generic = {
   generic_preconfig,
   generic_postconfig,
   NULL,
-  generic_dissect
+  generic_dissect,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 

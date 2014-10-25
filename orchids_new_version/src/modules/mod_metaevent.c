@@ -312,6 +312,7 @@ static mod_cfg_cmd_t metaevent_cfgcmds[] = {
 input_module_t mod_metaevent = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "metaevent",		    /* module name */
   "CeCILL2",                /* module license */
   NULL,			    /* module dependencies */
@@ -321,6 +322,7 @@ input_module_t mod_metaevent = {
   metaevent_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
   metaevent_postcompil,
+  NULL,
   NULL
 };
 

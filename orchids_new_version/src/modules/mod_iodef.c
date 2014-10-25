@@ -657,11 +657,13 @@ static mod_cfg_cmd_t iodef_dir[] =
 input_module_t mod_iodef = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
+  0,			    /* flags */
   "iodef",
   "CeCILL2",
   NULL,
   iodef_dir,
   iodef_preconfig,
+  NULL,
   NULL,
   NULL,
   NULL
