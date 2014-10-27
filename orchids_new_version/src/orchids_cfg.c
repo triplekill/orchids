@@ -448,7 +448,7 @@ static int proceed_includes(gc_t *gc_ctx,
   DebugLog(DF_CORE, DS_DEBUG, "Include config file pattern '%s'\n", pattern);
 
   ret = glob(pattern, 0, NULL, &globbuf);
-gc_check(gc_ctx);
+  //gc_check(gc_ctx);
   if (ret)
     {
       if (ret == GLOB_NOMATCH)
@@ -915,10 +915,8 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   i = 0;
   while (builtin_mods[i] && strcmp(builtin_mods[i]->name, dir->args) )
     ++i;
-  if (builtin_mods[i])
-    {
-      add_module(ctx, builtin_mods[i]);
-    }
+  if (builtin_mods[i] && add_module(ctx, builtin_mods[i]) >= 0)
+    ;
   else
     {
       DebugLog(DF_CORE, DS_FATAL, "module %s not found.\n", dir->args);
@@ -1142,13 +1140,7 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
   char	*mod_source_name;
   char	*mod_dissect_name;
   char	*cond_param_str;
-  mod_entry_t *m_source;
   mod_entry_t *m_dissect;
-  void	*cond_param;
-  int	cond_param_size;
-  void	*dissect_func;
-  type_t *given_type;
-  char *tname;
 
   mod_dissect_name = dir->args;
   while (*dir->args!=0 && !isblank(*dir->args))
@@ -1170,84 +1162,76 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
 
   if (*mod_dissect_name==0 || *mod_source_name==0 || *cond_param_str==0)
     {
-      fprintf (stderr, "DISSECT %s %s %s: ill-formed directive, requires <dissector-module> <source-module> <condition-name>.\n",
-	       mod_dissect_name, mod_source_name, cond_param_str);
+      fprintf (stderr, "%s:%u: ill-formed DISSECT directive, requires <dissector-module> <source-module> <condition-name>.\n",
+	       dir->file, dir->line);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : ill-formed directive \n");
-      return;
+      exit(EXIT_FAILURE);
     }
 
+  /*
   if ((m_source = find_module_entry(ctx, mod_source_name)) == NULL)
     {
-      fprintf (stderr, "DISSECT %s %s %s: unknown source module %s.\n",
-	       mod_dissect_name, mod_source_name, cond_param_str,
-	       mod_source_name);
+      fprintf (stderr, "%s:%u: unknown source module %s in DISSECT directive.\n",
+	       dir->file, dir->line, mod_source_name);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : unknown module %s\n", mod_source_name);
-      return;
+      exit(EXIT_FAILURE);
     }
+  */
 
   if ((m_dissect = find_module_entry(ctx, mod_dissect_name)) == NULL)
     {
-      fprintf (stderr, "DISSECT %s %s %s: unknown dissection module %s.\n",
-	       mod_dissect_name, mod_source_name, cond_param_str,
+      fprintf (stderr, "%s:%u: unknown dissection module %s.\n",
+	       dir->file, dir->line,
 	       mod_dissect_name);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : unknown module %s\n", mod_dissect_name);
-      return;
+      exit(EXIT_FAILURE);
     }
-  if ((m_source->flags & MODULE_DISSECTABLE)==0)
+  /*
+    if ((m_source->mod->flags & MODULE_DISSECTABLE)==0)
     {
-      fprintf (stderr, "DISSECT %s %s %s: source module %s is not dissectable.\n",
-	       mod_dissect_name, mod_source_name, cond_param_str,
+      fprintf (stderr, "%s:%u: source module %s is not dissectable.\n",
+	       dir->file, dir->line,
 	       mod_source_name);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : source module %s not dissectable",
-	       mod_source_name);
-      return;
+      exit(EXIT_FAILURE);
     }
-  dissect_func = m_dissect->dissect_fun;
-  if (dissect_func==NULL)
+  */
+  /*
+  dissect_func = m_dissect->mod->dissect_fun;
+  if (dissect_func==NULL || m_source->num_fields < 2)
     {
-      fprintf (stderr, "DISSECT %s %s %s: module %s is not a dissection module.\n",
-	       mod_dissect_name, mod_source_name, cond_param_str,
+      fprintf (stderr, "%s:%u: module %s is not a dissection module.\n",
+	       dir->file, dir->line,
 	       mod_dissect_name);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : %s not a dissection module",
-	       mod_dissect_name);
-      return;
+      exit(EXIT_FAILURE);
     }
-
+  */
+#if 0
   given_type = ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type;
   switch ((int)(unsigned int)(given_type->tag))
     {
     case T_STR:
     case T_VSTR: // subsumed by T_STR, actually
       tname = "str";
-      if (m_dissect->type==NULL || strcmp(m_dissect->type->name, tname))
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
 	{
 	type_error:
-	  fprintf (stderr, "DISSECT %s %s %s: source module %s provides a %s, but dissection module %s requires a %s.\n",
-		   mod_dissect_name, mod_source_name, cond_param_str,
+	  fprintf (stderr, "%s:%u: source module %s provides a %s, but dissection module %s requires a %s.\n",
+		   dir->file, dir->line,
 		   mod_source_name, given_type->name,
 		   mod_dissect_name, tname);
 	  fflush (stderr);
-	  DebugLog(DF_CORE, DS_ERROR,
-		   "DISSECT %s %s %s: type error",
-		   mod_dissect_name, mod_source_name, cond_param_str);
-	  return;
+	  exit(EXIT_FAILURE);
 	}
       cond_param = cond_param_str;
       cond_param_size = strlen(cond_param_str);
       break;
     case T_UINT:
       tname = "uint";
-      if (m_dissect->type==NULL || strcmp(m_dissect->type->name, tname))
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (unsigned long));
       *(unsigned long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
@@ -1255,7 +1239,8 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       break;
     case T_INT:
       tname = "int";
-      if (m_dissect->type==NULL || strcmp(m_dissect->type->name, tname))
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (long));
       *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
@@ -1263,43 +1248,50 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       break;
     case T_IPV4:
       tname = "ipv4";
-      if (m_dissect->type==NULL || strcmp(m_dissect->type->name, tname))
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
-      if(inet_pton(AF_INET, cond_param_str, cond_param) != 1)
-      {
-	DebugLog(DF_CORE, DS_ERROR,
-		"Cannot convert string %s into struct in_addr\n", cond_param_str);
-      }
+      if (inet_pton (AF_INET, cond_param_str, cond_param) != 1)
+	{
+	  fprintf (stderr,
+		   "DISSECT %s %s %s: cannot read %s as ipv4 address.\n",
+		   mod_dissect_name, mod_source_name, cond_param_str,
+		   cond_param_str);
+	  fflush (stderr);
+	  exit(EXIT_FAILURE);
+	}
       cond_param_size = sizeof (in_addr_t);
       break;
     case T_IPV6:
       tname = "ipv6";
-      if (m_dissect->type==NULL || strcmp(m_dissect->type->name, tname))
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (struct in6_addr));
       /* inet_addr is not IPv6 aware. Use inet_pton instead */
-      if(inet_pton(AF_INET6, cond_param_str, cond_param) != 1)
-      {
-	DebugLog(DF_CORE, DS_ERROR,
-		"Cannot convert string %s into struct in6_addr\n", cond_param_str);
-      }
+      if (inet_pton (AF_INET6, cond_param_str, cond_param) != 1)
+	{
+	  fprintf (stderr,
+		   "DISSECT %s %s %s: cannot read %s as ipv6 address.\n",
+		   mod_dissect_name, mod_source_name, cond_param_str,
+		   cond_param_str);
+	  fflush (stderr);
+	  exit(EXIT_FAILURE);
+	}
       cond_param_size = sizeof (struct in6_addr);
       break;
     default:
-      fprintf (stderr, "DISSECT %s %s %s: source module %s provides non-dissectable type %s.\n",
-		   mod_dissect_name, mod_source_name, cond_param_str,
+      fprintf (stderr, "%s:%u: source module %s provides non-dissectable type %s.\n",
+		   dir->file, dir->line,
 		   mod_source_name, given_type->name);
       fflush (stderr);
-      DebugLog(DF_CORE, DS_ERROR,
-	       "DISSECT : cannot dissect type %i \n",
-	       given_type->name);
-      return;
+      exit(EXIT_FAILURE);
   }
-
+#endif
   register_conditional_dissector(ctx, m_dissect, mod_source_name,
-				 cond_param, cond_param_size,
-				 dissect_func, NULL);
+				 cond_param_str, strlen(cond_param_str),
+				 NULL, dir->file, dir->line);
 }
 
 static mod_cfg_cmd_t config_dir_g[] =

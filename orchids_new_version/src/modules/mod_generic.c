@@ -276,6 +276,8 @@ static void generic_postconfig(orchids_t *ctx, mod_entry_t *mod)
 
       /* add modules */
       vmod->mod_id = add_module(ctx, &vmod->mod_entry, NULL);
+      if (vmod->mod_id < 0)
+	exit (EXIT_FAILURE);
 
       /* register fields */
       register_fields(ctx,
@@ -290,9 +292,9 @@ static void generic_postconfig(orchids_t *ctx, mod_entry_t *mod)
     {
       DebugLog(DF_MOD, DS_DEBUG, "Registering hook: module=%s condition=%s\n", 
 	       hook->module, hook->condition);
-      register_conditional_dissector(ctx, mod, hook->module, hook->condition,
-				     strlen(hook->condition),
-				     generic_dissect, hook);
+      register_conditional_dissector(ctx, mod, hook->module,
+				     hook->condition, strlen(hook->condition),
+				     hook, hook->file, hook->line);
     }
 
   return;
@@ -431,6 +433,7 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
       vmod->mod_id = 0; /* temporary */
       vmod->mod_entry.magic = MOD_MAGIC;
       vmod->mod_entry.version = ORCHIDS_VERSION;
+      vmod->mod_entry.flags = MODULE_DISSECTABLE;
       vmod->mod_entry.license = mod_generic.license;
       vmod->mod_entry.name = vmod->name;
       vmod->mod_entry.dependencies = NULL;
@@ -438,6 +441,8 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
       vmod->mod_entry.pre_config = NULL;
       vmod->mod_entry.post_config = NULL;
       vmod->mod_entry.post_compil = NULL;
+      vmod->mod_entry.dissect_fun = generic_dissect;
+      vmod->mod_entry.dissect_type = &t_str;
       vmod->nfields = 0;
       vmod->field_array = NULL;
       vmod->field_hash = new_strhash(ctx->gc_ctx, 257);
@@ -447,9 +452,8 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
 
       if (find_module(ctx, vmod->name) != NULL)
 	{
-	  DebugLog(DF_MOD, DS_DEBUG,
-		   "warning! module [%s] already loaded...\n",
-		   vmod->name);
+	  fprintf (stderr, "%s %d: module %s already exists.\n",
+		   vmod_dir->file, vmod_dir->line, mod_name);
 	  exit(EXIT_FAILURE);
 	}
 
@@ -501,13 +505,16 @@ static void generic_add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_
   sscanf(dir->args, "%64s \"%256[^\"]\"", mod_buf, mod_cond);
   h->module = gc_strdup(ctx->gc_ctx, mod_buf);
   h->condition = gc_strdup(ctx->gc_ctx, mod_cond);
+  h->file = dir->file;
+  h->line = dir->line;
 
   for (vmod_dir = dir->first_child; vmod_dir!=NULL; vmod_dir = vmod_dir->next)
     {
       if (strcmp(vmod_dir->directive, "<vmod"))
 	{
 	  fprintf(stderr,
-		  "bad directive ('%s' instead of '<vmod')\n", 
+		  "%s:%u: bad directive ('%s' instead of '<vmod')\n",
+		  vmod_dir->file, vmod_dir->line,
 		  vmod_dir->directive);
 	  exit(EXIT_FAILURE);
 	}

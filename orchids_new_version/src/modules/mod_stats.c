@@ -52,7 +52,7 @@ static mod_cfg_cmd_t stats_dir[] = {
   { NULL, NULL }
 };
 
-input_module_t mod_remoteadm = {
+input_module_t mod_stats = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
   0,			    /* flags */

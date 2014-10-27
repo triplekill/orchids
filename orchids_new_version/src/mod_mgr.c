@@ -61,8 +61,8 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
   //gc_check(ctx->gc_ctx);
   if (mod == NULL)
     {
-      DebugLog(DF_CORE, DS_FATAL,
-	       "error: dlsym(%s): %s\n", mod_fname, dlerror());
+      fprintf (stderr, "Cannot load module %s: dlsym failed: %s.\n",
+	       mod_fname, dlerror());
       return NULL;
     }
 
@@ -71,7 +71,8 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
 	   "module [%s] successfully loaded: symbol mod_%s found at %x\n",
 	   name, name, mod);
 
-  add_module(ctx, mod, mod_handle);
+  if (add_module(ctx, mod, mod_handle) < 0)
+    return NULL;
 
   return mod;
 }
@@ -82,18 +83,28 @@ int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
   void *mod_cfg;
 
   //gc_check(ctx->gc_ctx);
-  if (ctx->loaded_modules >= MAX_MODULES)
-    {
-      fprintf(stderr, "module limit reached.\n");
-      exit(EXIT_FAILURE);
-    }
 
   /* 0 - check module info */
-  if ((mod->magic != MOD_MAGIC) ||
-      (mod->version != ORCHIDS_VERSION) ||
-      (mod->name == NULL))
+  if (mod->name==NULL)
     {
-      DPRINTF( ("Unable to load module...\n") );
+      fprintf (stderr, "Unable to load module: NULL name.\n");
+      return -1;
+    }
+  if (ctx->loaded_modules >= MAX_MODULES)
+    {
+      fprintf(stderr, "Unable to load module %s: too many modules (limit=%d).\n",
+	      mod->name, MAX_MODULES);
+      return -1;
+    }
+  if (mod->magic != MOD_MAGIC)
+    {
+      fprintf (stderr, "Unable to load module %s: bad magic.\n", mod->name);
+      return -1;
+    }
+  if (mod->version != ORCHIDS_VERSION)
+    {
+      fprintf (stderr, "Unable to load module %s: bad version number %d (Orchids version=%d).\n",
+	       mod->name, mod->version, ORCHIDS_VERSION);
       return -1;
     }
 
@@ -101,7 +112,8 @@ int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
   /* 1 - Check if already registered */
   if (find_module(ctx, mod->name) != NULL)
     {
-      DPRINTF( ("warning! module [%s] already loaded...\n", mod->name) );
+      fprintf (stderr, "Unable to load module %s: already exists.\n",
+	       mod->name);
       return -1;
     }
 
@@ -114,9 +126,8 @@ int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
       for (d = mod->dependencies; *d!=NULL; d++)
 	if (find_module(ctx, *d) == NULL)
 	  {
-	    DPRINTF( ("failed module dependencie '%s' for module '%s'\n",
-		      *d, mod->name) );
-	    exit(EXIT_FAILURE); /* XXX: Keep This ??? */
+	    fprintf (stderr, "Unable to load module %s: depends on module %s, which is not loaded.\n",
+		     mod->name, *d);
 	    return -1;
 	  }
     }

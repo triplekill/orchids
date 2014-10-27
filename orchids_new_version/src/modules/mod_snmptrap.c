@@ -222,8 +222,9 @@ snmptrap_preconfig(orchids_t *ctx, mod_entry_t *mod)
   ** optional goes in config directives */
   port = Xzmalloc(ctx->gc_ctx, sizeof (int));
   *port = 162;
-  register_conditional_dissector(ctx, mod, "udp", (void *)port, sizeof (int),
-                                 snmptrap_dissect, NULL);
+  register_conditional_dissector(ctx, mod, "udp",
+				 (void *)port, sizeof (int),
+                                 NULL, "snmptrap(no file)", 0);
 
   register_fields(ctx, mod, snmptrap_fields, SNMPTRAP_FIELDS);
 

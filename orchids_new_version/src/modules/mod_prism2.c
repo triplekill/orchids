@@ -48,8 +48,7 @@
 
 input_module_t mod_prism2;
 
-static int
-prism2_callback(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
 {
   u_int8_t *packet;
   size_t packet_len;
@@ -130,7 +129,7 @@ static void *prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)
   *dl = pcap_datalink_name_to_val("PRISM_HEADER");
   register_conditional_dissector(ctx, mod, "pcap",
                                  (void *)dl, sizeof (int),
-                                 prism2_callback, NULL);
+                                 NULL, "prism2(no file)", 0);
 
   return NULL;
 }
@@ -146,8 +145,8 @@ input_module_t mod_prism2 = {
   prism2_preconfig,
   NULL,
   NULL,
-  NULL,
-  NULL
+  prism2_dissect,
+  &t_bstr
 };
 
 /*

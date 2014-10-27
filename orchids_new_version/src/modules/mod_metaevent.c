@@ -157,6 +157,8 @@ static void metaevent_postconfig(orchids_t *ctx, mod_entry_t *mod)
 
       /* add modules */
       vmod->mod_id = add_module(ctx, &vmod->mod_entry, NULL);
+      if (vmod->mod_id < 0)
+	exit (EXIT_FAILURE);
       DebugLog(DF_MOD, DS_DEBUG, "*** adding mod [%s] %i\n",
 	       vmod->name, vmod->nfields);
       /* register fields */
@@ -262,6 +264,7 @@ static void add_vmod(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       vmod->mod_id = 0;
       vmod->mod_entry.magic = MOD_MAGIC;
       vmod->mod_entry.version = ORCHIDS_VERSION;
+      vmod->mod_entry.flags = MODULE_DISSECTABLE; /* why not? */
       vmod->mod_entry.name = vmod->name;
       vmod->mod_entry.license = mod_metaevent.license;
       vmod->mod_entry.dependencies = NULL;
@@ -269,6 +272,8 @@ static void add_vmod(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       vmod->mod_entry.pre_config = NULL;
       vmod->mod_entry.post_config = NULL;
       vmod->mod_entry.post_compil = NULL;
+      vmod->mod_entry.dissect_fun = NULL;
+      vmod->mod_entry.dissect_type = NULL;
       vmod->field_array = NULL;
       vmod->nfields = 0;
       vmod->fields = NULL;

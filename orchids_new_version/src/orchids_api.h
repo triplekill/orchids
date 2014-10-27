@@ -208,19 +208,20 @@ register_dissector(orchids_t *ctx,
  ** @param mod             The caller module registering the
  **                        conditional dissector.
  ** @param parent_modname  The module to hook.
- ** @param key             The key value to trig the dissector.
- ** @param keylen          The length of the key.
- ** @param dissect         The sub-dissector to register.
+ ** @param cond_param_str  The key value to trig the dissector.
+ ** @param cond_param_size in case cond_param_str is a binary string, its length
  ** @param data            Data passed to the dissector.
+ ** @param file            File name, for error reporting
+ ** @param line            Line number, for error reporting
  **/
-void
-register_conditional_dissector(orchids_t *ctx,
-                               mod_entry_t *mod,
-                               char *parent_modname,
-                               void *key,
-                               size_t keylen,
-                               dissect_t dissect,
-                               void *data);
+void register_conditional_dissector(orchids_t *ctx,
+				    mod_entry_t *mod,
+				    char *parent_modname,
+				    char *cond_param_str,
+				    int cond_param_size, /*in case cond_param_str is a bstr */
+				    void *data,
+				    const char *file,
+				    uint32_t line);
 
 
 /**

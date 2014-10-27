@@ -68,6 +68,8 @@ struct generic_hook_s
   STAILQ_HEAD(vmods, generic_vmod_t) vmod_list;
   char *module;
   char *condition;
+  char *file;
+  uint32_t line;
 };
 
 

@@ -28,6 +28,8 @@
 #include <sys/utsname.h>
 #include <sys/select.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <fcntl.h>
 #include <errno.h>
@@ -384,46 +386,192 @@ void register_dissector(orchids_t *ctx,
 }
 
 
-void
-register_conditional_dissector(orchids_t *ctx,
-                               mod_entry_t *mod,
-                               char *parent_modname,
-                               void *key,
-                               size_t keylen,
-                               dissect_t dissect,
-                               void *data)
+void register_conditional_dissector(orchids_t *ctx,
+				    mod_entry_t *m_dissect,
+				    char *mod_source_name,
+				    /*void *key,*/
+				    /*size_t keylen,*/
+				    /*dissect_t dissect,*/
+				    char *cond_param_str, /*new*/
+				    int cond_param_size, /*in case cond_param_str is a bstr */
+				    void *data,
+				    const char *file, /*new*/
+				    uint32_t line) /*new*/
 {
-  mod_entry_t *parent_mod;
+  mod_entry_t *m_source;
   conditional_dissector_record_t *cond_dissect;
+  dissect_t dissect_func;
+  type_t *given_type;
+  char *tname;
+  void	*cond_param;
+  char errbuf[32];
 
   DebugLog(DF_CORE, DS_INFO, "register conditional dissector...\n");
 
-  parent_mod = find_module_entry(ctx, parent_modname);
-  if (!parent_mod) {
-    DebugLog(DF_CORE, DS_FATAL,
-             "parent module [%s] not found\n", parent_modname);
-    exit(EXIT_FAILURE);
-  }
+  m_source = find_module_entry(ctx, mod_source_name);
+  if (m_source==NULL)
+    {
+      fprintf (stderr, "%s:%u: unknown source module %s in DISSECT directive.\n",
+	       file, line, mod_source_name);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  if (m_source->dissect!=NULL)
+    {
+      fprintf (stderr, "%s:%u: source module %s already has an unconditional dissector.\n",
+	       file, line,
+	       mod_source_name);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  if ((m_source->mod->flags & MODULE_DISSECTABLE)==0)
+    {
+      fprintf (stderr, "%s:%u: source module %s is not dissectable.\n",
+	       file, line,
+	       mod_source_name);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  dissect_func = m_dissect->mod->dissect_fun;
+  if (dissect_func==NULL || m_source->num_fields < 2)
+    {
+      fprintf (stderr, "%s:%u: module %s is not a dissection module.\n",
+	       file, line,
+	       m_dissect->mod->name);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  given_type = ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type;
+  switch ((int)(unsigned int)(given_type->tag))
+    {
+    case T_STR:
+    case T_VSTR: // subsumed by T_STR, actually
+      tname = "str";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	{
+	type_error:
+	  fprintf (stderr, "%s:%u: source module %s provides a %s, but dissection module %s requires a %s.\n",
+		   file, line,
+		   mod_source_name, given_type->name,
+		   m_dissect->mod->name, tname);
+	  fflush (stderr);
+	  exit(EXIT_FAILURE);
+	}
+      cond_param = cond_param_str;
+      cond_param_size = strlen(cond_param_str);
+      break;
+    case T_BSTR:
+    case T_VBSTR: // subsumed by T_BSTR, actually
+      tname = "bstr";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	goto type_error;
+      cond_param = cond_param_str;
+      /* cond_param_size is given */
+      {
+	char *s;
+	int i, j, len;
 
-  if (parent_mod->dissect) {
-    DebugLog(DF_CORE, DS_FATAL, "unconditional sub dissector present.\n");
-    exit(EXIT_FAILURE);
-  }
+	strcpy (errbuf, "<bstr:");
+	i = strlen(errbuf);
+	s = errbuf+i;
+	for (j=0; j<cond_param_size && i+6 < sizeof(errbuf); j++)
+	  {
+	    len = sprintf (s, "0x%02x", ((char *)cond_param)[j]);
+	    i += len;
+	    s += len;
+	  }
+	if (j<cond_param_size) /* overflow */
+	  {
+	    if (s > errbuf+sizeof(errbuf)-5)
+	      s = errbuf+sizeof(errbuf)-5;
+	    strcpy (s, "...>");
+	  }
+	else strcpy (s, ">");
+	cond_param_str = errbuf; /* for error reporting */
+      }
+      break;
+    case T_UINT:
+      tname = "uint";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	goto type_error;
+      cond_param = Xmalloc (sizeof (unsigned long));
+      *(unsigned long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
+      cond_param_size = sizeof (unsigned long);
+      break;
+    case T_INT:
+      tname = "int";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	goto type_error;
+      cond_param = Xmalloc (sizeof (long));
+      *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
+      cond_param_size = sizeof (long);
+      break;
+    case T_IPV4:
+      tname = "ipv4";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	goto type_error;
+      cond_param = Xmalloc (sizeof (in_addr_t));
+      if (inet_pton (AF_INET, cond_param_str, cond_param) != 1)
+	{
+	  fprintf (stderr,
+		   "%s:%u: cannot read %s as ipv4 address.\n",
+		   file, line,
+		   cond_param_str);
+	  fflush (stderr);
+	  exit(EXIT_FAILURE);
+	}
+      cond_param_size = sizeof (in_addr_t);
+      break;
+    case T_IPV6:
+      tname = "ipv6";
+      if (m_dissect->mod->dissect_type==NULL ||
+	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	goto type_error;
+      cond_param = Xmalloc (sizeof (struct in6_addr));
+      /* inet_addr is not IPv6 aware. Use inet_pton instead */
+      if (inet_pton (AF_INET6, cond_param_str, cond_param) != 1)
+	{
+	  fprintf (stderr,
+		   "%s:%u: cannot read %s as ipv6 address.\n",
+		   file, line,
+		   cond_param_str);
+	  fflush (stderr);
+	  exit(EXIT_FAILURE);
+	}
+      cond_param_size = sizeof (struct in6_addr);
+      break;
+    default:
+      fprintf (stderr, "%s:%u: source module %s provides non-dissectable type %s.\n",
+		   file, line,
+		   mod_source_name, given_type->name);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+      break;
+    }
 
-  if (!parent_mod->sub_dissectors) {
-    /* XXX Hard-coded hash size... */
-    parent_mod->sub_dissectors = new_hash(31);
-  } else if (hash_get(parent_mod->sub_dissectors, key, keylen)) {
-    DebugLog(DF_CORE, DS_FATAL, "another module registered this value.\n");
-    exit(EXIT_FAILURE);
-  }
+  if (m_source->sub_dissectors==NULL)
+    {
+      /* XXX Hard-coded hash size... */
+      m_source->sub_dissectors = new_hash(31);
+    }
+  else if (hash_get(m_source->sub_dissectors, cond_param, cond_param_size))
+    {
+      fprintf (stderr, "%s:%u: dissection module %s already has a subdissector for key %s",
+	       file, line, m_dissect->mod->name, cond_param_str);
+      exit(EXIT_FAILURE);
+    }
 
   cond_dissect = Xmalloc(sizeof (conditional_dissector_record_t));
-  cond_dissect->dissect = dissect;
+  cond_dissect->dissect = dissect_func;
   cond_dissect->data = data;
-  cond_dissect->mod = mod;
+  cond_dissect->mod = m_dissect;
 
-  hash_add(parent_mod->sub_dissectors, cond_dissect, key, keylen);
+  hash_add(m_source->sub_dissectors, cond_dissect, cond_param, cond_param_size);
 }
 
 
