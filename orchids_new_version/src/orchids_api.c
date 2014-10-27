@@ -402,7 +402,6 @@ void register_conditional_dissector(orchids_t *ctx,
   conditional_dissector_record_t *cond_dissect;
   dissect_t dissect_func;
   type_t *given_type;
-  char *tname;
   void	*cond_param;
   char errbuf[32];
 
@@ -446,15 +445,14 @@ void register_conditional_dissector(orchids_t *ctx,
     {
     case T_STR:
     case T_VSTR: // subsumed by T_STR, actually
-      tname = "str";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	{
 	type_error:
 	  fprintf (stderr, "%s:%u: source module %s provides a %s, but dissection module %s requires a %s.\n",
 		   file, line,
 		   mod_source_name, given_type->name,
-		   m_dissect->mod->name, tname);
+		   m_dissect->mod->name, m_dissect->mod->dissect_type->name);
 	  fflush (stderr);
 	  exit(EXIT_FAILURE);
 	}
@@ -463,9 +461,8 @@ void register_conditional_dissector(orchids_t *ctx,
       break;
     case T_BSTR:
     case T_VBSTR: // subsumed by T_BSTR, actually
-      tname = "bstr";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = cond_param_str;
       /* cond_param_size is given */
@@ -493,27 +490,24 @@ void register_conditional_dissector(orchids_t *ctx,
       }
       break;
     case T_UINT:
-      tname = "uint";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = Xmalloc (sizeof (unsigned long));
       *(unsigned long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (unsigned long);
       break;
     case T_INT:
-      tname = "int";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = Xmalloc (sizeof (long));
       *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (long);
       break;
     case T_IPV4:
-      tname = "ipv4";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = Xmalloc (sizeof (in_addr_t));
       if (inet_pton (AF_INET, cond_param_str, cond_param) != 1)
@@ -528,9 +522,8 @@ void register_conditional_dissector(orchids_t *ctx,
       cond_param_size = sizeof (in_addr_t);
       break;
     case T_IPV6:
-      tname = "ipv6";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = Xmalloc (sizeof (struct in6_addr));
       /* inet_addr is not IPv6 aware. Use inet_pton instead */
