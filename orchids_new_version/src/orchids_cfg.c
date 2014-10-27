@@ -1213,15 +1213,14 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
     {
     case T_STR:
     case T_VSTR: // subsumed by T_STR, actually
-      tname = "str";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	{
 	type_error:
 	  fprintf (stderr, "%s:%u: source module %s provides a %s, but dissection module %s requires a %s.\n",
 		   dir->file, dir->line,
 		   mod_source_name, given_type->name,
-		   mod_dissect_name, tname);
+		   mod_dissect_name, m_dissect->mod->dissect_type->name);
 	  fflush (stderr);
 	  exit(EXIT_FAILURE);
 	}
@@ -1229,27 +1228,24 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       cond_param_size = strlen(cond_param_str);
       break;
     case T_UINT:
-      tname = "uint";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (unsigned long));
       *(unsigned long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (unsigned long);
       break;
     case T_INT:
-      tname = "int";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (long));
       *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (long);
       break;
     case T_IPV4:
-      tname = "ipv4";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
       if (inet_pton (AF_INET, cond_param_str, cond_param) != 1)
@@ -1264,9 +1260,8 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       cond_param_size = sizeof (in_addr_t);
       break;
     case T_IPV6:
-      tname = "ipv6";
       if (m_dissect->mod->dissect_type==NULL ||
-	  strcmp(m_dissect->mod->dissect_type->name, tname))
+	  strcmp(m_dissect->mod->dissect_type->name, given_type->name))
 	goto type_error;
       cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (struct in6_addr));
       /* inet_addr is not IPv6 aware. Use inet_pton instead */
