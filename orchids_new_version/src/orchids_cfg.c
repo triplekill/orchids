@@ -365,7 +365,7 @@ void proceed_pre_config(orchids_t *ctx)
 
   DebugLog(DF_CORE, DS_NOTICE, "*** beginning ORCHIDS configuration ***\n");
 
-gc_check(ctx->gc_ctx);
+//gc_check(ctx->gc_ctx);
   if (ctx->off_line_mode == MODE_ONLINE)
     {
       build_config_tree(ctx->gc_ctx, ctx->config_file, &ctx->cfg_tree);
@@ -530,7 +530,7 @@ static int build_config_tree_sub(gc_t *gc_ctx,
 	    new_dir->next = NULL;
 	    new_dir->first_child = NULL;
 	    new_dir->parent = parent;
-	    new_dir->file = file;
+	    new_dir->file = gc_strdup(gc_ctx, (char *)file);
 	    new_dir->line = *lineno;
 
 	    /* Add the directive to the section */
@@ -579,7 +579,7 @@ static int build_config_tree_sub(gc_t *gc_ctx,
 	new_dir->next = NULL;
 	new_dir->first_child = NULL;
 	new_dir->parent = NULL;
-	new_dir->file = file;
+	new_dir->file = gc_strdup(gc_ctx, (char *)file);
 	new_dir->line = *lineno;
 
 	if (last_dir!=NULL) /* add to current list */
