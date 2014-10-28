@@ -305,6 +305,28 @@ struct node_expr_s
   */
 };
 
+typedef struct varset_s varset_t; /* set of variable numbers;
+				     garbage collectable */
+#define VS_EMPTY NULL
+#define VS_IS_EMPTY(vs) ((vs)==NULL)
+varset_t *vs_one_element (gc_t *gc_ctx, int n);
+varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2);
+varset_t *vs_inter (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2);
+int vs_subset (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2);
+int vs_sweep (varset_t *vs, int (*p) (int var, void *data), void *data);
+
+varset_t *node_expr_vars_may_read (gc_t *gc_ctx, node_expr_t *e);
+/* returns set of variables that e may read
+   (we are not sure that it reads them all, consider
+   for example 'x && y', which may read x and y, but will
+   only read x for certain)
+*/
+varset_t *node_expr_vars_must_set (gc_t *gc_ctx, node_expr_t *e);
+/* returns set of variables that e is sure to set
+   (e.g., in 'x=3', x must be set;
+   in 'if (x) { y=0; z=1; } else { y= 1; }' only y is sure to be set)
+*/
+
 /**
  ** @struct node_trans_s
  **   Transition (if (cond) goto somewhere;)

@@ -885,6 +885,315 @@ static void type_check (rule_compiler_t *ctx)
   GC_END(ctx->gc_ctx);
 }
 
+/* Sets of variable numbers are implemented as sorted lists
+   of integers.  This is not optimal, but is easy to implement
+   and fares OK on small numbers of variables.
+*/
+
+struct varset_s {
+  gc_header_t gc;
+  int n;
+  struct varset_s *next;
+};
+
+static void varset_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  varset_t *vs = (varset_t *)p;
+
+  GC_TOUCH (gc_ctx, vs->next);
+}
+
+static void varset_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int varset_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			    void *data)
+{
+  varset_t *vs = (varset_t *)p;
+
+  return (*gtc->do_subfield) (gtc, (gc_header_t *)vs->next, data);
+}
+
+static gc_class_t varset_class = {
+  GC_ID('v','s','e','t'),
+  varset_mark_subfields,
+  varset_finalize,
+  varset_traverse
+};
+
+varset_t *vs_one_element (gc_t *gc_ctx, int n)
+{
+  varset_t *vs;
+
+  vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+  vs->gc.type = T_NULL;
+  vs->n = n;
+  vs->next = NULL;
+  return vs;
+}
+
+varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
+{
+  varset_t *vs;
+
+  if (vs1==NULL)
+    return vs2;
+  if (vs2==NULL)
+    return vs1;
+  GC_START(gc_ctx, 1);
+  if (vs1->n < vs2->n)
+    {
+      vs = vs_union (gc_ctx, vs1->next, vs2);
+      GC_UPDATE (gc_ctx, 0, vs);
+      vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+      vs->gc.type = T_NULL;
+      vs->n = vs1->n;
+      vs->next = (varset_t *)GC_LOOKUP(0);
+    }
+  else if (vs1->n > vs2->n)
+    {
+      vs = vs_union (gc_ctx, vs1, vs2->next);
+      GC_UPDATE (gc_ctx, 0, vs);
+      vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+      vs->gc.type = T_NULL;
+      vs->n = vs2->n;
+      vs->next = (varset_t *)GC_LOOKUP(0);
+    }
+  else
+    {
+      vs = vs_union (gc_ctx, vs1->next, vs2->next);
+      GC_UPDATE (gc_ctx, 0, vs);
+      vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+      vs->gc.type = T_NULL;
+      vs->n = vs1->n;
+      vs->next = (varset_t *)GC_LOOKUP(0);
+    }
+  GC_END(gc_ctx);
+  return vs;
+}
+
+varset_t *vs_inter (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
+{
+  varset_t *vs;
+
+ again:
+  if (vs1==NULL)
+    return NULL;
+  if (vs2==NULL)
+    return NULL;
+  if (vs1->n < vs2->n)
+    {
+      vs1 = vs1->next;
+      goto again;
+    }
+  if (vs1->n > vs2->n)
+    {
+      vs2 = vs2->next;
+      goto again;
+    }
+  vs = vs_inter (gc_ctx, vs1->next, vs2->next);
+  GC_START(gc_ctx, 1);
+  GC_UPDATE (gc_ctx, 0, vs);
+  vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+  vs->gc.type = T_NULL;
+  vs->n = vs1->n;
+  vs->next = (varset_t *)GC_LOOKUP(0);
+  GC_END(gc_ctx);
+  return vs;
+}
+
+int vs_subset (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
+{
+ again:
+  if (vs1==NULL)
+    return 1;
+ again2:
+  if (vs2==NULL)
+    return 0;
+  if (vs1->n > vs2->n)
+    {
+      vs2 = vs2->next;
+      goto again2;
+    }
+  if (vs1->n < vs2->n)
+    return 0;
+  vs1 = vs1->next;
+  vs2 = vs2->next;
+  goto again;
+}
+
+int vs_sweep (varset_t *vs, int (*p) (int var, void *data), void *data)
+{
+  while (vs!=NULL)
+    {
+      if ((*p) (vs->n, data))
+	return 1;
+      vs = vs->next;
+    }
+  return 0;
+}
+
+varset_t *node_expr_vars_may_read (gc_t *gc_ctx, node_expr_t *e)
+{
+  varset_t *vs;
+
+ again:
+  if (e==NULL)
+    return VS_EMPTY;
+  switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+      return VS_EMPTY;
+    case NODE_VARIABLE:
+      return vs_one_element (gc_ctx, SYM_RES_ID(e));
+    case NODE_CALL:
+      {
+	node_expr_t *l;
+
+	GC_START (gc_ctx, 2);
+	GC_UPDATE(gc_ctx, 0, VS_EMPTY);
+	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, BIN_LVAL(l)));
+	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+			   (varset_t *)GC_LOOKUP(1));
+	    GC_UPDATE(gc_ctx, 0, vs);
+	  }
+	GC_END(gc_ctx);
+	return vs;
+      }
+    case NODE_BINOP:
+    case NODE_COND:
+    case NODE_CONS:
+    case NODE_EVENT:
+      GC_START(gc_ctx, 2);
+      GC_UPDATE(gc_ctx, 0, node_expr_vars_may_read (gc_ctx, BIN_LVAL(e)));
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, BIN_RVAL(e)));
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_END(gc_ctx);
+      return vs;
+    case NODE_MONOP:
+      e = MON_VAL(e);
+      goto again;
+    case NODE_REGSPLIT:
+      e = REGSPLIT_STRING(e);
+      goto again;
+    case NODE_IFSTMT:
+      GC_START(gc_ctx, 2);
+      GC_UPDATE(gc_ctx, 0, node_expr_vars_may_read (gc_ctx, IF_COND(e)));
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, IF_THEN(e)));
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_UPDATE(gc_ctx, 0, vs);
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, IF_ELSE(e)));
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_END(gc_ctx);
+      return vs;
+    case NODE_ASSOC:
+      e = BIN_RVAL(e);
+      goto again;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+    }
+}
+
+varset_t *node_expr_vars_must_set (gc_t *gc_ctx, node_expr_t *e)
+{
+  varset_t *vs;
+
+ again:
+  if (e==NULL)
+    return VS_EMPTY;
+  switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+    case NODE_VARIABLE:
+      return VS_EMPTY;
+    case NODE_CALL:
+      {
+	node_expr_t *l;
+
+	GC_START (gc_ctx, 2);
+	GC_UPDATE(gc_ctx, 0, VS_EMPTY);
+	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_LVAL(l)));
+	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+			   (varset_t *)GC_LOOKUP(1));
+	    GC_UPDATE(gc_ctx, 0, vs);
+	  }
+	GC_END(gc_ctx);
+	return vs;
+      }
+    case NODE_BINOP:
+    case NODE_COND:
+    case NODE_CONS:
+    case NODE_EVENT:
+      GC_START(gc_ctx, 2);
+      GC_UPDATE(gc_ctx, 0, node_expr_vars_must_set (gc_ctx, BIN_LVAL(e)));
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_RVAL(e)));
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_END(gc_ctx);
+      return vs;
+    case NODE_MONOP:
+      e = MON_VAL(e);
+      goto again;
+    case NODE_REGSPLIT:
+      {
+	node_varlist_t *vars;
+	size_t i, n;
+
+	GC_START (gc_ctx, 2);
+	vs = node_expr_vars_must_set (gc_ctx, REGSPLIT_STRING(e));
+	GC_UPDATE(gc_ctx, 0, vs);
+	vars = REGSPLIT_DEST_VARS(e);
+	for (n=vars->vars_nb, i=0; i<n; i++)
+	  {
+	    GC_UPDATE(gc_ctx, 1,
+		      vs_one_element (gc_ctx, SYM_RES_ID(vars->vars[i])));
+	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+			   (varset_t *)GC_LOOKUP(1));
+	    GC_UPDATE(gc_ctx, 0, vs);
+	  }
+	GC_END(gc_ctx);
+	return vs;
+      }
+    case NODE_IFSTMT:
+      GC_START(gc_ctx, 3);
+      GC_UPDATE(gc_ctx, 0, node_expr_vars_must_set (gc_ctx, IF_COND(e)));
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, IF_THEN(e)));
+      GC_UPDATE(gc_ctx, 2, node_expr_vars_must_set (gc_ctx, IF_ELSE(e)));
+      vs = vs_inter (gc_ctx, (varset_t *)GC_LOOKUP(1),
+		     (varset_t *)GC_LOOKUP(2));
+      GC_UPDATE(gc_ctx, 1, vs);
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_END(gc_ctx);
+      return vs;
+    case NODE_ASSOC:
+      GC_START(gc_ctx, 2);
+      GC_UPDATE(gc_ctx, 0, vs_one_element (gc_ctx, SYM_RES_ID(BIN_LVAL(e))));
+      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_RVAL(e)));
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
+		     (varset_t *)GC_LOOKUP(1));
+      GC_END(gc_ctx);
+      return vs;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+    }
+}
+
 /**
  * Lex/yacc parser entry point.
  * @param ctx Orchids context.
