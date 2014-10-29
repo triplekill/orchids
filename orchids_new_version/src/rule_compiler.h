@@ -341,7 +341,13 @@ void node_expr_vars (gc_t *gc_ctx, node_expr_t *e,
  **     Transition condition (NULL if it is an unconditional transition).
  **/
 /**   @var node_trans_s::dest
- **     Destination state name.
+ **     Destination state name, if direct transition (NULL otherwise)
+ **/
+/**   @var node_trans_s::file
+ **     File in which goto occurred, if direct transition (NULL otherwise)
+ **/
+/**   @var node_trans_s::lineno
+ **     Line at which goto occurred, if direct transition (-1 otherwise)
  **/
 /**   @var node_trans_s::sub_state_dest
  **     Sub-states (for nested states/actions).
@@ -352,7 +358,11 @@ struct node_trans_s
   int type; /* = -1 */
   node_expr_t  *cond;
   char         *dest;
+  char         *file;
+  unsigned int lineno;
   node_state_t *sub_state_dest;
+  unsigned long an_flags;
+#define AN_NONEXISTENT_TARGET_ALREADY_SAID 0x01
 };
 
 
@@ -378,6 +388,11 @@ struct node_trans_s
 /**   @var node_state_s::flags
  **     Optional state flags.
  **/
+/**   @var node_state_s::mustset
+ **     Set of variables that are set (initialized) for sure
+ **     at the beginning of this state.  Will be computed by
+ **     static analyzer.
+ **/
 struct node_state_s
 {
   gc_header_t        gc;
@@ -387,6 +402,9 @@ struct node_state_s
   node_expr_t *actionlist;
   node_expr_t  *translist;
   unsigned long      flags;
+  unsigned long      an_flags;
+#define AN_MUSTSET_REACHABLE 0x1
+  varset_t *mustset;
 };
 
 
@@ -704,11 +722,12 @@ set_state_label(rule_compiler_t *ctx,
  * Build a direct transition node.
  * A direct transition is "if (cond) goto somewhere".
  * @param cond The condition expression of the transition.
- * @param dest The name string of the destination state.
+ * @param sym The name string of the destination state, with location.
  * @return The new transition node.
  **/
 node_trans_t *build_direct_transition(rule_compiler_t *ctx,
-				      node_expr_t *cond, char *dest);
+				      node_expr_t *cond,
+				      symbol_token_t *sym);
 
 /**
  * Build a if statement node.

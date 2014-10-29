@@ -416,19 +416,15 @@ goto : GOTO { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 
 transition:
   expect O_PARENT expr C_PARENT GOTO SYMNAME SEMICOLUMN
-  {  if ($6.file!=NULL)
-       gc_base_free ($6.file);
-     RESULT_DROP($$,$1,
-		build_direct_transition(compiler_ctx_g, $3, $6.name)); }
+  {  RESULT_DROP($$,$1,
+		 build_direct_transition(compiler_ctx_g, $3, &($6))); }
 | expect O_PARENT expr C_PARENT O_BRACE statedefs C_BRACE
   { RESULT_DROP($$,$1,
 		build_indirect_transition(compiler_ctx_g, $3, $6)); }
 | goto SYMNAME SEMICOLUMN
-  { if ($2.file!=NULL)
-       gc_base_free ($2.file);
-     RESULT_DROP($$,$1,
+  { RESULT_DROP($$,$1,
 		build_direct_transition(compiler_ctx_g,
-					NULL, $2.name)); }
+					NULL, &($2))); }
 ;
 
 %%

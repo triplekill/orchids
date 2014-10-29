@@ -371,6 +371,7 @@ static void node_state_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, n->actionlist);
   GC_TOUCH (gc_ctx, n->translist);
+  GC_TOUCH (gc_ctx, n->mustset);
 }
 
 static void node_state_finalize (gc_t *gc_ctx, gc_header_t *p)
@@ -391,6 +392,9 @@ static int node_state_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   if (err)
     return err;
   err = (*gtc->do_subfield) (gtc, (gc_header_t *)n->translist, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)n->mustset, data);
   return err;
 }
 
@@ -411,8 +415,11 @@ static void node_trans_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_trans_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
+  char *file = ((node_trans_t *)p)->file;
   char *name = ((node_trans_t *)p)->dest;
 
+  if (file!=NULL)
+    gc_base_free (file);
   if (name!=NULL)
     gc_base_free (name);
 }
@@ -1207,8 +1214,8 @@ void node_expr_vars (gc_t *gc_ctx, node_expr_t *e,
       vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), *mustset);
       GC_UPDATE(gc_ctx, 0, vs); /* now mayread(e2) - mustset(e1) */
       node_expr_vars (gc_ctx, IF_ELSE(e),
-		      (varset_t **)&GC_LOOKUP(2), /* mayread(e2) */
-		      (varset_t **)&GC_LOOKUP(3)); /* mustset(e2) */
+		      (varset_t **)&GC_LOOKUP(2), /* mayread(e3) */
+		      (varset_t **)&GC_LOOKUP(3)); /* mustset(e3) */
       vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(2), *mustset);
       GC_UPDATE(gc_ctx, 2, vs); /* now mayread(e3) - mustset(e1) */
       vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
@@ -1241,6 +1248,201 @@ void node_expr_vars (gc_t *gc_ctx, node_expr_t *e,
       exit(EXIT_FAILURE);
       break;
     }
+}
+
+typedef struct an_worklist_s {
+  struct an_worklist_s *next;
+  node_state_t *state;
+} an_worklist_t;
+
+static node_state_t *find_state_by_name (node_rule_t *rule, char *name)
+{
+  node_expr_t *l;
+  node_state_t *state;
+
+  for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
+    {
+      state = (node_state_t *)BIN_LVAL(l);
+      if (state->name!=NULL && strcmp(state->name, name)==0)
+	return state;
+    }
+  return NULL;
+}
+
+static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
+				 char *file, unsigned int line,
+				 node_state_t *state)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  varset_t *vs;
+  node_expr_t *l;
+  node_trans_t *trans;
+
+  GC_START(gc_ctx, 4);
+  node_expr_vars (gc_ctx, state->actionlist,
+		  (varset_t **)&GC_LOOKUP(0), /* mayread(actionlist) */
+		  (varset_t **)&GC_LOOKUP(1)); /* mustset(actionlist) */
+  vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), state->mustset);
+  for (; vs!=VS_EMPTY; vs = vs->next)
+    {
+      fprintf (stderr, "%s:%u: Error: variable %s may be used initialized here.\n",
+	       file, line, ctx->dyn_var_name[vs->n]);
+      ctx->nerrors++;
+    }
+  vs = vs_union (gc_ctx, state->mustset, (varset_t *)GC_LOOKUP(1));
+  GC_UPDATE(gc_ctx, 1, vs); /* = state->mustset union mustset(actionlist) */
+  for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+    {
+      trans = (node_trans_t *)BIN_LVAL(l);
+      if (trans==NULL)
+	continue;
+      node_expr_vars (gc_ctx, trans->cond,
+		      (varset_t **)&GC_LOOKUP(2), /* mayread(cond) */
+		      (varset_t **)&GC_LOOKUP(3)); /* mustset(cond) */
+      vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(2),
+		    (varset_t *)GC_LOOKUP(1));
+      for (; vs!=VS_EMPTY; vs = vs->next)
+	{
+	  fprintf (stderr, "%s:%u: Error: variable %s may be used initialized here.\n",
+		   trans->file, trans->lineno, ctx->dyn_var_name[vs->n]);
+	  ctx->nerrors++;
+	}
+      if (trans->sub_state_dest!=NULL)
+	check_state_mustset (ctx, rule, trans->file, trans->lineno,
+			     trans->sub_state_dest);
+    }
+  GC_END(gc_ctx);
+}
+
+static void check_rule_mustset (rule_compiler_t *ctx, node_rule_t *rule)
+{
+  char *file;
+  unsigned int line;
+  node_expr_t *l;
+  node_state_t *state;
+
+  for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
+    {
+      state = (node_state_t *)BIN_LVAL(l);
+      if (state->actionlist!=NULL)
+	{
+	  file = STR(BIN_LVAL(state->actionlist)->file);
+	  /* STR() is NUL-terminated by construction */
+	  line = BIN_LVAL(state->actionlist)->lineno;
+	}
+      else if (state->translist!=NULL)
+	{
+	  file = STR(BIN_LVAL(state->translist)->file);
+	  /* STR() is NUL-terminated by construction */
+	  line = BIN_LVAL(state->translist)->lineno;
+	}
+      else
+	{
+	  file = rule->file;
+	  line = (unsigned int)rule->line;
+	}
+      if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
+	{
+	  fprintf (stderr, "%s:%u: Warning: state %s is unreachable, hence useless\n",
+		   file, line, state->name);
+	}
+      else check_state_mustset (ctx, rule, file, line, state);
+    }
+}
+
+static void analyze_rule (rule_compiler_t *ctx, node_rule_t *rule)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  an_worklist_t *work, *next;
+  node_state_t *state, *target;
+  node_expr_t *l;
+  node_trans_t *trans;
+
+  GC_START(gc_ctx, 4);
+  work = Xmalloc (sizeof(an_worklist_t));
+  work->next = NULL;
+  work->state = rule->init;
+  rule->init->an_flags |= AN_MUSTSET_REACHABLE; /* and its mustset
+						   is already set to
+						   VS_EMPTY, fine */
+  /* AN_MUSTSET_REACHABLE really means that the state's mustset
+     field is (some upper approximation) of the set of variables
+     that are guaranteed to be set at the beginning of the set.
+     If AN_MUSTSET_REACHABLE is not set, then this set must be
+     conceived as the set of all variables.
+  */
+  while (work!=NULL)
+    {
+      next = work->next;
+      state = work->state;
+      gc_base_free (work);
+      work = next;
+      node_expr_vars (gc_ctx, state->actionlist,
+		      (varset_t **)&GC_LOOKUP(0), /* mayread(actionlist) */
+		      (varset_t **)&GC_LOOKUP(1)); /* mustset(actionlist) */
+      GC_UPDATE(gc_ctx, 1, vs_union (gc_ctx, state->mustset,
+				     (varset_t *)GC_LOOKUP(1)));
+      /* now equal to mustset after execution of the actionlist */
+      for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+	{
+	  trans = (node_trans_t *)BIN_LVAL(l);
+	  node_expr_vars (gc_ctx, trans->cond,
+		      (varset_t **)&GC_LOOKUP(2), /* mayread(cond) */
+		      (varset_t **)&GC_LOOKUP(3)); /* mustset(cond) */
+	  GC_UPDATE (gc_ctx, 3, vs_union (gc_ctx, (varset_t *)GC_LOOKUP(1),
+					  (varset_t *)GC_LOOKUP(3)));
+	  /* now equal to the mustset after this transition */
+	  target = trans->sub_state_dest;
+	  if (target==NULL)
+	    {
+	      target = find_state_by_name (rule, trans->dest);
+	      if (target==NULL &&
+		  (trans->an_flags & AN_NONEXISTENT_TARGET_ALREADY_SAID)==0)
+		{
+		  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
+		  fprintf (stderr, "%s:%u: nonexistent target state %s\n",
+			   trans->file, trans->lineno, trans->dest);
+		  ctx->nerrors++;
+		}
+	    }
+	  if (target->an_flags & AN_MUSTSET_REACHABLE)
+	    { /* if target already reached by the analyzer,
+		 take intersection of its mustset with the mustset
+		 obtained after the transition, in GC_LOOKUP(3).
+		 We shall reinstall target into the worklist
+		 iff target->mustset changes.  It does not change
+		 iff target->mustset is already included in GC_LOOKUP(3);
+		 we signal this by setting target to NULL, when this
+		 happens.
+	      */
+	      if (vs_subset (gc_ctx, target->mustset,
+			     (varset_t *)GC_LOOKUP(3)))
+		target = NULL;
+	      else
+		{
+		  GC_TOUCH (gc_ctx, target->mustset =
+			    vs_inter (gc_ctx, target->mustset,
+				      (varset_t *)GC_LOOKUP(3)));
+		}
+	    }
+	  else
+	    {
+	      target->an_flags |= AN_MUSTSET_REACHABLE;
+	      GC_TOUCH (gc_ctx, target->mustset = (varset_t *)GC_LOOKUP(3));
+	    }
+	  /* Now add target to the worklist */
+	  if (target!=NULL)
+	    {
+	      next = work;
+	      work = Xmalloc (sizeof(an_worklist_t));
+	      work->next = next;
+	      work->state = target;
+	    }
+	  /* And continue */
+	}
+    }
+  GC_END(gc_ctx);
+  check_rule_mustset (ctx, rule);
 }
 
 /**
@@ -1337,8 +1539,10 @@ node_state_t *build_state(rule_compiler_t *ctx,
   s->line = 0; /* not set: will be set by set_state_label() */
   s->name = NULL; /* not set: will be set by set_state_label() */
   s->flags = 0; /* not set: will be set by set_state_label() */
+  s->an_flags = 0;
   GC_TOUCH (ctx->gc_ctx, s->actionlist = actions);
   GC_TOUCH (ctx->gc_ctx, s->translist = transitions);
+  s->mustset = VS_EMPTY;
   return s;
 }
 
@@ -1466,7 +1670,8 @@ static void add_boolean_check (rule_compiler_t *ctx,
 }
 
 node_trans_t *build_direct_transition(rule_compiler_t *ctx,
-				      node_expr_t *cond, char *dest)
+				      node_expr_t *cond,
+				      symbol_token_t *sym)
 {
   node_trans_t *trans;
 
@@ -1476,8 +1681,11 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
   trans->gc.type = T_NULL;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
-  trans->dest = dest;
+  trans->file = sym->file;
+  trans->lineno = sym->line;
+  trans->dest = sym->name;
   trans->sub_state_dest = NULL; /* not set */
+  trans->an_flags = 0;
   GC_UPDATE(ctx->gc_ctx, 0, trans);
   if (cond!=NULL)
     add_boolean_check (ctx, cond);
@@ -1498,7 +1706,10 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   trans->dest = NULL; /* not set */
+  trans->file = NULL; /* not set */
+  trans->lineno = -1; /* not set */
   GC_TOUCH (ctx->gc_ctx, trans->sub_state_dest = substate);
+  trans->an_flags = 0;
   return trans;
 }
 
@@ -3257,6 +3468,8 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 
   if (stat(node_rule->file, &filestat))
     filestat.st_mtime = 0;
+
+  analyze_rule (ctx, node_rule);
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
