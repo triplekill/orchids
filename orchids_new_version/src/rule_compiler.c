@@ -1004,6 +1004,40 @@ varset_t *vs_inter (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
   return vs;
 }
 
+varset_t *vs_diff (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
+{
+  varset_t *vs;
+
+ again:
+  if (vs1==NULL)
+    return NULL;
+  if (vs2==NULL)
+    return vs1;
+  if (vs1->n > vs2->n)
+    {
+      vs2 = vs2->next;
+      goto again;
+    }
+  if (vs1->n < vs2->n)
+    {
+      vs = vs_diff (gc_ctx, vs1->next, vs2);
+      GC_START(gc_ctx, 1);
+      GC_UPDATE (gc_ctx, 0, vs);
+      vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
+      vs->gc.type = T_NULL;
+      vs->n = vs1->n;
+      vs->next = (varset_t *)GC_LOOKUP(0);
+      GC_END(gc_ctx);
+    }
+  else
+    {
+      vs1 = vs1->next;
+      vs2 = vs2->next;
+      goto again;
+    }
+  return vs;
+}
+
 int vs_subset (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
 {
  again:
@@ -1035,162 +1069,177 @@ int vs_sweep (varset_t *vs, int (*p) (int var, void *data), void *data)
   return 0;
 }
 
-varset_t *node_expr_vars_may_read (gc_t *gc_ctx, node_expr_t *e)
-{
+static varset_t *varlist_varset (gc_t *gc_ctx, size_t start, size_t end,
+				 node_expr_t **vars)
+{ /* convert a list to a set of variables; this is just merge sort */
+  size_t mid;
   varset_t *vs;
 
- again:
-  if (e==NULL)
+  if (end<=start)
     return VS_EMPTY;
-  switch (e->type)
-    {
-    case NODE_FIELD:
-    case NODE_CONST:
-      return VS_EMPTY;
-    case NODE_VARIABLE:
-      return vs_one_element (gc_ctx, SYM_RES_ID(e));
-    case NODE_CALL:
-      {
-	node_expr_t *l;
-
-	GC_START (gc_ctx, 2);
-	GC_UPDATE(gc_ctx, 0, VS_EMPTY);
-	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
-	  {
-	    GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, BIN_LVAL(l)));
-	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-			   (varset_t *)GC_LOOKUP(1));
-	    GC_UPDATE(gc_ctx, 0, vs);
-	  }
-	GC_END(gc_ctx);
-	return vs;
-      }
-    case NODE_BINOP:
-    case NODE_COND:
-    case NODE_CONS:
-    case NODE_EVENT:
-      GC_START(gc_ctx, 2);
-      GC_UPDATE(gc_ctx, 0, node_expr_vars_may_read (gc_ctx, BIN_LVAL(e)));
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, BIN_RVAL(e)));
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
-      GC_END(gc_ctx);
-      return vs;
-    case NODE_MONOP:
-      e = MON_VAL(e);
-      goto again;
-    case NODE_REGSPLIT:
-      e = REGSPLIT_STRING(e);
-      goto again;
-    case NODE_IFSTMT:
-      GC_START(gc_ctx, 2);
-      GC_UPDATE(gc_ctx, 0, node_expr_vars_may_read (gc_ctx, IF_COND(e)));
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, IF_THEN(e)));
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
-      GC_UPDATE(gc_ctx, 0, vs);
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_may_read (gc_ctx, IF_ELSE(e)));
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
-      GC_END(gc_ctx);
-      return vs;
-    case NODE_ASSOC:
-      e = BIN_RVAL(e);
-      goto again;
-    default:
-      DebugLog(DF_OLC, DS_FATAL,
-	       "unrecognized node type %d\n", e->type);
-      exit(EXIT_FAILURE);
-    }
+  if (end==start+1)
+    return vs_one_element (gc_ctx, SYM_RES_ID(vars[start]));
+  mid = (start+end) >> 1;
+  GC_START(gc_ctx, 2);
+  GC_UPDATE(gc_ctx, 0, varlist_varset (gc_ctx, start, mid, vars));
+  GC_UPDATE(gc_ctx, 0, varlist_varset (gc_ctx, mid, end, vars));
+  vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0), (varset_t *)GC_LOOKUP(1));
+  GC_END(gc_ctx);
+  return vs;
 }
 
-varset_t *node_expr_vars_must_set (gc_t *gc_ctx, node_expr_t *e)
+void node_expr_vars (gc_t *gc_ctx, node_expr_t *e,
+		     varset_t **mayread,
+		     varset_t **mustset)
 {
   varset_t *vs;
 
+  *mayread = VS_EMPTY;
+  *mustset = VS_EMPTY;
  again:
   if (e==NULL)
-    return VS_EMPTY;
+    return;
   switch (e->type)
     {
     case NODE_FIELD:
     case NODE_CONST:
+      break;
     case NODE_VARIABLE:
-      return VS_EMPTY;
+      GC_TOUCH (gc_ctx, vs_one_element (gc_ctx, SYM_RES_ID(e)));
+      break;
     case NODE_CALL:
+      /* For NODE_CALL, NODE_BINOP, and general sequence evaluation, we have:
+	 mayread(e1; e2) = mayread(e1) U (mayread(e2) - mustset(e1))
+	 mustset(e1; e2) = mustset(e1) U mustset(e2)
+      */
       {
 	node_expr_t *l;
 
 	GC_START (gc_ctx, 2);
-	GC_UPDATE(gc_ctx, 0, VS_EMPTY);
 	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
 	  {
-	    GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_LVAL(l)));
-	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-			   (varset_t *)GC_LOOKUP(1));
-	    GC_UPDATE(gc_ctx, 0, vs);
+	    /* Given that *mayread==mayread(e1) and *mustset=mustset(e1),
+	       where e1 is sequence of all previous parameters,
+	       and letting e2 be the current parameter BIN_LVAL(l),
+	    */
+	    node_expr_vars (gc_ctx, BIN_LVAL(l),
+			    (varset_t **)&GC_LOOKUP(0), /* mayread(e2) */
+			    (varset_t **)&GC_LOOKUP(1)); /* mustset(e2) */
+	    vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), *mustset);
+	    GC_UPDATE(gc_ctx, 0, vs); /* now mayread(e2) - mustset(e1) */
+	    GC_TOUCH (gc_ctx, *mayread = vs_union (gc_ctx, *mayread, vs));
+	    /* now *mayread == mayread(e1) U (mayread(e2) - mustset(e1)) */
+	    GC_TOUCH (gc_ctx, *mustset =
+		      vs_union (gc_ctx, *mustset, (varset_t *)GC_LOOKUP(1)));
+	    /* and *mustset == mustset(e1) U mustset(e2) */
 	  }
 	GC_END(gc_ctx);
-	return vs;
+	break;
       }
     case NODE_BINOP:
-    case NODE_COND:
     case NODE_CONS:
     case NODE_EVENT:
+      /* e1 == BIN_LVAL(e), e2 == BIN_RVAL(e) */
       GC_START(gc_ctx, 2);
-      GC_UPDATE(gc_ctx, 0, node_expr_vars_must_set (gc_ctx, BIN_LVAL(e)));
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_RVAL(e)));
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
+      node_expr_vars (gc_ctx, BIN_LVAL(e), mayread, mustset);
+      node_expr_vars (gc_ctx, BIN_RVAL(e),
+		      (varset_t **)&GC_LOOKUP(0), /* mayread(e2) */
+		      (varset_t **)&GC_LOOKUP(1)); /* mustset(e2) */
+      vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), *mustset);
+      GC_UPDATE(gc_ctx, 0, vs); /* now mayread(e2) - mustset(e1) */
+      GC_TOUCH (gc_ctx, *mayread = vs_union (gc_ctx, *mayread, vs));
+      /* now *mayread == mayread(e1) U (mayread(e2) - mustset(e1)) */
+      GC_TOUCH (gc_ctx, *mustset =
+		vs_union (gc_ctx, *mustset, (varset_t *)GC_LOOKUP(1)));
+      /* and *mustset == mustset(e1) U mustset(e2) */
       GC_END(gc_ctx);
-      return vs;
+      break;
+    case NODE_COND:
+      /* Here there is a difference: in e1 && e2, or e1 || e2 for example,
+	 e2 may fail to be executed.  So
+	 mayread(e1 cond e2) = mayread(e1) U (mayread(e2) - mustset(e1))
+	 but mustset(e1; e2) = mustset(e1) only
+      */
+      /* e1 == BIN_LVAL(e), e2 == BIN_RVAL(e) */
+      GC_START(gc_ctx, 2);
+      node_expr_vars (gc_ctx, BIN_LVAL(e), mayread, mustset);
+      node_expr_vars (gc_ctx, BIN_RVAL(e),
+		      (varset_t **)&GC_LOOKUP(0), /* mayread(e2) */
+		      (varset_t **)&GC_LOOKUP(1)); /* mustset(e2) */
+      vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), *mustset);
+      GC_UPDATE(gc_ctx, 0, vs); /* now mayread(e2) - mustset(e1) */
+      GC_TOUCH (gc_ctx, *mayread = vs_union (gc_ctx, *mayread, vs));
+      /* now *mayread == mayread(e1) U (mayread(e2) - mustset(e1)) */
+      GC_END(gc_ctx);
+      break;
     case NODE_MONOP:
       e = MON_VAL(e);
       goto again;
     case NODE_REGSPLIT:
-      {
-	node_varlist_t *vars;
-	size_t i, n;
-
-	GC_START (gc_ctx, 2);
-	vs = node_expr_vars_must_set (gc_ctx, REGSPLIT_STRING(e));
-	GC_UPDATE(gc_ctx, 0, vs);
-	vars = REGSPLIT_DEST_VARS(e);
-	for (n=vars->vars_nb, i=0; i<n; i++)
-	  {
-	    GC_UPDATE(gc_ctx, 1,
-		      vs_one_element (gc_ctx, SYM_RES_ID(vars->vars[i])));
-	    vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-			   (varset_t *)GC_LOOKUP(1));
-	    GC_UPDATE(gc_ctx, 0, vs);
-	  }
-	GC_END(gc_ctx);
-	return vs;
-      }
+      /* /e1/"regex"/x1/x2/.../xn
+	 where e1 == REGSPLIT_STRING(e),
+	 "regex" == REGSPLIT_PAT(e),
+	 [x1, x2, ..., xn] == REGSPLIT_DEST_VARS(e)
+	 Its mayread is mayread(e1),
+	 its mustset is mustset(e1) union {x1, x2, ..., xn}.
+      */
+      node_expr_vars (gc_ctx, REGSPLIT_STRING(e), mayread, mustset);
+      GC_START(gc_ctx, 1);
+      GC_UPDATE(gc_ctx, 0, varlist_varset(gc_ctx, 0,
+					  REGSPLIT_DEST_VARS(e)->vars_nb,
+					  REGSPLIT_DEST_VARS(e)->vars));
+      GC_TOUCH (gc_ctx, *mustset = vs_union (gc_ctx, *mustset,
+					     (varset_t *)GC_LOOKUP(0)));
+      GC_END(gc_ctx);
+      break;
     case NODE_IFSTMT:
-      GC_START(gc_ctx, 3);
-      GC_UPDATE(gc_ctx, 0, node_expr_vars_must_set (gc_ctx, IF_COND(e)));
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, IF_THEN(e)));
-      GC_UPDATE(gc_ctx, 2, node_expr_vars_must_set (gc_ctx, IF_ELSE(e)));
-      vs = vs_inter (gc_ctx, (varset_t *)GC_LOOKUP(1),
+      /*
+	e == if (e1) e2 else e3
+	mayread(e) = mayread(e1) union (mayread(e2) - mustset(e1))
+	                         union (mayread(e3) - mustset(e1))
+	mustset(e) = mustset(e1) union (mustset(e2) inter mustset(e3))
+       */
+      node_expr_vars (gc_ctx, IF_COND(e), mayread, mustset);
+      GC_START(gc_ctx, 4);
+      node_expr_vars (gc_ctx, IF_THEN(e),
+		      (varset_t **)&GC_LOOKUP(0), /* mayread(e2) */
+		      (varset_t **)&GC_LOOKUP(1)); /* mustset(e2) */
+      vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(0), *mustset);
+      GC_UPDATE(gc_ctx, 0, vs); /* now mayread(e2) - mustset(e1) */
+      node_expr_vars (gc_ctx, IF_ELSE(e),
+		      (varset_t **)&GC_LOOKUP(2), /* mayread(e2) */
+		      (varset_t **)&GC_LOOKUP(3)); /* mustset(e2) */
+      vs = vs_diff (gc_ctx, (varset_t *)GC_LOOKUP(2), *mustset);
+      GC_UPDATE(gc_ctx, 2, vs); /* now mayread(e3) - mustset(e1) */
+      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
 		     (varset_t *)GC_LOOKUP(2));
-      GC_UPDATE(gc_ctx, 1, vs);
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
+      GC_UPDATE(gc_ctx, 0, vs); /* now (mayread(e2) - mustset(e1))
+				   union (mayread(e3) - mustset(e1)) */
+      GC_TOUCH (gc_ctx, *mayread = vs_union (gc_ctx, *mayread, vs));
+      vs = vs_inter (gc_ctx, (varset_t *)GC_LOOKUP(1),
+		     (varset_t *)GC_LOOKUP(3));
+      GC_UPDATE(gc_ctx, 1, vs); /* now mustset(e2) inter mustset(e3) */
+      GC_TOUCH (gc_ctx, *mustset = vs_union (gc_ctx, *mustset, vs));
       GC_END(gc_ctx);
-      return vs;
+      break;
     case NODE_ASSOC:
-      GC_START(gc_ctx, 2);
+      /* e is x = e2
+	 mayread(e) = mayread(e2)
+	 mustset(e) = mustset(e2) U {x}
+	 where x == BIN_LVAL(e), e2 == BIN_RVAL(e)
+       */
+      node_expr_vars (gc_ctx, BIN_RVAL(e), mayread, mustset);
+      GC_START(gc_ctx, 1);
       GC_UPDATE(gc_ctx, 0, vs_one_element (gc_ctx, SYM_RES_ID(BIN_LVAL(e))));
-      GC_UPDATE(gc_ctx, 1, node_expr_vars_must_set (gc_ctx, BIN_RVAL(e)));
-      vs = vs_union (gc_ctx, (varset_t *)GC_LOOKUP(0),
-		     (varset_t *)GC_LOOKUP(1));
+      GC_TOUCH (gc_ctx, *mustset =
+		vs_union (gc_ctx, *mustset, (varset_t *)GC_LOOKUP(0)));
       GC_END(gc_ctx);
-      return vs;
+      break;
     default:
       DebugLog(DF_OLC, DS_FATAL,
 	       "unrecognized node type %d\n", e->type);
       exit(EXIT_FAILURE);
+      break;
     }
 }
 
