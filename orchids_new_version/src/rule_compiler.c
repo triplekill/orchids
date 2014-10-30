@@ -1109,8 +1109,8 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
  again:
 //gc_check(gc_ctx);
   if (e==NULL)
-    return res;
-  switch (e->type)
+    ;
+  else switch (e->type)
     {
     case NODE_FIELD:
     case NODE_CONST:
