@@ -449,7 +449,7 @@ void register_conditional_dissector(orchids_t *ctx,
 	       mod_source_name, given_type->name,
 	       m_dissect->mod->name, m_dissect->mod->dissect_type->name);
       fflush (stderr);
-      exit(EXIT_FAILURE);
+      //exit(EXIT_FAILURE);
     }
   given_type = ctx->global_fields->fields[m_source->first_field_pos + m_source->num_fields - 2].type;
   switch ((int)(unsigned int)given_type->tag)

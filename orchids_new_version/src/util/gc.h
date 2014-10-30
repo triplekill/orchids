@@ -95,8 +95,13 @@ typedef struct gc_rootzone {
 typedef struct gc_stack_data {
   struct gc_stack_data *next;
   int n; /* number of elements currently in 'data' table */
-  gc_header_t *data[1]; /* actually data[nmax], for some value
-			 nmax >= n that we don't care to store. */
+  void *data[1]; /* actually gc_header_t *data[nmax], for some value
+	            nmax >= n that we don't care to store.
+                    The type is void *, because this is the only pointer
+                    type in C that does not obey the strict aliasing rule,
+                    and we need each data[i] to be of a type different
+                    from gc_header_t * (still, a pointer to something
+                    that contains a gc_header_t in first position) */
 } gc_stack_data;
 
 /* In the following macros, we keep an identifier '__gc' that nobody
@@ -105,7 +110,7 @@ typedef struct gc_stack_data {
 */
 #define GC_START_PROGRESSIVE(gc_ctx, nmax)				\
   {									\
-  struct __gc { struct gc_stack_data *next; int n; gc_header_t *data[nmax]; } __gc; \
+  struct __gc { struct gc_stack_data *next; int n; void *data[nmax]; } __gc; \
   __gc.next = (gc_ctx)->stack_data;					\
   __gc.n = 0;								\
   (gc_ctx)->stack_data = (gc_stack_data *)&__gc
@@ -113,7 +118,7 @@ typedef struct gc_stack_data {
   (gc_ctx)->stack_data = (gc_ctx)->stack_data->next; }
 #define GC_PROTECT_PROGRESSIVE(gc_ctx, value) \
   do { GC_TOUCH(gc_ctx,value);		      \
-    __gc.data[__gc.n++] = value; } while (0)
+    __gc.data[__gc.n++] = (char *)value; } while (0)
 #define GC_PROTECT_PROGRESSIVE_NOTOUCH(value) \
    __gc.data[__gc.n++] = value
 #define GC_N __gc.n
@@ -126,9 +131,9 @@ typedef struct gc_stack_data {
   (gc_ctx)->stack_data = (gc_ctx)->stack_data->next; }
 
 #define GC_UPDATE(gc_ctx, i, new_value) \
-  GC_TOUCH(gc_ctx, __gc.data[i] = (gc_header_t *)(new_value))
+  GC_TOUCH(gc_ctx, __gc.data[i] = (void *)(new_value))
 #define GC_UPDATE_NOTOUCH(i, new_value) \
-  __gc.data[i] = new_value
+  __gc.data[i] = (void *)new_value
 #define GC_LOOKUP(i) __gc.data[i]
 #define GC_DATA() __gc.data
 

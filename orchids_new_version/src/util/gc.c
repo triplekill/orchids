@@ -126,7 +126,7 @@ int gc_mark (gc_t *gc_ctx)
 	      {
 		n = sdata->n;
 		for (i=0; i<n; i++)
-		  gc_touch (gc_ctx, sdata->data[i]);
+		  gc_touch (gc_ctx, (gc_header_t *)sdata->data[i]);
 	      }
 	    gc_ctx->mark_state = GC_MARK_STATE_RUNNING;
 	    break;
@@ -407,6 +407,7 @@ void gc_check (gc_t *gc_ctx)
   gc_rootzone *root;
   gc_header_t *p;
   gc_traverse_ctx_t gtc;
+  gc_stack_data *sd;
   int color;
   int current_seen;
 
@@ -425,6 +426,13 @@ void gc_check (gc_t *gc_ctx)
        */
       (void) gc_check_grey (&gtc, *root->root, &color);
       /* 0 is for initial parent color white */
+    }
+  for (sd = gc_ctx->stack_data; sd!=NULL; sd = sd->next)
+    {
+      int i, n;
+
+      for (n=sd->n, i=0; i<n; i++)
+        (void) gc_check_grey (&gtc, (gc_header_t *)sd->data[i], &color);
     }
   /* Now check that:
      - every object in the grey list is indeed grey.

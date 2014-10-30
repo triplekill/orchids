@@ -59,7 +59,7 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   */
   char *t;
   struct timeval time;
-  unsigned int serial;
+  unsigned long serial;
   ovm_var_t *var;
   gc_t *gc_ctx = octx->ctx->gc_ctx;
   GC_START (gc_ctx, 2);
@@ -68,7 +68,7 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   serial = 0;
   if (t<end && *t==':') /* found it */
     {
-      t = orchids_atoui (t+1, end, &serial);
+      t = orchids_atoui (t+1, end-t-1, &serial);
       if (t<end && *t==')')
 	t++;
     }
@@ -76,7 +76,7 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   TIMEVAL(var) = time;
   GC_UPDATE (gc_ctx, 0, var);
 
-  var = ovm_int_new (gc_ctx, (int)serial);
+  var = ovm_uint_new (gc_ctx, serial);
   GC_UPDATE (gc_ctx, 1, var);
 
   FILL_EVENT(octx, F_AUDITD_TIME, 2);

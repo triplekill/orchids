@@ -1258,7 +1258,7 @@ static int ovm_regsplit(isn_param_t *param)
 	  char *s = (TYPE(string)==T_STR)?STR(string):VSTR(string);
 
 	  GC_START_PROGRESSIVE(ctx->gc_ctx, 1);
-	  GC_PROTECT_PROGRESSIVE(ctx->gc_ctx, (gc_header_t *)string);
+	  GC_PROTECT_PROGRESSIVE(ctx->gc_ctx, string);
 	  STACK_DROP(ctx->ovm_stack, 2);
 	  for (i = n; i > 0; i--)
 	    {
