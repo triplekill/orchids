@@ -316,14 +316,14 @@ varset_t *vs_diff (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2);
 int vs_subset (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2);
 int vs_sweep (varset_t *vs, int (*p) (int var, void *data), void *data);
 
-void node_expr_vars (gc_t *gc_ctx, node_expr_t *e,
-		     varset_t **mayread,
-		     varset_t **mustset);
-/* returns set of variables that e may read in *mayread,
-   and set of variables that e is sure to set in *mustset.
+typedef struct node_expr_vars_s {
+  varset_t *mayread;
+  varset_t *mustset;
+} node_expr_vars_t;
 
-   mayread and mustset must be zones that the gc is aware of,
-   typically objects of the form (varset_t **)&GC_LOOKUP(i).
+node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e);
+/* returns set of variables that e may read in mayread,
+   and set of variables that e is sure to set in mustset.
 
    To explain what 'may read' and 'sure to set' mean, consider
    the following examples:
