@@ -125,7 +125,7 @@ typedef struct gc_stack_data {
 
 #define GC_START(gc_ctx, nmax) \
   { \
-  struct __gc { struct gc_stack_data *next; int n; gc_header_t *data[nmax]; } __gc = { (gc_ctx)->stack_data, nmax, }; /* Note: data[] will be zeroed out */ \
+  struct __gc { struct gc_stack_data *next; int n; void *data[nmax]; } __gc = { (gc_ctx)->stack_data, nmax, }; /* Note: data[] will be zeroed out */ \
   (gc_ctx)->stack_data = (gc_stack_data *)&__gc
 #define GC_END(gc_ctx)					\
   (gc_ctx)->stack_data = (gc_ctx)->stack_data->next; }
