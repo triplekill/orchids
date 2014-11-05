@@ -76,13 +76,34 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
 
   GC_START(gc_ctx, BINTOTEXT_FIELDS+1);
   GC_UPDATE(gc_ctx, BINTOTEXT_FIELDS, event->next);
-  //GC_UPDATE(gc_ctx, F_BINTOTEXT_TAG, event->next->value);
-  /* When entering bintotext_subdissect(),
-     event = [<some bstr>; <some tag>; ...]
-     We product a new event of the form [<some line of text>; <some tag>; ...]
-     where <some bstr> has been discarded.  This allows
-     the next subdissector to be chosen based on the same tag
-     (<some tag>) we were given. */
+  switch (TYPE(event->next->value))
+    {
+    case T_STR:
+    case T_VSTR:
+      GC_UPDATE(gc_ctx, F_BINTOTEXT_TAG, event->next->value);
+      /* When entering bintotext_subdissect(),
+	 event = [<some bstr>; <some tag>; ...]
+	 We product a new event of the form
+	 [<some line of text>; <some tag>; <some tag>; ...]
+	 where <some bstr> has been discarded.
+	 This allows the next subdissector to be chosen based
+	 on the same tag (<some tag>) we were given.
+	 We duplicate <same tag>, so that it appears both as
+	 a field in the source module, and as .bintotext.tag;
+	 the real reason is that we only do this when <some tag>
+	 is a string---otherwise (see below) our new event will
+	 instead be of the form
+	 [<some line of text>; ""; <some tag>; ...].
+	 This is needed because .bintotext.tag is document as being
+	 of type string.  I'm lazy and I'm only returning the
+	 empty string when <some tag> is not a string.  I hope
+	 it won't bother too many people.
+      */
+      break;
+    default:
+      GC_UPDATE(gc_ctx, F_BINTOTEXT_TAG, ctx->empty_string);
+      break;
+    }
   line = ovm_vstr_new (gc_ctx, delegate);
   VSTR(line) = (char *)stream;
   VSTRLEN(line) = stream_len-1; /* remove the final newline */
@@ -98,6 +119,7 @@ static int bintotext_dissect (orchids_t *ctx, mod_entry_t *mod,
 }
 
 static field_t bintotext_fields[] = {
+  { "bintotext.tag", &t_str, "tag for further subdissection" },
   { "bintotext.line", &t_str, "extracted line of text" }
 };
 

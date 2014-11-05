@@ -21,9 +21,10 @@
 
 #include "orchids.h"
 
-#define F_BINTOTEXT_LINE 0
+#define F_BINTOTEXT_TAG 0
+#define F_BINTOTEXT_LINE 1
 
-#define BINTOTEXT_FIELDS 1
+#define BINTOTEXT_FIELDS 2
 
 #endif /* MOD_BINTOTEXT_H */
 
