@@ -432,7 +432,7 @@ void register_conditional_dissector(orchids_t *ctx,
       exit(EXIT_FAILURE);
     }
   dissect_func = m_dissect->mod->dissect_fun;
-  if (dissect_func==NULL || m_source->num_fields < 2)
+  if (dissect_func==NULL) // || m_source->num_fields < 2)
     {
       fprintf (stderr, "%s:%u: module %s is not a dissection module.\n",
 	       file, line,
