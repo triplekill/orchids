@@ -8,6 +8,7 @@ SetModuleDir @@LIBDIR@@/orchids
 # Module section.
 # This is the place where modules are loaded.
 
+LoadModule bintotext
 LoadModule htmlstate
 LoadModule remoteadm
 LoadModule textfile
