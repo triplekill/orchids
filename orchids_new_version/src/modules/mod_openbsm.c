@@ -108,7 +108,10 @@ input_module_t mod_openbsm;
 #define STATE_HEADER BLOX_NSTATES+1
 #define STATE_FILE_EXPECT_FILENAMELEN BLOX_NSTATES+2
 
-static size_t openbsm_compute_length (unsigned char *first_bytes, size_t n_first_bytes,
+static size_t openbsm_compute_length (unsigned char *first_bytes,
+				      size_t n_first_bytes,
+				      size_t available_bytes,
+				      /* available_bytes is ignored here */
 				      int *state,
 				      void *sd_data)
 { /* n_first_bytes should be 5: 1 AUT_HEADER* byte + 4 bytes of length, in big-endian format */

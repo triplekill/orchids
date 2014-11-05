@@ -970,13 +970,13 @@ static int my_regvexec(gc_t *gc_ctx,
   char *s;
   size_t len;
 
-  switch (TYPE(string))
+  switch (TYPE(v))
     {
     case T_STR: s = STR(v); len = STRLEN(v); break;
     case T_VSTR: s = VSTR(v); len = VSTRLEN(v); break;
     default: return 0;
     }
-  ret = regnexec(preg, s, len, nmatch, eflags);
+  ret = regnexec(preg, s, len, nmatch, pmatch, eflags);
 #else
   char *s;
 

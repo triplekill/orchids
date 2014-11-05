@@ -354,6 +354,8 @@ AC_SUBST(PCRE_LDFLAGS)
 
 AC_CHECK_HEADERS(libaudit.h)
 
+AC_CHECK_FUNCS([regnexec strptime], [], [])
+
 CFLAGS="$CFLAGS -Wall -DPKGDATADIR=\\\"$datadir\\\" -DSYSCONFDIR=\\\"$sysconfdir\\\" -DLOCALSTATEDIR=\\\"$localstatedir\\\" -DLIBDIR=\\\"$libdir\\\""
 
 AC_CONFIG_FILES([Makefile

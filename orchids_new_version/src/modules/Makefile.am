@@ -21,6 +21,7 @@ pkglib_LTLIBRARIES = \
   mod_sunbsm.la \
   mod_syslog.la \
   mod_textfile.la \
+  mod_bintotext.la \
   mod_udp.la \
   mod_win32evt.la \
   mod_period.la \
@@ -164,6 +165,9 @@ mod_syslog_la_LDFLAGS = -module -avoid-version
 
 mod_textfile_la_SOURCES = mod_textfile.c mod_textfile.h
 mod_textfile_la_LDFLAGS = -module -avoid-version
+
+mod_bintotext_la_SOURCES = mod_bintotext.c mod_bintotext.h
+mod_bintotext_la_LDFLAGS = -module -avoid-version
 
 mod_udp_la_SOURCES = mod_udp.c mod_udp.h
 mod_udp_la_LDFLAGS = -module -avoid-version

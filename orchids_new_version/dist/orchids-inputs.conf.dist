@@ -19,10 +19,12 @@ INPUT			textfile	/var/log/auth.log
 DISSECT syslog	textfile	/var/log/auth.log
 ## (standard syslog udp)
 INPUT			udp		514
-DISSECT	syslog	udp		514
+DISSECT		bintotext	udp	514
+DISSECT		syslog	bintotext	514
 ##  (user-defined syslog udp, for testing without being root)
-#INPUT			udp		15014
-#DISSECT	syslog	udp		15014
+#INPUT				udp	15014
+#DISSECT	bintotext	udp	15014
+#DISSECT	syslog	bintotext	15014
 
 #INPUT			sockunix	/dev/log
 #DISSECT syslog	sockunix	/dev/log

@@ -102,7 +102,7 @@ static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he)
       reclen = hook->n_first_bytes;
       goto again;
     default:
-      reclen = (*hook->compute_length) (stream, reclen,
+      reclen = (*hook->compute_length) (stream, reclen, len,
 					&hook->state,
 					hook->sd_data);
       goto again;
@@ -207,7 +207,7 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       reclen = hook->n_first_bytes;
       goto again;
     default:
-      reclen = (*hook->compute_length) (stream, reclen,
+      reclen = (*hook->compute_length) (stream, reclen, len,
 					&hook->state,
 					hook->sd_data);
       goto again;

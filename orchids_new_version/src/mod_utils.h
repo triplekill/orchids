@@ -32,6 +32,7 @@ typedef struct blox_hook_s blox_hook_t;
 
 typedef size_t (*compute_length_fun) (unsigned char *first_bytes,
 				      size_t n_first_bytes,
+				      size_t available_bytes,
 				      int *state, /* pointer to blox state */
 				      void *sd_data);
 typedef void (*subdissect_fun) (orchids_t *ctx, mod_entry_t *mod,

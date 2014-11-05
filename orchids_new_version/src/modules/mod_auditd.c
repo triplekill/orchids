@@ -252,7 +252,7 @@ input_module_t mod_auditd = {
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 **
-vv** This software is a computer program whose purpose is to detect intrusions
+** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.
 **
 ** This software is governed by the CeCILL license under French law and
