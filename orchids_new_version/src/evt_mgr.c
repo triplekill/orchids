@@ -89,6 +89,8 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
   heap_t *left;
   struct heap_entry_s *he2;
 
+  GC_START(gc_ctx, 1);
+  GC_UPDATE(gc_ctx, 0, he->gc_data);
   rtp = &ctx->rtactionlist;
   while ((rt = *rtp) != NULL)
     {
@@ -110,6 +112,7 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
 	  rt->entry = he;
 	  GC_TOUCH (gc_ctx, he->gc_data);
 	  he = he2;
+	  GC_UPDATE(gc_ctx, 0, he->gc_data); // we don't want it to be freed
 	  rtp = &rt->left;
 	}
       else
@@ -123,6 +126,7 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
   rt->left = NULL;
   rt->right = NULL;
   GC_TOUCH (gc_ctx, *rtp = rt);
+  GC_END(gc_ctx);
 }
 
 

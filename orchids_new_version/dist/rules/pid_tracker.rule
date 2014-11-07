@@ -25,7 +25,7 @@ rule pidtrack
     cut("init");
 /*
     $query =  "property(Login, user, uid, "
-             + str_from_int($uid) + "), property(Login, user, realname, Name)";
+             + str_from_uint($uid) + "), property(Login, user, realname, Name)";
     $user = prolog($query, "Name");
     $str = str_from_int($pid) + " started by " + $user;
     print($str); */

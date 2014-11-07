@@ -678,6 +678,8 @@ struct filestack_s;
 */
 #define QSTRMAX 4096
 
+struct type_heap_s; /* defined in rule_compiler.h */
+
 /**
  ** @struct rule_compiler_s
  ** The main rule compiler context.
@@ -767,7 +769,7 @@ struct rule_compiler_s
   rule_t           *first_rule;
   rule_t           *last_rule;
   /* Type-checking: */
-  struct node_expr_s *type_stack; /* stack of nodes whose type we now know */
+  struct type_heap_s *type_stack; /* stack of nodes whose type we now know */
   int nerrors;
 };
 

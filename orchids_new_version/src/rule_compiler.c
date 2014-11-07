@@ -869,6 +869,9 @@ static size_t list_len (node_expr_t *l)
   return n;
 }
 
+
+static node_expr_t *pop_type_node (gc_t *gc_ctx, struct type_heap_s **rtp);
+
 static void type_check (rule_compiler_t *ctx)
 {
   node_expr_t *e, *l, *parent;
@@ -876,9 +879,8 @@ static void type_check (rule_compiler_t *ctx)
   GC_START(ctx->gc_ctx, 2);
   while (ctx->type_stack!=NULL)
     {
-      e = BIN_LVAL(ctx->type_stack);
+      e = pop_type_node (ctx->gc_ctx, &ctx->type_stack);
       GC_UPDATE(ctx->gc_ctx, 0, e);
-      GC_TOUCH (ctx->gc_ctx, ctx->type_stack = BIN_RVAL(ctx->type_stack));
       l = e->parents;
       GC_UPDATE(ctx->gc_ctx, 1, l);
       GC_TOUCH(ctx->gc_ctx, e->parents = NULL); /* remove cycles */
@@ -1759,15 +1761,195 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
 ** expression building functions...
 */
 
+typedef struct type_heap_s type_heap_t;
+struct type_heap_s {
+  gc_header_t gc;
+  node_expr_t *e;
+  type_heap_t *left;
+  type_heap_t *right;
+} ;
+
+static void type_heap_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  type_heap_t *h = (type_heap_t *)p;
+
+  GC_TOUCH (gc_ctx, h->e);
+  GC_TOUCH (gc_ctx, h->left);
+  GC_TOUCH (gc_ctx, h->right);
+}
+
+static void type_heap_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int type_heap_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			       void *data)
+{
+  type_heap_t *h = (type_heap_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->e, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->left, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)h->right, data);
+  return err;
+}
+
+static gc_class_t type_heap_class = {
+  GC_ID('t','p','h','p'),
+  type_heap_mark_subfields,
+  type_heap_finalize,
+  type_heap_traverse
+};
+
+/* Priority queues, implemented as skew heaps */
+
+static int expr_node_cmp (node_expr_t *e1, node_expr_t *e2)
+{
+  int cmp;
+
+  if (e1==NULL)
+    {
+      if (e2==NULL)
+	return 0;
+      return -1;
+    }
+  if (e2==NULL)
+    return 1;
+  if (e1->file!=NULL && e2->file==NULL)
+    return -1; /* prefer to treat named files first */
+  if (e1->file==NULL && e2->file!=NULL)
+    return 1;
+  if (e1->file!=NULL && e2->file!=NULL)
+    {
+      cmp = strcmp (STR(e1->file), STR(e2->file));
+      /* STR() is legal, because since e1->file and e2->file
+	 were created NUL-terminated, on purpose */
+      if (cmp)
+	return cmp;
+    }
+  return e1->lineno - e2->lineno;
+}
+
+static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp, node_expr_t *e)
+{
+  type_heap_t *rt;
+  type_heap_t *left;
+  node_expr_t *olde;
+
+  GC_START(gc_ctx, 1);
+  while ((rt = *rtp) != NULL)
+    {
+      /* Swap left and right.
+       In principle we should GC_TOUCH() after each of the following
+      two assignments, but this is not needed.  The only purpose of
+      GC_TOUCH() is to make sure no black object points to a white
+      object.  But if rt is black then neither rt->left nor rt->right
+      will be white before the swap, hence also, trivially, after
+      the swap. */
+      left = rt->left;
+      rt->left = rt->right;
+      rt->right = left;
+
+      if (expr_node_cmp(e, rt->e) < 0)
+	{ /* Store e into root, then insert the old
+	     value of rt->entry into rt->left subheap */
+	  olde = rt->e;
+	  GC_UPDATE(gc_ctx, 0, olde);
+	  GC_TOUCH (gc_ctx, rt->e = e);
+	  e = olde;
+	  rtp = &rt->left;
+	}
+      else
+	{ /* Else insert he into rt->left subheap */
+	  rtp = &rt->left;
+	}
+    }
+  rt = gc_alloc (gc_ctx, sizeof(type_heap_t), &type_heap_class);
+  rt->gc.type = T_NULL;
+  GC_TOUCH (gc_ctx, rt->e = e);
+  rt->left = NULL;
+  rt->right = NULL;
+  GC_TOUCH (gc_ctx, *rtp = rt);
+  GC_END(gc_ctx);
+}
+
+
+static void type_heap_merge (gc_t *gc_ctx, type_heap_t *h1, type_heap_t *h2,
+			     type_heap_t **res)
+{
+  type_heap_t *left;
+
+  while (1)
+    {
+      if (h2==NULL)
+	{
+	  GC_TOUCH (gc_ctx, *res = h1);
+	  return;
+	}
+      if (h1==NULL)
+	{
+	  GC_TOUCH (gc_ctx, *res = h2);
+	  return;
+	}
+      if (expr_node_cmp (h1->e, h2->e) < 0)
+	{
+	  /* We shall return h1, which is first. */
+	  GC_TOUCH (gc_ctx, *res = h1);
+	  /* First exchange the left and right parts of h1.
+	   No need to GC_TOUCH() here, see 'Swap left and right' comment
+	   in push_type_node(). */
+	  left = h1->right;
+	  h1->right = h1->left;
+	  h1->left = left;
+	  /* Next, merge the old right part (left now) with h2 */
+	  res = &h1->left;
+	  h1 = left;
+	  /* h2 unchanged; then loop */
+	}
+      else
+	{ /* In this other case, we shall instead return h2. */
+	  GC_TOUCH (gc_ctx, *res = h2);
+	  /* First (again) exchange its left and right parts.
+	   No need to GC_TOUCH() here, see 'Swap left and right' comment
+	   in push_type_node(). */
+	  left = h2->right;
+	  h2->right = h2->left;
+	  h2->left = left;
+	  /* Next merge the old right part (left now) with h1...
+	     swapping the roles of h1 and h2 in the process. */
+	  res = &h2->left;
+	  h2 = h1;
+	  h1 = left;
+	}
+    }
+}
+
+static node_expr_t *pop_type_node (gc_t *gc_ctx, type_heap_t **rtp)
+{
+  type_heap_t *rt = *rtp;
+  node_expr_t *e;
+
+  if (rt==NULL)
+    return NULL;
+  GC_START(gc_ctx, 1);
+  e = rt->e;
+  GC_UPDATE(gc_ctx, 0, e);
+  type_heap_merge (gc_ctx, rt->left, rt->right, rtp);
+  GC_END(gc_ctx);
+  return e;
+}
+
 static void set_type (rule_compiler_t *ctx, node_expr_t *myself,
 		      type_t *stype)
 {
-  node_expr_t *l;
-
   myself->stype = stype;
   /* Now add myself to the stack of nodes whose type we now know */
-  l = build_expr_cons (ctx, myself, ctx->type_stack); 
-  GC_TOUCH (ctx->gc_ctx, ctx->type_stack = l);
+  push_type_node (ctx->gc_ctx, &ctx->type_stack, myself);
 }
 
 static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
