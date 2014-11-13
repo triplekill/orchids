@@ -397,6 +397,7 @@ struct node_state_s
 {
   gc_header_t        gc;
   int                state_id;
+  char              *file;
   int                line;
   char              *name;
   node_expr_t *actionlist;
@@ -404,6 +405,8 @@ struct node_state_s
   unsigned long      flags;
   unsigned long      an_flags;
 #define AN_MUSTSET_REACHABLE 0x1
+#define AN_EPSILON_REACHABLE 0x2
+#define AN_EPSILON_DONE 0x4
   varset_t *mustset;
 };
 

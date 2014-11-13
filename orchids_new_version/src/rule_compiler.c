@@ -376,10 +376,12 @@ static void node_state_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_state_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  char *name = ((node_state_t *)p)->name;
+  node_state_t *state = (node_state_t *)p;
 
-  if (name!=NULL)
-    gc_base_free (name);
+  if (state->file!=NULL)
+    gc_base_free (state->file);
+  if (state->name!=NULL)
+    gc_base_free (state->name);
 }
 
 static int node_state_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -1307,8 +1309,10 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
   vs = vs_diff (gc_ctx, action_res.mayread, state->mustset);
   for (; vs!=VS_EMPTY; vs = vs->next)
     {
-      fprintf (stderr, "%s:%u: Error: variable %s may be used initialized here.\n",
-	       file, line, ctx->dyn_var_name[vs->n]);
+      if (file!=NULL)
+	fprintf (stderr, "%s:", file);
+      fprintf (stderr, "%u: Error: variable %s may be used initialized here.\n",
+	       line, ctx->dyn_var_name[vs->n]);
       ctx->nerrors++;
     }
   action_res.mustset = vs_union (gc_ctx, state->mustset, action_res.mustset);
@@ -1325,8 +1329,10 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
       vs = vs_diff (gc_ctx, cond_res.mayread, action_res.mustset);
       for (; vs!=VS_EMPTY; vs = vs->next)
 	{
-	  fprintf (stderr, "%s:%u: Error: variable %s may be used initialized here.\n",
-		   trans->file, trans->lineno, ctx->dyn_var_name[vs->n]);
+	  if (trans->file!=NULL)
+	    fprintf (stderr, "%s:", trans->file);
+	  fprintf (stderr, "%u: Error: variable %s may be used initialized here.\n",
+		   trans->lineno, ctx->dyn_var_name[vs->n]);
 	  ctx->nerrors++;
 	}
       if (trans->sub_state_dest!=NULL)
@@ -1365,14 +1371,16 @@ static void check_rule_mustset (rule_compiler_t *ctx, node_rule_t *rule)
 	}
       if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
 	{
-	  fprintf (stderr, "%s:%u: Warning: state %s is unreachable, hence useless\n",
-		   file, line, state->name);
+	  if (file!=NULL)
+	    fprintf (stderr, "%s:", file);
+	  fprintf (stderr, "%u: Warning: state %s is unreachable, hence useless\n",
+		   line, state->name);
 	}
       else check_state_mustset (ctx, rule, file, line, state);
     }
 }
 
-static void analyze_rule (rule_compiler_t *ctx, node_rule_t *rule)
+static void check_var_usage (rule_compiler_t *ctx, node_rule_t *rule)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
   an_worklist_t *work, *next;
@@ -1424,8 +1432,10 @@ static void analyze_rule (rule_compiler_t *ctx, node_rule_t *rule)
 		  (trans->an_flags & AN_NONEXISTENT_TARGET_ALREADY_SAID)==0)
 		{
 		  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
-		  fprintf (stderr, "%s:%u: nonexistent target state %s\n",
-			   trans->file, trans->lineno, trans->dest);
+		  if (trans->file!=NULL)
+		    fprintf (stderr, "%s:", trans->file);
+		  fprintf (stderr, "%u: nonexistent target state %s\n",
+			   trans->lineno, trans->dest);
 		  ctx->nerrors++;
 		}
 	    }
@@ -1466,6 +1476,51 @@ static void analyze_rule (rule_compiler_t *ctx, node_rule_t *rule)
     }
   GC_END(gc_ctx);
   check_rule_mustset (ctx, rule);
+}
+
+static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
+{
+  node_expr_t *l;
+  node_trans_t *trans;
+
+  if (state->an_flags & AN_EPSILON_DONE)
+    return; /* already dealt with in a previous call to
+	       mark_epsilon_reachable() */
+  if (state->an_flags & AN_EPSILON_REACHABLE)
+    { /* cycle */
+      if (state->file!=NULL)
+	fprintf (stderr, "%s:", state->file);
+      fprintf (stderr, "%u: Error: state %s is part of a cycle of gotos\n",
+	       state->line, state->name);
+      return;
+    }
+  state->an_flags |= AN_EPSILON_REACHABLE;
+  for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+    {
+      trans = (node_trans_t *)BIN_LVAL(l);
+      if (trans==NULL)
+	continue;
+      if (trans->cond==NULL) /* epsilon transition, i.e.,
+				goto without an expect */
+	mark_epsilon_reachable (ctx, trans->sub_state_dest);
+    }
+  state->an_flags &= ~AN_EPSILON_REACHABLE;
+  state->an_flags |= AN_EPSILON_DONE;
+}
+
+static void check_epsilon_transitions (rule_compiler_t *ctx, node_rule_t *rule)
+{ /* must be called after check_var_usage(), which sets the
+     AN_MUSTSET_REACHABLE flags of each state */
+  node_expr_t *l;
+  node_state_t *state;
+
+  for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
+    {
+      state = (node_state_t *)BIN_LVAL(l);
+      if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
+	continue; /* ignore unreachable states */
+      mark_epsilon_reachable (ctx, state);
+    }
 }
 
 /**
@@ -1559,6 +1614,7 @@ node_state_t *build_state(rule_compiler_t *ctx,
 		&node_state_class);
   s->gc.type = T_NULL;
   s->state_id = 0; /* not set */
+  s->file = NULL; /* not set: will be set by set_state_label() */
   s->line = 0; /* not set: will be set by set_state_label() */
   s->name = NULL; /* not set: will be set by set_state_label() */
   s->flags = 0; /* not set: will be set by set_state_label() */
@@ -1575,12 +1631,18 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
 			      symbol_token_t *sym,
 			      unsigned long flags)
 {
-  if (sym->file!=NULL)
-    gc_base_free (sym->file);
   if (state == NULL)
     {
+      if (sym->file!=NULL)
+	gc_base_free (sym->file);
       gc_base_free (sym->name);
       return NULL;
+    }
+  if (sym->file!=NULL)
+    {
+      if (state->file!=NULL)
+	gc_base_free (state->file);
+      state->file = sym->file;
     }
   state->name = sym->name;
   state->line = sym->line;
@@ -3740,7 +3802,8 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   if (stat(node_rule->file, &filestat))
     filestat.st_mtime = 0;
 
-  analyze_rule (ctx, node_rule);
+  check_var_usage (ctx, node_rule);
+  check_epsilon_transitions (ctx, node_rule);
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
