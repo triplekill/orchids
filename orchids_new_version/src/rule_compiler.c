@@ -1664,6 +1664,72 @@ node_expr_t *build_unconditional_transition(rule_compiler_t *ctx,
 }
 */
 
+static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
+{
+  if (e==NULL)
+    return;
+  switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+    case NODE_VARIABLE:
+      break;
+    case NODE_CALL:
+      {
+	node_expr_t *l;
+
+	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    check_expect_condition (ctx, BIN_LVAL(l));
+	  }
+	break;
+      }
+    case NODE_BINOP:
+    case NODE_CONS:
+    case NODE_EVENT:
+    case NODE_COND:
+      check_expect_condition (ctx, BIN_LVAL(e));
+      check_expect_condition (ctx, BIN_RVAL(e));
+      break;
+    case NODE_MONOP:
+      check_expect_condition (ctx, MON_VAL(e));
+      break;
+    case NODE_REGSPLIT:
+      check_expect_condition (ctx, REGSPLIT_STRING(e));
+      if (REGSPLIT_DEST_VARS(e)->vars_nb!=0)
+	{
+	  if (e->file!=NULL)
+	    fprintf (stderr, "%s:", STR(e->file));
+	  /* printing STR(e->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: error: cannot assign to variable%s inside 'expect' clause\n",
+		   e->lineno, REGSPLIT_DEST_VARS(e)->vars_nb==1?"":"s");
+	  ctx->nerrors++;
+	}
+      break;
+    case NODE_IFSTMT:
+      check_expect_condition (ctx, IF_COND(e));
+      check_expect_condition (ctx, IF_THEN(e));
+      check_expect_condition (ctx, IF_ELSE(e));
+      break;
+    case NODE_ASSOC:
+      check_expect_condition (ctx, BIN_RVAL(e));
+      if (e->file!=NULL)
+	fprintf (stderr, "%s:", STR(e->file));
+      /* printing STR(e->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: error: cannot assign to variable inside 'expect' clause\n",
+	       e->lineno);
+      ctx->nerrors++;
+      break;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+      break;
+    }
+}
+
 static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself);
 static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
 			node_expr_t *parent);
@@ -1710,6 +1776,7 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
   trans->sub_state_dest = NULL; /* not set */
   trans->an_flags = 0;
   GC_UPDATE(ctx->gc_ctx, 0, trans);
+  check_expect_condition (ctx, cond);
   if (cond!=NULL)
     add_boolean_check (ctx, cond);
   GC_END(ctx->gc_ctx);
@@ -1728,6 +1795,7 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
   trans->gc.type = T_NULL;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
+  check_expect_condition (ctx, cond);
   trans->dest = NULL; /* not set */
   trans->file = NULL; /* not set */
   trans->lineno = -1; /* not set */
@@ -1978,7 +2046,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 	fprintf (stderr, "%s:", STR(str->file));
       /* printing STR(str->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: type error: expected str, got %s",
+      fprintf (stderr, "%u: type error: expected str, got %s\n",
 	       str->lineno,
 	       str->stype->name);
       ctx->nerrors++;
