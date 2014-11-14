@@ -249,6 +249,11 @@ static void add_vmod(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   /* add a virtual module */
 
   mod_name = strdup(dir->args);
+  if (mod_name==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "Cannot strdup %s\n", dir->args);
+      return;
+    }
   mod_name[ strlen(mod_name) - 1 ] = '\0';
 
   vmod = strhash_get(cfg->mod_hash, mod_name);
