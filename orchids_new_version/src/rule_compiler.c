@@ -1824,6 +1824,7 @@ static unsigned long h_mul (unsigned long x, unsigned long y)
   return z;
 }
 
+/*
 static unsigned long h_exp (unsigned long x, unsigned long n)
 {
   unsigned long res;
@@ -1838,10 +1839,44 @@ static unsigned long h_exp (unsigned long x, unsigned long n)
     res = h_mul (res, x);
   return res;
 }
+*/
 
-static unsigned long h_pair (unsigned long x, unsigned long y)
-{ /* compute <x,y> as 2**x . 3**y, mod bigprime */
-  return h_mul (h_exp (2L, x), h_exp (3L, y));
+static unsigned long h_pair (unsigned long m, unsigned long n)
+{ /* There is a well-known bijection from N x N to N:
+     <m, n> = (m+n)(m+n+1)/2 + m
+     Here we compute <m, n> mod bigprime
+  */
+  unsigned long sum, sump1, prod, res;
+
+  sum = m+n;
+  if (sum>=bigprime)
+    sum -= bigprime;
+  sump1 = sum+1;
+  if (sump1>=bigprime)
+    sump1 -= bigprime;
+  prod = h_mul (sum, sump1);
+  /* prod should be even (mod bigprime)
+     If it is even at all, compute prod/2
+     Otherwise, compute (prod+bigprime)/2
+     Note that <_, _> is a morphism mod bigprime, since
+     bigprime is odd: this follows from the fact that
+     k -> k(k+1)/2 is a morphism mod bigprime
+     (if k=k' mod bigprime, say k' = k + a.bigprime,
+     then k'(k'+1)/2
+     = (k+a.bigprime)(k+a.bigprime+1)/2
+     = k(k+a.bigprime+1)/2 + a.bigprime(k+a.bigprime+1)/2
+     = k(k+1)/2 + ka.bigprime/2 + a.bigprime(k+a.bigprime+1)/2
+     = k(k+1)/2 + [2ka+a^2.bigprime+a)].bigprime/2;
+     then note that 2ka is even, and a^2.bigprime+a mod 2=a^2+a mod 2
+     since bigprime is odd, and a^2+a mod 2 = 0 mod 2.)
+   */
+  if (prod & 1)
+    res = (prod + bigprime) >> 1;
+  else res = prod >> 1;
+  res += m;
+  if (res>=bigprime)
+    res -= bigprime;
+  return res;
 }
 
 #define H_NULL (bigprime-1)  /* NULL is encoded as (-1) mod bigprime */
