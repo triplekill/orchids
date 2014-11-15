@@ -66,6 +66,7 @@ typedef struct node_expr_if_s node_expr_if_t;
   int   type; /* node type: NODE_FIELD, or NODE_VARIABLE, or ... */	\
   ovm_var_t *file; /* really a NUL-terminated ovm_str_t * */		\
   unsigned int lineno;							\
+  unsigned long hash;							\
   type_t *stype; /* static type, used in static type checking (&t_int,	\
 		    &t_str, etc.) */					\
   void (*compute_stype) (rule_compiler_t *ctx, node_expr_t *myself);	\

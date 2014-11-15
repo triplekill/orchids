@@ -46,6 +46,11 @@
 #include "issdl.tab.h"
 #include "ovm.h"
 
+static unsigned long bigprime =
+  (sizeof(unsigned long)>=8)?5174544934365344191L: /* 63 bit prime */
+  ((sizeof(unsigned long)>=4)?2031676799L: /* 31 bit prime */
+   22391L /* 15 bit prime */);
+
 #define STATICS_SZ 16
 #define DYNVARNAME_SZ 16
 
@@ -1792,6 +1797,62 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
     }
 }
 
+/* functions used to compute the hash code of every node_expr_t: */
+static unsigned long h_mul (unsigned long x, unsigned long y)
+{ /* multiplication mod bigprime;
+     this is native, and essentially meant not to overflow
+     sizeof(unsigned long) */
+  unsigned long z;
+
+  if (x==0 || y==0)
+    return 0;
+  if (y < x)
+    {
+      z = x;
+      x = y;
+      y = z;
+    }
+  z = h_mul (x, y>>1) << 1;
+  if (z>=bigprime)
+    z -= bigprime; /* reduce mod bigprime */
+  if (y & 1)
+    {
+      z += x;
+      if (z>=bigprime)
+	z -= bigprime; /* reduce mod bigprime */
+    }
+  return z;
+}
+
+static unsigned long h_exp (unsigned long x, unsigned long n)
+{
+  unsigned long res;
+
+  if (x==0)
+    return 0L;
+  if (n==0)
+    return 1L;
+  res = h_exp (x, n>>1);
+  res = h_mul (res, res);
+  if (n & 1)
+    res = h_mul (res, x);
+  return res;
+}
+
+static unsigned long h_pair (unsigned long x, unsigned long y)
+{ /* compute <x,y> as 2**x . 3**y, mod bigprime */
+  return h_mul (h_exp (2L, x), h_exp (3L, y));
+}
+
+#define H_NULL (bigprime-1)  /* NULL is encoded as (-1) mod bigprime */
+
+static unsigned long h_cons (node_expr_t *e, unsigned long l)
+{
+  if (e==NULL)
+    return h_pair (H_NULL, l);
+  return h_pair (e->hash, l);
+}
+
 static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself);
 static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
 			node_expr_t *parent);
@@ -1808,6 +1869,12 @@ static void add_boolean_check (rule_compiler_t *ctx,
   bool_check->type = NODE_IFSTMT;
   GC_TOUCH (ctx->gc_ctx, bool_check->file = expr->file);
   bool_check->lineno = expr->lineno;
+  bool_check->hash = h_pair (NODE_IFSTMT,
+			     h_cons (expr,
+				     h_cons (NULL,
+					     h_cons (NULL,
+						     H_NULL))));
+  /* hash = '(NODE_IFSTMT expr NULL NULL)' mod bigprime */
   bool_check->stype = NULL; /* not known yet */
   bool_check->compute_stype = compute_stype_ifstmt;
   bool_check->npending_argtypes = 1;
@@ -2160,6 +2227,19 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
     }
 }
 
+static unsigned long h_varlist (node_varlist_t *vl)
+{
+  size_t i, n;
+  unsigned long res = H_NULL;
+
+  if (vl!=NULL)
+    {
+      for (n=vl->vars_nb, i=0; i<n; i++)
+	res = h_cons (vl->vars[i], res);
+    }
+  return res;
+}
+
 node_expr_t *build_string_split(rule_compiler_t *ctx,
 				node_expr_t *source,
 				node_expr_t *pattern,
@@ -2174,6 +2254,11 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
   n->type = NODE_REGSPLIT;
   GC_TOUCH (ctx->gc_ctx, n->file = pattern->file);
   n->lineno = pattern->lineno;
+  n->hash = h_pair (NODE_REGSPLIT,
+		    h_cons (source,
+			    h_cons (pattern,
+				    h_varlist (dest_list))));
+  /* hash = '(NODE_REGSPLIT source pattern x1 ... xn)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_string_split;
   n->npending_argtypes = 1;
@@ -2338,6 +2423,12 @@ node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
   n->type = NODE_BINOP;
   GC_TOUCH (ctx->gc_ctx, n->file = left_node->file);
   n->lineno = left_node->lineno;
+  n->hash = h_pair (NODE_BINOP,
+		    h_pair (op,
+			    h_cons (left_node,
+				    h_cons (right_node,
+					    H_NULL))));
+  /* hash = '(NODE_BINOP op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_binop;
   n->npending_argtypes = 2;
@@ -2424,6 +2515,10 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
   n->type = NODE_MONOP;
   GC_TOUCH (ctx->gc_ctx, n->file = arg_node->file);
   n->lineno = arg_node->lineno;
+  n->hash = h_pair (NODE_MONOP,
+		    h_pair (op,
+			    h_cons (arg_node, H_NULL)));
+  /* hash = '(NODE_MONOP op arg_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_monop;
   n->npending_argtypes = 1;
@@ -2448,6 +2543,7 @@ node_expr_t *build_expr_cons(rule_compiler_t *ctx,
   n->type = NODE_CONS;
   n->file = NULL;
   n->lineno = 0;
+  n->hash = h_cons (left_node, (right_node==NULL)?H_NULL:right_node->hash);
   n->stype = NULL;
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -2622,6 +2718,12 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
   n->type = NODE_COND;
   GC_TOUCH (ctx->gc_ctx, n->file = left_node?left_node->file:right_node->file);
   n->lineno = left_node?left_node->lineno:right_node->lineno;
+  n->hash = h_pair (NODE_COND,
+		    h_pair (op,
+			    h_cons (left_node,
+				    h_cons (right_node,
+					    H_NULL))));
+  /* hash = '(NODE_COND op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_cond;
   n->npending_argtypes = left_node?2:1;
@@ -2681,6 +2783,10 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
   n->type = NODE_ASSOC;
   GC_TOUCH (ctx->gc_ctx, n->file = var->file);
   n->lineno = var->lineno;
+  n->hash = h_pair (NODE_ASSOC,
+		    h_cons (var,
+			    h_cons (expr, H_NULL)));
+  /* hash = '(NODE_ASSOC var expr)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_assoc;
   n->npending_argtypes = 1; /* we are just waiting for the rval(=expr)
@@ -2764,6 +2870,24 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
     }
 }
 
+static unsigned long h_str (char *s, size_t len)
+{
+  unsigned long res = H_NULL;
+  char *t = s+len;
+
+  while (t!=s)
+    {
+      t--;
+      res = h_pair ((unsigned long)(unsigned char)*t, res);
+    }
+  return res;
+}
+
+static unsigned long h_string (char *s)
+{
+  return h_str (s, strlen(s));
+}
+
 node_expr_t *build_function_call(rule_compiler_t  *ctx,
 				 symbol_token_t   *sym,
 				 node_expr_t *paramlist)
@@ -2793,6 +2917,11 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
 					    &node_expr_call_class);
   call_node->gc.type = T_NULL;
   call_node->file = NULL;
+  call_node->hash = h_pair (NODE_CALL,
+			    h_pair (h_string (sym->name),
+				    (paramlist==NULL)?H_NULL:
+				    paramlist->hash));
+  /* hash = '(NODE_CALL (n a m e) param1 ... paramn)' mod bigprime */
   call_node->parents = NULL;
   call_node->paramlist = NULL;
   GC_UPDATE(ctx->gc_ctx, 1, call_node);
@@ -2884,6 +3013,12 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
   i->type = NODE_IFSTMT;
   GC_TOUCH (ctx->gc_ctx, i->file = cond->file);
   i->lineno = cond->lineno;
+  i->hash = h_pair (NODE_IFSTMT,
+		    h_cons (cond,
+			    h_cons (then,
+				    h_cons (els,
+					    H_NULL))));
+  /* hash = '(NODE_IFSTMT cond then els)' mod bigprime */
   i->stype = NULL; /* not known yet */
   i->compute_stype = compute_stype_ifstmt;
   i->npending_argtypes = (els==NULL)?2:3;
@@ -2919,6 +3054,9 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   n->type = NODE_FIELD;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_FIELD,
+		    h_string (fieldname));
+  /* hash = '(NODE_FIELD n a m e)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -2956,6 +3094,8 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
   n->parents = NULL;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
+  n->hash = h_pair (NODE_VARIABLE, h_pair (n->res_id, H_NULL));
+  /* hash = '(NODE_VARIABLE n)' mod bigprime */
   GC_START(ctx->gc_ctx, 1);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   gc_strhash_add(ctx->gc_ctx, ctx->rule_env, (gc_header_t *)n,
@@ -2982,6 +3122,11 @@ node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_UINT,
+			    h_pair (i % bigprime,
+				    H_NULL)));
+  /* hash = '(NODE_CONST T_UINT i)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3010,6 +3155,11 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_FLOAT,
+			    h_pair (h_str ((char *)&f, sizeof(double)),
+				    H_NULL)));
+  /* hash = '(NODE_CONST T_FLOAT byte1 ... byten)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3045,6 +3195,10 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_STR,
+			    h_string (str)));
+  /* hash = '(NODE_CONST T_STR c h a r s)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3095,6 +3249,11 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
   n->type = NODE_EVENT;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_EVENT,
+		    h_pair (op,
+			    h_cons (left_node,
+				    h_cons (right_node, H_NULL))));
+  /* hash = '(NODE_EVENT op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_event;
   n->parents = NULL;
@@ -3148,6 +3307,11 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_IPV4,
+			    h_str ((char *)&IPV4(addr),
+				   sizeof(struct in_addr))));
+  /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3189,6 +3353,11 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_IPV6,
+			    h_str ((char *)&IPV6(addr),
+				   sizeof(struct in6_addr))));
+  /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3217,6 +3386,11 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_CTIME,
+			    h_pair (CTIME(time) % bigprime,
+				    H_NULL)));
+  /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3285,6 +3459,11 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_CTIME,
+			    h_pair (CTIME(time) % bigprime,
+				    H_NULL)));
+  /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3315,6 +3494,12 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_TIMEVAL,
+			    h_pair (sec % bigprime,
+				    h_pair (usec % bigprime,
+					    H_NULL))));
+  /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3357,6 +3542,12 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_TIMEVAL,
+			    h_pair (TIMEVAL(timeval).tv_sec % bigprime,
+				    h_pair (TIMEVAL(timeval).tv_usec % bigprime,
+					    H_NULL))));
+  /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
@@ -3447,6 +3638,10 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_REGEX,
+			    h_string (regex_str)));
+  /* hash = '(NODE_CONST T_REGEX r e g e x)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
   n->npending_argtypes = 0;
