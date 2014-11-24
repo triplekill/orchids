@@ -645,7 +645,9 @@ struct wait_thread_s
   wait_thread_t    *next_in_state_instance;
   unsigned long     flags;
   unsigned int      pass;
+#ifdef TIMEOUT_OBSOLETE
   time_t            timeout;
+#endif
 };
 
 

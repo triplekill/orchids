@@ -320,8 +320,10 @@ static int simulate_state_and_create_threads(orchids_t        *ctx,
         GC_TOUCH (gc_ctx, state->thread_list = thread);
       }
 
+#ifdef TIMEOUT_OBSOLETE
       /* compute the timeout date */
       thread->timeout = time(NULL) + DEFAULT_TIMEOUT;
+#endif
 
       /* add thread into the 'new thread' queue */
       if (ctx->new_qt) { /* if queue isn't empty, append to the tail */
@@ -642,12 +644,14 @@ void inject_event(orchids_t *ctx, event_t *event)
     next_thread = t->next;
     GC_TOUCH (gc_ctx, ctx->current_tail = t);
 
+#ifdef TIMEOUT_OBSOLETE
     /* Check timeout date */
     if ( !(t->flags & THREAD_ONLYONCE) && (t->timeout <= cur_time) )
       {
 	DebugLog(DF_ENG, DS_DEBUG, "thread %p timed out ! (killing)\n", t);
 	t->flags |= THREAD_KILLED;
       }
+#endif
 
     /* Killed thread reaper (and rule instance if apply) */
     if ( THREAD_IS_KILLED(t) )

@@ -42,7 +42,9 @@
 #define DEFAULT_RULE_DIR "./rules"
 #define DEFAULT_FIELD_ACTIVATION 1
 
+#ifdef TIMEOUT_OBSOLETE
 #define DEFAULT_TIMEOUT 600
+#endif
 
 /* #define PATH_TO_DOT "/usr/local/bin/dot" */
 /* #define PATH_TO_EPSTOPDF "/usr/bin/epstopdf" */
