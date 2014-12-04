@@ -125,10 +125,10 @@ static int sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *dat
 }
 
 static field_t sockunix_fields[] = {
-  { "sockunix.event",    &t_int,      "event number"        },
-  { "sockunix.time",     &t_timeval,  "reception time"      },
-  { "sockunix.socket",   &t_str,      "unix socket name"    },
-  { "sockunix.msg",      &t_bstr,     "message"             }
+  { "sockunix.event",    &t_int, MONO_MONO,      "event number"        },
+  { "sockunix.time",     &t_timeval, MONO_MONO,  "reception time"      },
+  { "sockunix.socket",   &t_str, MONO_UNKNOWN,      "unix socket name"    },
+  { "sockunix.msg",      &t_bstr, MONO_UNKNOWN,     "message"             }
 };
 
 static void * sockunix_preconfig(orchids_t *ctx, mod_entry_t *mod)

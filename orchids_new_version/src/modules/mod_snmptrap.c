@@ -184,25 +184,25 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
 
 static field_t snmptrap_fields[] = {
   /* common fields */
-  { "snmptrap.seq",          &t_int, "Sequence number" },
-  { "snmptrap.bind",         &t_int, "Index of binding" },
-  { "snmptrap.version",      &t_int, "Protocol version" },
-  { "snmptrap.community",    &t_str, "Community name" },
-  { "snmptrap.pdu_type",     &t_str, "Protocol Data Unit type" },
-  { "snmptrap.object_id",    &t_snmpoid, "Object identifier" },
-  { "snmptrap.value",        &t_bstr, "Object value" },
+  { "snmptrap.seq",          &t_int, MONO_MONO, "Sequence number" },
+  { "snmptrap.bind",         &t_int, MONO_UNKNOWN, "Index of binding" },
+  { "snmptrap.version",      &t_int, MONO_UNKNOWN, "Protocol version" },
+  { "snmptrap.community",    &t_str, MONO_UNKNOWN, "Community name" },
+  { "snmptrap.pdu_type",     &t_str, MONO_UNKNOWN, "Protocol Data Unit type" },
+  { "snmptrap.object_id",    &t_snmpoid, MONO_UNKNOWN, "Object identifier" },
+  { "snmptrap.value",        &t_bstr, MONO_UNKNOWN, "Object value" },
 
   /* Version 1 Specific */
-  { "snmptrap.enterprise",   &t_snmpoid, "Identifies the trap source" },
-  { "snmptrap.agent_addr",   &t_ipv4, "Source address" },
-  { "snmptrap.trap_type",    &t_int, "Trap type" },
-  { "snmptrap.specific_trap_type",    &t_int, "Specific trap type" },
-  { "snmptrap.timestamp",    &t_int, "Timestamp" },
+  { "snmptrap.enterprise",   &t_snmpoid, MONO_UNKNOWN, "Identifies the trap source" },
+  { "snmptrap.agent_addr",   &t_ipv4, MONO_UNKNOWN, "Source address" },
+  { "snmptrap.trap_type",    &t_int, MONO_UNKNOWN, "Trap type" },
+  { "snmptrap.specific_trap_type",    &t_int, MONO_UNKNOWN, "Specific trap type" },
+  { "snmptrap.timestamp",    &t_int, MONO_UNKNOWN, "Timestamp" },
 
   /* Version 2 Specific */
-  { "snmptrap.request_id",   &t_uint, "Request ID" },
-  { "snmptrap.error_status", &t_uint, "Error status" },
-  { "snmptrap.error_index",  &t_uint, "Error index" },
+  { "snmptrap.request_id",   &t_uint, MONO_UNKNOWN, "Request ID" },
+  { "snmptrap.error_status", &t_uint, MONO_UNKNOWN, "Error status" },
+  { "snmptrap.error_index",  &t_uint, MONO_UNKNOWN, "Error index" },
 };
 
 static void *

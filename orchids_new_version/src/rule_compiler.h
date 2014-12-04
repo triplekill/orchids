@@ -157,6 +157,7 @@ struct node_expr_call_s
 
 #define CALL_SYM(e) ((node_expr_call_t *)e)->symbol
 #define CALL_RES_ID(e) (((node_expr_call_t *)e)->f==NULL?0:((node_expr_call_t *)e)->f->id)
+#define CALL_COMPUTE_MONOTONY(e) (((node_expr_call_t *)e)->f==NULL?NULL:((node_expr_call_t *)e)->f->compute_monotony)
 #define CALL_PARAMS(e) ((node_expr_call_t *)e)->paramlist
 
 
@@ -173,7 +174,10 @@ node_expr_t *expr_cons_reverse(rule_compiler_t *ctx, node_expr_t *l);
  **     Expression type: NODE_VARIABLE.
  **/
 /**   @var node_expr_symbol_s::res_id
- **     Variable identifier (id in environment).
+ **     Variable identifier (id in environment, or in fields table).
+ **/
+/**   @var node_expr_symbol_s::mono
+ **     Monotonicity info (for fields)
  **/
 /**   @var node_expr_symbol_s::name
  **     Variable name.
@@ -183,10 +187,12 @@ struct node_expr_symbol_s
 {
   NODE_EXPR_S
   int   res_id;
+  monotony mono; /* for field names */
   char *name;
 };
 
 #define SYM_RES_ID(e) ((node_expr_symbol_t *)e)->res_id
+#define SYM_MONO(e) ((node_expr_symbol_t *)e)->mono
 #define SYM_NAME(e) ((node_expr_symbol_t *)e)->name
 
 

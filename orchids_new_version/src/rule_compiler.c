@@ -1528,6 +1528,399 @@ static void check_epsilon_transitions (rule_compiler_t *ctx, node_rule_t *rule)
     }
 }
 
+static monotony compute_monotony_bin (rule_compiler_t *ctx,
+				      int op,
+				      monotony ma,
+				      monotony mb)
+{
+  monotony res;
+
+  res = MONO_UNKNOWN;
+  switch (op)
+    {
+    case OP_ADD: /* + is meant to be monotonic, whatever the types
+		    of the arguments */
+      /* MONO+MONO=MONO, ANTI+ANTI=ANTI */
+      if ((ma & MONO_MONO) && (mb & MONO_MONO))
+	res |= MONO_MONO;
+      if ((ma & MONO_ANTI) && (mb & MONO_ANTI))
+	res |= MONO_ANTI;
+      break;
+    case OP_SUB:
+      /* - is meant to be monotonic in its first argument and
+	 antitonic in its second argument, whatever the types
+	 of the arguments */
+      /* MONO-ANTI=MONO, ANTI-MONO=ANTI */
+      res = MONO_UNKNOWN;
+      if ((ma & MONO_MONO) && (mb & MONO_ANTI))
+	res |= MONO_MONO;
+      if ((ma & MONO_ANTI) && (mb & MONO_MONO))
+	res |= MONO_ANTI;
+      break;
+    case OP_MUL:
+    case OP_DIV:
+    case OP_MOD:
+    case OP_AND: /* &, not && */
+    case OP_OR: /* |, not || */
+    case OP_XOR: /* ^ */
+    case OP_ADD_EVENT:
+      if (ma==MONO_CONST && mb==MONO_CONST)
+	res = MONO_CONST;
+      break;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized binop %d\n", op);
+      exit(EXIT_FAILURE);
+      break;
+    }
+  return res;
+}
+
+static monotony compute_monotony_mon (rule_compiler_t *ctx,
+				      int op,
+				      monotony ma,
+				      type_t *ta)
+{
+  monotony res;
+
+  res = MONO_UNKNOWN;
+  switch (op)
+    {
+    case OP_OPP:
+      if (strcmp (ta->name, "uint")==0)
+	{ /* special case: the opposite of a uint is a int,
+	     and monotonicity is not preserved; only constancy is.
+	     By the way, we need this operation to be interpret -1
+	     as an int (this is parsed as the opposite of the uint 1).
+	  */
+	  if (ma==MONO_CONST)
+	    res = MONO_CONST;
+	  break;
+	}
+      /*FALLTHROUGH*/
+    case OP_NOT:
+      if (ma & MONO_MONO)
+	res |= MONO_ANTI;
+      if (ma & MONO_ANTI)
+	res |= MONO_MONO;
+      break;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized monop %d\n", op);
+      exit(EXIT_FAILURE);
+      break;
+    }
+  return res;
+}
+
+static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
+					 node_expr_t *e,
+					 monotony vars[])
+{
+  if (e==NULL)
+    return;
+  switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+    case NODE_VARIABLE:
+      break;
+    case NODE_CALL:
+      {
+	node_expr_t *l;
+
+	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	break;
+      }
+    case NODE_BINOP:
+    case NODE_EVENT:
+    case NODE_CONS:
+    case NODE_COND:
+      set_monotony_unknown_mayset (ctx, BIN_LVAL(e), vars);
+      set_monotony_unknown_mayset (ctx, BIN_RVAL(e), vars);
+      break;
+    case NODE_MONOP:
+      set_monotony_unknown_mayset (ctx, MON_VAL(e), vars);
+      break;
+    case NODE_REGSPLIT:
+      {
+	size_t i, n;
+
+	set_monotony_unknown_mayset (ctx, REGSPLIT_STRING(e), vars);
+	n = REGSPLIT_DEST_VARS(e)->vars_nb;
+	for (i=0; i<n; i++)
+	  vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_UNKNOWN;
+	break;
+      }
+    case NODE_IFSTMT:
+      set_monotony_unknown_mayset (ctx, IF_COND(e), vars);
+      set_monotony_unknown_mayset (ctx, IF_THEN(e), vars);
+      set_monotony_unknown_mayset (ctx, IF_ELSE(e), vars);
+      break;
+    case NODE_ASSOC:
+      set_monotony_unknown_mayset (ctx, BIN_RVAL(e), vars);
+      vars[SYM_RES_ID(BIN_LVAL(e))] = MONO_UNKNOWN;
+      break;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+      break;
+    }
+}
+
+static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
+				  monotony vars[]);
+
+static monotony compute_monotony_cond (rule_compiler_t *ctx,
+				       int op,
+				       node_expr_t *left,
+				       node_expr_t *right,
+				       monotony vars[])
+{
+  monotony ma, mb, res;
+  monotony *alt;
+  size_t nvars, i;
+  size_t varsz;
+
+  switch (op)
+    {
+    case ANDAND:
+    case OROR:
+      ma = compute_monotony (ctx, left, vars);
+      nvars = ctx->rule_env->elmts;
+      varsz = nvars*sizeof(monotony);
+      alt = gc_base_malloc (ctx->gc_ctx, varsz);
+      memcpy (alt, vars, varsz);
+      mb = compute_monotony (ctx, right, alt);
+      /* The effect on vars[] is a bit complicated, and
+	 is as in the NODE_IFSTMT case in compute_monotony() */
+      if (ma==MONO_CONST)
+	{
+	  for (i=0; i<nvars; i++)
+	    vars[i] &= alt[i];
+	}
+      else /* cannot conclude on any variable that may be set
+	      by left or right. */
+	{
+	  set_monotony_unknown_mayset (ctx, left, vars);
+	  set_monotony_unknown_mayset (ctx, right, vars);
+	}
+      gc_base_free (alt);
+      /* Finally, ANDAND and OROR are monotonic, just like + */
+      res = MONO_UNKNOWN;
+      /* MONO+MONO=MONO, ANTI+ANTI=ANTI */
+      if ((ma & MONO_MONO) && (mb & MONO_MONO))
+	res |= MONO_MONO;
+      if ((ma & MONO_ANTI) && (mb & MONO_ANTI))
+	res |= MONO_ANTI;
+      return res;
+    case BANG:
+      ma = compute_monotony (ctx, left, vars);
+      /* BANG is antitonic: */
+      res = MONO_UNKNOWN;
+      if (ma & MONO_MONO)
+	res |= MONO_ANTI;
+      if (ma & MONO_ANTI)
+	res |= MONO_MONO;
+      return res;
+    case OP_CEQ:
+    case OP_CNEQ:
+    case OP_CRM:
+    case OP_CNRM:
+      ma = compute_monotony (ctx, left, vars);
+      mb = compute_monotony (ctx, right, vars);
+      if (ma==MONO_CONST && mb==MONO_CONST)
+	return MONO_CONST;
+      return MONO_UNKNOWN;
+    case OP_CGT:
+    case OP_CGE:
+      ma = compute_monotony (ctx, left, vars);
+      mb = compute_monotony (ctx, right, vars);
+      /* >, >= are monotonic in its first argument, antitonic
+	 in its second argument, just like OP_SUB */
+      res = MONO_UNKNOWN;
+      if ((ma & MONO_MONO) && (mb & MONO_ANTI))
+	res |= MONO_MONO;
+      if ((ma & MONO_ANTI) && (mb & MONO_MONO))
+	res |= MONO_ANTI;
+      return res;
+    case OP_CLT:
+    case OP_CLE:
+      ma = compute_monotony (ctx, left, vars);
+      mb = compute_monotony (ctx, right, vars);
+      /* <, <= are antitonic in its first argument, monotonic
+	 in its second argument, just like OP_SUB */
+      res = MONO_UNKNOWN;
+      if ((mb & MONO_MONO) && (ma & MONO_ANTI))
+	res |= MONO_MONO;
+      if ((mb & MONO_ANTI) && (ma & MONO_MONO))
+	res |= MONO_ANTI;
+      return res;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized cond op %d\n", op);
+      exit(EXIT_FAILURE);
+      break;
+    }
+}
+
+static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
+				  monotony vars[])
+{
+  if (e==NULL)
+    return MONO_CONST; /* null is constant */
+  switch (e->type)
+    {
+    case NODE_FIELD:
+      return SYM_MONO(e);
+    case NODE_CONST:
+      return MONO_CONST;
+    case NODE_VARIABLE:
+      return vars[SYM_RES_ID(e)];
+    case NODE_CALL:
+      {
+	monotony (*cm) (rule_compiler_t *ctx,
+			node_expr_t *e,
+			monotony args[]);
+	size_t i, n;
+	monotony *args;
+	node_expr_t *l;
+	monotony res;
+
+	cm = CALL_COMPUTE_MONOTONY(e);
+	n = list_len (CALL_PARAMS(e));
+	args = gc_base_malloc (ctx->gc_ctx, n*sizeof(monotony));
+	for (i=0, l=CALL_PARAMS(e); l!=NULL; i++, l=BIN_RVAL(l))
+	  args[i] = compute_monotony (ctx, BIN_LVAL(l), vars);
+	if (cm==NULL)
+	  res = MONO_UNKNOWN; /* we do this after we have computed
+				 args[i] for every i, to give a chance
+				 to compute_monotony() to update vars[]
+				 for the given sequence of arguments. */
+	else res = (*cm) (ctx, e, args);
+	gc_base_free(args);
+	return res;
+      }
+    case NODE_BINOP:
+      {
+	monotony ma, mb;
+
+	ma = compute_monotony (ctx, BIN_LVAL(e), vars);
+	mb = compute_monotony (ctx, BIN_RVAL(e), vars);
+	return compute_monotony_bin (ctx, BIN_OP(e), ma, mb);
+      }
+    case NODE_MONOP:
+      {
+	monotony ma;
+
+	ma = compute_monotony (ctx, MON_VAL(e), vars);
+	return compute_monotony_mon (ctx, MON_OP(e),
+				     ma, MON_VAL(e)->stype);
+      }
+    case NODE_COND:
+      return compute_monotony_cond (ctx, BIN_OP(e),
+				    BIN_LVAL(e), BIN_RVAL(e),
+				    vars);
+    case NODE_EVENT:
+    case NODE_CONS:
+      {
+	monotony ma, mb;
+
+	ma = compute_monotony (ctx, BIN_LVAL(e), vars);
+	mb = compute_monotony (ctx, BIN_RVAL(e), vars);
+	if (ma==MONO_CONST && mb==MONO_CONST)
+	  return MONO_CONST;
+	return MONO_UNKNOWN;
+      }
+    case NODE_REGSPLIT:
+      {
+	size_t i, n;
+
+	n = REGSPLIT_DEST_VARS(e)->vars_nb;
+	if (compute_monotony (ctx, REGSPLIT_STRING(e), vars)==MONO_CONST)
+	  {
+	    for (i=0; i<n; i++)
+	      vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_CONST;
+	    return MONO_CONST;
+	  }
+	else
+	  {
+	    for (i=0; i<n; i++)
+	      vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_UNKNOWN;
+	    return MONO_UNKNOWN;
+	  }
+      }
+    case NODE_IFSTMT:
+      {
+	monotony mif, mthen, melse;
+	monotony *vars_then, *vars_else;
+	size_t nvars, i;
+	size_t varsz;
+	monotony res;
+
+	mif = compute_monotony (ctx, IF_COND(e), vars);
+	nvars = ctx->rule_env->elmts;
+	varsz = nvars*sizeof(monotony);
+	vars_then = gc_base_malloc (ctx->gc_ctx, varsz);
+	vars_else = gc_base_malloc (ctx->gc_ctx, varsz);
+	memcpy (vars_then, vars, varsz);
+	mthen = compute_monotony (ctx, IF_THEN(e), vars_then);
+	memcpy (vars_else, vars, varsz);
+	melse = compute_monotony (ctx, IF_ELSE(e), vars_else);
+	if (mif==MONO_CONST)
+	  {
+	    for (i=0; i<nvars; i++)
+	      vars[i] = vars_then[i] & vars_else[i];
+	    res = mthen & melse;
+	  }
+	else /* cannot conclude, on result (res), and on
+	      any variable that may be set by the then or else branch. */
+	  {
+	    set_monotony_unknown_mayset (ctx, IF_THEN(e), vars);
+	    set_monotony_unknown_mayset (ctx, IF_ELSE(e), vars);
+	    res = MONO_UNKNOWN;
+	  }
+	gc_base_free(vars_then);
+	gc_base_free(vars_else);
+	return res;
+      }
+    case NODE_ASSOC:
+      return vars[SYM_RES_ID(BIN_LVAL(e))] =
+	compute_monotony (ctx, BIN_RVAL(e), vars);
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+      break;
+    }
+}
+
+monotony m_const (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  return MONO_CONST;
+}
+
+monotony m_unknown_1 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  if (m[0]==MONO_CONST)
+    return MONO_CONST;
+  return MONO_UNKNOWN;
+}
+
+monotony m_unknown_2 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  if (m[0]==MONO_CONST && m[1]==MONO_CONST)
+    return MONO_CONST;
+  return MONO_UNKNOWN;
+}
+
+monotony m_random (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  return MONO_UNKNOWN;
+}
+
 /**
  * Lex/yacc parser entry point.
  * @param ctx Orchids context.
@@ -3083,6 +3476,7 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   n->parents = NULL;
   n->name = fieldname;
   n->res_id = f->id;
+  n->mono = f->mono;
   GC_UPDATE(ctx->gc_ctx, 0, n);
   set_type (ctx, (node_expr_t *)n, f->type);
   GC_END(ctx->gc_ctx);

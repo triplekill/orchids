@@ -42,15 +42,15 @@ static int cisco_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *d
 }
 
 static field_t cisco_fields[] = {
-  { "cisco.msg_type", &t_int,  "Cisco message type"   },
-  { "cisco.acl",      &t_str, "Access control list" },
-  { "cisco.action",   &t_str, "Action (permitted/denied)" },
-  { "cisco.proto",    &t_str, "Protocol" },
-  { "cisco.sip",      &t_ipv4, "Source IP address" },
-  { "cisco.dip",      &t_ipv4, "Destiantion IP address" },
-  { "cisco.spt",      &t_int,  "Source port" },
-  { "cisco.dpt",      &t_int,  "Destination port" },
-  { "cisco.packets",  &t_int,  "Number of packets" },
+  { "cisco.msg_type", &t_int, MONO_UNKNOWN, "Cisco message type"   },
+  { "cisco.acl",      &t_str, MONO_UNKNOWN, "Access control list" },
+  { "cisco.action",   &t_str, MONO_UNKNOWN, "Action (permitted/denied)" },
+  { "cisco.proto",    &t_str, MONO_UNKNOWN, "Protocol" },
+  { "cisco.sip",      &t_ipv4, MONO_UNKNOWN, "Source IP address" },
+  { "cisco.dip",      &t_ipv4, MONO_UNKNOWN, "Destiantion IP address" },
+  { "cisco.spt",      &t_int, MONO_UNKNOWN,  "Source port" },
+  { "cisco.dpt",      &t_int, MONO_UNKNOWN,  "Destination port" },
+  { "cisco.packets",  &t_int, MONO_UNKNOWN,  "Number of packets" },
 };
 
 static void *

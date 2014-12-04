@@ -423,19 +423,19 @@ static int wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
 }
 
 static field_t wifi_fields[] = {
-  { "wifi.type",       &t_str,      "frame type"                             },
-  { "wifi.subtype",    &t_str,      "frame subtype"                          },
-  { "wifi.time",       &t_timeval,  "reception time"                         },
-  { "wifi.da",         &t_str,      "destination address"                    },
-  { "wifi.sa",         &t_str,      "source address"                         },
-  { "wifi.bssid",      &t_str,      "basic service set identifier"           },
-  { "wifi.ta",         &t_str,      "transmitter address"                    },
-  { "wifi.ra",         &t_str,      "receiver address"                       },
-  { "wifi.dir",        &t_str,      "direction of the frame"                 },
-  { "wifi.seqnum",     &t_int,      "sequence number"                        },
-  { "wifi.iswep",      &t_int,      "1 if it is an encrypted frame, 0 else." },
-  { "wifi.bodylength", &t_int,      "body length"                            },
-  { "wifi.rssi",       &t_int,      "rssi"                                   }
+  { "wifi.type",       &t_str, MONO_UNKNOWN,      "frame type"                             },
+  { "wifi.subtype",    &t_str, MONO_UNKNOWN,      "frame subtype"                          },
+  { "wifi.time",       &t_timeval, MONO_MONO,  "reception time"                         },
+  { "wifi.da",         &t_str, MONO_UNKNOWN,      "destination address"                    },
+  { "wifi.sa",         &t_str, MONO_UNKNOWN,      "source address"                         },
+  { "wifi.bssid",      &t_str, MONO_UNKNOWN,      "basic service set identifier"           },
+  { "wifi.ta",         &t_str, MONO_UNKNOWN,      "transmitter address"                    },
+  { "wifi.ra",         &t_str, MONO_UNKNOWN,      "receiver address"                       },
+  { "wifi.dir",        &t_str, MONO_UNKNOWN,      "direction of the frame"                 },
+  { "wifi.seqnum",     &t_int, MONO_UNKNOWN,      "sequence number"                        },
+  { "wifi.iswep",      &t_int, MONO_UNKNOWN,      "1 if it is an encrypted frame, 0 else." },
+  { "wifi.bodylength", &t_int, MONO_UNKNOWN,      "body length"                            },
+  { "wifi.rssi",       &t_int, MONO_UNKNOWN,      "rssi"                                   }
 };
 
 static void *

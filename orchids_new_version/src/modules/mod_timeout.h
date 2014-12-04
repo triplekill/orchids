@@ -16,14 +16,12 @@
 #ifndef MOD_TIMEOUT_H
 #define MOD_TIMEOUT_H
 
-#define TIMEOUT_FIELDS  7
+#define TIMEOUT_FIELDS  5
 #define F_DATE          0
 #define F_REGDATE       1
 #define F_NAME          2
 #define F_RULE          3
-#define F_RULEINST      4
-#define F_STATE         5
-#define F_STATEINST     6
+#define F_STATE         4
 
 
 static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he);

@@ -51,6 +51,9 @@
 #include "lang.h"
 #include "lang_priv.h"
 
+#define TIME_MAX ((time_t)((1L<<(sizeof(time_t)*8-1))-1))
+#define TIME_MIN ((time_t)((1L<<(sizeof(time_t)*8-1))))
+
 /**
  ** Table of data types natively recognized in the Orchids language.
  **/
@@ -175,21 +178,65 @@ static int int_cmp(ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *int_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
+  long m, n, res;
+
   if (var2==NULL || var2->gc.type != T_INT)
     return NULL;
-  return ovm_int_new (gc_ctx, INT(var1) + INT(var2));
+  m = INT(var1);
+  n = INT(var2);
+  res = m+n;
+  /* There is an overflow if:
+     - m>=0, n>=0, and res<0
+     - m<0, n<0, and res>=0
+     In case this happens, we return the max (or min) possible value,
+     so as to preserve monotonicity.
+     There is never any overflow if m and n have opposite signs.
+  */
+  if (m>=0 && n>=0 && res<0)
+    return ovm_int_new (gc_ctx, LONG_MAX);
+  if (m<0 && n<0 && res>=0)
+    return ovm_int_new (gc_ctx, LONG_MIN);
+  return ovm_int_new (gc_ctx, res);
 }
 
 static ovm_var_t *int_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
+  long m, n, res;
+
   if (var2==NULL || var2->gc.type != T_INT)
     return NULL;
-  return ovm_int_new (gc_ctx, INT(var1) - INT(var2));
+  /* There is an overflow if:
+     - m>=0, n<0, and res<0
+     - m<0, n>=0, and res>=0
+     In case this happens, we return the max (or min) possible value,
+     so as to preserve monotonicity.
+     There is never any overflow if m and n have the same sign.
+     (Note that 0 - INT_MAX does not overflow in the negative
+     [this is equal to INT_MIN+1, in two's complement]
+     and (-1) - INT_MIN does not overflow in the positive
+     [this is equal to INT_MAX, in two's complement]
+   */
+  m = INT(var1);
+  n = INT(var2);
+  res = m-n;
+  if (m>=0 && n<0 && res<0)
+    return ovm_int_new (gc_ctx, LONG_MAX);
+  if (m<0 && n>=0 && res>=0)
+    return ovm_int_new (gc_ctx, LONG_MIN);
+  return ovm_int_new (gc_ctx, res);
 }
 
 static ovm_var_t *int_opp (gc_t *gc_ctx, ovm_var_t *var)
 {
-  return ovm_int_new (gc_ctx, -INT(var));
+  long m = INT(var);
+
+  /* Despite all appearances, opposite is not antitonic.
+     The naughty case is when m==LONG_MIN, in which case -m==LONG_MIN as well.
+     To force monotonicity, -LONG_MIN (==LONG_MAX+1) is chopped at LONG_MAX.
+  */
+  if (m==LONG_MIN)
+    return ovm_int_new (gc_ctx, LONG_MAX);
+  return ovm_int_new (gc_ctx, -m);
 }
 
 static ovm_var_t *int_mul (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -321,9 +368,20 @@ static int uint_cmp (ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *uint_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
+  unsigned long m, n, res;
+
   if (var2==NULL || var2->gc.type != T_UINT)
     return NULL;
-  return ovm_uint_new (gc_ctx, UINT(var1) + UINT(var2));
+  m = UINT(var1);
+  n = UINT(var2);
+  res = m+n;
+  /* There is an overflow if res<m (or equivalently, res<n)
+     In case this happens, we return the max possible value,
+     so as to preserve monotonicity.
+   */
+  if (res<m)
+    return ovm_uint_new (gc_ctx, ULONG_MAX);
+  return ovm_uint_new (gc_ctx, res);
 }
 
 static ovm_var_t *uint_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -845,20 +903,73 @@ static int ctime_cmp(ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *ctime_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
-  ovm_var_t *res;
-
   if (var2==NULL)
     return NULL;
   switch (TYPE(var2))
     {
     case T_CTIME:
-      return ovm_ctime_new (gc_ctx, CTIME(var1) + CTIME(var2));
+      {
+	time_t m, n, res;
+
+	/* For overflow rules, see int_add(); we don't know much about time_t,
+	 except that it must be signed. I am assuming two's complement to obtain
+	 the min and max values. */
+	m = CTIME(var1);
+	n = CTIME(var2);
+	res = m+n;
+	if (m>=0 && n>=0 && res<0)
+	  return ovm_ctime_new (gc_ctx, TIME_MAX);
+	if (m<0 && n<0 && res>=0)
+	  return ovm_ctime_new (gc_ctx, TIME_MIN);
+	return ovm_ctime_new (gc_ctx, res);
+      }
     case T_INT:
-      return ovm_ctime_new (gc_ctx,  CTIME(var1) + INT(var2));
+      {
+	time_t m, res;
+	long n;
+
+	/* For overflow rules, see int_add(); we don't know much about time_t,
+	 except that it must be signed. I am assuming two's complement to obtain
+	 the min and max values. */
+	m = CTIME(var1);
+	n = CTIME(var2);
+	res = m+n;
+	if (m>=0 && n>=0 && res<0)
+	  return ovm_ctime_new (gc_ctx, TIME_MAX);
+	if (m<0 && n<0 && res>=0)
+	  return ovm_ctime_new (gc_ctx, TIME_MIN);
+	return ovm_ctime_new (gc_ctx, res);
+      }
     case T_TIMEVAL:
-      res = timeval_clone(gc_ctx, var2);
-      TIMEVAL(res).tv_sec += CTIME(var1);
-      return res;
+      {
+	long tv_sec, tv_res;
+	time_t n;
+	ovm_var_t *res;
+
+	/* For overflow rules, see int_add(); we don't know much about time_t,
+	 except that it must be signed. I am assuming two's complement to obtain
+	 the min and max values. */
+	tv_sec = TIMEVAL(var2).tv_sec;
+	n = CTIME(var1);
+	tv_res = tv_sec+n;
+	res = ovm_timeval_new (gc_ctx);
+	if (tv_sec>=0 && n>=0 && tv_res<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MAX;
+	    TIMEVAL(res).tv_usec = 999999;
+	  }
+	else if (tv_sec<0 && n<0 && tv_res>=0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MIN;
+	    TIMEVAL(res).tv_usec = 0;
+	  }
+	else
+	  {
+	    TIMEVAL(res).tv_sec = tv_sec;
+	    TIMEVAL(res).tv_usec = TIMEVAL(var2).tv_usec;
+	  }
+	return res;
+      }
     default:
       return NULL;
     }
@@ -866,15 +977,39 @@ static ovm_var_t *ctime_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *ctime_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 {
-  /* XXX: check for overflows */
+  time_t m, res;
 
   if (var2==NULL)
     return NULL;
-  if (TYPE(var2) == T_CTIME)
-    return ovm_ctime_new (gc_ctx, CTIME(var1) - CTIME(var2));
-  else if (TYPE(var2) == T_INT)
-    return ovm_ctime_new (gc_ctx, CTIME(var1) - INT(var2));
-  else return NULL;
+  m = CTIME(var1);
+  /* For overflow cases, see int_sub() */
+  switch (TYPE(var2))
+    {
+    case T_CTIME:
+      {
+	time_t n = CTIME(var2);
+
+	res = m-n;
+	if (m>=0 && n<0 && res<0)
+	  return ovm_ctime_new (gc_ctx, TIME_MAX);
+	if (m<0 && n>=0 && res>=0)
+	  return ovm_ctime_new (gc_ctx, TIME_MIN);
+	return ovm_ctime_new (gc_ctx, res);
+      }
+    case T_INT:
+      {
+	long n = INT(var2);
+
+	res = m-n;
+	if (m>=0 && n<0 && res<0)
+	  return ovm_ctime_new (gc_ctx, TIME_MAX);
+	if (m<0 && n>=0 && res>=0)
+	  return ovm_ctime_new (gc_ctx, TIME_MIN);
+	return ovm_ctime_new (gc_ctx, res);
+      }
+    default:
+      return NULL;
+    }
 }
 
 static ovm_var_t *ctime_clone(gc_t *gc_ctx, ovm_var_t *var)
@@ -1211,20 +1346,77 @@ static ovm_var_t *timeval_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
   if (var2==NULL)
     return NULL;
+  /* For overflow rules, see int_add() */
   switch (TYPE(var2))
     {
     case T_TIMEVAL:
       res = ovm_timeval_new(gc_ctx);
       Timer_Add(&TIMEVAL(res) , &TIMEVAL(var1) , &TIMEVAL(var2));
+      if (TIMEVAL(var1).tv_sec>=0 && TIMEVAL(var2).tv_sec>=0 && TIMEVAL(res).tv_sec<0)
+	{
+	  TIMEVAL(res).tv_sec = LONG_MAX;
+	  TIMEVAL(res).tv_usec = 999999;
+	}
+      else if (TIMEVAL(var1).tv_sec<0 && TIMEVAL(var2).tv_sec<0 && TIMEVAL(res).tv_sec>=0)
+	{
+	  TIMEVAL(res).tv_sec = LONG_MIN;
+	  TIMEVAL(res).tv_usec = 0;
+	}
       return res;
     case T_CTIME:
-      res = timeval_clone(gc_ctx, var1);
-      TIMEVAL(res).tv_sec += CTIME(var2);
-      return res;
+      {
+	long tv_sec, tv_res;
+	time_t n;
+	ovm_var_t *res;
+
+	tv_sec = TIMEVAL(var1).tv_sec;
+	n = CTIME(var2);
+	tv_res = tv_sec+n;
+	res = ovm_timeval_new (gc_ctx);
+	if (tv_sec>=0 && n>=0 && tv_res<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MAX;
+	    TIMEVAL(res).tv_usec = 999999;
+	  }
+	else if (tv_sec<0 && n<0 && tv_res>=0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MIN;
+	    TIMEVAL(res).tv_usec = 0;
+	  }
+	else
+	  {
+	    TIMEVAL(res).tv_sec = tv_sec;
+	    TIMEVAL(res).tv_usec = TIMEVAL(var2).tv_usec;
+	  }
+	return res;
+      }
     case T_INT:
-      res = timeval_clone(gc_ctx, var1);
-      TIMEVAL(res).tv_sec += INT(var2);
-      return res;
+      {
+	long tv_sec, tv_res;
+	long n;
+	ovm_var_t *res;
+
+	tv_sec = TIMEVAL(var1).tv_sec;
+	n = INT(var2);
+	tv_res = tv_sec+n;
+	res = ovm_timeval_new (gc_ctx);
+	if (tv_sec>=0 && n>=0 && tv_res<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MAX;
+	    TIMEVAL(res).tv_usec = 999999;
+	  }
+	else if (tv_sec<0 && n<0 && tv_res>=0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MIN;
+	    TIMEVAL(res).tv_usec = 0;
+	  }
+	else
+	  {
+	    TIMEVAL(res).tv_sec = tv_sec;
+	    TIMEVAL(res).tv_usec = TIMEVAL(var2).tv_usec;
+	  }
+	return res;
+      }
     default:
       return NULL;
     }
@@ -1236,20 +1428,59 @@ static ovm_var_t *timeval_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
   if (var2==NULL)
     return NULL;
+  /* For overflow cases, see int_sub() */
   switch (TYPE(var2))
     {
     case T_TIMEVAL:
       res = ovm_timeval_new(gc_ctx);
       Timer_Sub(&TIMEVAL(res) , &TIMEVAL(var1) , &TIMEVAL(var2));
+      if (TIMEVAL(var1).tv_sec>=0 && TIMEVAL(var2).tv_sec<0 && TIMEVAL(res).tv_sec<0)
+	{
+	  TIMEVAL(res).tv_sec = LONG_MAX;
+	  TIMEVAL(res).tv_usec = 999999;
+	}
+      else if (TIMEVAL(var1).tv_sec<0 && TIMEVAL(var2).tv_sec>=0 && TIMEVAL(res).tv_sec>=0)
+	{
+	  TIMEVAL(res).tv_sec = LONG_MIN;
+	  TIMEVAL(res).tv_usec = 0;
+	}
       return res;
     case T_CTIME:
-      res = timeval_clone(gc_ctx, var1);
-      TIMEVAL(res).tv_sec -= CTIME(var2);
-      return res;
+      {
+	time_t n = CTIME(var2);
+
+	res = timeval_clone(gc_ctx, var1);
+	TIMEVAL(res).tv_sec -= n;
+	if (TIMEVAL(var1).tv_sec>=0 && n<0 && TIMEVAL(res).tv_sec<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MAX;
+	    TIMEVAL(res).tv_usec = 999999;
+	  }
+	else if (TIMEVAL(var1).tv_sec<0 && n>=0 && TIMEVAL(res).tv_sec<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MIN;
+	    TIMEVAL(res).tv_usec = 0;
+	  }
+	return res;
+      }
     case T_INT:
-      res = timeval_clone(gc_ctx, var1);
-      TIMEVAL(res).tv_sec -= INT(var2);
-      return res;
+      {
+	long n = INT(var2);
+
+	res = timeval_clone(gc_ctx, var1);
+	TIMEVAL(res).tv_sec -= n;
+	if (TIMEVAL(var1).tv_sec>=0 && n<0 && TIMEVAL(res).tv_sec<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MAX;
+	    TIMEVAL(res).tv_usec = 999999;
+	  }
+	else if (TIMEVAL(var1).tv_sec<0 && n>=0 && TIMEVAL(res).tv_sec<0)
+	  {
+	    TIMEVAL(res).tv_sec = LONG_MIN;
+	    TIMEVAL(res).tv_usec = 0;
+	  }
+	return res;
+      }
     default:
       return NULL;
     }
@@ -3279,6 +3510,8 @@ static void issdl_defined(orchids_t *ctx, state_instance_t *state)
     PUSH_RETURN_TRUE(ctx);
 }
 
+#ifdef OBSOLETE
+// superseded by plain old '-'
 static void issdl_difftime(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *t1, *t2, *res;
@@ -3293,6 +3526,7 @@ static void issdl_difftime(orchids_t *ctx, state_instance_t *state)
   else
     PUSH_VALUE(ctx, NULL);
 }
+#endif
 
 static void issdl_str_from_time(orchids_t *ctx, state_instance_t *state)
 {
@@ -3424,8 +3658,10 @@ static type_t **regex_of_str_sigs[] = { regex_of_str_sig, NULL };
 static type_t *str_of_regex_sig[] = { &t_str, &t_regex };
 static type_t **str_of_regex_sigs[] = { str_of_regex_sig, NULL };
 
+#ifdef OBSOLETE
 static type_t *difftime_sig[] = { &t_int, &t_ctime, &t_ctime };
 static type_t **difftime_sigs[] = { difftime_sig, NULL };
+#endif
 
 static type_t *str_of_ctime_sig[] = { &t_str, &t_ctime };
 static type_t **str_of_ctime_sigs[] = { str_of_ctime_sig, NULL };
@@ -3448,113 +3684,149 @@ static type_t **ipv6_of_ipv4_sigs[] = { ipv6_of_ipv4_sig, NULL };
 static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "null",
     0, null_sigs,
+    m_const,
     "returns null (the undefined object)" },
   { issdl_print, 1, "print",
     1, int_of_any_sigs, /* always returns true, in fact */
+    m_const,
     "display a string (TEST FUNCTION)" },
   { issdl_dumpstack, 2, "dump_stack",
     0, int_sigs, /* returns 0 or 1, in fact */
+    m_random,
     "dump the stack of the current rule" },
 #if 0
   { issdl_printevent, 3, "print_event",
     0, int_sigs,  /* always returns true, in fact */
+    m_const,
     "print the event associated with state" },
   // OBSOLETE, use print(current_event())
 #endif
   { issdl_dumppathtree, 4, "dump_dot_pathtree",
     0, int_sigs, /* always returns true, in fact */
+    m_const,
     "dump the rule instance path tree in the GraphViz Dot format"},
   { issdl_drop_event, 5, "drop_event",
     0, int_sigs, /* returns 0 or 1, in fact */
+    m_random,
     "Drop event" },
   { issdl_set_event_level, 6, "set_event_level",
     1, int_of_int_sigs, /* returns 0 or 1, in fact */
+    m_random,
     "Set event level" },
   { issdl_report, 7, "report",
     0, int_sigs, /* returns 0 or 1, in fact */
+    m_random,
     "generate report" },
   { issdl_shutdown, 8, "shutdown",
     0, null_sigs, /* does not return */
+    m_const,
     "shutdown orchids" },
   { issdl_random, 9, "random",
     0, int_sigs,
+    m_random,
     "return a random number" },
   { issdl_system, 10, "system",
     1, int_of_str_sigs,
+    m_random,
     "execute a system command" },
   { issdl_stats, 11, "show_stats",
     0, int_sigs, /* always returns true, in fact */
+    m_const,
     "show orchids internal statistics" },
   { issdl_str_from_int, 12, "str_from_int",
     1, str_of_int_sigs,
+    m_unknown_1,
     "convert an integer to a string" },
   { issdl_int_from_str, 13, "int_from_str",
     1, int_of_str_sigs,
+    m_unknown_1,
     "convert a string to an integer" },
   { issdl_float_from_str, 14, "float_from_str",
     1, float_of_str_sigs,
+    m_unknown_1,
     "convert a string to a float" },
   { issdl_str_from_float, 15, "str_from_float",
     1, str_of_float_sigs,
+    m_unknown_1,
     "convert a float to a string" },
   { issdl_str_from_ipv4, 16, "str_from_ipv4",
     1, str_of_ipv4_sigs,
+    m_unknown_1,
     "convert an ipv4 address to a string" },
   { issdl_kill_threads, 17, "kill_threads",
     0, int_sigs, /* always returns true, in fact */
+    m_const,
     "kill threads of a rule instance" },
   { issdl_cut, 18, "cut",
     1, int_of_str_sigs, /* returns 0 or 1, in fact */
+    m_unknown_1,
     "special cut" },
   { issdl_sendmail, 19, "sendmail",
     4, sendmail_sigs,
      /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
+    m_random,
     "Send an email" },
   { issdl_sendmail_report, 20, "sendmail_report",
     4, sendmail_sigs,
+    m_random,
      /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
     "Send a report by email" },
   { issdl_bindist, 21, "bitdist",
     2, cmp_sigs,
+    m_unknown_2,
     "Number of different bits" },
   { issdl_bytedist, 22, "bytedist",
     2, cmp_sigs,
+    m_unknown_2,
     "Number of different bytes" },
   { issdl_vstr_from_regex, 23, "str_from_regex",
     1, str_of_regex_sigs,
+    m_unknown_1,
     "Return the source string of a compiled regex" },
   { issdl_regex_from_str, 24, "regex_from_str",
     1, regex_of_str_sigs,
+    m_unknown_1,
     "Compile a regex from a string" },
   { issdl_defined, 25, "defined",
     1, int_of_any_sigs, /* returns 0 or 1, in fact */
+    m_unknown_1,
     "Return if a field is defined" },
+#ifdef OBSOLETE
   { issdl_difftime, 26, "difftime",
     2, difftime_sigs,
     "difference expressed in seconds as an int"},
+#endif
   { issdl_str_from_time, 27, "str_from_time",
     1, str_of_ctime_sigs,
+    m_unknown_1,
     "convert a time to a string" },
   { issdl_str_from_timeval, 28, "str_from_timeval",
     1, str_of_timeval_sigs,
+    m_unknown_1,
     "convert a timeval to a string" },
   { issdl_time_from_str, 29, "time_from_str",
     1, ctime_of_str_sigs,
+    m_unknown_1,
     "convert a string to a time" },
   { issdl_timeval_from_str, 30, "timeval_from_str",
     1, timeval_of_str_sigs,
+    m_unknown_1,
     "convert a string to a timeval" },
   { issdl_str_from_ipv6, 31, "str_from_ipv6",
     1, str_of_ipv6_sigs,
+    m_unknown_1,
     "convert an ipv6 address to a string" },
   { issdl_ipv4_from_ipv6, 32, "ipv4_from_ipv6",
     1, ipv4_of_ipv6_sigs,
+    m_unknown_1,
     "convert an ipv6 address to an ipv4 address" },
   { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4",
     1, ipv6_of_ipv4_sigs,
+    m_unknown_1,
     "convert an ipv4 address to an ipv6 address" },
   { issdl_str_from_uint, 34, "str_from_uint",
     1, str_of_uint_sigs,
+    m_unknown_1,
     "convert an unsigned integer to a string" },
   { NULL, 0, NULL, 0, NULL, NULL }
 };

@@ -101,20 +101,20 @@ static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void
 
 
 static field_t prism2_fields[] = {
-  { "prism2.msgcode",   &t_uint,  "Prism message code"                    },
-  { "prism2.msglen",    &t_uint,  "Prism message length"                  },
-  { "prism2.devname",   &t_str,  "Device name (interface)"               },
-  { "prism2.hosttime",  &t_uint,  "Host time"                             },
-  { "prism2.mactime",   &t_uint,  "MAC time"                              },
-  { "prism2.channel",   &t_uint,  "Wifi channel"                          },
-  { "prism2.rssi",      &t_uint,  "Received Signal Strength Indication"  },
-  { "prism2.sq",        &t_uint,  "SQ"                                    },
-  { "prism2.signal",    &t_uint,  "Signal"                                },
-  { "prism2.noise",     &t_uint,  "Noise"                                 },
-  { "prism2.rate",      &t_uint,  "Rate"                                  },
-  { "prism2.istx",      &t_uint,  "IsTX"                                  },
-  { "prism2.framelen",  &t_uint,  "Frame length"                          },
-  { "prism2.frame",     &t_bstr, "Frame"                                 }
+  { "prism2.msgcode",   &t_uint, MONO_UNKNOWN,  "Prism message code"                    },
+  { "prism2.msglen",    &t_uint, MONO_UNKNOWN,  "Prism message length"                  },
+  { "prism2.devname",   &t_str, MONO_UNKNOWN,  "Device name (interface)"               },
+  { "prism2.hosttime",  &t_uint, MONO_MONO,  "Host time"                             },
+  { "prism2.mactime",   &t_uint, MONO_MONO,  "MAC time"                              },
+  { "prism2.channel",   &t_uint, MONO_UNKNOWN,  "Wifi channel"                          },
+  { "prism2.rssi",      &t_uint, MONO_UNKNOWN,  "Received Signal Strength Indication"  },
+  { "prism2.sq",        &t_uint, MONO_UNKNOWN,  "SQ"                                    },
+  { "prism2.signal",    &t_uint, MONO_UNKNOWN,  "Signal"                                },
+  { "prism2.noise",     &t_uint, MONO_UNKNOWN,  "Noise"                                 },
+  { "prism2.rate",      &t_uint, MONO_UNKNOWN,  "Rate"                                  },
+  { "prism2.istx",      &t_uint, MONO_UNKNOWN,  "IsTX"                                  },
+  { "prism2.framelen",  &t_uint, MONO_UNKNOWN,  "Frame length"                          },
+  { "prism2.frame",     &t_bstr, MONO_UNKNOWN, "Frame"                                 }
 };
 
 static void *prism2_preconfig(orchids_t *ctx, mod_entry_t *mod)

@@ -505,7 +505,7 @@ static void generic_add_hook(orchids_t *ctx, mod_entry_t *mod, config_directive_
   sscanf(dir->args, "%64s \"%256[^\"]\"", mod_buf, mod_cond);
   h->module = gc_strdup(ctx->gc_ctx, mod_buf);
   h->condition = gc_strdup(ctx->gc_ctx, mod_cond);
-  h->file = dir->file;
+  h->file = (char *)dir->file;
   h->line = dir->line;
 
   for (vmod_dir = dir->first_child; vmod_dir!=NULL; vmod_dir = vmod_dir->next)

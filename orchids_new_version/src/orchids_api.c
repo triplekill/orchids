@@ -725,6 +725,7 @@ void register_fields(orchids_t *ctx, mod_entry_t *mod, field_t *field_tab, size_
     new_fields[i].type = field_tab[i].type;
     new_fields[i].desc = field_tab[i].desc;
     new_fields[i].id   = n + i;
+    new_fields[i].mono = field_tab[i].mono;
     new_fields[i].val = NULL;
   }
   mod->num_fields = sz;

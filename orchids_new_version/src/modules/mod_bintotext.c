@@ -119,8 +119,8 @@ static int bintotext_dissect (orchids_t *ctx, mod_entry_t *mod,
 }
 
 static field_t bintotext_fields[] = {
-  { "bintotext.tag", &t_str, "tag for further subdissection" },
-  { "bintotext.line", &t_str, "extracted line of text" }
+  { "bintotext.tag", &t_str, MONO_UNKNOWN, "tag for further subdissection" },
+  { "bintotext.line", &t_str, MONO_UNKNOWN, "extracted line of text" }
 };
 
 static void *bintotext_preconfig(orchids_t *ctx, mod_entry_t *mod)

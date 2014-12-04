@@ -38,13 +38,11 @@ static mod_entry_t *mod_entry_g = NULL;
 
 
 static field_t timeout_fields[] = {
-  { "timeout.date",        &t_timeval,  "Date when the timeout triggered"   },
-  { "timeout.regdate",     &t_timeval,  "Registration date of the timeout"   },
-  { "timeout.name",        &t_str,     "Name of the timeout"   },
-  { "timeout.rule",        &t_str,     "Name of the registration rule" },
-  { "timeout.rule_inst",   &t_int,      "Instance ID of the registration rule instance" },
-  { "timeout.state",       &t_str,     "Name of the registration state" },
-  { "timeout.state_inst",  &t_int,      "Instance ID of the registration state instance" },
+  { "timeout.date",        &t_timeval, MONO_MONO,  "Date when the timeout triggered"   },
+  { "timeout.regdate",     &t_timeval, MONO_MONO,  "Registration date of the timeout"   },
+  { "timeout.name",        &t_str, MONO_UNKNOWN,   "Name of the timeout"   },
+  { "timeout.rule",        &t_str, MONO_UNKNOWN,   "Name of the registration rule" },
+  { "timeout.state",       &t_str, MONO_UNKNOWN,   "Name of the registration state" },
 };
 
 

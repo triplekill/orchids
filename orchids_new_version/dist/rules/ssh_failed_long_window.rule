@@ -1,9 +1,9 @@
 // WINDOW : time window in seconds
 // THRESH : Number of event to detect
 // DIFF_TIME : Minimum time gap between two rule instances
-#define WINDOW 36000
+#define WINDOW _CTIME(36000)
 #define THRESH 100
-#define DIFF_TIME 100
+#define DIFF_TIME _CTIME(100)
 
 // Here we detect failed ssh connection comming from the same source
 #define TIME_FIELD .syslog.time
@@ -44,13 +44,13 @@ rule ssh_failed_long_window
     if ($last_rule_start == 0)
       $last_rule_start = TIME_FIELD;
     else
-      if (difftime(TIME_FIELD, $last_rule_start) < DIFF_TIME)
+      if (TIME_FIELD - $last_rule_start < DIFF_TIME)
 	$start = 0;
 
     $begin = TIME_FIELD;
     $last = TIME_FIELD;
-    $diff_begin = 0;
-    $diff_last = 0;
+    $diff_begin = _CTIME(0);
+    $diff_last = _CTIME(0);
     $mark = mark();
     expect ($start == 1)
       goto loop;
@@ -65,8 +65,8 @@ rule ssh_failed_long_window
     $count = $count + 1;
     if ($begin != TIME_FIELD)
     {
-      $diff_begin = difftime(TIME_FIELD, $begin);
-      $diff_last = difftime(TIME_FIELD, $last);
+      $diff_begin = TIME_FIELD - $begin;
+      $diff_last = TIME_FIELD - $last;
     }
     $last = TIME_FIELD;
 
@@ -88,7 +88,7 @@ rule ssh_failed_long_window
       goto stop;
 
     expect (defined(TIME_FIELD)
-	    && (difftime(TIME_FIELD, $begin) > WINDOW))
+	    && TIME_FIELD - $begin > WINDOW)
       goto stop;
 
   }

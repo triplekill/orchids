@@ -71,15 +71,6 @@
 #define T_HEAP 253
 /* T_HEAP is for skew heaps, as used in register_rtaction() and others in evt_mgr.c */
 
-/* monotony flags */
-/*
-#define MONOTONY_MASK 3
-#define TYPE_UNKNOWN  0
-#define TYPE_MONO     1
-#define TYPE_ANTI     2
-#define TYPE_CONST    (TYPE_MONO|TYPE_ANTI)
-*/
-
 /* Types, for the type checker.
    Not to be confused with the run-time type tags T_*
 */

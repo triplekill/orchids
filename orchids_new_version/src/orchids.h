@@ -187,6 +187,14 @@ struct active_event_s
 typedef struct orchids_s orchids_t;
 
 
+/* monotony flags */
+typedef int monotony;
+#define MONOTONY_MASK 3
+#define MONO_UNKNOWN  0
+#define MONO_MONO     1
+#define MONO_ANTI     2
+#define MONO_CONST    (MONO_MONO|MONO_ANTI)
+
 /**
  ** @struct field_record_s
  **   Used for building global field record array.
@@ -206,6 +214,9 @@ typedef struct orchids_s orchids_t;
 /**   @var field_record_s::id
  **     Field identifier. Used for reverse field name lookup from hash tables.
  **/
+/**   @var field_record_s::mono
+ **     Monotonicity info for the field.
+ **/
 /**   @var field_record_s::val
  **     Current field value resolution is not thread-safe.
  **/
@@ -217,6 +228,7 @@ struct field_record_s
   type_t     *type;
   char       *desc;
   int32_t     id;
+  monotony    mono;
   ovm_var_t  *val;
 };
 
@@ -807,9 +819,17 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
  **     Types are NULL, &t_int, &t_bstr, &t_str, etc.,
  **     plus &t_any (wildcard arg type)
  **/
+/**   @var issdl_function_s::compute_monotony
+ **     Auxiliary function meant to compute monotonicity status of expression e.
+ **     Can be left NULL if result is always MONO_UNKNOWN.
+ **     e is a NODE_CALL.
+ **     args[] is a table of monotonicity info, one for each argument.
+ **/
 /**   @var issdl_function_s::desc
  **     Function description (for a little help).
  **/
+struct node_expr_s;
+
 typedef struct issdl_function_s issdl_function_t;
 struct issdl_function_s
 {
@@ -818,9 +838,29 @@ struct issdl_function_s
   char      *name;
   int32_t    args_nb;
   type_t  ***sigs;
+  monotony (*compute_monotony) (rule_compiler_t *ctx, struct node_expr_s *e,
+				monotony args[]);
   char      *desc;
 };
 
+/* Possible values for compute_monotony field
+   (non-exclusive): */
+monotony m_const (rule_compiler_t *ctx, struct node_expr_s *e,
+		  monotony args[]); /* for maps returning a constant */
+/* The m_unknown_<n> functions are for maps of <n> arguments,
+   returning a value that may increase or decrease, we do not know;
+   but at least if you call it twice on the same argument, you get
+   the same result */
+monotony m_unknown_1 (rule_compiler_t *ctx, struct node_expr_s *e,
+		      monotony args[]);
+monotony m_unknown_2 (rule_compiler_t *ctx, struct node_expr_s *e,
+		      monotony args[]);
+monotony m_random (rule_compiler_t *ctx, struct node_expr_s *e,
+		   monotony args[]); /* for maps returning a value
+					that may increase or decrease,
+					we do not know; additional,
+					calling them twice may return
+					different results */
 
 typedef struct mod_entry_s mod_entry_t;
 
@@ -1442,6 +1482,9 @@ typedef int (*poll_callback_t)(orchids_t *ctx, mod_entry_t *mod, void *data);
 /**   @var field_s::type
  **     Field data type. (ISSDL type, @see lang.h).
  **/
+/**   @var field_s::mono
+ **     Monotonicity information.
+ **/
 /**   @var field_s::desc
  **     Field description.
  **/
@@ -1450,6 +1493,7 @@ struct field_s
 {
   char    *name;
   type_t  *type;
+  monotony mono;
   char    *desc;
 };
 

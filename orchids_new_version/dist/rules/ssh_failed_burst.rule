@@ -1,6 +1,6 @@
 // DIFF_TIME : Maximum time gap between two events
 // THRESH : Number of chained events to detect
-#define DIFF_TIME 53
+#define DIFF_TIME _CTIME(53)
 #define THRESH 100
 
 #define TIME_FIELD .syslog.time
@@ -50,8 +50,8 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     $begin = TIME_FIELD;
     $last = TIME_FIELD;
 
-    $diff_begin = 0;
-    $diff_last = 0;
+    $diff_begin = _CTIME(0);
+    $diff_last = _CTIME(0);
     $mark = mark();
     // If a rule instance is already running with the same AGGR_VARS, this one is stopped here.
     goto loop;
@@ -66,8 +66,8 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     $count = $count + 1;
     if ($begin != TIME_FIELD)
     {
-      $diff_begin = difftime(TIME_FIELD, $begin);
-      $diff_last = difftime(TIME_FIELD, $last);
+      $diff_begin = TIME_FIELD - $begin;
+      $diff_last = TIME_FIELD - $last;
     }
     $last = TIME_FIELD;
 
@@ -92,7 +92,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
       goto stop;
 
     expect (defined(TIME_FIELD)
-	    && (difftime(TIME_FIELD, $last) > DIFF_TIME))
+	    && TIME_FIELD - $last > DIFF_TIME)
       goto stop;
   }
 
