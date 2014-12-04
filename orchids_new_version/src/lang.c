@@ -105,7 +105,7 @@ type_t t_bstr = { "bstr", T_BSTR };
 type_t t_str = { "str", T_STR };
 type_t t_ctime = { "ctime", T_CTIME };
 type_t t_ipv4 = { "ipv4", T_IPV4 };
-type_t t_ipv6 = { "ipv6", T_IPV4 };
+type_t t_ipv6 = { "ipv6", T_IPV6 };
 type_t t_timeval = { "timeval", T_TIMEVAL };
 type_t t_regex = { "regex", T_REGEX };
 type_t t_snmpoid = { "snmpoid", T_SNMPOID };
@@ -2349,7 +2349,7 @@ char *orchids_atoi (char *str, size_t len, long *result)
   while ((str < end) && isspace(*str)) 
     str++;
   
-  if ((str < end) && (*str=='-')) 
+  if ((str < end) && (*str == '-')) 
     { 
       negate = 1; 
       str++;

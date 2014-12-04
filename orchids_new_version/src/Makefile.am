@@ -15,7 +15,6 @@ orchids_SOURCES = \
         graph_output.c graph_output.h graph_output_priv.h \
         issdl.yy.c issdl.tab.c issdl.tab.h                \
  \
-        util/array.c               util/array.h           \
         util/gc.c utils/gc.h       util/queue.c           \
         util/crc32.c               util/queue.h           \
         util/debuglog.c            util/debuglog.h        \

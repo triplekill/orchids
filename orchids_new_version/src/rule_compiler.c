@@ -1592,21 +1592,6 @@ compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
 }
 
 
-char *
-build_substate_name(const char *refname, int n)
-{
-  char *subname;
-  char num[12]; /* maxlen: -2^31 = -2147483648 (11 chars + '\0') */
-
-  snprintf(num, 12, "_%i", n);
-  subname = Xmalloc( strlen(refname) + strlen(num) );
-  strcat(subname, refname);
-  strcat(subname, num);
-
-  return (subname);
-}
-
-
 /* Abstract syntax tree building functions (called by the yaccer issdl.y) */
 
 node_state_t *build_state(rule_compiler_t *ctx,

@@ -1360,10 +1360,13 @@ static void fprintf_cfg_mib_sub(FILE *f, config_directive_t *section, char *base
 	  if (base)
 	    {
 	      /* 3 = ">." + '\0' */
-	      newbase = Xmalloc(strlen(base) + strlen(section->directive) + 3);
-	      strcpy(newbase, base);
-	      strcat(newbase, ">.");
-	      strcat(newbase, section->directive);
+	      newbase = malloc(strlen(base) + strlen(section->directive) + 3);
+              if (newbase != NULL)
+                {
+	          strcpy(newbase, base);
+	          strcat(newbase, ">.");
+	          strcat(newbase, section->directive);
+                }
 	    }
 	  else
 	    newbase = strdup(section->directive);
