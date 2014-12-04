@@ -111,7 +111,7 @@ static void issdl_temporal(orchids_t *ctx, state_instance_t *state)
       DebugLog(DF_ENG, DS_INFO, "New container %s\n", key);
       /* create container ctx */
       /* add to hash */
-      strhash_add(ctx->temporal, (void *)1, key);
+      strhash_add(ctx->gc_ctx, ctx->temporal, (void *)1, key);
     }
   else
     gc_base_free(key);

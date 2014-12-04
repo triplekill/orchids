@@ -187,7 +187,7 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod,
   con->port = port;
   con->fp = create_udp_socket(con->host, con->port);
 
-  strhash_add (((conscfg_t *)mod->config)->consoles, con, con->name);
+  strhash_add (ctx->gc_ctx, ((conscfg_t *)mod->config)->consoles, con, con->name);
 }
 
 

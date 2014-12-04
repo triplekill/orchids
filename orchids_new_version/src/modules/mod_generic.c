@@ -353,7 +353,7 @@ static void add_field(orchids_t *ctx,
       DebugLog(DF_MOD, DS_DEBUG,
 	       "    Adding field [%s] into hash and globlist\n",
 	       f->name, f->substring);
-      strhash_add(v->field_hash, f, f->name);
+      strhash_add(ctx->gc_ctx, v->field_hash, f, f->name);
       f->field_id = v->nfields++;
       STAILQ_INSERT_TAIL(&v->field_globlist, f, globfields);
     }
@@ -457,7 +457,7 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
 	  exit(EXIT_FAILURE);
 	}
 
-      strhash_add(gen_cfg_g->mod_hash, vmod, vmod->name);
+      strhash_add(ctx->gc_ctx, gen_cfg_g->mod_hash, vmod, vmod->name);
       gen_cfg_g->mods++;
       STAILQ_INSERT_TAIL(&gen_cfg_g->vmod_globlist, vmod, globvmods);
     }

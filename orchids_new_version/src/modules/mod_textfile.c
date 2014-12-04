@@ -58,11 +58,6 @@ static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
   GC_START(gc_ctx, TF_FIELDS+1);
 
   DebugLog(DF_MOD, DS_TRACE, "Dissecting: %s", buf);
-<<<<<<< .mine
-//gc_check(gc_ctx);
-=======
-  //gc_check(gc_ctx);
->>>>>>> .r528
 
   val = ovm_int_new (gc_ctx, tf->line);
   GC_UPDATE(gc_ctx, F_LINE_NUM, val);
@@ -73,19 +68,9 @@ static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
   val = ovm_str_new (gc_ctx, len);
   memcpy (STR(val), buf, len);
   GC_UPDATE(gc_ctx, F_LINE, val);
-<<<<<<< .mine
-//gc_check(gc_ctx);
-=======
-  //gc_check(gc_ctx);
->>>>>>> .r528
 
   REGISTER_EVENTS(ctx, mod, TF_FIELDS);
   GC_END(gc_ctx);
-<<<<<<< .mine
-//gc_check(gc_ctx);
-=======
-  //gc_check(gc_ctx);
->>>>>>> .r528
 }
 
 

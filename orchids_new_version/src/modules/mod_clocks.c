@@ -64,7 +64,7 @@ static void clock_add_float(clockctx_t *ctx,
   clock->prec = prec;
   clock->sync = sync;
 
-  strhash_add(ctx->clocks, clock, name);
+  strhash_add(ctx->gc_ctx, ctx->clocks, clock, name);
 }
 
 

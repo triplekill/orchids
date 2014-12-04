@@ -51,15 +51,15 @@ void gc_clear_strhash(strhash_t *hash, void (*elmt_free)(void *e));
    gc_base_free()s the keys, mirroring the use of gc_strhash_add().
 */
 void *strhash_to_array(gc_t *gc_ctx, strhash_t *hash);
-void strhash_resize(strhash_t *hash, size_t newsize);
-void strhash_add(strhash_t *hash, void *data, char *key);
+void strhash_resize(gc_t *gc_ctx, strhash_t *hash, size_t newsize);
+void strhash_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key);
 void gc_strhash_add(gc_t *ctx, strhash_t *hash, gc_header_t *data, char *key);
 /* Compared to strhash_add(), gc_strhash_add() also:
    - GC_TOUCH()es data
    - gc_strdup()s key
 */
 void *strhash_get(strhash_t *hash, char *key);
-void *strhash_check_and_add(strhash_t *hash, void *data, char *key);
+void *strhash_check_and_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key);
 void *strhash_update(strhash_t *hash, void *new_data, char *key);
 void *gc_strhash_update_or_add(gc_t *gc_ctx, strhash_t *hash, void *new_data, char *key);
 void *strhash_del(strhash_t *hash, char *key);

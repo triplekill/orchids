@@ -3687,7 +3687,7 @@ static void build_fields_hash(orchids_t *ctx)
 
   h = ctx->rule_compiler->fields_hash;
   for (f = 0; f < ctx->global_fields->num_fields; f++)
-    strhash_add(h, &ctx->global_fields->fields[f],
+    strhash_add(ctx->gc_ctx, h, &ctx->global_fields->fields[f],
 		ctx->global_fields->fields[f].name);
 
   DebugLog(DF_OLC, DS_INFO,
@@ -3715,7 +3715,7 @@ static void build_functions_hash(orchids_t *ctx)
       DebugLog(DF_ENG, DS_ERROR, "Function '%s' already registered\n", func_tbl[f].name);
       return ;
     }
-    strhash_add(h, &func_tbl[f], func_tbl[f].name);
+    strhash_add(ctx->gc_ctx, h, &func_tbl[f], func_tbl[f].name);
   }
 
   DebugLog(DF_OLC, DS_INFO,
