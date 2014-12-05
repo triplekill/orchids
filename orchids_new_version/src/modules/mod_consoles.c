@@ -57,7 +57,7 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
       STACK_DROP(ctx->ovm_stack, 2);
-      PUSH_RETURN_TRUE(ctx);
+      PUSH_RETURN_FALSE(ctx);
       return;
     }
   str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
@@ -68,7 +68,7 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(str));
       STACK_DROP(ctx->ovm_stack, 2);
-      PUSH_RETURN_TRUE(ctx);
+      PUSH_RETURN_FALSE(ctx);
       return;
     }
 
@@ -94,7 +94,7 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
       STACK_DROP(ctx->ovm_stack, 1);
-      PUSH_RETURN_TRUE(ctx);
+      PUSH_RETURN_FALSE(ctx);
       return;
     }
   c = ovm_strdup(ctx->gc_ctx, con);
@@ -118,9 +118,11 @@ static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
            "loading consoles module @ %p\n", (void *) &mod_consoles);
   register_lang_function(ctx, issdl_console_msg, "console_msg",
 			 2, console_msg_sigs,
+			 m_unknown_2,
 			 "Console message output");
   register_lang_function(ctx, issdl_console_evt, "console_evt",
 			 1, console_evt_sigs,
+			 m_unknown_1,
 			 "Console event output");
   mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
   mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);

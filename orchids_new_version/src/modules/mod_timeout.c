@@ -146,6 +146,7 @@ static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_timeout,
                          "timeout",
 			 2, timeout_sigs,
+			 m_unknown_2,
                          "Register a real-time timeout.");
 
   mod_entry_g = mod;

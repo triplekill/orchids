@@ -137,6 +137,7 @@ static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   register_lang_function(ctx, issdl_temporal, "temporal",
 			 1, temporal_sigs,
+			 m_unknown_1,
 			 "update a temporal context");
 
   html_output_add_menu_entry(ctx, mod, period_htmloutput);

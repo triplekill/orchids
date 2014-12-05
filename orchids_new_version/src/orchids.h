@@ -819,7 +819,7 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
  **     Types are NULL, &t_int, &t_bstr, &t_str, etc.,
  **     plus &t_any (wildcard arg type)
  **/
-/**   @var issdl_function_s::compute_monotony
+/**   @var issdl_function_s::cm
  **     Auxiliary function meant to compute monotonicity status of expression e.
  **     Can be left NULL if result is always MONO_UNKNOWN.
  **     e is a NODE_CALL.
@@ -830,6 +830,9 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
  **/
 struct node_expr_s;
 
+typedef monotony (*monotony_apply) (rule_compiler_t *ctx,
+				    struct node_expr_s *e,
+				    monotony args[]);
 typedef struct issdl_function_s issdl_function_t;
 struct issdl_function_s
 {
@@ -838,8 +841,7 @@ struct issdl_function_s
   char      *name;
   int32_t    args_nb;
   type_t  ***sigs;
-  monotony (*compute_monotony) (rule_compiler_t *ctx, struct node_expr_s *e,
-				monotony args[]);
+  monotony_apply cm;
   char      *desc;
 };
 
@@ -1732,6 +1734,7 @@ void register_lang_function(orchids_t *ctx,
 			    const char *name,
 			    int arity,
 			    const type_t ***sigs,
+			    monotony_apply cm,
 			    const char *desc);
 
 /**

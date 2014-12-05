@@ -105,11 +105,13 @@ static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 issdl_inject_event,
 			 "inject_event",
 			 1, inject_event_sigs,
+			 m_const,
 			 "inject the event into the orchids engine");
   register_lang_function(ctx,
 			 issdl_current_event,
 			 "current_event",
 			 1, current_event_sigs,
+			 m_unknown_1,
 			 "get the current event");
   return cfg;
 }

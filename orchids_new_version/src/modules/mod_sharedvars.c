@@ -217,18 +217,21 @@ static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_set_shared_var,
                          "set_shared_var",
 			 2, shset_sigs,
+			 m_unknown_2,
                          "Set or update a shared variable");
 
   register_lang_function(ctx,
                          issdl_get_shared_var,
                          "get_shared_var",
 			 1, shget_sigs,
+			 m_unknown_1,
                          "Get a shared variable");
 
   register_lang_function(ctx,
                          issdl_del_shared_var,
                          "del_shared_var",
 			 1, shdel_sigs,
+			 m_unknown_1,
                          "Delete a shared variable");
 
   /* return config structure, for module manager */

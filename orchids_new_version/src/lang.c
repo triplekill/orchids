@@ -3837,7 +3837,8 @@ void register_core_functions(orchids_t *ctx)
 
   for (f = issdl_function_g; f->func!=NULL; f++)
     register_lang_function(ctx, f->func, f->name,
-			   f->args_nb, (const type_t ***)f->sigs, f->desc);
+			   f->args_nb, (const type_t ***)f->sigs,
+			   f->cm, f->desc);
 }
 
 void register_lang_function(orchids_t *ctx,
@@ -3845,6 +3846,7 @@ void register_lang_function(orchids_t *ctx,
 			    const char *name,
 			    int arity,
 			    const type_t ***sigs,
+			    monotony_apply cm,
 			    const char *desc)
 {
   issdl_function_t *f;
@@ -3862,6 +3864,7 @@ void register_lang_function(orchids_t *ctx,
   f->name = (char *)name;
   f->args_nb = arity;
   f->sigs = (type_t ***)sigs;
+  f->cm = cm;
   f->desc = (char *)desc;
   ctx->vm_func_tbl_sz++;
 }

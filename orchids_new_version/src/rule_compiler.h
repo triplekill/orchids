@@ -157,7 +157,7 @@ struct node_expr_call_s
 
 #define CALL_SYM(e) ((node_expr_call_t *)e)->symbol
 #define CALL_RES_ID(e) (((node_expr_call_t *)e)->f==NULL?0:((node_expr_call_t *)e)->f->id)
-#define CALL_COMPUTE_MONOTONY(e) (((node_expr_call_t *)e)->f==NULL?NULL:((node_expr_call_t *)e)->f->compute_monotony)
+#define CALL_COMPUTE_MONOTONY(e) (((node_expr_call_t *)e)->f==NULL?NULL:((node_expr_call_t *)e)->f->cm)
 #define CALL_PARAMS(e) ((node_expr_call_t *)e)->paramlist
 
 
