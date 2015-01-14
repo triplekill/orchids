@@ -19,14 +19,20 @@
 
 #include "orchids.h"
 
-#define UDP_FIELDS 7
+#define UDP_FIELDS 8
 #define F_EVENT    0
 #define F_TIME     1
 #define F_SRC_ADDR 2
 #define F_SRC_PORT 3
 #define F_DST_ADDR 4
 #define F_DST_PORT 5
-#define F_MSG      6
+#define F_TAG      6
+#define F_MSG      7
+
+struct udp_config {
+  ovm_var_t *port;
+  ovm_var_t *tag;
+};
 
 static int
 create_udp_socket(int udp_port);

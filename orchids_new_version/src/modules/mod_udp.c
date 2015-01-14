@@ -63,6 +63,7 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   struct sockaddr_in from;
   socklen_t len;
   ovm_var_t *var;
+  struct udp_config *uc = (struct udp_config *)data;
 
   GC_START(gc_ctx, UDP_FIELDS+1);
   /* UDP_FIELDS fields, plus the event to be built */
@@ -76,8 +77,9 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   var = ovm_int_new (gc_ctx, (long) mod->posts);
   GC_UPDATE(gc_ctx, F_EVENT, var);
 
-  GC_UPDATE(gc_ctx, F_DST_PORT, (ovm_var_t *)data);
+  GC_UPDATE(gc_ctx, F_DST_PORT, uc->port);
   /* F_DST_ADDR never filled in */
+  GC_UPDATE(gc_ctx, F_TAG, uc->tag);
 
   var = ovm_bstr_new (gc_ctx, MAXSOCKLEN);
   GC_UPDATE (gc_ctx, F_MSG, var);
@@ -108,6 +110,7 @@ static field_t udp_fields[] = {
   { "udp.src_port", &t_uint, MONO_UNKNOWN,      "source port"         },
   { "udp.dst_addr", &t_ipv4, MONO_UNKNOWN,     "destination address" }, /* never used? */
   { "udp.dst_port", &t_uint, MONO_UNKNOWN,      "destination port"    },
+  { "udp.tag",      &t_str, MONO_UNKNOWN,      "dissection tag" },
   { "udp.msg",      &t_bstr, MONO_UNKNOWN,     "message"             }
 };
 
@@ -116,7 +119,7 @@ static void *udp_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() udp@%p\n", (void *) &mod_udp);
 
-gc_check(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   register_fields(ctx, mod, udp_fields, UDP_FIELDS);
   return NULL;
 }
@@ -127,6 +130,8 @@ static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t
   int sd;
   int port;
   ovm_var_t *var;
+  struct udp_config *uc;
+  size_t len;
 
   port = (int)strtol(dir->args, (char **)NULL, 10); /* atoi() is deprecated */
   DebugLog(DF_MOD, DS_INFO, "Add udp listen port %i\n", port);
@@ -136,11 +141,18 @@ static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t
     return;
   }
 
+  uc = gc_base_malloc (ctx->gc_ctx, sizeof(struct udp_config));
   sd = create_udp_socket(port);
-  GC_START(ctx->gc_ctx, 1);
+  GC_START(ctx->gc_ctx, 2);
   var = ovm_uint_new (ctx->gc_ctx, port);
+  uc->port = var;
   GC_UPDATE(ctx->gc_ctx, 0, var);
-  add_input_descriptor(ctx, mod, udp_callback, sd, (void *)var);
+  len = strlen (dir->args);
+  var = ovm_str_new (ctx->gc_ctx, len);
+  memcpy (STR(var), dir->args, len);
+  uc->tag = var;
+  GC_UPDATE(ctx->gc_ctx, 1, var);
+  add_input_descriptor(ctx, mod, udp_callback, sd, (void *)uc);
   GC_END(ctx->gc_ctx);
 }
 
