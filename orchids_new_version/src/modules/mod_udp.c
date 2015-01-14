@@ -152,6 +152,8 @@ static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t
   memcpy (STR(var), dir->args, len);
   uc->tag = var;
   GC_UPDATE(ctx->gc_ctx, 1, var);
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&uc->port);
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&uc->tag);
   add_input_descriptor(ctx, mod, udp_callback, sd, (void *)uc);
   GC_END(ctx->gc_ctx);
 }
