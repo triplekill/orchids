@@ -6,12 +6,10 @@ EXTRA_DIST =                  \
   03_mod_udp.conf.dist        \
   04_mod_sockunix.conf.dist   \
   05_mod_consoles.conf.dist   \
-  06_mod_remoteadm.conf.dist  \
   07_mod_snare.conf.dist      \
   08_mod_rawsnare.conf.dist   \
   09_mod_netfilter.conf.dist  \
   10_mod_prolog.conf.dist     \
-  11_mod_clocks.conf.dist     \
   12_mod_generic.conf.dist    \
   13_mod_pcap.conf.dist       \
   14_mod_wifi.conf.dist       \
@@ -29,12 +27,10 @@ orchidsconfd_DATA =         \
   03_mod_udp.conf           \
   04_mod_sockunix.conf      \
   05_mod_consoles.conf      \
-  06_mod_remoteadm.conf     \
   07_mod_snare.conf         \
   08_mod_rawsnare.conf      \
   09_mod_netfilter.conf     \
   10_mod_prolog.conf        \
-  11_mod_clocks.conf        \
   12_mod_generic.conf       \
   13_mod_pcap.conf          \
   14_mod_wifi.conf          \

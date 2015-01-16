@@ -54,7 +54,6 @@
 #ifdef ORCHIDS_STATIC
 /*!!! no longer really up to date */
 /* declare built-in modules */
-extern input_module_t mod_remoteadm;
 extern input_module_t mod_textfile;
 extern input_module_t mod_udp;
 extern input_module_t mod_syslog;
@@ -64,12 +63,10 @@ extern input_module_t mod_rawsnare;
 extern input_module_t mod_generic;
 extern input_module_t mod_test;
 extern input_module_t mod_test2;
-extern input_module_t mod_cisco;
 extern input_module_t mod_snmp;
 #ifdef HAVE_NETSNMP
 extern input_module_t mod_snmptrap;
 #endif /* HAVE_NETSNMP */
-extern input_module_t mod_sunbsm;
 extern input_module_t mod_win32evt;
 extern input_module_t mod_consoles;
 extern input_module_t mod_sockunix;
@@ -895,16 +892,13 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     &mod_udp,
     &mod_syslog,
     &mod_snare,
-    &mod_remoteadm,
     &mod_rawsnare,
     &mod_netfilter,
     &mod_generic,
-    &mod_cisco,
     &mod_snmp,
 #ifdef HAVE_NETSNMP
     &mod_snmptrap,
 #endif /* HAVE_NETSNMP */
-    &mod_sunbsm,
     &mod_win32evt,
     &mod_consoles,
     &mod_sockunix,

@@ -10,7 +10,6 @@ SetModuleDir @@LIBDIR@@/orchids
 
 LoadModule bintotext
 LoadModule htmlstate
-LoadModule remoteadm
 LoadModule textfile
 LoadModule sockunix
 LoadModule udp
@@ -21,12 +20,10 @@ LoadModule auditd
 LoadModule openbsm
 LoadModule generic
 LoadModule netfilter
-LoadModule cisco
 LoadModule snmptrap
 LoadModule consoles
 LoadModule prolog
 #LoadModule prolog_history
-LoadModule clocks
 LoadModule period
 LoadModule pcap
 LoadModule wifi

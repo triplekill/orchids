@@ -1,24 +1,18 @@
 INCLUDES = -I$(top_srcdir)/src -I$(top_srcdir)/src/util
 
-BUILT_SOURCES = cisco.tab.c cisco.tab.h cisco.yy.c \
-                netfilter.tab.c netfilter.tab.h netfilter.yy.c \
+BUILT_SOURCES = netfilter.tab.c netfilter.tab.h netfilter.yy.c \
                 snare.tab.c snare.tab.h snare.yy.c
 
-EXTRA_DIST = cisco.l cisco.y \
-             netfilter.l netfilter.y \
+EXTRA_DIST = netfilter.l netfilter.y \
              snare.l snare.y
 
 pkglib_LTLIBRARIES = \
-  mod_cisco.la \
-  mod_clocks.la \
   mod_consoles.la \
   mod_generic.la \
   mod_netfilter.la \
   mod_rawsnare.la \
-  mod_remoteadm.la \
   mod_snare.la \
   mod_sockunix.la \
-  mod_sunbsm.la \
   mod_syslog.la \
   mod_textfile.la \
   mod_bintotext.la \
@@ -54,21 +48,6 @@ endif
 
 
 #  mod_stats.la
-
-mod_cisco_la_SOURCES =     \
-  mod_cisco.c mod_cisco.h  \
-  cisco.tab.c cisco.tab.h  \
-  cisco.yy.c
-mod_cisco_la_LDFLAGS = -module -avoid-version
-
-$(srcdir)/cisco.tab.c $(srcdir)/cisco.tab.h: $(srcdir)/cisco.y
-	$(YACC) -p cisco -d -b cisco -o $(srcdir)/cisco.tab.c $(srcdir)/cisco.y
-
-$(srcdir)/cisco.yy.c: $(srcdir)/cisco.l
-	$(LEX) -f -Pcisco -o$(srcdir)/cisco.yy.c $(srcdir)/cisco.l
-
-mod_clocks_la_SOURCES = mod_clocks.c mod_clocks.h
-mod_clocks_la_LDFLAGS = -module -avoid-version
 
 mod_consoles_la_SOURCES = mod_consoles.c mod_consoles.h
 mod_consoles_la_LDFLAGS = -module -avoid-version
@@ -133,9 +112,6 @@ endif
 mod_rawsnare_la_SOURCES = mod_rawsnare.c mod_rawsnare.h rawsnare.h
 mod_rawsnare_la_LDFLAGS = -module -avoid-version
 
-mod_remoteadm_la_SOURCES = mod_remoteadm.c mod_remoteadm.h
-mod_remoteadm_la_LDFLAGS = -module -avoid-version
-
 mod_snare_la_SOURCES = mod_snare.c mod_snare.h snare.tab.c snare.tab.h snare.yy.c
 mod_snare_la_LDFLAGS = -module -avoid-version
 
@@ -156,9 +132,6 @@ mod_auditd_la_LIBADD = -lm
 
 # mod_stats_la_SOURCES = mod_stats.c
 # mod_stats_la_LDFLAGS = -module -avoid-version
-
-mod_sunbsm_la_SOURCES = mod_sunbsm.c
-mod_sunbsm_la_LDFLAGS = -module -avoid-version
 
 mod_syslog_la_SOURCES = mod_syslog.c mod_syslog.h
 mod_syslog_la_LDFLAGS = -module -avoid-version

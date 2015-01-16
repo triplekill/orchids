@@ -362,3 +362,14 @@ AC_DEFUN([MY_ARG_WITH],
              AS_HELP_STRING([--with-$1], [use $1 (default is $2)]),
                             ac_cv_use_$1=$withval, ac_cv_use_$1=no),
  AC_CACHE_CHECK(whether to use $1, ac_cv_use_$1, ac_cv_use_$1=$2)])
+
+
+AC_DEFUN([AC_CHECK_CPP],
+[
+AC_PATH_PROG(CPP,cpp)
+if test "$CPP" != "" ; then
+   AC_DEFINE([HAVE_CPP], 1 , [Set to 1 if cpp is present])
+   AC_DEFINE_UNQUOTED([PATH_TO_CPP], "$CPP", [Path to cpp])
+fi
+])
+

@@ -49,6 +49,7 @@ dnl AM_MAINTAINER_MODE
 dnl Checks for programs
 AC_PROG_CC
 AM_PROG_CC_STDC
+AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
@@ -139,18 +140,19 @@ if test "$orchids_demo" = "true" ; then
    AC_DEFINE([ORCHIDS_DEMO], 1, [Set to 1 if DEMO is requested])
 fi
 
-AC_ARG_ENABLE(preproc,
-AS_HELP_STRING([--enable-preproc], [enable preprocessor (default is on)]),
-[case "${enableval}" in
-    yes) orchids_preproc=true ;;
-    no)  orchids_preproc=false ;;
-    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-preproc) ;;
-esac],
-[orchids_preproc=true]
-)
-if test "$orchids_preproc" = "true" ; then
-   AC_DEFINE([ENABLE_PREPROC], 1, [Set to 1 if PREPROC is requested])
-fi
+dnl Removed because of security reasons
+dnl AC_ARG_ENABLE(preproc,
+dnl AS_HELP_STRING([--enable-preproc], [enable preprocessor (default is off)]),
+dnl [case "${enableval}" in
+dnl   yes) orchids_preproc=true ;;
+dnl   no)  orchids_preproc=false ;;
+dnl   *)   AC_MSG_ERROR(bad value ${enableval} for --enable-preproc) ;;
+dnl esac],
+dnl ]orchids_preproc=false]
+dnl )
+dnl if test "$orchids_preproc" = "true" ; then
+dnl   AC_DEFINE([ENABLE_PREPROC], 1, [Set to 1 if PREPROC is requested])
+dnl fi
 
 AC_ARG_ENABLE(debug,
 AS_HELP_STRING([--enable-debug], [enable debugging (default is off)]),
