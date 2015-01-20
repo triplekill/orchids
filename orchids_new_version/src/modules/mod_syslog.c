@@ -37,6 +37,7 @@ input_module_t mod_syslog;
 ** priority = facility * 8 + severity
 ** (extracted from rfc3164)
 */
+#ifdef OBSOLETE
 static char *syslog_severity_g[] = {
   "(0) Emergency: system is unusable"           ,
   "(1) Alert: action must be taken immediately" ,
@@ -76,6 +77,7 @@ static char *syslog_facility_g[] = {
   "(23) local use 7  (local7)"                   ,
   NULL
 };
+#endif
 
 /*
 int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
@@ -92,8 +94,8 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   char *txt_line;
   int txt_len;
   size_t token_size;
-  long syslog_priority;
-  long n;
+  unsigned long syslog_priority;
+  unsigned long n;
   int ret;
   ovm_var_t *val;
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -120,10 +122,10 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   GC_UPDATE(gc_ctx, SYSLOG_FIELDS, event);
   ret = 0;
 
-  /* check if we have a raw syslog line (with encoded facility and priotity) */
+  /* check if we have a raw syslog line (with encoded facility and priority) */
   if (txt_line[0] == '<')
     {
-      token_size = get_next_int(txt_line + 1, &syslog_priority, txt_len);
+      token_size = get_next_uint(txt_line + 1, &syslog_priority, txt_len);
       if (syslog_priority > 191)
 	{ /* 23 (local7) * 8 + 7 (debug) == 191 */
 	  DebugLog(DF_MOD, DS_WARN, "PRI error.\n");
@@ -209,9 +211,9 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       txt_line += 22;
       txt_len -= 22;
 
-      token_size = get_next_int(txt_line, &n, txt_len);
+      token_size = get_next_uint(txt_line, &n, txt_len);
       token_size++;
-      val = ovm_int_new (gc_ctx, n);
+      val = ovm_uint_new (gc_ctx, n);
       GC_UPDATE(gc_ctx, F_REPEAT, val);
 
       txt_line += token_size;
@@ -242,7 +244,7 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   txt_line += token_size;
   txt_len -= token_size;
 
-  /* XXX check sizes are always positives */
+  /* XXX check sizes are always positive */
   if (txt_len <= 0)
     {
       DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
@@ -253,8 +255,8 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   /* look ahead */
   if (*txt_line == '[')
     { /* fill pid */
-      token_size = get_next_int(txt_line + 1, &n, txt_len);
-      val = ovm_int_new (gc_ctx, n);
+      token_size = get_next_uint(txt_line + 1, &n, txt_len);
+      val = ovm_uint_new (gc_ctx, n);
       GC_UPDATE(gc_ctx, F_PID, val);
 
       if (strncmp(txt_line + token_size + 1, "]: ", 3))
@@ -293,14 +295,14 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 }
 
 field_t syslog_fields[] = {
-  { "syslog.facility", &t_str, MONO_UNKNOWN,  "source of the message"          },
-  { "syslog.severity", &t_str, MONO_UNKNOWN,  "severity of the message"        },
+  { "syslog.facility", &t_uint, MONO_UNKNOWN,  "source of the message"       },
+  { "syslog.severity", &t_uint, MONO_UNKNOWN,  "severity of the message"     },
   { "syslog.time",     &t_ctime, MONO_MONO, "date of the event"              },
-  { "syslog.host",     &t_str, MONO_UNKNOWN,  "host"                           },
-  { "syslog.repeat",   &t_int, MONO_UNKNOWN,   "message repetition"             },
-  { "syslog.pid",      &t_int, MONO_UNKNOWN,   "process id of the event source" },
-  { "syslog.prog",     &t_str, MONO_UNKNOWN,  "program name"                   },
-  { "syslog.msg",      &t_str, MONO_UNKNOWN,  "the message"                    }
+  { "syslog.host",     &t_str, MONO_UNKNOWN,  "host"                         },
+  { "syslog.repeat",   &t_uint, MONO_UNKNOWN,   "message repetition"         },
+  { "syslog.pid",      &t_uint, MONO_UNKNOWN,   "process id of the event source" },
+  { "syslog.prog",     &t_str, MONO_UNKNOWN,  "program name"                 },
+  { "syslog.msg",      &t_str, MONO_UNKNOWN,  "the message"                  }
 };
 
 
@@ -308,8 +310,8 @@ static void *
 syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   syslog_data_t *data;
-  int i;
-  size_t len;
+  unsigned int i;
+  //size_t len;
   ovm_var_t *val;
 
   DebugLog(DF_MOD, DS_INFO, "load() syslog@%p\n", (void *) &mod_syslog);
@@ -323,19 +325,25 @@ syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   for (i=0; i<SYSLOG_MAX_SEVERITY; i++)
     {
+      GC_TOUCH (ctx->gc_ctx, val = ovm_uint_new (ctx->gc_ctx, i));
+      /*
       len = strlen(syslog_severity_g[i]);
       GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
       VSTR(val) = syslog_severity_g[i];
       VSTRLEN(val) = strlen(VSTR(val));
+      */
       data->syslog_severity[i] = val;
       gc_add_root(ctx->gc_ctx, (gc_header_t **)&data->syslog_severity[i]);
     }
   for (i=0; i<SYSLOG_MAX_FACILITY; i++)
     {
+      GC_TOUCH (ctx->gc_ctx, val = ovm_uint_new (ctx->gc_ctx, i));
+      /*
       len = strlen(syslog_facility_g[i]);
       GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
       VSTR(val) = syslog_facility_g[i];
       VSTRLEN(val) = strlen(VSTR(val));
+      */
       data->syslog_facility[i] = val;
       gc_add_root(ctx->gc_ctx, (gc_header_t **)&data->syslog_facility[i]);
     }

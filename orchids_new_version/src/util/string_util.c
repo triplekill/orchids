@@ -33,7 +33,7 @@ size_t get_next_token(const char *pos, int c, size_t n)
   return (token_size);
 }
 
-size_t get_next_int(const char *istr, long *i, size_t n)
+size_t get_next_uint(const char *istr, unsigned long *i, size_t n)
 {
   size_t sz;
 
