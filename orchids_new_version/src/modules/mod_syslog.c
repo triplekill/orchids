@@ -23,7 +23,7 @@
 #include <time.h>
 #include <string.h>
 #include <ctype.h>
-
+#include <errno.h>
 
 #include "orchids.h"
 
@@ -90,13 +90,19 @@ int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data
 static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 			  void *data)
 {
+  syslog_data_t *syslog_cfg = mod->config;
   struct tm *t;
   char *txt_line;
   int txt_len;
+  char *tag;
+  int tag_len;
   size_t token_size;
   unsigned long syslog_priority;
   unsigned long n;
   int ret;
+  int diff;
+  int year_present, bytes_read;
+  syslog_time_tracker_t *tt;
   ovm_var_t *val;
   gc_t *gc_ctx = ctx->gc_ctx;
 
@@ -138,29 +144,62 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       txt_line += token_size + 2; /* number size and '<' '>' */
       txt_len -= token_size + 2;
     }
-
-  if ((txt_len > 15) &&
-      (txt_line[3] == ' ') && (txt_line[6] == ' ') &&
-      (txt_line[9] == ':') && (txt_line[12] == ':') &&
-      (txt_line[15] == ' '))
+  
+  t = syslog_getdate(txt_line, txt_len, &year_present, &bytes_read);
+  if (t == NULL)
     {
-      t = syslog_getdate(txt_line);
-      if (t == NULL)
-	{
-	  DebugLog(DF_MOD, DS_WARN, "time format error.\n");
-	  ret = 1;
-	  goto end;
-	}
-      val = ovm_ctime_new(gc_ctx, mktime(t));
-      GC_UPDATE(gc_ctx, F_TIME, val);
-
-      txt_line += 16;
-      txt_len -= 16;
+      DebugLog(DF_MOD, DS_WARN, "time format error.\n");
+      /*
+	ret = 1;
+	goto end;
+      */
+      val = ovm_ctime_new (gc_ctx, time(NULL));
+      // in case of error, take current time
     }
   else
     {
-      DebugLog(DF_MOD, DS_INFO, "no date present.\n");
+      // Deal with the standard syslog problem: the year is usually missing
+      // Get dissection tag:
+      tag = NULL;
+      tag_len = 0;
+      if (event->next!=NULL && event->next->value!=NULL)
+	switch (TYPE(event->next->value))
+	  {
+	  case T_STR: tag = STR(event->next->value);
+	    tag_len = STRLEN(event->next->value);
+	    break;
+	  case T_VSTR: tag = VSTR(event->next->value);
+	    tag_len = VSTRLEN(event->next->value);
+	    break;
+	  }
+      tt = NULL;
+      if (tag!=NULL)
+	tt = hash_get (syslog_cfg->year_table, tag, tag_len);
+      if (tt==NULL)
+	tt = &syslog_cfg->default_year;
+      if (tt->flags && SYSLOG_TT_FIRST)
+	{
+	  tt->flags &= ~SYSLOG_TT_FIRST;
+	}
+      else
+	{ /* We decide that year has advanced by 1 if month has decreased
+	     by too much, namely if t->tm_mon - tt->last.tm_mon
+	     is between 6 and 11 modulo 12.
+	  */
+	  diff = t->tm_mon - tt->last.tm_mon;
+	  if (diff<0)
+	    diff += 12;
+	  if (diff>=6)
+	    tt->year++;
+	}
+      t->tm_year = tt->year;
+      tt->last.tm_mon = t->tm_mon; /* Only record the month, for speed */
+      val = ovm_ctime_new(gc_ctx, mktime(t));
     }
+  GC_UPDATE(gc_ctx, F_TIME, val);
+
+  txt_line += bytes_read;
+  txt_len -= bytes_read;
 
   if (txt_len <= 0)
     {
@@ -306,17 +345,23 @@ field_t syslog_fields[] = {
 };
 
 
-static void *
-syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   syslog_data_t *data;
   unsigned int i;
   //size_t len;
   ovm_var_t *val;
+  struct tm *t;
+  time_t now;
 
   DebugLog(DF_MOD, DS_INFO, "load() syslog@%p\n", (void *) &mod_syslog);
  
   data = Xmalloc (sizeof(syslog_data_t));
+  now = time (NULL);
+  t = gmtime (&now);
+  data->default_year.year = t->tm_year;
+  data->default_year.flags = SYSLOG_TT_FIRST;
+  data->year_table = new_hash (101); /* XXX hard-coded hash table size */
   GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
   VSTR(val) = "syslog";
   VSTRLEN(val) = strlen(VSTR(val));
@@ -360,6 +405,105 @@ static char *syslog_deps[] = {
 };
 #endif
 
+static void syslog_set_default_year (orchids_t *ctx, mod_entry_t * mod, config_directive_t *dir)
+{
+  syslog_data_t *data = mod->config;
+  int year, n;
+  time_t now;
+
+  errno = 0;
+  switch (dir->args[0])
+    {
+    case '+':
+      n = strtol (dir->args+1, NULL, 10);
+      if (errno)
+	{
+	err:
+	  DebugLog(DF_MOD, DS_ERROR, "SetDefaultYear %s: bad argument, errno=%d\n", dir->args, errno);
+	  return;
+	}
+      now = time (NULL);
+      year = gmtime (&now)->tm_year + n;
+      break;
+    case '-':
+      n = strtol (dir->args+1, NULL, 10);
+      if (errno)
+	goto err;
+      now = time (NULL);
+      year = gmtime (&now)->tm_year - n;
+      break;
+    default:
+      year = strtol (dir->args, NULL, 10);
+      if (errno)
+	goto err;
+      break;
+    }
+  data->default_year.year = year;
+}
+
+static void syslog_set_year (orchids_t *ctx, mod_entry_t * mod, config_directive_t *dir)
+{
+  syslog_data_t *data = mod->config;
+  int year, n;
+  char *tag, *end;
+  long len;
+  syslog_time_tracker_t *tt;
+  time_t now;
+
+  tag = dir->args;
+  for (end=tag; end[0]!=0 && !isspace(end[0]); end++);
+  len = end-tag;
+  while (isspace(end[0])) end++;
+  errno = 0;
+  tt = hash_get(data->year_table,tag,len);
+  if (tt!=NULL)
+    {
+      char c = tag[len];
+
+      tag[len] = 0;
+      DebugLog(DF_MOD, DS_ERROR, "SetYear already specified for tag %s\n", tag);
+      tag[len] = c;
+      return;
+    }
+  switch (end[0])
+    {
+    case '+':
+      n = strtol (end+1, NULL, 10);
+      if (errno)
+	{
+	err:
+	  DebugLog(DF_MOD, DS_ERROR, "SetYear %s: bad argument, errno=%d\n", dir->args, errno);
+	  return;
+	}
+      now = time (NULL);
+      year = gmtime (&now)->tm_year + n;
+      break;
+    case '-':
+      n = strtol (end+1, NULL, 10);
+      if (errno)
+	goto err;
+      now = time (NULL);
+      year = gmtime (&now)->tm_year - n;
+      break;
+    default:
+      year = strtol (end, NULL, 10);
+      if (errno)
+	goto err;
+      break;
+    }
+  tt = Xmalloc (sizeof(syslog_time_tracker_t));
+  tt->year = year;
+  tt->flags = SYSLOG_TT_FIRST;
+  hash_add (data->year_table, tt, tag, len);
+}
+
+static mod_cfg_cmd_t syslog_dir[] =
+{
+  { "SetDefaultYear", syslog_set_default_year, "Set default starting year" },
+  { "SetYear", syslog_set_year, "Set starting year for given dissection tag" },
+  { NULL, NULL, NULL }
+};
+
 input_module_t mod_syslog = {
   MOD_MAGIC,
   ORCHIDS_VERSION,
@@ -367,7 +511,7 @@ input_module_t mod_syslog = {
   "syslog",
   "CeCILL2",
   NULL,
-  NULL,
+  syslog_dir,
   syslog_preconfig,
   NULL,
   NULL,
@@ -380,15 +524,17 @@ input_module_t mod_syslog = {
 ** date conversion
 */
 
-struct tm *
-syslog_getdate(const char *date)
+struct tm *syslog_getdate(const char *date, int date_len,
+			   int *year_present, int *bytes_read)
 {
   static struct tm t;
-  int day;
+  int year;
+  int i;
 
-  /* XXX hard coded year */
-  t.tm_year = 107;
-
+  *year_present = 0; /* year is missing by default */
+  *bytes_read = 0;
+  if (date_len<4)
+    return NULL;
   switch (date[0]) {
     case 'A': /* Aug, Avr */
       switch (date[1]) {
@@ -449,19 +595,49 @@ syslog_getdate(const char *date)
       break;
     }
 
-  if (date[4] != ' ') {
-    day = (date[4] - '0') * 10;
-  }
-  else {
-    day = 0;
-  }
-  day += date[5] - '0';
-  t.tm_mday = day;
+  date += 4;
+  date_len -= 4;
+  *bytes_read += 4;
+  if (date_len<3)
+    return NULL;
+  if (isdigit(date[0]) && isdigit(date[1]) && date[2]==' ')
+    t.tm_mday = (date[0]-'0')*10 + (date[1]-'0');
+  else return NULL;
 
-  t.tm_hour = (date[7] - '0') * 10 + (date[8] - '0');
-  t.tm_min = (date[10] - '0') * 10 + (date[11] - '0');
-  t.tm_sec = (date[13] - '0') * 10 + (date[14] - '0');
+  date += 3;
+  date_len -= 3;
+  *bytes_read += 3;
 
+  if (date_len<3)
+    return NULL;
+  if (date[2]!=':') // then assume that year is given
+    {
+      *year_present = 1;
+      year = 0;
+      for (i=0; i<date_len && isdigit(date[i]); i++)
+	{
+	  year = 10*year + (date[i] - '0');
+	}
+      t.tm_year = year;
+      for (; i<date_len && date[i]==' '; i++);
+      date += i;
+      date_len -= i;
+      *bytes_read += i;
+    }
+  if (date_len < 8)
+    return NULL;
+  if (isdigit(date[0]) && isdigit(date[1]) && date[2]==':' &&
+      isdigit(date[3]) && isdigit(date[4]) && date[5]==':' &&
+      isdigit(date[6]) && isdigit(date[7]))
+    {
+      t.tm_hour = (date[0] - '0') * 10 + (date[1] - '0');
+      t.tm_min = (date[3] - '0') * 10 + (date[4] - '0');
+      t.tm_sec = (date[6] - '0') * 10 + (date[7] - '0');
+    }
+  else return NULL;
+  date += 8;
+  date_len -= 8;
+  *bytes_read += 8;
   return (&t);
 }
 

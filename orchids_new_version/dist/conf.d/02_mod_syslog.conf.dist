@@ -3,5 +3,14 @@
 #
 
 <module syslog>
+# set default year to current year
+  SetDefaultYear +0
+# SetDefaultYear +n sets it to current+n, -n to current-n, n to n (absolute)
+# e.g.,
+# SetDefaultYear -3         (3 years ago)
+# SetDefaultYear 2007       (in 2007)
 
+# set year for specific dissection tags
+# SetYear /var/log/messages 2007
+# SetYear 541 +0
 </module>

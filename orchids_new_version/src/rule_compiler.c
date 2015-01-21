@@ -167,9 +167,9 @@ static void rule_compiler_finalize (gc_t *gc_ctx, gc_header_t *p)
   issdllex_destroy (ctx->scanner);
   if (ctx->issdlin!=NULL)
     {
+#ifdef ENABLE_PREPROC
       int ret;
 
-#ifdef ENABLE_PREPROC
       ret = Xpclose(ctx->issdlin);
       if (ret > 0) {
 	DebugLog(DF_OLC, DS_ERROR, "error: preprocessor returned %i.\n", ret);
