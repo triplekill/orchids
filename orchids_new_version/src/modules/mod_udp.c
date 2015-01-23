@@ -74,7 +74,7 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   gettimeofday(&TIMEVAL(var) , NULL);
   GC_UPDATE(gc_ctx, F_TIME, var);
 
-  var = ovm_int_new (gc_ctx, (long) mod->posts);
+  var = ovm_uint_new (gc_ctx, mod->posts);
   GC_UPDATE(gc_ctx, F_EVENT, var);
 
   GC_UPDATE(gc_ctx, F_DST_PORT, uc->port);
@@ -104,9 +104,9 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
 
 
 static field_t udp_fields[] = {
-  { "udp.event",    &t_int, MONO_MONO,      "event number"        },
+  { "udp.event",    &t_uint, MONO_MONO,      "event number"        },
   { "udp.time",     &t_timeval, MONO_MONO,  "reception time"      },
-  { "udp.src_addr", &t_ipv4, MONO_UNKNOWN,     "source adress"       },
+  { "udp.src_addr", &t_ipv4, MONO_UNKNOWN,     "source address"       },
   { "udp.src_port", &t_uint, MONO_UNKNOWN,      "source port"         },
   { "udp.dst_addr", &t_ipv4, MONO_UNKNOWN,     "destination address" }, /* never used? */
   { "udp.dst_port", &t_uint, MONO_UNKNOWN,      "destination port"    },
