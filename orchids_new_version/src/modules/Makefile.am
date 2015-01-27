@@ -1,10 +1,8 @@
 INCLUDES = -I$(top_srcdir)/src -I$(top_srcdir)/src/util
 
-BUILT_SOURCES = netfilter.tab.c netfilter.tab.h netfilter.yy.c \
-                snare.tab.c snare.tab.h snare.yy.c
+BUILT_SOURCES = snare.tab.c snare.tab.h snare.yy.c
 
-EXTRA_DIST = netfilter.l netfilter.y \
-             snare.l snare.y
+EXTRA_DIST = snare.l snare.y
 
 pkglib_LTLIBRARIES = \
   mod_consoles.la \
@@ -55,14 +53,8 @@ mod_consoles_la_LDFLAGS = -module -avoid-version
 mod_generic_la_SOURCES = mod_generic.c mod_generic.h
 mod_generic_la_LDFLAGS = -module -avoid-version
 
-mod_netfilter_la_SOURCES = mod_netfilter.c netfilter.tab.c netfilter.tab.h netfilter.yy.c
+mod_netfilter_la_SOURCES = mod_netfilter.c mod_netfilter.h
 mod_netfilter_la_LDFLAGS = -module -avoid-version
-
-$(srcdir)/netfilter.tab.c $(srcdir)/netfilter.tab.h: $(srcdir)/netfilter.y
-	$(YACC) -p netfilter -d -b netfilter -o $(srcdir)/netfilter.tab.c $(srcdir)/netfilter.y
-
-$(srcdir)/netfilter.yy.c: $(srcdir)/netfilter.l
-	$(LEX) -f -Pnetfilter -o$(srcdir)/netfilter.yy.c $(srcdir)/netfilter.l
 
 mod_period_la_SOURCES = mod_period.c mod_period.h period.c period.h
 mod_period_la_LDFLAGS = -module -avoid-version

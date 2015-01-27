@@ -24,6 +24,10 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
+
 #include "orchids.h"
 #include "orchids_api.h"
 #include "mod_mgr.h"
@@ -603,6 +607,49 @@ char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
   FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return s;
+}
+
+char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
+		      int field_num)
+{
+  gc_t *gc_ctx = octx->ctx->gc_ctx;
+  ovm_var_t *addr;
+  struct addrinfo *sa;
+  int status;
+  char *t;
+  size_t len;
+  GC_START(gc_ctx, 1);  
+ 
+  t = gc_base_malloc(gc_ctx, INET6_ADDRSTRLEN * sizeof(*t));
+  len = end - s;
+  if (len >= INET6_ADDRSTRLEN)
+  { 
+    len = INET6_ADDRSTRLEN-1;
+    memcpy(t, s, len);
+    t[len+1] = "\0";
+  }
+
+  if ((status = getaddrinfo(t, NULL, NULL, &sa)) != 0)
+  {
+    DebugLog(DF_CORE, DS_ERROR, "getaddrinfo, %s\n", gai_strerror(status));
+  }
+  else if(sa->ai_family == AF_INET)
+  { 
+    addr = ovm_ipv4_new(gc_ctx);
+    IVP4(addr) = ((struct sockadrr_in *)(sa->ai_addr))->sin_addr;
+    freeaddrinfo(sa);
+  }
+  else
+  {
+    addr = ovm_ipv6_new(gc_ctx);
+    IPV6(addr) = ((struct sockaddr_in6 *)(sa->ai_addr))->sin6_addr;
+    freeaddrinfo(sa);
+  }
+ 
+  GC_UPDATE(gc_ctx, 0 , addr);
+  FILL_EVENT(octx, field_num, 1);
+  GC_END(gc_ctx); 
+  return t;
 }
 
 /*

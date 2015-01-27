@@ -112,6 +112,8 @@ char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
 		      int field_num);
 char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
 			  int field_num);
+char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
+		      int field_num);
 
 
 #endif /* MOD_UTILS_H */
