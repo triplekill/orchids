@@ -625,12 +625,13 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   if (len >= INET6_ADDRSTRLEN)
     len = INET6_ADDRSTRLEN-1;
   memcpy(t, s, len);
-  t[len+1] = "\0";
+  t[len] = "\0";
  
 
   if ((status = getaddrinfo(t, NULL, NULL, &sa)) != 0)
   {
     DebugLog(DF_CORE, DS_ERROR, "getaddrinfo, %s\n", gai_strerror(status));
+    addr = NULL;
   }
   else if(sa->ai_family == AF_INET)
   { 
