@@ -616,17 +616,15 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   ovm_var_t *addr;
   struct addrinfo *sa;
   int status;
-  char *t;
-  size_t len;
+  char t[INET6_ADDRSTRLEN];
   GC_START(gc_ctx, 1);  
  
-  t = gc_base_malloc(gc_ctx, INET6_ADDRSTRLEN * sizeof(*t));
-  len = end - s;
-  if (len >= INET6_ADDRSTRLEN)
-    len = INET6_ADDRSTRLEN-1;
-  memcpy(t, s, len);
-  t[len] = "\0";
- 
+  while (s<end && end-s<INET6_ADDRSTRLEN && (isdigit(*s) || *s=='.' || *s==':'))
+  {
+    /* not needed to add '\0' to the string t when the loop ends.
+       strncat do it for us. */
+    strncat(t, s++, 1);    
+  }
 
   if ((status = getaddrinfo(t, NULL, NULL, &sa)) != 0)
   {
@@ -636,7 +634,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   else if(sa->ai_family == AF_INET)
   { 
     addr = ovm_ipv4_new(gc_ctx);
-    IVP4(addr) = ((struct sockadrr_in *)(sa->ai_addr))->sin_addr;
+    IPV4(addr) = ((struct sockaddr_in *)(sa->ai_addr))->sin_addr;
     freeaddrinfo(sa);
   }
   else
@@ -649,7 +647,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   GC_UPDATE(gc_ctx, 0 , addr);
   FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx); 
-  return t;
+  return s;
 }
 
 /*

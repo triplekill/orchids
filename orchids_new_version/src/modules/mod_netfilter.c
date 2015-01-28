@@ -52,7 +52,7 @@ static action_t netfilter_actions[] = {
   {"TTL=", F_TTL, action_doer_int },
   {"IPID=", F_IPID, action_doer_int },
   {"IPFLAGS=", F_IPFLAGS, action_doer_int },
-  {"FRAG=", F_FRAGS, action_doer_int },
+  {"FRAG=", F_FRAG, action_doer_int },
   {"IPOPTS=", F_IPOPTS, action_doer_string },
   {"PROTO=", F_PROTO, action_doer_string },
   {"SPT=", F_SPT, action_doer_int },
@@ -71,7 +71,7 @@ static action_t netfilter_actions[] = {
   {"ICMPMTU=", F_ICMPMTU, action_doer_int }
 };
 
-static int netfilter _dissect(orchids_t *ctx, mod_entry_t *mod,
+static int netfilter_dissect(orchids_t *ctx, mod_entry_t *mod,
 		event_t *event, void *data)
 {
   char *txt_line;
