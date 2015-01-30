@@ -159,7 +159,7 @@ static void add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t
 
 static mod_cfg_cmd_t sockunix_dir[] =
 {
-  { "AddUnixSocket", add_unix_socket, "Add a unix socket" },
+  //{ "AddUnixSocket", add_unix_socket, "Add a unix socket" },
   { "INPUT", add_unix_socket, "Add a unix socket" },
   { NULL, NULL, NULL }
 };

@@ -4,9 +4,9 @@
 
 #<module sockunix>
 #
-#  # Adds a PF_UNIX (local) DGRAM Socket to listen realtime message.
+#  # Adds an AF_UNIX (local) DGRAM Socket to listen realtime message.
 #  # Defining a socket to /dev/log receive messages directly from the syslog socket.
-#  # Note that enabling this will bypass the real syskig.
-#  AddUnixSocket /dev/log
+#  # Note that enabling this will bypass the real syslog.
+#  INPUT /dev/log
 #
 #</module>

@@ -170,8 +170,8 @@ static size_t openbsm_compute_length (unsigned char *first_bytes,
     }
 }
 
-/* !!! add all this to oft */
 static field_t openbsm_fields[] = {
+  { "openbsm.kind", &t_uint, MONO_UNKNOWN, "header kind" },
   { "openbsm.version", &t_uint, MONO_UNKNOWN, "version (in header)" },
   { "openbsm.type", &t_uint, MONO_UNKNOWN, "type (in header)" },
   { "openbsm.modifier", &t_uint, MONO_UNKNOWN, "modifier (in header)" },
@@ -208,7 +208,7 @@ static field_t openbsm_fields[] = {
   { "openbsm.ipcperm_mode", &t_uint, MONO_UNKNOWN, "access mode (in ipcperm token)" },
   { "openbsm.ipcperm_seq", &t_uint, MONO_UNKNOWN, "slot sequence number (in ipcperm token)" },
   { "openbsm.ipcperm_key", &t_uint, MONO_UNKNOWN, "key (in ipcperm token)" },
-  { "openbsm.iport", &t_uint, MONO_UNKNOWN, "port IP address (in iport token)" },
+  { "openbsm.iport", &t_uint, MONO_UNKNOWN, "IP port (in iport token)" },
   { "openbsm.opaque", &t_bstr, MONO_UNKNOWN, "opaque data (in opaque token)" },
   { "openbsm.path", &t_str, MONO_UNKNOWN, "path (in path token)" },
   { "openbsm.proc_auid", &t_uint, MONO_UNKNOWN, "audit id (in process token)" },
@@ -294,6 +294,8 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	case AUT_HEADER64_EX:
 	  WITH_SIZE(4,hdr_wrap); /* skip uint32_t size */
 	  GC_START(gc_ctx, F_OPENBSM_HDR_SIZE);
+	  GC_UPDATE(gc_ctx, F_OPENBSM_HDR_KIND,
+		    ovm_uint_new (gc_ctx, (unsigned int)c));
 	  WITH_SIZE(1,hdr_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_HDR_VERSION,
@@ -359,6 +361,8 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  break;
 	case AUT_OTHER_FILE32:
 	  GC_START(gc_ctx, F_OPENBSM_HDR_SIZE);
+	  GC_UPDATE(gc_ctx, F_OPENBSM_HDR_KIND,
+		    ovm_uint_new (gc_ctx, (unsigned int)c));
 	  WITH_SIZE(8,other_wrap)
 	    {
 	      GC_UPDATE(gc_ctx, F_OPENBSM_HDR_TIME, val = ovm_timeval_new (gc_ctx));
@@ -799,7 +803,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  GC_END(gc_ctx);
 	  break;
 	case AUT_IPORT:
-	  /* port IP address (2 bytes) */
+	  /* IP port (2 bytes) */
 	  GC_START(gc_ctx, F_OPENBSM_IPORT_SIZE);
 	  WITH_SIZE(2,iport_wrap)
 	    {
