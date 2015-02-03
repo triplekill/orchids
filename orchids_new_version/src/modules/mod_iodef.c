@@ -294,7 +294,8 @@ static void generate_and_write_report (orchids_t	*ctx,
 				       void		*data,
 				       state_instance_t *state)
 {
-  xml_doc_t	*report;
+  ovm_var_t *report;
+  xmlDocPtr doc;
   iodef_cfg_t*	cfg;
   char		buff[PATH_MAX];
   struct timeval tv;
@@ -308,39 +309,44 @@ static void generate_and_write_report (orchids_t	*ctx,
     return ;
   }
 
-  if ((report = generate_report(ctx, mod, state)))
-  {
-    gettimeofday(&tv, NULL);
-    Timer_to_NTP(&tv, ntph, ntpl);
+  report = iodef_generate_report(ctx, mod, state);
+  if (report!=NULL)
+    {
+      GC_START(ctx->gc_ctx, 1);
+      GC_UPDATE(ctx->gc_ctx, 0, report);
+      gettimeofday(&tv, NULL);
+      Timer_to_NTP(&tv, ntph, ntpl);
 
-    // Write the report in the reports dir
-    snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
-	     cfg->report_dir, "report-", ntph, ntpl, ".xml");
-    fp = fopen(buff, "w");
-    if (fp==NULL)
-      {
-	DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
-		 buff, strerror(errno));
-      }
-    else
-      {
-	xmlDocFormatDump(fp, report->doc, 1);
-	(void) fclose(fp);
-      }
-    free_xml_doc (report); // [jgl] Baptiste did not call this but wrote 'XXX FREE REPORT': why?
-  }
+      // Write the report in the reports dir
+      snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
+	       cfg->report_dir, "report-", ntph, ntpl, ".xml");
+      fp = fopen(buff, "w");
+      if (fp==NULL)
+	{
+	  DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
+		   buff, strerror(errno));
+	}
+      else
+	{
+	  doc = XMLDOC_RD(ctx->gc_ctx,state,report);
+	  xmlDocFormatDump(fp, doc, 1);
+	  (void) fclose(fp);
+	}
+      // No need to free the xmlDoc, the gc will do it.
+      // free_xml_doc (report); // [jgl] Baptiste did not call this but wrote 'XXX FREE REPORT': why?
+      GC_END(ctx->gc_ctx);
+    }
 }
 
-xml_doc_t *generate_report(orchids_t	*ctx,
-			   mod_entry_t	*mod,
-			   state_instance_t *state)
+ovm_var_t *iodef_generate_report(orchids_t	*ctx,
+				 mod_entry_t	*mod,
+				 state_instance_t *state)
 {
   xmlDoc	*report_doc = NULL;
   xmlDoc	*iodef_doc = NULL;
   xmlNode	*report_root = NULL;
   xmlNode	*report_cur_node = NULL;
   xmlXPathContext *report_ctx = NULL;
-  xml_doc_t	*xml_doc = NULL;
 
   char		buff[PATH_MAX];
   iodef_cfg_t*	cfg;
@@ -413,11 +419,7 @@ xml_doc_t *generate_report(orchids_t	*ctx,
     xmlFreeDoc(iodef_doc);
   }
 
-  xml_doc = gc_base_malloc(ctx->gc_ctx, sizeof(xml_doc_t));
-  xml_doc->doc = report_doc;
-  xml_doc->xpath_ctx = report_ctx;
-
-  return xml_doc;
+  return ovm_xml_new (ctx->gc_ctx, report_doc, report_ctx, xml_description);
 }
 
 static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
@@ -427,17 +429,15 @@ static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
 
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
-
-  res = ovm_xml_new (ctx->gc_ctx, xml_description);
+  res = generate_report (ctx, mod_entry, state);
   PUSH_VALUE(ctx, res);
-  EXTPTR(res) = generate_report(ctx, mod_entry, state);
 }
 
 
 static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var;
-  xml_doc_t	*report;
+  xmlDocPtr doc;
   static mod_entry_t	*mod_entry = NULL;
   iodef_cfg_t*	cfg;
   char		buff[PATH_MAX];
@@ -467,7 +467,7 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
       return ;
     }
 
-  report = EXTPTR(var);
+  doc = XMLDOC_RD(ctx->gc_ctx,state,var);
 
   gettimeofday(&tv, NULL);
   Timer_to_NTP(&tv, ntph, ntpl);
@@ -485,7 +485,7 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
     }
   else
     {
-      xmlDocFormatDump(fp, report->doc, 1);
+      xmlDocFormatDump(fp, doc, 1);
       (void) fclose(fp);
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_RETURN_TRUE(ctx);

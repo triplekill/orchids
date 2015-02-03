@@ -719,13 +719,13 @@ static int generate_html_orchids_stats(orchids_t *ctx,
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> rule instances </td> "
-          "<td class=\"v0\"> %u </td> "
+          "<td class=\"v0\"> %lu </td> "
           "</tr>\n",
           ctx->rule_instances);
   fprintf(fp,
           "  <tr> "
           "<td class=\"e1\"> state instances </td> "
-          "<td class=\"v1\"> %u </td> "
+          "<td class=\"v1\"> %lu </td> "
           "</tr>\n",
           ctx->state_instances);
   fprintf(fp,
@@ -1364,7 +1364,7 @@ static int generate_html_rule_instance_list(orchids_t *ctx,
 	      "  <tr> "
 	      "<td class=\"e%i\"> <a href=\"rule-insts/%s.html\"> %i </a> </td> "
 	      "<td class=\"v%i\"><a href=\"rules/%s.html\">%s</a></td>"
-	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %lu </td> "
 	      "<td class=\"v%i\"> %i </td> "
 	      "<td class=\"v%i\"> %i </td> "
 	      "<td class=\"v%i\"> %.32s (%li) </td> "

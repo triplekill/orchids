@@ -54,11 +54,14 @@ typedef struct idmef_buf_t
     char*	message;
 }		idmef_buf_t;
 
+struct ovm_var_s;
+struct ovm_var_s *idmef_generate_alert(orchids_t	*ctx,
+				       mod_entry_t	*mod,
+				       state_instance_t *state)
+
 static int idmef_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
 
-
-static void *
-idmef_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 #endif /* !MOD_IDMEF_H */
 

@@ -510,7 +510,7 @@ struct rule_instance_s
   rule_t *rule;
   state_instance_t *first_state;
   rule_instance_t  *next;
-  int32_t           state_instances;
+  unsigned long     state_instances;
   time_t            creation_date;
   timeval_t         new_creation_date;
   timeval_t         new_last_act;
@@ -562,6 +562,8 @@ struct heap_s {
   heap_t *right;
 };
 
+struct thread_local_list_s; /* private; defined in mod_utils.c */
+
 /**
  ** @struct state_instance_s
  ** State instance structure.
@@ -590,15 +592,12 @@ struct heap_s {
 /**   @var state_instance_s::env
  **     Environment: trie of values allocated by actions in this state instance.
  **/
-/**   @var state_instance_s::global_next
- **     Global state instance list by inverse creation order.
- **     (add a heap or a priority queue for future scheduling).
+/**   @var state_instance_s::thread_locals
+ **     List of thread_local objects that have an instance local to this state_instance
+ **     (see mod_utils.h)
  **/
 /**   @var state_instance_s::retrig_next
  **     Re-trigger list for THIS rule instance only.
- **/
-/**   @var state_instance_s::depth
- **     Depth of this state
  **/
 struct state_instance_s
 {
@@ -613,9 +612,8 @@ struct state_instance_s
 			      in rule_instance->rule->state[] array */
   rule_instance_t  *rule_instance;
   ovm_var_t        *env;
-  state_instance_t *global_next; /* XXX: UNUSED */
+  struct thread_local_list_s *thread_locals;
   state_instance_t *retrig_next;
-  int32_t           depth; /* XXX: UNUSED (only in create_state_instance()) */
   wait_thread_t    *thread_list;
   state_instance_t *next_report_elmt;
 };
@@ -1101,10 +1099,10 @@ struct reportmod_s {
  **     Number of active events.
  **/
 /**   @var orchids_s::rule_instances
- **     Number of total rule instance.
+ **     Number of extant rule instances.
  **/
 /**   @var orchids_s::state_instances
- **     Number of total state instance.
+ **     Number of extant state instances.
  **/
 /**   @var orchids_s::threads
  **     Total number of threads.
@@ -1243,8 +1241,8 @@ struct orchids_s
   rule_instance_t    *last_rule_instance;
   state_instance_t   *retrig_list;
   uint32_t            active_events;
-  uint32_t            rule_instances;
-  uint32_t            state_instances;
+  unsigned long       rule_instances;
+  unsigned long       state_instances;
   uint32_t            threads;
   lifostack_t        *ovm_stack;
   issdl_function_t   *vm_func_tbl;
@@ -1786,6 +1784,7 @@ char *orchids_atof (char *str, size_t len, double *result);
 
 /* In mod_utils.c */
 char *orchids_atoui_hex (char *s, char *end, unsigned long *ip);
+void remove_thread_local_entries (state_instance_t *state);
 
 #endif /* ORCHID_H */
 

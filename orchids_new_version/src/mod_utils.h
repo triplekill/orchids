@@ -66,6 +66,47 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data);
 
+/***
+ *** Thread-local objects.
+ *** The idea is to have objects, out of reach of the garbage collector,
+ *** which one naturally deals with by in-place modification.
+ *** This is typically the case of XML objects as provided by the libxml2
+ *** library.  In-place modification is incompatible with Orchids threads.
+ *** But we can provide copies of the object, one per thread (=Orchids' state_instance_t)
+ *** which the thread can modify at will.
+ ***/
+
+typedef struct thread_local_class_s {
+  void (*free) (void *obj);
+  void *(*copy) (void *obj);
+} thread_local_class_t;
+
+struct thread_local_obj_s;
+typedef struct thread_local_obj_s thread_local_obj_t;
+
+thread_local_obj_t *new_thread_local_obj (gc_t *gc_ctx, thread_local_class_t *class,
+					  void *default_obj);
+/* allocate new thread_local object; neither class nor default_obj will be
+   copied, and pointers to them will be stored flat inside the thread_local object.
+*/
+
+void free_thread_local_obj (thread_local_obj_t *tl);
+/* free a thread_local object, including all copies of objects stored inside it;
+   not that it will also free the default_obj, as given to new_thread_local_obj().
+*/
+
+void *thread_local_obj_rd (gc_t *gc_ctx, state_instance_t *state, thread_local_obj_t *tl);
+/* return the object in tl that is local to state_instance state,
+   for reading only (_rd is for "read"); use thread_local_obj_rw() if you plan
+   to modify the object. */
+
+void *thread_local_obj_rw (gc_t *gc_ctx, state_instance_t *state, thread_local_obj_t *tl);
+/* return the object in tl that is local to state_instance state;
+   can be used for reading and writing; less efficient than thread_local_obj_rd(),
+   since it can be forced to make a local copy through the copy method in the
+   thread_local_class_t of the thread_local_obj_t.
+*/
+
 /*** Quick parser functions
  *** can parse sequences of <keyword><data>, as used e.g. in mod_newauditd.c
  ***/

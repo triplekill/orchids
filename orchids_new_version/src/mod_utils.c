@@ -264,6 +264,319 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
   return hook;
 }
 
+/***
+ *** Thread-local objects.
+ ***/
+
+typedef struct thread_local_trie_s thread_local_trie_t;
+
+struct thread_local_leaf_s {
+  struct state_instance_s *owner; /* the state_instance that owns this obj;
+				     ids are just the pointers themselves */
+  void *obj;
+};
+
+struct thread_local_node_s {
+  thread_local_trie_t *left;
+  thread_local_trie_t *right;
+};
+
+struct thread_local_trie_s {
+  int flags;
+  /* is it a leaf? */
+#define TL_LEAF_MASK 0x01
+  /* if a leaf, is the obj stored there a private copy? */
+#define TL_LEAF_PRIVATE 0x02
+  union {
+    struct thread_local_leaf_s leaf;
+    struct thread_local_node_s node;
+  } what;
+};
+
+struct thread_local_obj_s {
+  thread_local_class_t *class;
+  thread_local_trie_t *trie;
+  void *default_obj;
+};
+
+/* Detect basic alignment.
+   E.g., sizeof(void *)==8 (bytes) => we believe every state_instance_t pointer
+   should be a multiple of 8 bytes.
+   BASIC_ALIGN_MASK deals with the unlikely case that sizeof(void *) is not
+   a power of 2, and returns the largest power of 2 that divides sizeof(void *).
+ */
+#define BASIC_ALIGN_SIZE sizeof(void *)
+#define BASIC_ALIGN_MASK (BASIC_ALIGN_SIZE & -BASIC_ALIGN_SIZE)
+
+static thread_local_trie_t *tl_get_obj (struct state_instance_s *id, thread_local_obj_t *tl)
+{
+  unsigned long mask;
+  thread_local_trie_t *trie, *leaf;
+
+  leaf = NULL;
+  for (trie=tl->trie, mask = BASIC_ALIGN_MASK; trie!=NULL; mask <<= 1)
+    if (trie->flags & TL_LEAF_MASK)
+      {
+	if (trie->what.leaf.owner==id)
+	  leaf = trie;
+	break;
+      }
+    else
+      if (((unsigned long)id) & mask)
+	trie = trie->what.node.left;
+      else trie = trie->what.node.right;
+  return leaf;
+}
+
+struct thread_local_list_s {
+  struct thread_local_obj_s *tl;
+  struct thread_local_list_s *next;
+};
+
+static thread_local_trie_t *tl_add_obj (gc_t *gc_ctx, struct state_instance_s *id, void *obj,
+					thread_local_obj_t *tl)
+{
+  unsigned long mask;
+  thread_local_trie_t *trie, *left, *right, *leaf;
+  thread_local_trie_t *branch[8*sizeof(struct state_instance_s *)];
+  thread_local_trie_t **branchp;
+  struct state_instance_s *id2;
+  struct thread_local_list_s *l;
+
+  for (trie = tl->trie, mask = BASIC_ALIGN_MASK, branchp=branch; trie!=NULL; mask <<= 1)
+    if (trie->flags & TL_LEAF_MASK)
+      break;
+    else if (((unsigned long)id) & mask)
+      {
+	*branchp++ = trie->what.node.left;
+	trie = trie->what.node.right;
+      }
+    else
+      {
+	*branchp++ = trie->what.node.right;
+	trie = trie->what.node.left;
+      }
+  if (trie!=NULL)
+    {
+      id2 = trie->what.leaf.owner;
+      if (id2==id)
+	{
+	  DebugLog(DF_MOD, DS_ERROR, "tl_add_obj of an id already there (%p)\n", id);
+	  return NULL;
+	}
+      for (;; mask <<= 1)
+	{
+	  if ((((unsigned long)id2) & mask) == (((unsigned long)id) & mask))
+	    *branchp++ = NULL;
+	  else
+	    {
+	      *branchp++ = trie;
+	      mask <<= 1;
+	      break;
+	    }
+	}
+    }
+  trie = leaf = gc_base_malloc (gc_ctx, sizeof (thread_local_trie_t));
+  trie->flags = TL_LEAF_MASK; /* but not TL_LEAF_PRIVATE: we shall do the copy,
+				 if needed, lazily */
+  trie->what.leaf.owner = id; /* should use GC_TOUCH() in principle; however, id is
+				 only used as an id, not a pointer.
+				 May cause some problems later when we wish to serialize
+				 the internals of Orchids. */
+  //GC_TOUCH (gc_ctx, trie->what.leaf.owner = id);
+  trie->what.leaf.obj = obj; /* do not copy (yet) */
+  for (; branchp > branch; )
+    {
+      mask >>= 1;
+      if (((unsigned long)id) & mask)
+	{
+	  left = *--branchp;
+	  right = trie;
+	}
+      else
+	{
+	  left = trie;
+	  right = *--branchp;
+	}
+      trie = gc_base_malloc (gc_ctx, sizeof (thread_local_trie_t));
+      trie->flags = 0;
+      trie->what.node.left = left;
+      trie->what.node.right = right;
+    }
+  tl->trie = trie;
+  /* Finally, add tl to the list of thread_locals of state */
+  l = gc_base_malloc (gc_ctx, sizeof(struct thread_local_list_s));
+  l->next = id->thread_locals;
+  l->tl = tl;
+  id->thread_locals = l;
+  return leaf;
+}
+
+static thread_local_trie_t *thread_local_obj (gc_t *gc_ctx,
+					      state_instance_t *state, thread_local_obj_t *tl)
+{ /* find object local to state_instance state.
+     Will crawl up its parents, repeatedly, until it finds one.
+  */
+  struct state_instance_s *id;
+  thread_local_trie_t *leaf;
+
+  for (id = state; id!=NULL; id = id->parent)
+    {
+      leaf = tl_get_obj (id, tl); /* try to find an obj with the right id */
+      if (leaf!=NULL)
+	{
+	  if (id!=state) /* record shortcut from state (not its grand-grand-...-parent id)
+			    to object */
+	    {
+	      leaf = tl_add_obj (gc_ctx, state, leaf->what.leaf.obj, tl);
+	    }
+	  return leaf;
+	}
+      /* otherwise, try with the id of the parent state_instance, and repeat */
+    }
+  /* If not found, then install shortcut to default obj */
+  leaf = tl_add_obj (gc_ctx, state, tl->default_obj, tl);
+  return leaf;
+}
+
+void *thread_local_obj_rd (gc_t *gc_ctx, state_instance_t *state, thread_local_obj_t *tl)
+{
+  thread_local_trie_t *leaf;
+
+  leaf = thread_local_obj (gc_ctx, state, tl);
+  if (leaf==NULL)
+    return NULL;
+  return leaf->what.leaf.obj;
+}
+
+void *thread_local_obj_rw (gc_t *gc_ctx, state_instance_t *state, thread_local_obj_t *tl)
+{
+  thread_local_trie_t *leaf;
+
+  leaf = thread_local_obj (gc_ctx, state, tl);
+  if (leaf==NULL)
+    return NULL;
+  if ((leaf->flags & TL_LEAF_PRIVATE)==0) /* not a private copy already */
+    {
+      /* make a private copy, by using the copy() method */
+      leaf->what.leaf.obj = (*tl->class->copy) (leaf->what.leaf.obj);
+      leaf->flags |= TL_LEAF_PRIVATE;
+    }
+  return leaf->what.leaf.obj;
+}
+
+static void tl_rem_obj1 (struct state_instance_s *id, thread_local_obj_t *tl,
+			 thread_local_trie_t **triep, unsigned long mask)
+{
+  thread_local_trie_t *trie = *triep;
+
+  if (trie==NULL)
+    return;
+  if (trie->flags & TL_LEAF_MASK)
+    {
+      if (trie->flags & TL_LEAF_PRIVATE) /* free private copy of object */
+	(*tl->class->free) (trie->what.leaf.obj);
+      gc_base_free (trie); /* free the leaf */
+      *triep = NULL;
+      return;
+    }
+  if (((unsigned long)id) & mask)
+    tl_rem_obj1 (id, tl, &trie->what.node.right, mask << 1);
+  else tl_rem_obj1 (id, tl, &trie->what.node.left, mask << 1);
+  if (trie->what.node.left==NULL)
+    {
+      if (trie->what.node.right==NULL || (trie->what.node.right->flags & TL_LEAF_MASK))
+	{
+	  gc_base_free (trie);
+	  *triep = trie->what.node.right;
+	}
+    }
+  else if (trie->what.node.right==NULL)
+    {
+      if (trie->what.node.left->flags & TL_LEAF_MASK)
+	{
+	  gc_base_free (trie);
+	  *triep = trie->what.node.left;
+	}
+    }
+}
+
+static void tl_rem_obj (struct state_instance_s *id, thread_local_obj_t *tl)
+{
+  tl_rem_obj1 (id, tl, &tl->trie, BASIC_ALIGN_MASK);
+}
+
+void remove_thread_local_entries (state_instance_t *state)
+{
+  struct thread_local_list_s *l, *next;
+  struct thread_local_obj_s *tl;
+
+  for (l=state->thread_locals; l!=NULL; l=next)
+    {
+      tl = l->tl;
+      next = l->next;
+      gc_base_free (l);
+      tl_rem_obj (state, tl);
+    }
+  state->thread_locals = NULL;
+}
+
+thread_local_obj_t *new_thread_local_obj (gc_t *gc_ctx, thread_local_class_t *class,
+					  void *default_obj)
+{
+  thread_local_obj_t *tl;
+
+  tl = gc_base_malloc (gc_ctx, sizeof(thread_local_obj_t));
+  tl->class = class;
+  tl->trie = NULL;
+  tl->default_obj = default_obj;
+  return tl;
+}
+
+static void free_thread_local_trie (thread_local_trie_t *trie, thread_local_obj_t *tl)
+{
+  struct thread_local_list_s *l, **lp;
+
+  if (trie==NULL)
+    return;
+  if (trie->flags & TL_LEAF_MASK)
+    {
+      if (trie->flags & TL_LEAF_PRIVATE)
+	(*tl->class->free) (trie->what.leaf.obj);
+      /* Remove tl from thread_locals list of owner.
+	 Eww: inefficient, should use a better structure than just linked lists.
+	 However, there are chances that state_instances have very few
+	 thread-local objects (typically one xml document for reporting),
+	 and anyway that a thread-local object will only be freed (what we are
+	 doing here) when the state_instance dies anyway.
+       */
+      for (lp = &trie->what.leaf.owner->thread_locals; (l = *lp)!=NULL; )
+	{
+	  if (l->tl==tl) /* unlink list cell */
+	    {
+	      *lp = l->next;
+	      gc_base_free (l);
+	      /* and break; since tl should only occur once in a thread_locals list */
+	      break;
+	    }
+	  else lp = &l->next;
+	}
+    }
+  else
+    {
+      free_thread_local_trie (trie->what.node.left, tl);
+      free_thread_local_trie (trie->what.node.right, tl);
+    }
+}
+
+void free_thread_local_obj (thread_local_obj_t *tl)
+{
+  free_thread_local_trie (tl->trie, tl);
+  (*tl->class->free) (tl->default_obj);
+  gc_base_free (tl);
+}
+
+
 /*** Quick parser functions
  *** can parse sequences of <keyword><data>, as used e.g. in mod_newauditd.c
  ***/

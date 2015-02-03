@@ -39,11 +39,10 @@ struct iodef_cfg_s {
     int		full_dump;
 };
 
-
-xml_doc_t*
-generate_report(orchids_t	*ctx,
-		mod_entry_t	*mod,
-		state_instance_t *state);
+struct ovm_var_s;
+struct ovm_var_s *iodef_generate_report(orchids_t	*ctx,
+					mod_entry_t	*mod,
+					state_instance_t *state);
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification

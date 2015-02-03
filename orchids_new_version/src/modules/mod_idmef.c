@@ -111,7 +111,6 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
   idmef_cfg_t	*cfg;
   xmlDocPtr	doc = NULL;
   xmlXPathContextPtr	xpath_ctx = NULL;
-  xml_doc_t	*xml_doc = NULL;
   int		c;
   gc_t *gc_ctx = ctx->gc_ctx;
   ovm_var_t *val;
@@ -130,17 +129,11 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
       DebugLog(DF_MOD, DS_ERROR, "Error creating XPath context\n");
       return 0;
     }
-
-  GC_START(gc_ctx, MAX_IDMEF_FIELDS+1);
-  
-  xml_doc = gc_base_malloc(gc_ctx, sizeof (xml_doc_t));
-  xml_doc->doc = doc;
-  xml_doc->xpath_ctx = xpath_ctx;
-
   xmlXPathRegisterNs(xpath_ctx, BAD_CAST ("idmef"),
 		     BAD_CAST ("http://iana.org/idmef"));
 
-  val = ovm_extern_new(gc_ctx, xml_doc, xml_description, free_xml_doc);
+  GC_START(gc_ctx, MAX_IDMEF_FIELDS+1);
+  val = ovm_xml_new (gc_ctx, doc, xpath_ctx, xml_description);
   GC_UPDATE (gc_ctx, F_PTR, val);
 
   for (c = 1; c < cfg->nb_fields; c++)
@@ -314,15 +307,14 @@ static void add_analyzer_node(xmlNode *alert_root,
   }
 }
 
-xml_doc_t* generate_alert(orchids_t	*ctx,
-			  mod_entry_t	*mod,
-			  state_instance_t *state)
+ovm_var_t *idmef_generate_alert(orchids_t	*ctx,
+				mod_entry_t	*mod,
+				state_instance_t *state)
 {
   xmlDoc	*alert_doc = NULL;
   xmlNode	*alert_root = NULL;
   xmlNode	*cur_node = NULL;
   xmlXPathContext *alert_ctx = NULL;
-  xml_doc_t	*xml_doc = NULL;
   char		buff[PATH_MAX];
 
   xmlNs		*ns;
@@ -371,12 +363,7 @@ xml_doc_t* generate_alert(orchids_t	*ctx,
 	     xmlEncodeEntities(alert_root->doc,
 			       BAD_CAST buff));
 
-
-  xml_doc = gc_base_malloc (ctx->gc_ctx, sizeof(xml_doc_t));
-  xml_doc->doc = alert_doc;
-  xml_doc->xpath_ctx = alert_ctx;
-
-  return xml_doc;
+  return ovm_xml_new (ctx->gc_ctx, alert_doc, alert_ctx, xml_description);
 }
 
 
@@ -387,16 +374,14 @@ static void issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state)
 
   if (mod_entry==NULL)
     mod_entry = find_module_entry(ctx, "idmef");
-
-  res = ovm_xml_new (ctx->gc_ctx, xml_description);
+  res = idmef_generate_alert (ctx, mod_entry, state);
   PUSH_VALUE(ctx, res);
-  EXTPTR(res) = generate_alert(ctx, mod_entry, state);
 }
 
 static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var;
-  xml_doc_t	*report;
+  xmlDocPtr doc;
   static mod_entry_t	*mod_entry = NULL;
   idmef_cfg_t*	cfg;
   char		buff[PATH_MAX];
@@ -424,7 +409,7 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
     }
   else
     {
-      report = EXTPTR(var);
+      doc = XMLDOC_RD(ctx->gc_ctx, state, var);
 
       gettimeofday(&tv, NULL);
       Timer_to_NTP(&tv, ntph, ntpl);
@@ -442,7 +427,7 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 	}
       else
 	{
-	  xmlDocFormatDump(fp, report->doc, 1);
+	  xmlDocFormatDump(fp, doc, 1);
 	  (void) fclose(fp);
 	  STACK_DROP(ctx->ovm_stack, 1);
 	  PUSH_RETURN_TRUE(ctx);

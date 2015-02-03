@@ -166,7 +166,7 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var1, *var2, *var3;
   char *str2, *str3;
-  xml_doc_t	*xml_doc;
+  xmlDocPtr doc;
   xmlNode	*node = NULL;
   xmlChar	*content;
 
@@ -195,7 +195,8 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  if ((xml_doc = EXTPTR(var1)) == NULL)
+  doc = XMLDOC_RW(ctx->gc_ctx, state, var1);
+  if (doc==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "error : xmldoc is null\n");
       STACK_DROP(ctx->ovm_stack, 3);
@@ -204,7 +205,7 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str2 = ovm_strdup (ctx->gc_ctx, var2);
-  if (!(node = xml_walk_and_create(xml_doc->xpath_ctx,
+  if (!(node = xml_walk_and_create(XMLPATHCTX(var1),
 				   BAD_CAST str2)))
     {
       gc_base_free (str2);
@@ -214,7 +215,7 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str3 = ovm_strdup (ctx->gc_ctx, var3);
-  content = xmlEncodeEntitiesReentrant(xml_doc->doc, BAD_CAST str3);
+  content = xmlEncodeEntitiesReentrant(doc, BAD_CAST str3);
   xmlNodeSetContent(node, content);
   xmlFree(content);
 
@@ -386,13 +387,14 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
  *
  * @param doc XML Document to free
  */
+
 void free_xml_doc(void *ptr)
 {
   xml_doc_t *doc = ptr;
 
   if (doc!=NULL)
     {
-      xmlFreeDoc(doc->doc);
+      free_thread_local_obj (doc->tl);
       xmlXPathFreeContext(doc->xpath_ctx);
       gc_base_free(doc);
     }
@@ -401,11 +403,32 @@ void free_xml_doc(void *ptr)
 /**
  * Create a new extern variable for xml documents
  */
-ovm_var_t *ovm_xml_new(gc_t *gc_ctx, char *description)
+static xml_free (void *obj)
 {
-  ovm_var_t*	res;
+  xmlFreeDoc (obj);
+}
 
-  res = ovm_extern_new (gc_ctx, NULL, description, free_xml_doc);
+static void *xml_copy (void *obj)
+{
+  return xmlCopy (obj, 1);
+}
+
+static thread_local_class_t xml_thread_local_class = {
+  xml_free,
+  xml_copy
+};
+
+ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx,
+		       char *description)
+{
+  ovm_var_t *res;
+  xml_doc_trie_t *trie;
+  xml_doc_t *xdoc;
+
+  xdoc = gc_base_malloc(gc_ctx, sizeof(xml_doc_t));
+  xdoc->tl = new_thread_local_obj (gc_ctx, &xml_thread_local_class, doc);
+  xdoc->xpath_ctx = xpath_ctx;
+  res = ovm_extern_new (gc_ctx, xdoc, description, free_xml_doc);
   return res;
 }
 

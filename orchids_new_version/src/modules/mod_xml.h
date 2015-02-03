@@ -3,6 +3,7 @@
  ** Definitions for mod_xml.h
  **
  ** @author Baptiste Gourdin <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
@@ -13,27 +14,34 @@
 #ifndef MOD_XML_H_
 # define MOD_XML_H_
 
-typedef struct {
-    xmlDocPtr	doc;
-    xmlXPathContextPtr	xpath_ctx;
-}		xml_doc_t;
+/* xml_doc_t's are basically a pair of an xmlDocPtr doc, and an
+   xmlXPathContextPtr xpath_ctx.
+   However, there is potentially one per state_instance.
+   This is similar to the notion of buffer-local variable in Emacs.
+*/
 
+typedef struct xml_doc_s {
+  thread_local_obj_t *tl; /* see mod_utils.h; objets stored are of C type xmlDocPtr */
+  xmlXPathContextPtr xpath_ctx;
+} xml_doc_t;
 
-extern char * xml_description;
+extern char *xml_description;
 
-ovm_var_t* ovm_xml_new(gc_t *gc_ctx, char *desc);
+ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx,
+		       char *description);
+#define XMLDOC_RD(gc_ctx,state,var) ((xmlDocPtr)thread_local_obj_rd (gc_ctx, state, ((xml_doc_t *)EXTPTR(var))->tl))
+#define XMLDOC_RW(gc_ctx,state,var) ((xmlDocPtr)thread_local_obj_rw (gc_ctx, state, ((xml_doc_t *)EXTPTR(var))->tl))
 
-char*
-xml_get_string(xml_doc_t	*xml_doc,
-	       char		*path);
+#define XMLPATHCTX(var) ((xml_doc_t *)EXTPTR(var))->xpath_ctx
 
-xmlNodePtr
-xml_walk_and_create (xmlXPathContextPtr ctx,
-		     xmlChar	*path);
+char*xml_get_string(xml_doc_t	*xml_doc,
+		    char	*path);
 
-char
-validate_xml_with_schema(xmlSchemaPtr	schema,
-			 char		*doc);
+xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
+				xmlChar	*path);
+
+char validate_xml_with_schema(xmlSchemaPtr	schema,
+			      char		*doc);
 
 xmlNode*
 new_xs_datetime_node(xmlNode	*parent,

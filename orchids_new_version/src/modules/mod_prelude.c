@@ -692,7 +692,7 @@ static void dir_add_prelude_field(orchids_t *ctx, mod_entry_t *mod,
   pos = strchr(dir->args, ' ');
   if (!pos)
   {
-    DebugLog(DF_MOD, DS_ERROR, "Error when parsing directiv str_field\n");
+    DebugLog(DF_MOD, DS_ERROR, "Error when parsing directive str_field\n");
     return;
   }
   *pos = '\0';

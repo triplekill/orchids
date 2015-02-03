@@ -429,7 +429,8 @@ static void create_rule_initial_threads(orchids_t *ctx,
     GC_UPDATE (gc_ctx, 0, new_rule); /* useless, because of the following line */
     GC_TOUCH (gc_ctx, init->rule_instance = new_rule); /* move in create_init_inst() ? */
     /* link rule */
-/*     ctx->state_instances++; */
+/*     ctx->state_instances++;
+*/
 
     ret = simulate_state_and_create_threads(ctx, init, event, THREAD_ONLYONCE);
 
@@ -903,7 +904,6 @@ static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, si->event);
   GC_TOUCH (gc_ctx, si->rule_instance);
   GC_TOUCH (gc_ctx, si->env);
-  GC_TOUCH (gc_ctx, si->global_next);
   GC_TOUCH (gc_ctx, si->retrig_next);
   GC_TOUCH (gc_ctx, si->thread_list);
   GC_TOUCH (gc_ctx, si->next_report_elmt);
@@ -911,9 +911,9 @@ static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void state_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  //state_instance_t *si = (state_instance_t *)p;
+  state_instance_t *si = (state_instance_t *)p;
 
-  return;
+  remove_thread_local_entries (si);
 }
 
 static int state_instance_traverse (gc_traverse_ctx_t *gtc,
@@ -939,9 +939,6 @@ static int state_instance_traverse (gc_traverse_ctx_t *gtc,
   if (err)
     return err;
   err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->env, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->global_next, data);
   if (err)
     return err;
   err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->retrig_next, data);
@@ -973,7 +970,6 @@ static state_instance_t *create_state_instance(orchids_t *ctx,
   new_state->gc.type = T_STATE_INSTANCE;
   new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
   GC_TOUCH (ctx->gc_ctx, new_state->rule_instance = parent->rule_instance);
-  new_state->depth = parent->depth + 1;
   new_state->first_child = NULL;
   new_state->next_sibling = NULL;
   new_state->parent = NULL;
@@ -981,9 +977,8 @@ static state_instance_t *create_state_instance(orchids_t *ctx,
   new_state->flags = 0;
   new_state->event = NULL;
   GC_TOUCH (ctx->gc_ctx, new_state->env = parent->env);
-  new_state->global_next = NULL;
+  new_state->thread_locals = NULL;
   new_state->retrig_next = NULL;
-
   ctx->state_instances++;
   return new_state;
 }
@@ -1000,7 +995,6 @@ static state_instance_t *create_init_state_instance(orchids_t *ctx, const rule_t
   new_state->gc.type = T_STATE_INSTANCE;
   new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
   new_state->rule_instance = NULL;
-  new_state->depth = 0;
   new_state->first_child = NULL;
   new_state->next_sibling = NULL;
   new_state->parent = NULL;
@@ -1008,11 +1002,10 @@ static state_instance_t *create_init_state_instance(orchids_t *ctx, const rule_t
   new_state->flags = 0;
   new_state->event = NULL;
   new_state->env = NULL;
-  new_state->global_next = NULL;
+  new_state->thread_locals = NULL;
   new_state->retrig_next = NULL;
   new_state->thread_list = NULL;
   new_state->next_report_elmt = NULL;
-
   ctx->state_instances++;
   return new_state;
 }
@@ -1130,7 +1123,7 @@ void fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
     else {
       strcpy(asc_time, "initial instance");
     }
-    fprintf(fp, " %3i |%12.12s |%6i |%4i | %3i | %li (%.32s)\n",
+    fprintf(fp, " %3i |%12.12s |%6lu |%4i | %3i | %li (%.32s)\n",
             i, r->rule->name, r->state_instances, r->threads,
             r->max_depth, r->creation_date, asc_time);
   }

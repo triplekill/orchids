@@ -956,8 +956,8 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
   fprintf(fp, "  registered fields : %zd\n", ctx->global_fields->num_fields);
   fprintf(fp, "    injected events : %u\n", ctx->events);
   fprintf(fp, "      active events : %u\n", ctx->active_events);
-  fprintf(fp, "     rule instances : %u\n", ctx->rule_instances);
-  fprintf(fp, "    state instances : %u\n", ctx->state_instances);
+  fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);
+  fprintf(fp, "    state instances : %lu\n", ctx->state_instances);
   fprintf(fp, "     active threads : %u\n", ctx->threads);
   fprintf(fp, "     ovm stack size : %d\n", ctx->ovm_stack->n);
   fprintf(fp, "            reports : %u\n", ctx->reports);

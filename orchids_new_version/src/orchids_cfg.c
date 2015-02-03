@@ -287,9 +287,10 @@ static void set_runtime_user(orchids_t *ctx, mod_entry_t *mod,
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
+#ifdef OBSOLETE
 static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 				    config_directive_t *dir);
-
+#endif
 
 /**
  ** Handler for the AddPreprocessorCmd configuration directive.
@@ -297,9 +298,10 @@ static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
  **/
+#ifdef OBSOLETE
 static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 			    config_directive_t *dir);
-
+#endif
 
 /**
  ** Handler for the SetModuleDir configuration directive.
@@ -941,7 +943,7 @@ static void set_runtime_user(orchids_t *ctx, mod_entry_t *mod,
   ctx->runtime_user = dir->args;
 }
 
-
+#ifdef OBSOLETE
 static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 				    config_directive_t *dir)
 {
@@ -949,8 +951,9 @@ static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 	   "setting default pre-processor command to '%s'\n", dir->args);
   ctx->default_preproc_cmd = dir->args;
 }
+#endif
 
-
+#ifdef OBSOLETE
 static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 			    config_directive_t *dir)
 {
@@ -976,7 +979,7 @@ static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
   preproc->cmd = gc_strdup(ctx->gc_ctx, cmd);
   SLIST_INSERT_HEAD(&ctx->preproclist, preproc, preproclist);
 }
-
+#endif
 
 static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
 			    config_directive_t *dir)
@@ -1294,8 +1297,10 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "AddRuleFile", add_rule_file , "Add a rule file" },
   { "AddRuleFiles", add_rule_files , "Add a rule files with a pattern" },
   { "RuntimeUser", set_runtime_user, "Set the runtime user." },
+#ifdef OBSOLETE
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
   { "AddPreprocessorCmd", add_preproc_cmd, "Add a preprocessor command for a file suffix" },
+#endif
   { "SetModuleDir", set_modules_dir, "Set the modules directory" },
   { "SetLockFile", set_lock_file, "Set the lock file name" },
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
