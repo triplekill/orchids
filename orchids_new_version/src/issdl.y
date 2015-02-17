@@ -313,9 +313,9 @@ expr:
 | KW_CTIME o_parent string C_PARENT
   { RESULT_DROP($$,$2, build_ctime_from_string(compiler_ctx_g, $3)); }
 | KW_IPV4 O_PARENT string C_PARENT
-    { $$ = build_ipv4(compiler_ctx_g, $3); }
+    { $$ = build_ip(compiler_ctx_g, $3); }
 | KW_IPV6 O_PARENT string C_PARENT
-    { $$ = build_ipv6(compiler_ctx_g, $3); }
+    { $$ = build_ip(compiler_ctx_g, $3); }
 | KW_TIMEVAL o_parent NUMBER COMMA NUMBER C_PARENT
   { RESULT_DROP($$,$2, build_timeval_from_int(compiler_ctx_g, $3, $5)); }
 | KW_TIMEVAL o_parent string COMMA NUMBER C_PARENT

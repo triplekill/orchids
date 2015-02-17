@@ -3785,6 +3785,75 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
   return (node_expr_t *)n;
 }
 
+node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
+{
+  ovm_var_t *addr;
+  node_expr_term_t *n;
+  struct addrinfo *sa;
+  int status;
+
+  /* XXX Add hash for constant sharing here */
+  
+  GC_START(ctx->gc_ctx,1);
+  n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
+				     &node_expr_term_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_CONST;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->stype = NULL; /* not known yet */
+  n->compute_stype = NULL;
+  n->npending_argtypes = 0;
+  n->parents = NULL;
+  
+  /* resolve host name */
+  if ((status = getaddrinfo(hostname, NULL, NULL, &sa)) != 0)
+  {
+    DebugLog(DF_OLC, DS_FATAL, "getaddrinfo, %s\n", gai_strerror(status));
+    exit(EXIT_FAILURE);
+  }
+
+  if (sa->ai_family == AF_INET)
+  {
+    addr = ovm_ipv4_new(ctx->gc_ctx);
+    IPV4(addr) = ((struct sockaddr_in *)(sa->ai_addr))->sin_addr; 
+    
+    n->hash = h_pair (NODE_CONST,
+		      h_pair (T_IPV4,
+		  	      h_str ((char *)&IPV4(addr),
+				     sizeof(struct in_addr))));
+    /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
+    GC_TOUCH (ctx->gc_ctx, n->data = addr);
+    n->res_id = ctx->statics_nb;
+    GC_UPDATE(ctx->gc_ctx, 0, n);
+    set_type (ctx, (node_expr_t *)n, &t_ipv4);
+  }
+  else
+  {
+    addr = ovm_ipv6_new(ctx->gc_ctx);
+    IPV6(addr) = ((struct sockaddr_in6 *)(sa->ai_addr))->sin6_addr;
+    
+    n->hash = h_pair (NODE_CONST,
+		      h_pair (T_IPV6,
+			      h_str ((char *)&IPV6(addr),
+				     sizeof(struct in6_addr))));
+    /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
+    GC_TOUCH (ctx->gc_ctx, n->data = addr);
+    n->res_id = ctx->statics_nb;
+    GC_UPDATE(ctx->gc_ctx, 0, n);
+    set_type (ctx, (node_expr_t *)n, &t_ipv6);
+  }
+   
+  freeaddrinfo(sa);
+  /* free string memory allocated by the lexer */
+  gc_base_free(hostname);
+  
+  statics_add(ctx, addr);
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+
 node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 {
   node_expr_term_t  *n;

@@ -930,13 +930,14 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   struct addrinfo *sa;
   int status;
   char t[INET6_ADDRSTRLEN];
-  GC_START(gc_ctx, 1);  
- 
+  GC_START(gc_ctx, 1);
+
+  t[0] = '\0';  
   while (s<end && end-s<INET6_ADDRSTRLEN && (isdigit(*s) || *s=='.' || *s==':'))
   {
     /* not needed to add '\0' to the string t when the loop ends.
        strncat do it for us. */
-    strncat(t, s++, 1);    
+    strncat(t, s++, 1); 
   }
 
   if ((status = getaddrinfo(t, NULL, NULL, &sa)) != 0)
@@ -957,7 +958,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
     freeaddrinfo(sa);
   }
  
-  GC_UPDATE(gc_ctx, 0 , addr);
+  GC_UPDATE(gc_ctx, 0, addr);
   FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx); 
   return s;
