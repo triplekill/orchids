@@ -2648,6 +2648,52 @@ static void issdl_uint_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *ui;
+  ovm_var_t *i;
+  long n;
+
+  ui = POP_VALUE(ctx);
+  if (ui != NULL && TYPE(ui) == T_UINT)
+  {
+    if (UINT(i) <= LONG_MAX)
+      n = UINT(i);
+    else n = LONG_MAX;
+    
+    i = ovm_int_new(ctx->gc_ctx, n);
+    PUSH_VALUE(ctx, i);  
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_uint(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
+static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *i;
+  ovm_var_t *ui;
+  unsigned long n;
+
+  i = POP_VALUE(ctx);
+  if (i != NULL && TYPE(i) == T_INT)
+  {
+    if (INT(i) >= 0)
+      n = INT(i);
+    else n = 0;
+
+    ui = ovm_uint_new(ctx->gc_ctx, n);
+    PUSH_VALUE(ctx, ui);   
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_int(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
 char *time_convert_idmef(char *str, char *end, time_t *res)
 { /* IDMEF time format is %Y-%m-%dT%H:%M:%S%z
      parse it in a fault-tolerant way.
@@ -3807,6 +3853,12 @@ static type_t **ipv4_of_ipv6_sigs[] = { ipv4_of_ipv6_sig, NULL };
 static type_t *ipv6_of_ipv4_sig[] = { &t_ipv6, &t_ipv4 };
 static type_t **ipv6_of_ipv4_sigs[] = { ipv6_of_ipv4_sig, NULL };
 
+static type_t *int_of_uint_sig[] = { &t_int, &t_uint };
+static type_t **int_of_uint_sigs[] = { int_of_uint_sig, NULL };
+
+static type_t *uint_of_int_sig[] = { &t_uint, &t_int };
+static type_t **uint_of_int_sigs[] = { uint_of_int_sig, NULL };
+
 static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "null",
     0, null_sigs,
@@ -3960,6 +4012,14 @@ static issdl_function_t issdl_function_g[] = {
     1, uint_of_str_sigs,
     m_unknown_1,
     "convert a string to an unsigned integer" },
+  { issdl_int_from_uint, 36, "int_from_uint",
+    1, int_of_uint_sigs,
+    m_unknown_1,
+    "convert an unsigned integer to an integer"},
+  { issdl_uint_from_int, 37, "uint_from_int",
+    1, uint_of_int_sigs,
+    m_unknown_1,
+    "convert an integer to an unsigned integer"},
   { NULL, 0, NULL, 0, NULL, NULL }
 };
 
