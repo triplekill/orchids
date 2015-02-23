@@ -47,6 +47,7 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   char *s;
   size_t len;
   char *c;
+  int ok;
 
   con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   switch (TYPE(con))
@@ -73,10 +74,12 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
     }
 
   c = ovm_strdup(ctx->gc_ctx, con);
-  output_console_msg(c, s, len);
+  ok = output_console_msg(c, s, len);
   gc_base_free (c);
   STACK_DROP(ctx->ovm_stack, 2);
-  PUSH_RETURN_TRUE(ctx);
+  if (ok)
+    PUSH_RETURN_TRUE(ctx);
+  else PUSH_RETURN_FALSE(ctx);
 }
 
 
@@ -84,6 +87,7 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *con;
   char *c;
+  int ok;
 
   con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   switch (TYPE(con))
@@ -98,10 +102,12 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
       return;
     }
   c = ovm_strdup(ctx->gc_ctx, con);
-  output_console_evt(ctx, c, state);
+  ok = output_console_evt(ctx, c, state);
   gc_base_free (c);
   STACK_DROP(ctx->ovm_stack, 1);
-  PUSH_RETURN_TRUE(ctx);
+  if (ok)
+    PUSH_RETURN_TRUE(ctx);
+  else PUSH_RETURN_FALSE(ctx);
 }
 
 static const type_t *console_msg_sig[] = { &t_int, &t_str, &t_str }; /* returns 0 or 1, in fact */
@@ -193,7 +199,7 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod,
 }
 
 
-static void output_console_msg(char *console, char *msg, size_t len)
+static int output_console_msg(char *console, char *msg, size_t len)
 {
   console_t *con;
   size_t i;
@@ -207,7 +213,7 @@ static void output_console_msg(char *console, char *msg, size_t len)
   if (con == NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
-      return;
+      return 0;
     }
   fp = con->fp;
   for (i=0; i<len; i++)
@@ -217,10 +223,11 @@ static void output_console_msg(char *console, char *msg, size_t len)
     }
   putc ('\n', fp);
   fflush(fp);
+  return 1;
 }
 
 
-static void output_console_evt(orchids_t *ctx, char *console,
+static int output_console_evt(orchids_t *ctx, char *console,
 			       state_instance_t *state)
 {
   console_t *con;
@@ -231,7 +238,7 @@ static void output_console_evt(orchids_t *ctx, char *console,
   if (con == NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
-      return;
+      return 0;
     }
 
   for ( ; state!=NULL && state->event == NULL; state = state->parent)
@@ -241,6 +248,7 @@ static void output_console_evt(orchids_t *ctx, char *console,
   else
     fprintf(con->fp, "No event to display.\n");
   fflush(con->fp);
+  return 1;
 }
 
 static mod_cfg_cmd_t cons_dir[] = 

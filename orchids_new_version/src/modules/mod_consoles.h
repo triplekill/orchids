@@ -31,12 +31,8 @@ struct conscfg_s
   strhash_t *consoles;
 };
 
-static void
-issdl_console_msg(orchids_t *ctx, state_instance_t *state);
-
-
-static void
-issdl_console_evt(orchids_t *ctx, state_instance_t *state);
+static void issdl_console_msg(orchids_t *ctx, state_instance_t *state);
+static void issdl_console_evt(orchids_t *ctx, state_instance_t *state);
 
 
 static void *
@@ -47,11 +43,9 @@ static FILE *
 create_udp_socket(const char *host, const int port);
 
 
-static void output_console_msg(char *console, char *msg, size_t len);
-
-
-static void output_console_evt(orchids_t *ctx, char *console,
-			       state_instance_t *state);
+static int output_console_msg(char *console, char *msg, size_t len);
+static int output_console_evt(orchids_t *ctx, char *console,
+			      state_instance_t *state);
 
 
 static void

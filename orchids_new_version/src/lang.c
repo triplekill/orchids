@@ -2579,13 +2579,12 @@ char *orchids_atoi (char *str, size_t len, long *result)
 
   while ((str < end) && isspace(*str)) 
     str++;
-  
-  if ((str < end) && (*str == '-')) 
-    { 
-      negate = 1; 
-      str++;
-    }
-
+  if (str<end)
+    switch (*str)
+      {
+      case '-': negate = 1; /*FALLTHROUGH*/
+      case '+': str++; break;
+      }
   s = orchids_atoui(str, len, &ures);
   *result = negate?-(long)ures:(long)ures;
   return s;
@@ -2620,13 +2619,134 @@ static void issdl_int_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+static void issdl_uint_from_str(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *str;
+  ovm_var_t *i;
+  unsigned long n;
+
+  str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (str!=NULL && str->gc.type == T_STR)
+    {
+      (void) orchids_atoui(STR(str), STRLEN(str), &n);
+      i = ovm_uint_new(ctx->gc_ctx, n);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx,i);
+    }
+  else if (str && str->gc.type == T_VSTR)
+    {
+      (void) orchids_atoui(VSTR(str), VSTRLEN(str), &n);
+      i = ovm_uint_new(ctx->gc_ctx, n);
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx,i);
+    }
+  else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_str(): param error\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_VALUE(ctx, NULL);
+    }
+}
+
+char *time_convert_idmef(char *str, char *end, time_t *res)
+{ /* IDMEF time format is %Y-%m-%dT%H:%M:%S%z
+     parse it in a fault-tolerant way.
+   */
+  struct tm tm = { 0, };
+  unsigned long i;
+  int negate = 0;
+  int looks_ok = 0;
+  int looks_wrong = 0;
+  char *str0 = str;
+
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_year = i - 1900; /* tm_year is number of years since 1900 */
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]=='-')
+    looks_ok++;
+  while (str < end && !isdigit(*str)) str++; /* skip '-' */
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_mon = i-1; /* should be between 0 and 11, while %m month is between 1 and 12 */
+  if (i==0 || i>12)
+    looks_wrong++;
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]=='-')
+    looks_ok++;
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]=='-')
+    looks_ok++;
+  while (str < end && !isdigit(*str)) str++; /* skip '-' */
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_mday = i; /* should be between 1 and 31 */
+  if (i==0 || i>31)
+    looks_wrong++;
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]=='T')
+    looks_ok++;
+  while (str < end && !isdigit(*str)) str++; /* skip 'T' */
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_hour = i; /* should be between 0 and 23 */
+  if (i>23)
+    looks_wrong++;
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]==':')
+    looks_ok++;
+  while (str < end && !isdigit(*str)) str++; /* skip ':' */
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_min = i; /* should be between 0 and 59 */
+  if (i>59)
+    looks_wrong++;
+  while (str < end && isspace(*str)) str++; /* skip spaces */
+  if (str < end && str[0]==':')
+    looks_ok++;
+  while (str < end && !isdigit(*str)) str++; /* skip ':' */
+  str = orchids_atoui (str, end-str, &i);
+  tm.tm_sec = i; /* should be between 0 and 60 */
+  if (i>60)
+    looks_wrong++;
+  while (str < end && isspace(*str)) str++;
+  if (str < end)
+    switch (*str)
+      {
+      case '-': negate = 1; /*FALLTHROUGH*/
+      case '+': str++;
+	/* expect timezone, as HHMM */
+	if (str+4>end)
+	  break;
+	if (!isdigit(str[0]) || !isdigit(str[1]) ||
+	    !isdigit(str[2]) || !isdigit(str[3]))
+	    break;
+	i = 60* (
+		 60*(10*(str[0]-'0') + (str[1]-'0')) +
+		 10*(str[2]-'0') + (str[3]-'0')
+		 );
+	tm.tm_gmtoff = negate?(-i):i;
+	break;
+      }
+  if (looks_wrong)
+    return str0;
+  if (!looks_ok)
+    return str0;
+  *res = timegm(&tm);
+  return str;
+}
+
 char *time_convert(char *str, char *end, struct timeval *tv)
 {
   long sec = 0;
   double d = 0.0;
   double mask = 1.0;
   char c;
+  char *newstr;
+  time_t t;
 
+  newstr = time_convert_idmef (str, end, &t);
+  if (newstr!=str) /* should be an IDMEF time */
+    {
+      tv->tv_sec = t;
+      tv->tv_usec = 0;
+      return newstr;
+    }
   while (str<end && (c = *str, isdigit(c)))
     {
       sec = 10 * sec + (((int)c) - '0');
@@ -3147,7 +3267,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 	from_str = ovm_strdup (ctx->gc_ctx, from);
 	break;
       default:
-	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail(): param error: from\n");
+	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail_report(): param error: from\n");
 	STACK_DROP(ctx->ovm_stack, 4);
 	PUSH_RETURN_FALSE(ctx);
 	return;
@@ -3159,7 +3279,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 	to_str = ovm_strdup (ctx->gc_ctx, to);
 	break;
       default:
-	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail(): param error: to\n");
+	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail_report(): param error: to\n");
 	STACK_DROP(ctx->ovm_stack, 4);
 	PUSH_RETURN_FALSE(ctx);
 	return;
@@ -3171,7 +3291,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 	subject_str = ovm_strdup (ctx->gc_ctx, subject);
 	break;
       default:
-	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail(): param error: subject\n");
+	DebugLog(DF_OVM, DS_DEBUG, "issdl_sendmail_report(): param error: subject\n");
 	STACK_DROP(ctx->ovm_stack, 4);
 	PUSH_RETURN_FALSE(ctx);
 	return;
@@ -3279,6 +3399,7 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
     gc_base_free (subject_str);
 }
 
+#if 0
 static void issdl_drop_event(orchids_t *ctx, state_instance_t *state)
 {
   if (state->event == NULL)
@@ -3310,14 +3431,14 @@ static void issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
   state->event_level = INT(level);
   PUSH_RETURN_TRUE(ctx);
 }
-
+#endif
 
 /* Compute the number of different bits between two variables of
    the same type and size (binary distance). */
 static void
 issdl_bindist(orchids_t *ctx, state_instance_t *state)
 {
-  static int bitcnt_tbl[] = { /* Precomputed table of 1-bit in each bytes */
+  static unsigned long bitcnt_tbl[] = { /* Precomputed table of 1-bit in each bytes */
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -3342,7 +3463,7 @@ issdl_bindist(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *param2;
   unsigned char *data2;
   size_t len2;
-  int dist;
+  unsigned long dist;
   ovm_var_t *d;
 
   param2 = POP_VALUE(ctx);
@@ -3376,7 +3497,7 @@ issdl_bindist(orchids_t *ctx, state_instance_t *state)
 	  int x = *data1++ ^ *data2++;
 	  dist += bitcnt_tbl[x];
 	}
-      d = ovm_int_new(ctx->gc_ctx, dist);
+      d = ovm_uint_new(ctx->gc_ctx, dist);
       PUSH_VALUE (ctx, d);
       DebugLog(DF_OVM, DS_DEBUG, "Computed bit distance %i\n", dist);
     }
@@ -3390,7 +3511,7 @@ static void issdl_bytedist(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *param2;
   unsigned char *data2;
   size_t len2;
-  int dist;
+  unsigned long dist;
   ovm_var_t *d;
 
   param2 = POP_VALUE(ctx);
@@ -3424,7 +3545,7 @@ static void issdl_bytedist(orchids_t *ctx, state_instance_t *state)
 	  if (*data1++ != *data2++)
 	    dist++;
 	}
-      d = ovm_int_new(ctx->gc_ctx, dist);
+      d = ovm_uint_new(ctx->gc_ctx, dist);
       PUSH_VALUE (ctx, d);
       DebugLog(DF_OVM, DS_DEBUG, "Computed byte distance %i\n", dist);
     }
@@ -3610,11 +3731,16 @@ static type_t **int_sigs[] = { int_sig, NULL };
 static type_t *int_of_any_sig[] = { &t_int, &t_any };
 static type_t **int_of_any_sigs[] = { int_of_any_sig, NULL };
 
+#if 0
 static type_t *int_of_int_sig[] = { &t_int, &t_int };
 static type_t **int_of_int_sigs[] = { int_of_int_sig, NULL };
+#endif
 
 static type_t *int_of_str_sig[] = { &t_int, &t_str };
 static type_t **int_of_str_sigs[] = { int_of_str_sig, NULL };
+
+static type_t *uint_of_str_sig[] = { &t_uint, &t_str };
+static type_t **uint_of_str_sigs[] = { uint_of_str_sig, NULL };
 
 static type_t *str_of_int_sig[] = { &t_str, &t_int };
 static type_t **str_of_int_sigs[] = { str_of_int_sig, NULL };
@@ -3637,15 +3763,15 @@ static type_t **str_of_ipv6_sigs[] = { str_of_ipv6_sig, NULL };
 static type_t *sendmail_sig[] = { &t_int, &t_str, &t_str, &t_str, &t_str };
 static type_t **sendmail_sigs[] = { sendmail_sig, NULL };
 
-static type_t *int_cmp_sig[] = { &t_int, &t_int, &t_int };
-static type_t *uint_cmp_sig[] = { &t_int, &t_uint, &t_uint };
-static type_t *ipv4_cmp_sig[] = { &t_int, &t_ipv4, &t_ipv4 };
-static type_t *ipv6_cmp_sig[] = { &t_int, &t_ipv6, &t_ipv6 };
-static type_t *str_cmp_sig[] = { &t_int, &t_str, &t_str };
-static type_t *bstr_cmp_sig[] = { &t_int, &t_bstr, &t_bstr };
-static type_t *ctime_cmp_sig[] = { &t_int, &t_ctime, &t_ctime };
-static type_t *timeval_cmp_sig[] = { &t_int, &t_timeval, &t_timeval };
-static type_t *float_cmp_sig[] = { &t_int, &t_float, &t_float };
+static type_t *int_cmp_sig[] = { &t_uint, &t_int, &t_int };
+static type_t *uint_cmp_sig[] = { &t_uint, &t_uint, &t_uint };
+static type_t *ipv4_cmp_sig[] = { &t_uint, &t_ipv4, &t_ipv4 };
+static type_t *ipv6_cmp_sig[] = { &t_uint, &t_ipv6, &t_ipv6 };
+static type_t *str_cmp_sig[] = { &t_uint, &t_str, &t_str };
+static type_t *bstr_cmp_sig[] = { &t_uint, &t_bstr, &t_bstr };
+static type_t *ctime_cmp_sig[] = { &t_uint, &t_ctime, &t_ctime };
+static type_t *timeval_cmp_sig[] = { &t_uint, &t_timeval, &t_timeval };
+static type_t *float_cmp_sig[] = { &t_uint, &t_float, &t_float };
 static type_t **cmp_sigs[] = {
   int_cmp_sig, uint_cmp_sig, ipv4_cmp_sig, ipv6_cmp_sig,
   str_cmp_sig, bstr_cmp_sig, ctime_cmp_sig, timeval_cmp_sig,
@@ -3705,6 +3831,7 @@ static issdl_function_t issdl_function_g[] = {
     0, int_sigs, /* always returns true, in fact */
     m_const,
     "dump the rule instance path tree in the GraphViz Dot format"},
+#if 0
   { issdl_drop_event, 5, "drop_event",
     0, int_sigs, /* returns 0 or 1, in fact */
     m_random,
@@ -3713,12 +3840,13 @@ static issdl_function_t issdl_function_g[] = {
     1, int_of_int_sigs, /* returns 0 or 1, in fact */
     m_random,
     "Set event level" },
+#endif
   { issdl_report, 7, "report",
     0, int_sigs, /* returns 0 or 1, in fact */
     m_random,
     "generate report" },
   { issdl_shutdown, 8, "shutdown",
-    0, null_sigs, /* does not return */
+    0, int_sigs, /* does not return */
     m_const,
     "shutdown orchids" },
   { issdl_random, 9, "random",
@@ -3769,7 +3897,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_sendmail_report, 20, "sendmail_report",
     4, sendmail_sigs,
     m_random,
-     /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
+     /* sendmail_report (from, to, subject, body), returns 0 or 1, in fact */
     "Send a report by email" },
   { issdl_bindist, 21, "bitdist",
     2, cmp_sigs,
@@ -3796,7 +3924,7 @@ static issdl_function_t issdl_function_g[] = {
     2, difftime_sigs,
     "difference expressed in seconds as an int"},
 #endif
-  { issdl_str_from_time, 27, "str_from_time",
+  { issdl_str_from_time, 27, "str_from_ctime",
     1, str_of_ctime_sigs,
     m_unknown_1,
     "convert a time to a string" },
@@ -3828,6 +3956,10 @@ static issdl_function_t issdl_function_g[] = {
     1, str_of_uint_sigs,
     m_unknown_1,
     "convert an unsigned integer to a string" },
+  { issdl_uint_from_str, 35, "uint_from_str",
+    1, uint_of_str_sigs,
+    m_unknown_1,
+    "convert a string to an unsigned integer" },
   { NULL, 0, NULL, 0, NULL, NULL }
 };
 
@@ -3835,7 +3967,7 @@ void register_core_functions(orchids_t *ctx)
 {
   issdl_function_t *f;
 
-  for (f = issdl_function_g; f->func!=NULL; f++)
+  for (f = issdl_function_g + 1; f->func!=NULL; f++) /* +1: do not register "null" */
     register_lang_function(ctx, f->func, f->name,
 			   f->args_nb, (const type_t ***)f->sigs,
 			   f->cm, f->desc);

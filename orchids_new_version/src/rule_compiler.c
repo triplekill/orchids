@@ -2730,7 +2730,8 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_SUB:
       if (strcmp(ltype->name, "ctime")==0)
 	{
-	  if (strcmp(rtype->name, "int"))
+	  if (strcmp(rtype->name, "int") &&
+	      strcmp(rtype->name, "ctime"))
 	    goto type_error;
 	  set_type (ctx, myself, &t_ctime);
 	  return;
@@ -2741,18 +2742,25 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	      strcmp(rtype->name, "ctime") &&
 	      strcmp(rtype->name, "timeval"))
 	    goto type_error;
-	  set_type (ctx, myself, &t_ctime);
+	  set_type (ctx, myself, &t_timeval);
 	  return;
 	}
-      /*FALLTHROUGH*/ /* all the other cases as for *, /, % */
+      /*FALLTHROUGH*/ /* all the other cases as for *, / */
     case OP_MUL:
     case OP_DIV:
-    case OP_MOD:
       if (strcmp(ltype->name, rtype->name))
 	goto type_error;
       if (strcmp(ltype->name, "int") &&
 	  strcmp(ltype->name, "uint") &&
 	  strcmp(ltype->name, "float"))
+	goto type_error;
+      set_type (ctx, myself, ltype);
+      return;
+    case OP_MOD:
+      if (strcmp(ltype->name, rtype->name))
+	goto type_error;
+      if (strcmp(ltype->name, "int") &&
+	  strcmp(ltype->name, "uint"))
 	goto type_error;
       set_type (ctx, myself, ltype);
       return;
@@ -2778,8 +2786,12 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	}
       goto type_error;
     case OP_ADD_EVENT:
-      set_type (ctx, myself, NULL); /* OP_ADD_EVENT does not actually
-				       return an event per se */
+      set_type (ctx, myself, NULL); /* OP_ADD_EVENT, used as a binop
+				       tag, does not actually
+				       return an event per se; it only
+				       serves to build a pair (field, val)
+				       Do not confuse with event nodes.
+				    */
       if (strcmp(ltype->name, rtype->name))
 	{
 	  if (n->file!=NULL)
@@ -3372,7 +3384,9 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
 static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_if_t *ifn = (node_expr_if_t *)myself;
-  type_t *condtype, *thentype, *elsetype;
+  type_t *condtype;
+  /*type_t *thentype;*/
+  /*type_t *elsetype;*/
 
   condtype = IF_COND(ifn)->stype;
   if (condtype!=NULL)
@@ -3389,6 +3403,15 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 	  ctx->nerrors++;
 	}
     }
+  set_type (ctx, myself, NULL); /* does not return anything */
+#if 0
+  /* the following code is commented out; its purpose was to check
+     that the two branches of the conditional had the same type;
+     this would be useful for a C-like e?c1:c2 construction.
+     But this is an if (e) c1 else c2 construction, where the types
+     of c1 and c2 may be different (since they are types of values
+     that are ignored).
+  */
   if (IF_THEN(ifn)!=NULL) /* IF_THEN(ifn) may be NULL, in case of
 			     nodes created by add_boolean_check(). */
     {
@@ -3411,6 +3434,7 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 	    }
 	}
     }
+#endif
 }
 
 node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,

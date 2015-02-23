@@ -50,7 +50,7 @@ static void issdl_inject_event(orchids_t *ctx, state_instance_t *state)
 			   0);
     }
   STACK_DROP(ctx->ovm_stack, 1);
-  PUSH_VALUE(ctx, NULL);
+  PUSH_RETURN_TRUE(ctx);
 }
 
 static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
@@ -84,7 +84,7 @@ static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static const type_t *inject_event_sig[] = { NULL, &t_event };
+static const type_t *inject_event_sig[] = { &t_int, &t_event };
 static const type_t **inject_event_sigs[] = { inject_event_sig, NULL };
 
 static const type_t *current_event_sig[] = { &t_event };
