@@ -29,7 +29,7 @@ input_module_t mod_prelude;
 #define RETURN_OVM_INT(x) return ovm_int_new(gc_ctx, x)
 #define RETURN_OVM_UINT(x) return ovm_uint_new(gc_ctx, x)
 
-static type_t t_prelude = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_prelude = { "prelude", T_EXTERNAL }; /* convertible with xmldoc type */
 
 field_t prelude_fields[MAX_PRELUDE_FIELDS] = {
 { "prelude.ptr",		   &t_prelude, "prelude alert pointer"           }
@@ -451,8 +451,17 @@ static void *mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
 static const type_t *prelude_new_sig[] = { &t_prelude };
 static const type_t **prelude_new_sigs[] = { prelude_new_sig, NULL };
 
-static const type_t *prelude_set_sig[] = { &t_int, &t_prelude, &t_str, T_ANY };
-static const type_t **prelude_set_sigs[] = { prelude_set_sig, NULL };
+static const type_t *prelude_set_sig_int[] = { &t_int, &t_prelude, &t_str, &t_int };
+static const type_t *prelude_set_sig_uint[] = { &t_int, &t_prelude, &t_str, &t_uint };
+static const type_t *prelude_set_sig_float[] = { &t_int, &t_prelude, &t_str, &t_float };
+static const type_t *prelude_set_sig_str[] = { &t_int, &t_prelude, &t_str, &t_str };
+static const type_t *prelude_set_sig_ctime[] = { &t_int, &t_prelude, &t_str, &t_ctime };
+static const type_t **prelude_set_sigs[] = { prelude_set_sig_int,
+					     prelude_set_sig_uint,
+					     prelude_set_sig_float,
+					     prelude_set_sig_str,
+					     prelude_set_sig_ctime,
+					     NULL };
 
 static const type_t *prelude_send_sig[] = { &t_int, &t_prelude };
 static const type_t **prelude_send_sigs[] = { prelude_send_sig, NULL };

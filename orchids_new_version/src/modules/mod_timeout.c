@@ -41,8 +41,10 @@ static field_t timeout_fields[] = {
   { "timeout.date",        &t_timeval, MONO_MONO,  "Date when the timeout triggered"   },
   { "timeout.regdate",     &t_timeval, MONO_MONO,  "Registration date of the timeout"   },
   { "timeout.name",        &t_str, MONO_UNKNOWN,   "Name of the timeout"   },
+#ifdef OBSOLETE
   { "timeout.rule",        &t_str, MONO_UNKNOWN,   "Name of the registration rule" },
   { "timeout.state",       &t_str, MONO_UNKNOWN,   "Name of the registration state" },
+#endif
 };
 
 
@@ -77,8 +79,10 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *toname;
   ovm_var_t *todelay;
   ovm_var_t *val;
+#ifdef OBSOLETE
   rule_t *rule;
   char *str;
+#endif
   field_table_t *fields;
 
   toname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
@@ -111,6 +115,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
 
   GC_TOUCH (gc_ctx, fields->field_values[F_NAME] = toname);
 
+#ifdef OBSOLETE
   rule = state->rule_instance->rule;
   val = ovm_vstr_new (gc_ctx, (ovm_var_t *)rule);
   str = rule->name;
@@ -125,6 +130,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
   VSTR(val) = str;
   VSTRLEN(val) = strlen(str);
   GC_TOUCH (gc_ctx, fields->field_values[F_STATE] = val);
+#endif
 
   register_rtcallback(ctx, timeout_rtcallback,
 		      (gc_header_t *)fields, NULL, INT(todelay) );
