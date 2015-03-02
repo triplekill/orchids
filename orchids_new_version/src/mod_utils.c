@@ -933,7 +933,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
   GC_START(gc_ctx, 1);
 
   t[0] = '\0';  
-  while (s<end && end-s<INET6_ADDRSTRLEN && (isdigit(*s) || *s=='.' || *s==':'))
+  while (s<end && end-s<INET6_ADDRSTRLEN && (isxdigit(*s) || *s=='.' || *s==':'))
   {
     /* not needed to add '\0' to the string t when the loop ends.
        strncat do it for us. */

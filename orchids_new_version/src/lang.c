@@ -2694,6 +2694,92 @@ static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
   }
 }
 
+static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *x;
+  ovm_var_t *i;
+  long n;
+
+  x = POP_VALUE(ctx);
+  if (x!=NULL && TYPE(x)==T_FLOAT)
+  {
+    if (FLOAT(x) >= (double)LONG_MAX)
+      n = LONG_MAX;
+    else if (FLOAT(x) <= (double)LONG_MIN)
+      n = LONG_MIN;
+    else n = (int)FLOAT(x);
+
+    i = ovm_int_new(ctx->gc_ctx, n);
+    PUSH_VALUE(ctx, i);
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_float(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
+static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *x;
+  ovm_var_t *ui;
+  unsigned long n;
+
+  x = POP_VALUE(ctx);
+  if (x!=NULL && TYPE(x)==T_FLOAT)
+  {
+    if (FLOAT(x) >= (double)ULONG_MAX)
+      n = ULONG_MAX;
+    else if (FLOAT(x) <= 0.0)
+      n = 0;
+    else n = (unsigned int)FLOAT(x);
+
+    ui = ovm_uint_new(ctx->gc_ctx, n);
+    PUSH_VALUE(ctx, ui);
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_float(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
+static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *i;
+  ovm_var_t *x;
+
+  i = POP_VALUE(ctx);
+  if (i!=NULL && TYPE(i)==T_INT)
+  {
+    x = ovm_float_new(ctx->gc_ctx, (double)INT(i));
+    PUSH_VALUE(ctx, x);
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_int(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  } 
+}
+
+static void issdl_float_from_uint(orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *ui;
+  ovm_var_t *x;
+
+  ui = POP_VALUE(ctx);
+  if (ui!=NULL && TYPE(ui)==T_UINT)
+  {
+    x = ovm_float_new(ctx->gc_ctx, (double)UINT(ui));
+    PUSH_VALUE(ctx, x);
+  }
+  else
+  {
+    DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_uint(): param error\n");
+    PUSH_VALUE(ctx, NULL);
+  }
+}
+
 char *time_convert_idmef(char *str, char *end, time_t *res)
 { /* IDMEF time format is %Y-%m-%dT%H:%M:%S%z
      parse it in a fault-tolerant way.
@@ -3859,6 +3945,18 @@ static type_t **int_of_uint_sigs[] = { int_of_uint_sig, NULL };
 static type_t *uint_of_int_sig[] = { &t_uint, &t_int };
 static type_t **uint_of_int_sigs[] = { uint_of_int_sig, NULL };
 
+static type_t *int_of_float_sig[] = { &t_int, &t_float };
+static type_t **int_of_float_sigs[] = { int_of_float_sig, NULL };
+
+static type_t *uint_of_float_sig[] = { &t_uint, &t_float };
+static type_t **uint_of_float_sigs[] = { uint_of_float_sig, NULL };
+
+static type_t *float_of_int_sig[] = { &t_float, &t_int };
+static type_t **float_of_int_sigs[] = { float_of_int_sig, NULL };
+
+static type_t *float_of_uint_sig[] = { &t_float, &t_uint };
+static type_t **float_of_uint_sigs[] = { float_of_uint_sig, NULL };
+
 static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "null",
     0, null_sigs,
@@ -4020,6 +4118,22 @@ static issdl_function_t issdl_function_g[] = {
     1, uint_of_int_sigs,
     m_unknown_1,
     "convert an integer to an unsigned integer"},
+  { issdl_int_from_float, 38, "int_from_float",
+    1, int_of_float_sigs,
+    m_unknown_1,
+    "convert a float to an integer"},
+  { issdl_uint_from_float, 39, "uint_from_float",
+    1, uint_of_float_sigs,
+    m_unknown_1,
+    "convert a float to an unsigned integer"},
+  { issdl_float_from_int, 40, "float_from_int",
+    1, float_of_int_sigs,
+    m_unknown_1,
+    "convert an integer to a float"},
+  { issdl_float_from_uint, 41, "float_from_uint",
+    1, float_of_uint_sigs,
+    m_unknown_1,
+    "convert an unsigned integer to a float"},
   { NULL, 0, NULL, 0, NULL, NULL }
 };
 
