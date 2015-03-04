@@ -28,14 +28,25 @@
 
 extern int display_func(void *data, void *param);
 
+#ifdef BISON_2
 #define YYPARSE_PARAM __compiler_ctx_g
+#endif
+
 #define compiler_ctx_g ((rule_compiler_t *)__compiler_ctx_g)
+
+#ifdef BISON_2
 #define YYLEX_PARAM compiler_ctx_g, compiler_ctx_g->scanner
+#else
+#undef yylex
+#define yylex(yylval,ctx) issdllex(yylval,ctx,((rule_compiler_t *)ctx)->scanner)
+#endif
 //static rule_compiler_t *compiler_ctx_g = NULL;
 
 /* Redefine yyerror so that it now takes an extra ctx argument */
+#ifdef BISON_2
 #undef yyerror
 #define yyerror(msg) issdlerror (compiler_ctx_g, (msg))
+#endif
 
 #define RESULT(dollar,p) compile_gc_protect(compiler_ctx_g, (gc_header_t *)((dollar) = (p)))
 #define RESULT_DROP(dollar, n, p) compile_gc_protect_drop(compiler_ctx_g, (gc_header_t *)((dollar) = (p)), (n))
@@ -43,6 +54,8 @@ extern int display_func(void *data, void *param);
 %}
 
 %pure-parser
+%parse-param {void *__compiler_ctx_g}
+%lex-param {void *__compiler_ctx_g}
 
 %union {
   unsigned long integer;
