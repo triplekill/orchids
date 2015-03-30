@@ -3,8 +3,9 @@
  ** The intrusion scenario signature definition language.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 1.0
+ ** @version 1.1
  ** @ingroup engine
  **
  ** @date  Started on: Mon Feb  3 18:11:19 2003
@@ -25,6 +26,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -96,6 +98,12 @@ static struct issdl_type_s issdl_types_g[] = {
     "Meta event" },
   { "state_instance", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "State instance/cut mark" },
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    "Empty database" },
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    "Singleton database" },
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    "General database" },
   { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "External data (provided by a plugin)" },
   { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
@@ -117,6 +125,7 @@ type_t t_mark = { "mark", T_STATE_INSTANCE };
 
 /* Special types */
 type_t t_any = { "*", 128 };
+type_t t_db_empty = { "db[*]", T_DB_EMPTY };
 
 static int resolve_ipv4_g = 0;
 static int resolve_ipv6_g = 0;
@@ -167,13 +176,20 @@ void ovm_int_fprintf (FILE *fp, ovm_int_t *val)
   fprintf(fp, "int : %li\n", val->val);
 }
 
-static int int_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int int_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
+  int res;
+
   if (var2==NULL)
-    return INT(var1);
-  if (TYPE(var2) != T_INT)
-    return TYPE(var1) - TYPE(var2);
-  return INT(var1) - INT(var2);
+    return CMP_ERROR;
+  if (TYPE(var2) != T_INT) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  res = INT(var1) - INT(var2);
+  if (res>0)
+    return CMP_GT;
+  if (res<0)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 static ovm_var_t *int_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -357,13 +373,20 @@ void ovm_uint_fprintf(FILE *fp, ovm_uint_t *val)
   fprintf(fp, "uint : %lu\n", val->val);
 }
 
-static int uint_cmp (ovm_var_t *var1, ovm_var_t *var2)
+static int uint_cmp (ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
+  int res;
+
   if (var2==NULL)
-    return UINT(var1);
-  if (TYPE(var2) != T_UINT)
-    return TYPE(var1) - TYPE(var2);
-  return UINT(var1) - UINT(var2);
+    return CMP_ERROR;
+  if (TYPE(var2) != T_UINT) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  res = UINT(var1) - UINT(var2);
+  if (res>0)
+    return CMP_GT;
+  if (res<0)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 static ovm_var_t *uint_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -687,24 +710,34 @@ static ovm_var_t *str_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
   return NULL;
 }
 
-static int str_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int str_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
   int n;
 
   if (var2==NULL)
-    return STRLEN(var1);
+    return CMP_ERROR;
   if (TYPE(var2) == T_STR)
     {
       n = STRLEN(var1) - STRLEN(var2);
-      return (n==0)?memcmp(STR(var1), STR(var2), STRLEN(var1)):n;
+      if (n==0)
+	n = memcmp(STR(var1), STR(var2), STRLEN(var1));
     }
   else if (TYPE(var2) == T_VSTR)
     {
       n = STRLEN(var1) - VSTRLEN(var2);
-      return (n==0)?memcmp(STR(var1), VSTR(var2), STRLEN(var1)):n;
+      if (n==0)
+	n = memcmp(STR(var1), VSTR(var2), STRLEN(var1));
     }
-  DebugLog(DF_OVM, DS_DEBUG, "Type error\n");
-  return TYPE(var1) - TYPE(var2);
+  else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "Type error\n");
+      return CMP_ERROR;
+    }
+  if (n>0)
+    return CMP_GT;
+  if (n<0)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 void ovm_str_fprintf(FILE *fp, ovm_str_t *str)
@@ -815,24 +848,34 @@ static ovm_var_t *vstr_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
   return NULL;
 }
 
-static int vstr_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int vstr_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
   int n;
 
   if (var2==NULL)
-    return VSTRLEN(var1);
+    return CMP_ERROR;
   if (TYPE(var2) == T_STR)
     {
       n = VSTRLEN(var1) - STRLEN(var2);
-      return (n==0)?memcmp(VSTR(var1), STR(var2), VSTRLEN(var1)):n;
+      if (n==0)
+	n = memcmp(VSTR(var1), STR(var2), VSTRLEN(var1));
     }
   else if (TYPE(var2) == T_VSTR)
     {
       n = VSTRLEN(var1) - VSTRLEN(var2);
-      return (n==0)?memcmp(VSTR(var1), VSTR(var2), VSTRLEN(var1)):n;
+      if (n==0)
+	n = memcmp(VSTR(var1), VSTR(var2), VSTRLEN(var1));
     }
-  DebugLog(DF_OVM, DS_DEBUG, "Type error\n");
-  return TYPE(var1) - TYPE(var2);
+  else
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "Type error\n");
+      return CMP_ERROR;
+    }
+  if (n>0)
+    return CMP_GT;
+  if (n<0)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 
@@ -892,13 +935,20 @@ static size_t ctime_get_data_len(ovm_var_t *i)
   return sizeof(time_t);
 }
 
-static int ctime_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int ctime_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
+  long res;
+
   if (var2==NULL)
-    return (int)CTIME(var1);
-  if (TYPE(var2) != T_CTIME)
-    return TYPE(var1) - TYPE(var2);
-  return CTIME(var1) - CTIME(var2);
+    return CMP_ERROR;
+  if (TYPE(var2) != T_CTIME) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  res = CTIME(var1) - CTIME(var2);
+  if (res>0)
+    return CMP_GT;
+  if (res<0)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 static ovm_var_t *ctime_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -1048,13 +1098,21 @@ ovm_var_t *ovm_ipv4_new(gc_t* gc_ctx)
   return OVM_VAR(addr);
 }
 
-static int ipv4_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int ipv4_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
+  in_addr_t a1, a2;
+
   if (var2==NULL)
-    return (int)IPV4(var1).s_addr;
-  if (TYPE(var2) != T_IPV4)
-    return TYPE(var1) - TYPE(var2);
-  return IPV4(var1).s_addr - IPV4(var2).s_addr;
+    return CMP_ERROR;
+  if (TYPE(var2) != T_IPV4) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  a1 = IPV4(var1).s_addr;
+  a2 =  IPV4(var2).s_addr;
+  if (a1>a2)
+    return CMP_GT;
+  if (a1<a2)
+    return CMP_LT;
+  return CMP_EQ;
 }
 
 static void *ipv4_get_data(ovm_var_t *addr)
@@ -1192,19 +1250,25 @@ ovm_var_t *ovm_ipv6_new(gc_t* gc_ctx)
   return OVM_VAR(addr);
 }
 
-static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
-  if ((var2 == NULL) || (TYPE(var2) != T_IPV6))
-    return -1;
+  int i;
+  unsigned char a1, a2;
 
-  int i = 0;
+  if (var2 == NULL || TYPE(var2) != T_IPV6)
+    return CMP_ERROR;
   for (i = 0 ; i < 16 ; i++)
-  {
-    if (IPV6(var1).s6_addr[i] != IPV6(var2).s6_addr[i]) 
-      return 1; 
-  }
-
-  return 0;
+    {
+      a1 = IPV6(var1).s6_addr[i];
+      a2 = IPV6(var2).s6_addr[i];
+      if (a1!=a2)
+	{
+	  if (a1 > a2)
+	    return CMP_GT;
+	  return CMP_LT;
+	}
+    }
+  return CMP_EQ;
 }
 
 static void *ipv6_get_data(ovm_var_t *addr)
@@ -1486,18 +1550,26 @@ static ovm_var_t *timeval_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     }
 }
 
-static int timeval_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int timeval_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
+  int res;
+
   if (var2==NULL)
-    return TIMEVAL(var1).tv_sec;
-  if (TYPE(var2) != T_TIMEVAL)
-    return (TYPE(var1) - TYPE(var2));
-  if (timercmp(&TIMEVAL(var1) , &TIMEVAL(var2) , <))
-    return -1;
-  if (timercmp( &TIMEVAL(var1) , &TIMEVAL(var2) , >))
-    return 1;
-  /* if ( timercmp( &TIMEVAL(var1) , &TIMEVAL(var2) , = ) ) */
-  return 0;
+    return CMP_ERROR;
+  if (TYPE(var2) != T_TIMEVAL) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  res = 0;
+  if (dir & CMP_LEQ_MASK)
+    {
+      if (timercmp (&TIMEVAL(var1), &TIMEVAL(var2), <=))
+	res |= CMP_LEQ_MASK;
+    }
+  if (dir & CMP_GEQ_MASK)
+    {
+      if (timercmp (&TIMEVAL(var1), &TIMEVAL(var2), >=))
+	res |= CMP_GEQ_MASK;
+    }
+  return res;
 }
 
 static ovm_var_t *timeval_clone(gc_t *gc_ctx, ovm_var_t *var)
@@ -1627,20 +1699,29 @@ void ovm_float_fprintf(FILE *fp, ovm_float_t *val)
   fprintf(fp, "float : %f\n", val->val);
 }
 
-static int float_cmp(ovm_var_t *var1, ovm_var_t *var2)
+static int float_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
-  double diff;
+  double x1, x2;
+  int res;
 
   if (var2==NULL)
-    return (int)FLOAT(var1);
-  if (TYPE(var2) != T_FLOAT)
-    return TYPE(var1) - TYPE(var2);
-  diff = FLOAT(var1) - FLOAT(var2);
-  if (diff > 0.0)
-    return 1;
-  if (diff < 0.0)
-    return -1;
-  return 0;
+    return CMP_ERROR;
+  if (TYPE(var2) != T_FLOAT) /* should not happen (because of typing) */
+    return CMP_ERROR;
+  x1 = FLOAT(var1);
+  x2 = FLOAT(var2);
+  res = 0;
+  if (dir & CMP_LEQ_MASK)
+    {
+      if (islessequal(x1,x2))
+	res |= CMP_LEQ_MASK;
+    }
+  if (dir & CMP_GEQ_MASK)
+    {
+      if (isgreaterequal(x1,x2))
+	res |= CMP_GEQ_MASK;
+    }
+  return res;
 }
 
 static ovm_var_t *float_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -1705,6 +1786,8 @@ ovm_var_t *ovm_snmpoid_new(gc_t *gc_ctx, size_t len)
 
 void *issdl_get_data(ovm_var_t *val)
 {
+  if (val==NULL)
+    return NULL;
   if ( issdl_types_g[ val->gc.type ].get_data )
     return (*issdl_types_g[ val->gc.type ].get_data) (val);
   DebugLog(DF_OVM, DS_WARN,
@@ -1715,12 +1798,51 @@ void *issdl_get_data(ovm_var_t *val)
 
 size_t issdl_get_data_len(ovm_var_t *val)
 {
+  if (val==NULL)
+    return 0;
   if (issdl_types_g[val->gc.type].get_data_len)
     return (*issdl_types_g[val->gc.type].get_data_len) (val);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_get_data_len(): get_data_len doesn't apply for type '%s'\n",
 	   STRTYPE(val));
   return 0;
+}
+
+/* Databases
+ */
+
+static int db_cmp (ovm_var_t *db1, ovm_var_t *db2, int dir)
+{
+  int res;
+
+  if (db2==NULL)
+    return CMP_ERROR;
+  res = 0;
+  if (dir & CMP_LEQ_MASK)
+    {
+      if (db_included_lazy ((db_map *)db1, (db_map *)db2))
+	res |= CMP_LEQ_MASK;
+    }
+  if (dir & CMP_GEQ_MASK)
+    {
+      if (db_included_lazy ((db_map *)db2, (db_map *)db1))
+	res |= CMP_GEQ_MASK;
+    }
+  return res;
+}
+
+static ovm_var_t *db_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
+{
+  if (var2==NULL)
+    return NULL;
+  return (ovm_var_t *)db_union_lazy (gc_ctx, (db_map *)var1, (db_map *)var2);
+}
+
+static ovm_var_t *db_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
+{
+  if (var2==NULL)
+    return NULL;
+  return (ovm_var_t *)db_diff_lazy (gc_ctx, (db_map *)var1, (db_map *)var2);
 }
 
 /*
@@ -1793,14 +1915,14 @@ int issdl_test(ovm_var_t *var)
   }
 }
 
-int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2)
+int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
 {
   if (var1!=NULL && issdl_types_g[var1->gc.type].cmp!=NULL)
-    return (*issdl_types_g[var1->gc.type].cmp) (var1, var2);
+    return (*issdl_types_g[var1->gc.type].cmp) (var1, var2, dir);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_cmp(): comparison doesn't apply for type '%s'\n",
 	   STRTYPE(var1));
-  return -1;
+  return CMP_ERROR;
 }
 
 ovm_var_t *issdl_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -2657,8 +2779,8 @@ static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state)
   ui = POP_VALUE(ctx);
   if (ui != NULL && TYPE(ui) == T_UINT)
   {
-    if (UINT(i) <= LONG_MAX)
-      n = UINT(i);
+    if (UINT(ui) <= LONG_MAX)
+      n = UINT(ui);
     else n = LONG_MAX;
     
     i = ovm_int_new(ctx->gc_ctx, n);
