@@ -84,13 +84,15 @@ extern int display_func(void *data, void *param);
 %left O_PLUS O_PLUS_EVENT O_MINUS
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS O_NOT BANG
+%nonassoc COLLECT
 
-%token RULE STATE IF ELSE EXPECT GOTO /* Special keywords */
-%token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT EQ /* Punctuation */
+%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN /* Special keywords */
+%token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT O_DB C_DB EQ /* Punctuation */
 %token SEMICOLUMN SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_IPV6 KW_TIMEVAL KW_REGEX
+%token NOTHING
 %token <sym> SYMNAME
-%token <string> FIELD VARIABLE /* Raw data types */
+%token <string> FIELD VARIABLE LOGICAL /* Raw data types */
 %token <integer> NUMBER
 %token <fp_double> FPDOUBLE
 %token <string> STRING
@@ -99,7 +101,7 @@ extern int display_func(void *data, void *param);
 
 %type <node_expr> params paramlist
 %type <node_expr> var regsplit
-%type <node_expr> expr
+%type <node_expr> expr db_tuple db_non_empty_tuple db_patterns db_pattern
 %type <node_expr> event_record event_recordlist event_records
 %type <node_state> state statedefs
 %type <node_expr> states statelist
@@ -108,11 +110,11 @@ extern int display_func(void *data, void *param);
 %type <node_expr> action ifstatement
 %type <node_expr> transitionlist transitions
 %type <node_trans> transition
-%type <node_varlist> var_list
+%type <node_varlist> var_list optional_var_list
 %type <node_syncvarlist> sync_var_list synchro
 
 %type <string> string
-%type <depth> o_div o_parent eq ifkw o_brace o_open_event o_plus_event
+%type <depth> o_split o_parent eq ifkw o_brace o_open_event o_plus_event o_db for and
 %type <depth> expect goto statekw rulekw o_minus
 
 %%
@@ -235,22 +237,25 @@ regsplit:
   { RESULT($$,build_split_regex(compiler_ctx_g, $1)); }
 ;
 
-
 var_list:
-  var_list O_DIV var
+  var
+  { $$ = build_varlist(compiler_ctx_g, $1); }
+| var_list COMMA var
   { varlist_add(compiler_ctx_g, $1, $3); $$ = $1; }
-| O_DIV var
-  { $$ = build_varlist(compiler_ctx_g, $2); }
 ;
 
-o_div : O_DIV { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+optional_var_list : { $$ = NULL; }
+| var_list { $$ = $1; }
+;
+
+o_split : SPLIT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 action:
   expr SEMICOLUMN
   { RESULT($$, $1); }
-| o_div var O_DIV regsplit var_list SEMICOLUMN
-  { RESULT_DROP($$,$1, build_string_split(compiler_ctx_g, $2, $4, $5)); }
+| o_split regsplit O_DIV optional_var_list O_DIV expr SEMICOLUMN
+  { RESULT_DROP($$,$1, build_string_split(compiler_ctx_g, $6, $2, $4)); }
 | ifstatement
   { RESULT($$, $1); }
 ;
@@ -262,6 +267,12 @@ eq : EQ { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 o_minus : O_MINUS { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
+for : FOR { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
+and : AND { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 expr:
@@ -319,6 +330,8 @@ expr:
   { RESULT($$,build_double(compiler_ctx_g, $1)); }
 | VARIABLE /* Variable */
   { RESULT($$,build_varname(compiler_ctx_g, $1)); }
+| LOGICAL /* Logical variable */
+  { RESULT($$,build_varname(compiler_ctx_g, $1)); }
 | FIELD
   { RESULT($$, build_fieldname(compiler_ctx_g, $1)); }
 | KW_CTIME o_parent NUMBER C_PARENT
@@ -343,8 +356,33 @@ expr:
 | expr o_plus_event event_records C_BRACE %prec O_PLUS
   { RESULT_DROP($$,$2, build_expr_event(compiler_ctx_g,
 					OP_ADD_EVENT, $1, $3)); }
+| NOTHING { RESULT($$, build_db_nothing(compiler_ctx_g)); }
+| o_db db_tuple C_DB
+  { RESULT_DROP($$,$1,build_db_singleton(compiler_ctx_g,$2)); }
+| db_patterns COLLECT expr
+  { RESULT($$, build_db_collect(compiler_ctx_g,$3,$1)); }
 ;
 
+
+db_tuple : db_non_empty_tuple { RESULT($$, expr_cons_reverse(compiler_ctx_g, $1)); }
+;
+
+db_non_empty_tuple: expr
+{ RESULT($$, build_expr_cons(compiler_ctx_g, $1, NULL)); }
+| db_non_empty_tuple COMMA expr
+{ RESULT($$, build_expr_cons(compiler_ctx_g, $3, $1)); }
+;
+
+db_patterns :
+for db_pattern
+{ RESULT_DROP($$,$1,build_expr_cons(compiler_ctx_g, $2, NULL)); }
+| db_patterns and db_pattern
+{ RESULT_DROP($$,$2,build_expr_cons(compiler_ctx_g,$3,$1)); }
+;
+
+db_pattern : db_tuple IN expr
+{ RESULT($$, build_db_pattern(compiler_ctx_g, $1, $3)); }
+;
 
 event_records:
   /* Empty */
@@ -401,6 +439,9 @@ o_open_event : O_OPEN_EVENT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 o_plus_event : O_PLUS_EVENT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
+o_db : O_DB { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 actionblock:
