@@ -91,6 +91,12 @@ static size_t qstr_sz_g;
 "if"       { return (IF);       }
 "else"     { return (ELSE);     }
 "expect"   { return (EXPECT);   }
+"split"    { return (SPLIT);    }
+"for"      { return (FOR);    }
+"and"      { return (AND);      }
+"in"       { return (IN);       }
+"collect"  { return (COLLECT);  }
+"nothing"  { return (NOTHING);  }
 "{"        { return (O_BRACE);  }
 "}"        { return (C_BRACE);  }
 "("        { return (O_PARENT); }
@@ -112,6 +118,8 @@ static size_t qstr_sz_g;
              for (i=0; i<yyleng; i++) if (yytext[i]=='\n') ++issdllineno_g;
              return (O_PLUS_EVENT); }
 ".{"       { return (O_OPEN_EVENT); }
+"{{"       { return (O_DB); }
+"}}"       { return (C_DB); }
 "-"        { return (O_MINUS);  }
 "*"        { return (O_TIMES); }
 "/"        { return (O_DIV); }
@@ -197,9 +205,16 @@ static size_t qstr_sz_g;
 
  /* Variable name */
 $[A-Za-z_][A-Za-z0-9_\.]* {
-  issdllval.string = gc_strdup((ctx)->gc_ctx, issdltext + 1);
+  issdllval.string = gc_strdup((ctx)->gc_ctx, issdltext /* + 1*/);
   /* DPRINTF( ("VARIABLE %s\n", issdltext) ); */
   return VARIABLE;
+}
+
+ /* Logical variable name */
+[A-Z][A-Za-z0-9_\.]* {
+  issdllval.string = gc_strdup((ctx)->gc_ctx, issdltext);
+  /* DPRINTF( ("LOGICAL %s\n", issdltext) ); */
+  return LOGICAL;
 }
 
  /* Field name */
@@ -210,7 +225,7 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 }
 
  /* Symbol names (same as a C declaration) */
-[A-Za-z_][A-Za-z0-9_\.]* {
+[a-z_][A-Za-z0-9_\.]* {
   issdllval.sym.file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
   issdllval.sym.line = issdllineno_g;
   issdllval.sym.name = gc_strdup((ctx)->gc_ctx, issdltext);
