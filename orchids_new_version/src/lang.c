@@ -2829,7 +2829,7 @@ static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
       n = LONG_MAX;
     else if (FLOAT(x) <= (double)LONG_MIN)
       n = LONG_MIN;
-    else n = (int)FLOAT(x);
+    else n = (long)FLOAT(x);
 
     i = ovm_int_new(ctx->gc_ctx, n);
     PUSH_VALUE(ctx, i);
@@ -2854,7 +2854,7 @@ static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
       n = ULONG_MAX;
     else if (FLOAT(x) <= 0.0)
       n = 0;
-    else n = (unsigned int)FLOAT(x);
+    else n = (unsigned long)FLOAT(x);
 
     ui = ovm_uint_new(ctx->gc_ctx, n);
     PUSH_VALUE(ctx, ui);
