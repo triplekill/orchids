@@ -6,6 +6,7 @@ orchids_SOURCES = \
         evt_mgr.c evt_mgr.h evt_mgr_priv.h                \
         mod_mgr.c mod_mgr.h                               \
 	mod_utils.c mod_utils.h 			  \
+	db.c db.h					  \
         orchids_api.c orchids_api.h                       \
         engine.c engine.h engine_priv.h                   \
         rule_compiler.c rule_compiler.h                   \

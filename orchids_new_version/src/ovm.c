@@ -24,6 +24,7 @@
 
 #include "orchids.h"
 #include "stack.h"
+#include "db.h"
 
 #include "ovm.h"
 #include "ovm_priv.h"
@@ -239,6 +240,99 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 		  offset, OP_ADD_EVENT, code[1], code[1]);
 	  offset += 2;
 	  break ;
+	case OP_DB_FILTER:
+	  {
+	    int nfields = code[2];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04x: %08x ...         | db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
+		    offset, OP_DB_FILTER, code[1], code[2], code[3]);
+	    delim = "";
+	    for (i=0; i<nfields; i++)
+	      {
+		fputs (delim, fp);
+		val = code[4+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 4+nfields;
+	  }
+	  break;
+	case OP_DB_JOIN:
+	  {
+	    int nfields2 = code[2];
+	    int i;
+	    char *delim;
+	    unsigned long val;
+
+	    fprintf(fp, "0x%04x: %08x ...         | db_join [nfields1=%lu, nfields2=%lu] [",
+	      offset, OP_DB_JOIN, code[1], code[2]);
+	    delim = "";
+	    for (i=0; i<nfields2; i++)
+	      {
+		fputs (delim, fp);
+		val = code[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 3+nfields2;
+	  }
+	  break;
+	case OP_DB_PROJ:
+	  {
+	    int nfields_res = code[1];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04x: %08x ...         | db_proj [nfields_res=%lu, nconsts=%lu] [",
+		    offset, OP_DB_PROJ, code[1], code[2]);
+	    delim = "";
+	    for (i=0; i<nfields_res; i++)
+	      {
+		fputs (delim, fp);
+		val = code[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 3+nfields_res;
+	  }
+	  break;
+	case OP_DB_MAP:
+	  fprintf(fp, "0x%04x: %08x %08lx %08lx | db_map [%lu] [%lu]\n",
+		  offset, OP_DB_MAP, code[1], code[2], code[1], code[2]);
+	  fprintf(fp, "{{\n");
+	  fprintf_bytecode (fp, code+3);
+	  fprintf(fp, "}}\n");
+	  offset += code[1]+2;
+	  break ;
+	case OP_DB_SINGLE:
+	  fprintf (fp, "0x%04x: %08x %08lx    | db_single [%lu]\n",
+		   offset, OP_DB_SINGLE, code[1], code[1]);
+	  offset += 2;
+	  break;
+	case OP_DUP:
+	  fprintf(fp, "0x%04x: %08x %08lx    | dup [%lu]\n",
+		  offset, OP_DUP, code[1], code[1]);
+	  offset += 2;
+	  break ;
 	default:
 	  DebugLog(DF_OVM, DS_ERROR, "unknown opcode %lu\n", *code);
 	  return ;
@@ -409,6 +503,99 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 	case OP_ADD_EVENT:
 	  fprintf(fp, "%04x: %02x %02lx  | addevent [%lu]\n",
 		  offset, OP_ADD_EVENT, code[1], code[1]);
+	  offset += 2;
+	  break ;
+	case OP_DB_FILTER:
+	  {
+	    int nfields = code[2];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04x: %02x ...   | db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
+		    offset, OP_DB_FILTER, code[1], code[2], code[3]);
+	    delim = "";
+	    for (i=0; i<nfields; i++)
+	      {
+		fputs (delim, fp);
+		val = code[4+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 4+nfields;
+	  }
+	  break;
+	case OP_DB_JOIN:
+	  {
+	    int nfields2 = code[2];
+	    int i;
+	    char *delim;
+	    unsigned long val;
+
+	    fprintf(fp, "0x%04x: %02x ...   | db_join [nfields1=%lu, nfields2=%lu] [",
+	      offset, OP_DB_JOIN, code[1], code[2]);
+	    delim = "";
+	    for (i=0; i<nfields2; i++)
+	      {
+		fputs (delim, fp);
+		val = code[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 3+nfields2;
+	  }
+	  break;
+	case OP_DB_PROJ:
+	  {
+	    int nfields_res = code[1];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04x: %02x ...   | db_proj [nfields_res=%lu, nconsts=%lu] [",
+		    offset, OP_DB_PROJ, code[1], code[2]);
+	    delim = "";
+	    for (i=0; i<nfields_res; i++)
+	      {
+		fputs (delim, fp);
+		val = code[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    offset += 3+nfields_res;
+	  }
+	  break;
+	case OP_DB_MAP:
+	  fprintf(fp, "0x%04x: %02x %02lx %02lx | db_map [%lu] [%lu]\n",
+		  offset, OP_DB_MAP, code[1], code[2], code[1], code[2]);
+	  fprintf(fp, "{{\n");
+	  fprintf_bytecode_short (fp, code+3);
+	  fprintf(fp, "}}\n");
+	  offset += code[1]+2;
+	  break ;
+	case OP_DB_SINGLE:
+	  fprintf (fp, "%04x: %02x %02lx  | db_single [%lu]\n",
+		   offset, OP_DB_SINGLE, code[1], code[1]);
+	  offset += 2;
+	  break ;
+	case OP_DUP:
+	  fprintf(fp, "%04x: %02x %02lx  | dup [%lu]\n",
+		  offset, OP_DUP, code[1], code[1]);
 	  offset += 2;
 	  break ;
 	default:
@@ -879,26 +1066,26 @@ static int ovm_popcjmp(isn_param_t *param)
       case T_INT:
 	if (INT(res)!=0)
 	  {
-	    param->ip += param->ip[1];
+	    param->ip += param->ip[1]+2;
 	    return 0;
 	  }
 	break;
       case T_UINT:
 	if (UINT(res)!=0)
 	  {
-	    param->ip += param->ip[1];
+	    param->ip += param->ip[1]+2;
 	    return 0;
 	  }
 	break;
       default:
-	param->ip += param->ip[1];
+	param->ip += param->ip[1]+2;
 	return 0;
       }
 #else
   /* Type-checker guarantees res is NULL or a T_INT */
   if (res!=NULL && INT(res)!=0)
     {
-      param->ip += param->ip[1];
+      param->ip += param->ip[1]+2;
       return 0;
     }
 #endif
@@ -920,10 +1107,13 @@ static int ovm_ceq(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      res = (ret) ? FALSE_VAR : TRUE_VAR;
-      if (!ret)
-	DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: true\n");
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_EQUAL(ret))
+	{
+	  res = TRUE_VAR;
+	  DebugLog(DF_OVM, DS_TRACE, "OP_CEQ: true\n");
+	}
+      else res = FALSE_VAR;
     }
   else
     res = NULL;
@@ -946,10 +1136,13 @@ static int ovm_cneq(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      res = (ret) ? TRUE_VAR : FALSE_VAR;
-      if (ret)
-	DebugLog(DF_OVM, DS_TRACE, "OP_CNEQ: true\n");
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_DIFFERENT(ret))
+	{
+	  res = TRUE_VAR;
+	  DebugLog(DF_OVM, DS_TRACE, "OP_CNEQ: true\n");
+	}
+      else res = FALSE_VAR;
     }
   else
     res = NULL;
@@ -1098,16 +1291,16 @@ static int ovm_clt(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      if (ret >= 0)
-	{
-	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (false ret=%i)\n", ret);
-	  res = FALSE_VAR;
-	}
-      else
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_LESS(ret))
 	{
 	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (true ret=%i)\n", ret);
 	  res = TRUE_VAR;
+	}
+      else
+	{
+	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLT (false ret=%i)\n", ret);
+	  res = FALSE_VAR;
 	}
     }
   else
@@ -1131,16 +1324,16 @@ static int ovm_cgt(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      if (ret <= 0)
-	{
-	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (false ret=%i)\n", ret);
-	  res = FALSE_VAR;
-	}
-      else
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_GREATER(ret))
 	{
 	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (true ret=%i)\n", ret);
 	  res = TRUE_VAR;
+	}
+      else
+	{
+	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGT (false ret=%i)\n", ret);
+	  res = FALSE_VAR;
 	}
     }
   else
@@ -1164,16 +1357,23 @@ static int ovm_cle(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      if (ret > 0)
-	{
-	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (false ret=%i)\n", ret);
-	  res = FALSE_VAR;
-	}
-      else
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK);
+      /* Don't need CMP_GEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op1 in op2 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op2 is included in op1, wasting time for nothing
+      */
+      if (CMP_LEQ(ret))
 	{
 	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (true ret=%i)\n", ret);
 	  res = TRUE_VAR;
+	}
+      else
+	{
+	  DebugLog(DF_OVM, DS_DEBUG, "OP_CLE (false ret=%i)\n", ret);
+	  res = FALSE_VAR;
 	}
     }
   else
@@ -1197,16 +1397,23 @@ static int ovm_cge(isn_param_t *param)
   param->ip += 1;
   if (!IS_NULL(op1) && !IS_NULL(op2))
     {
-      ret = issdl_cmp(op1, op2);
-      if (ret < 0)
-	{
-	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (false ret=%i)\n", ret);
-	  res = FALSE_VAR;
-	}
-      else
+      ret = issdl_cmp(op1, op2, CMP_GEQ_MASK);
+      /* Don't need CMP_LEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op2 in op1 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op1 is included in op2, wasting time for nothing
+      */
+      if (CMP_GEQ(ret))
 	{
 	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (true ret=%i)\n", ret);
 	  res = TRUE_VAR;
+	}
+      else
+	{
+	  DebugLog(DF_OVM, DS_DEBUG, "OP_CGE (false ret=%i)\n", ret);
+	  res = FALSE_VAR;
 	}
     }
   else
@@ -1287,6 +1494,7 @@ static int ovm_cesv(isn_param_t *param)
 static int ovm_empty_event(isn_param_t *param)
 {
   DebugLog(DF_OVM, DS_DEBUG, "OP_EMPTY_EVENT\n");
+  param->ip++;
   PUSH_VALUE(param->ctx, NULL);
   return 0;
 }
@@ -1313,6 +1521,159 @@ static int ovm_add_event(isn_param_t *param)
     }
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx, res);
+  return 0;
+}
+
+static int ovm_db_filter(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  bytecode_t *ip;
+  int i, nconsts;
+  struct db_filter_spec spec;
+  db_map *m, *res;
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_DB_FILTER\n");
+  ip = param->ip+1;
+  spec.nfields_res = *ip++;
+  spec.nfields = *ip++;
+  nconsts  = *ip++;
+  spec.vals = ip;
+  ip += spec.nfields;
+  param->ip = ip;
+  m = (db_map *)STACK_ELT(ctx->ovm_stack, nconsts+1);
+  spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
+  spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
+  for (i=0; i<nconsts; i++)
+    spec.hash[i] = issdl_hash(spec.constants[i]);
+  res = db_filter (ctx->gc_ctx, &spec, m);
+  gc_base_free(spec.hash);
+  STACK_DROP(ctx->ovm_stack, nconsts+1);
+  PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_db_join(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  bytecode_t *ip;
+  struct db_join_spec spec;
+  db_map *m1, *m2, *res;
+
+  DebugLog(DF_OVM,DS_DEBUG, "OP_DB_JOIN\n");
+  ip = param->ip+1;
+  spec.nfields1 = *ip++;
+  spec.nfields2 = *ip++;
+  spec.vals = ip;
+  ip += spec.nfields2;
+  param->ip = ip;
+  m1 = (db_map *)STACK_ELT(ctx->ovm_stack, 2);
+  m2 = (db_map *)STACK_ELT(ctx->ovm_stack, 1);
+  res = db_join (ctx->gc_ctx, &spec, m1, m2);
+  STACK_DROP(ctx->ovm_stack, 2);
+  PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_db_proj(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  bytecode_t *ip;
+  int i, nconsts;
+  struct db_proj_spec spec;
+  db_map *m, *res;
+
+  DebugLog(DF_OVM,DS_DEBUG, "OP_DB_PROJ\n");
+  ip = param->ip+1;
+  spec.nsubfields = *ip++;
+  nconsts = *ip++;
+  spec.head = ip;
+  ip += spec.nsubfields;
+  param->ip = ip;
+  m = (db_map *)STACK_ELT(ctx->ovm_stack, nconsts+1);
+  spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
+  spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
+  for (i=0; i<nconsts; i++)
+    spec.hash[i] = issdl_hash(spec.constants[i]);
+  res = db_proj (ctx->gc_ctx, &spec, m);
+  gc_base_free(spec.hash);
+  STACK_DROP(ctx->ovm_stack, nconsts+1);
+  PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+struct ovm_db_map_data {
+  orchids_t *ctx;
+  state_instance_t *si;
+  bytecode_t *ip;
+};
+
+static db_map *do_ovm_db_map (gc_t *gc_ctx,
+			      int nfields_res,
+			      int nfields,
+			      db_map *singleton,
+			      void *data)
+{
+  struct ovm_db_map_data *vdata = data;
+  orchids_t *ctx;
+  ovm_var_t **tuple;
+  int i;
+
+  tuple = singleton->what.tuples.table->tuple;
+  ctx = vdata->ctx;
+  for (i=0; i<nfields; i++)
+    {
+      PUSH_VALUE(ctx, tuple[i]);
+    }
+  ovm_exec_base (ctx, vdata->si, vdata->ip);
+  return (db_map *)POP_VALUE(ctx);
+}
+
+static int ovm_db_map(isn_param_t *param)
+{
+  bytecode_t *ip;
+  int nfields;
+  db_map *m, *res;
+  struct ovm_db_map_data data;
+
+  DebugLog(DF_OVM,DS_DEBUG, "OP_DB_MAP\n");
+  ip = param->ip;
+  nfields = ip[2];
+  param->ip += ip[1]+2;
+  data.ctx = param->ctx;
+  data.si = param->state;
+  data.ip = ip+3;
+  m = (db_map *)STACK_ELT(data.ctx->ovm_stack, 1);
+  res = db_collect_lazy (data.ctx->gc_ctx, nfields, m, do_ovm_db_map, &data);
+  STACK_DROP(data.ctx->ovm_stack, 1);
+  PUSH_VALUE(data.ctx, res);
+  return 0;
+}
+
+static int ovm_db_single(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  int nconsts;
+  db_map *res;
+
+  DebugLog(DF_OVM,DS_DEBUG, "OP_DB_SINGLE\n");
+  nconsts = param->ip[1];
+  param->ip += 2;
+  res = db_singleton (ctx->gc_ctx,
+		      (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts),
+		      nconsts);
+  STACK_DROP(ctx->ovm_stack, nconsts);
+  PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_dup(isn_param_t *param)
+{
+  ovm_var_t *val;
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_DUP\n");
+  val = (ovm_var_t *)STACK_ELT(param->ctx->ovm_stack, param->ip[1]);
+  param->ip += 2;
+  PUSH_VALUE(param->ctx, val);
   return 0;
 }
 
@@ -1355,6 +1716,12 @@ static ovm_insn_rec_t ops_g[] = {
   { ovm_cesv,       0, "cesrv"      },
   { ovm_empty_event, 1, "emptyevent" },
   { ovm_add_event,  2, "addevent" },
+  { ovm_db_filter, 0, "db_filter" },
+  { ovm_db_join, 0, "db_join" },
+  { ovm_db_proj, 0, "db_proj" },
+  { ovm_db_map, 0, "db_map" },
+  { ovm_db_single, 0, "db_single" },
+  { ovm_dup, 0, "dup" },
   { NULL,           0, NULL         }
 };
 
@@ -1401,7 +1768,15 @@ static char *op_name[] = {
   "cle",
   "cge",
   "regsplit",
-  "csev",
+  "cesv",
+  "empty_event",
+  "add_event",
+  "db_filter",
+  "db_join",
+  "db_proj",
+  "db_map",
+  "db_single",
+  "dup",
   NULL
 };
 

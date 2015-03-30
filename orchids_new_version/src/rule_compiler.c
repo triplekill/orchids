@@ -3,8 +3,9 @@
  ** High-level functions for the yaccer for abstract syntax tree building
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup compiler
  **
  ** @date  Started on: Sat Feb 22 17:57:07 2003
@@ -45,6 +46,7 @@
 #include "rule_compiler.h"
 #include "issdl.tab.h"
 #include "ovm.h"
+#include "db.h"
 
 static unsigned long bigprime =
   (sizeof(unsigned long)>=8)?5174544934365344191L: /* 63 bit prime */
@@ -69,8 +71,7 @@ int issdllex_init (void ** scanner); /* really int issdllex_init (yyscan_t* scan
 /* XXX: static function prototype definition:
  * (should be moved in a private header) */
 
-static void
-compile_and_add_rulefile(orchids_t *ctx, char *rulefile);
+static void compile_and_add_rulefile(orchids_t *ctx, char *rulefile);
 
 static void compile_state_ast(rule_compiler_t *ctx,
 			      rule_t *rule,
@@ -112,6 +113,17 @@ static void build_fields_hash(orchids_t *ctx);
 static void build_functions_hash(orchids_t *ctx);
 
 static void fprintf_term_expr(FILE *fp, node_expr_t *expr);
+
+static int is_logical_variable(node_expr_t *e)
+{
+  if (e==NULL)
+    return 0;
+  if (e->type!=NODE_VARIABLE)
+    return 0;
+  if (SYM_NAME(e)[0]=='$')
+    return 0;
+  return 1;
+}
 
 static int rule_compiler_mark_hash_walk_func (void *elt, void *data)
 {
@@ -759,10 +771,13 @@ static void node_expr_regsplit_finalize (gc_t *gc_ctx, gc_header_t *p)
   size_t i, n;
 
   node_expr_finalize (gc_ctx, p);
-  for (i=0, n=dv->vars_nb; i<n; i++)
-    gc_base_free (dv->vars[i]);
-  gc_base_free (dv->vars);
-  gc_base_free (dv);
+  if (dv!=NULL)
+    {
+      for (i=0, n=dv->vars_nb; i<n; i++)
+	gc_base_free (dv->vars[i]);
+      gc_base_free (dv->vars);
+      gc_base_free (dv);
+    }
 }
 
 static int node_expr_regsplit_traverse (gc_traverse_ctx_t *gtc,
@@ -823,8 +838,7 @@ static void dynamic_add(rule_compiler_t *ctx, char *var_name)
 }
 
 
-void
-compile_rules(orchids_t *ctx)
+void compile_rules(orchids_t *ctx)
 {
   rulefile_t *rulefile;
 
@@ -992,6 +1006,16 @@ varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
   return vs;
 }
 
+int vs_in (int varid, varset_t *vs)
+{
+  for (; vs!=NULL; vs=vs->next)
+    if (vs->n == varid)
+      return 1;
+    else if (vs->n > varid)
+      break;
+  return 0;
+}
+
 varset_t *vs_inter (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
 {
   varset_t *vs;
@@ -1108,6 +1132,44 @@ static varset_t *varlist_varset (gc_t *gc_ctx, size_t start, size_t end,
   return vs;
 }
 
+varset_t *vs_bound_vars_tuple (gc_t *gc_ctx, node_expr_t *tuple)
+{
+  node_expr_t *l;
+  varset_t *vs;
+  size_t nargs;
+  node_expr_t **vars;
+
+  nargs = 0;
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    nargs++;
+  vars = gc_base_malloc (gc_ctx, nargs*sizeof(node_expr_t *));
+  nargs = 0;
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      if (is_logical_variable(BIN_LVAL(l)))
+	vars[nargs++] = BIN_LVAL(l);
+    }
+  vs = varlist_varset (gc_ctx, 0, nargs, vars);
+  gc_base_free (vars);
+  return vs;
+}
+
+varset_t *vs_bound_vars_db_pattern (gc_t *gc_ctx, node_expr_t *patterns)
+{
+  varset_t *vs, *tuplevs;
+
+  GC_START(gc_ctx, 1);
+  vs = VS_EMPTY;
+  for (; patterns!=NULL; patterns = BIN_RVAL(patterns))
+    {
+      tuplevs = vs_bound_vars_tuple (gc_ctx, BIN_LVAL(BIN_LVAL(patterns)));
+      vs = vs_union (gc_ctx, vs, tuplevs);
+      GC_UPDATE (gc_ctx, 0, vs);
+    }
+  GC_END(gc_ctx);
+  return vs;
+}
+
 node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
 {
   node_expr_vars_t res, newres;
@@ -1177,6 +1239,92 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
       res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
       /* and *mustset == mustset(e1) U mustset(e2) */
       break;
+    case NODE_DB_PATTERN:
+      /* e is db_pattern(db, pat1, ..., patn)
+	 mayread(e) = mayread(db) U union {mayread(pati) | pati not a logical variable}
+	 mustset(e) = mustset(db) U union {mustset(pati) | pati not a logical variable}
+	              U {pati | pati a logical variable}
+       */
+      res = node_expr_vars (gc_ctx, BIN_LVAL(e));
+      GC_UPDATE(gc_ctx, 0, res.mayread);
+      GC_UPDATE(gc_ctx, 1, res.mustset);
+      {
+	node_expr_t *l;
+
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    if (is_logical_variable(BIN_LVAL(l)))
+	      {
+		newres.mustset = vs_one_element (gc_ctx, SYM_RES_ID(BIN_LVAL(l)));
+		GC_UPDATE(gc_ctx, 3, newres.mustset);
+		res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+		GC_UPDATE(gc_ctx, 1, res.mustset);
+	      }
+	    else
+	      {
+		newres = node_expr_vars (gc_ctx, BIN_LVAL(l));
+		GC_UPDATE(gc_ctx, 2, newres.mayread);
+		GC_UPDATE(gc_ctx, 3, newres.mustset);
+		res.mayread = vs_union (gc_ctx, res.mayread, newres.mayread);
+		GC_UPDATE(gc_ctx, 0, res.mayread);
+		res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+		GC_UPDATE(gc_ctx, 1, res.mustset);
+	      }
+	  }
+      }
+      break;
+    case NODE_DB_COLLECT:
+      /* e is db_collect(expr, pat1, pat2, ..., patn)
+	 mayread(e) = (mayread(expr) - quantified_vars(pat1, ..., patn))
+	              U union {mayread (pati) | i=1...n}
+	 mustset(e) = union {mustset (pati) | i=1...n}
+	 Note that mustset(e) does not contain mustset(expr),
+	 since the comprehension may be over an empty domain, in which case
+	 expr will not be run.
+       */
+      {
+	node_expr_t *l;
+
+	res = node_expr_vars (gc_ctx, BIN_LVAL(e));
+	GC_UPDATE(gc_ctx, 0, res.mayread);
+	/* and forget about newres.mustset */
+	res.mustset = VS_EMPTY;
+	newres.mayread = vs_bound_vars_db_pattern (gc_ctx, BIN_RVAL(e));
+	GC_UPDATE(gc_ctx, 2, newres.mayread);
+	res.mayread = vs_diff (gc_ctx, res.mayread, newres.mayread);
+	GC_UPDATE(gc_ctx, 0, res.mayread);
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    newres = node_expr_vars (gc_ctx, BIN_LVAL(l));
+	    GC_UPDATE(gc_ctx, 2, newres.mayread);
+	    GC_UPDATE(gc_ctx, 3, newres.mustset);
+	    res.mayread = vs_union (gc_ctx, res.mayread, newres.mayread);
+	    GC_UPDATE(gc_ctx, 0, res.mayread);
+	    res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+	    GC_UPDATE(gc_ctx, 1, res.mustset);
+	  }
+      }
+      break;
+    case NODE_DB_SINGLETON:
+      /* e is db_singleton(e1, ..., em)
+	 mayread(e) = union {mayread (ei) | i=1...m}
+	 mustset(e) = union {mustset (ei) | i=1...m}
+       */
+      {
+	node_expr_t *l;
+
+	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    newres = node_expr_vars (gc_ctx, BIN_LVAL(l));
+	    GC_UPDATE(gc_ctx, 2, newres.mayread);
+	    GC_UPDATE(gc_ctx, 3, newres.mustset);
+	    res.mayread = vs_union (gc_ctx, res.mayread, newres.mayread);
+	    GC_UPDATE(gc_ctx, 0, res.mayread);
+	    res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+	    GC_UPDATE(gc_ctx, 1, res.mustset);
+	  }
+      }
+      break;
     case NODE_COND:
       /* Here there is a difference: in e1 && e2, or e1 || e2 for example,
 	 e2 may fail to be executed.  So
@@ -1200,7 +1348,7 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
       e = MON_VAL(e);
       goto again;
     case NODE_REGSPLIT:
-      /* /e1/"regex"/x1/x2/.../xn
+      /* split "regex" /x1, ..., xn/ e1  (former syntax: /e1/"regex"/x1/x2/.../xn)
 	 where e1 == REGSPLIT_STRING(e),
 	 "regex" == REGSPLIT_PAT(e),
 	 [x1, x2, ..., xn] == REGSPLIT_DEST_VARS(e)
@@ -1210,11 +1358,14 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
       res = node_expr_vars (gc_ctx, REGSPLIT_STRING(e));
       GC_UPDATE(gc_ctx, 0, res.mayread);
       GC_UPDATE(gc_ctx, 1, res.mustset);
-      newres.mustset = varlist_varset(gc_ctx, 0,
-				      REGSPLIT_DEST_VARS(e)->vars_nb,
-				      REGSPLIT_DEST_VARS(e)->vars);
-      GC_UPDATE(gc_ctx, 2, newres.mustset);
-      res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+      if (REGSPLIT_DEST_VARS(e)!=NULL)
+	{
+	  newres.mustset = varlist_varset(gc_ctx, 0,
+					  REGSPLIT_DEST_VARS(e)->vars_nb,
+					  REGSPLIT_DEST_VARS(e)->vars);
+	  GC_UPDATE(gc_ctx, 2, newres.mustset);
+	  res.mustset = vs_union (gc_ctx, res.mustset, newres.mustset);
+	}
       break;
     case NODE_IFSTMT:
       /*
@@ -1648,9 +1799,42 @@ static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
 	size_t i, n;
 
 	set_monotony_unknown_mayset (ctx, REGSPLIT_STRING(e), vars);
-	n = REGSPLIT_DEST_VARS(e)->vars_nb;
-	for (i=0; i<n; i++)
-	  vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_UNKNOWN;
+	if (REGSPLIT_DEST_VARS(e)!=NULL)
+	  {
+	    n = REGSPLIT_DEST_VARS(e)->vars_nb;
+	    for (i=0; i<n; i++)
+	      vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_UNKNOWN;
+	  }
+	break;
+      }
+    case NODE_DB_PATTERN:
+      {
+	node_expr_t *l;
+
+	set_monotony_unknown_mayset (ctx, BIN_LVAL(e), vars);
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    if (is_logical_variable (BIN_LVAL(l)))
+	      vars[SYM_RES_ID(BIN_LVAL(l))] = MONO_UNKNOWN;
+	    else set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	  }
+	break;
+      }
+    case NODE_DB_COLLECT:
+      {
+	node_expr_t *l;
+
+	set_monotony_unknown_mayset (ctx, BIN_RVAL(e), vars);
+	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	break;
+      }
+    case NODE_DB_SINGLETON:
+      {
+	node_expr_t *l;
+
+	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
+	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
 	break;
       }
     case NODE_IFSTMT:
@@ -1669,6 +1853,45 @@ static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
       break;
     }
 }
+/*
+static only_depends_on (gc_t *gc_ctx, node_expr_t *e, varset_t *vars)
+{
+  node_expr_t *l;
+
+  if (e==NULL)
+    return 1;
+  switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+      return 1;
+    case NODE_VARIABLE:
+      return !vs_in (SYM_RES_ID(e), vars);
+    case NODE_CALL:
+      for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	if (!only_depends_on (gc_ctx, BIN_LVAL(l), vars))
+	  return 0;
+      return 1;
+    case NODE_BINOP:
+    case NODE_EVENT:
+    case NODE_CONS:
+    case NODE_COND:
+      return only_depends_on (gc_ctx, BIN_LVAL(e), vars) &&
+	only_depends_on (gc_ctx, BIN_RVAL(e), vars);
+    case NODE_MONOP:
+      return only_depends_on (gc_ctx, MON_VAL(e), vars);
+    case NODE_REGSPLIT:
+      if (!only_depends_on (gc_ctx, REGSPLIT_STRING(e), vars))
+	return 0;
+      {
+	varset_t 
+      GC_START(gc_ctx, 1);
+
+      GC_END(gc_ctx);
+
+    }
+}
+*/
 
 static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 				  monotony vars[]);
@@ -1766,6 +1989,12 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
     }
 }
 
+static int do_set_mono_const (int var, void *data)
+{
+  ((monotony *)data)[var] = MONO_CONST;
+  return 0;
+}
+
 static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 				  monotony vars[])
 {
@@ -1834,11 +2063,93 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	  return MONO_CONST;
 	return MONO_UNKNOWN;
       }
+    case NODE_DB_PATTERN:
+      {
+	monotony m;
+	node_expr_t *l;
+
+	/* The ordering on databases is inclusion.
+	   Here we check whether there is potential for the final database
+	   comprehension to grow, judging from a single pattern.
+	   In a pattern (pat1, ..., patn) in db,
+	   the final database may grow iff db grows, and each pati
+	   that is not a logical variable is constant.
+	   Additionally, we set each pati that is a logical variable
+	   to MONO_UNKNOWN.
+	 */
+	m = compute_monotony (ctx, BIN_LVAL(e), vars);
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    if (is_logical_variable (BIN_LVAL(l)))
+	      vars[SYM_RES_ID(BIN_LVAL(l))] = MONO_UNKNOWN;
+	    else if (compute_monotony (ctx, BIN_LVAL(l), vars)!=MONO_CONST)
+	      m = MONO_UNKNOWN;
+	  }
+	return m;
+      }
+    case NODE_DB_COLLECT:
+      {
+	monotony m;
+	node_expr_t *l;
+	monotony *alt;
+	size_t nvars;
+	size_t varsz;
+	varset_t *bound;
+
+	m = MONO_CONST;
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    m &= compute_monotony (ctx, BIN_LVAL(l), vars);
+	  }
+	if (m!=MONO_UNKNOWN)
+	  { /* decide whether the tuple BIN_LVAL(e) is constant under the
+	       assumption that all bound variables (in 'bound' below) are constant;
+	       if so, keep m, otherwise set m to MONO_UNKNOWN.
+	       We do so using an alternate monotony table alt, instead of vars.
+	     */
+	    nvars = ctx->rule_env->elmts;
+	    varsz = nvars*sizeof(monotony);
+	    alt = gc_base_malloc (ctx->gc_ctx, varsz);
+	    memcpy (alt, vars, varsz);
+	    bound = vs_bound_vars_db_pattern (ctx->gc_ctx, BIN_RVAL(e));
+	    (void) vs_sweep (bound, do_set_mono_const, alt);
+	    if (compute_monotony (ctx, BIN_LVAL(e), alt)!=MONO_CONST)
+	      m = MONO_UNKNOWN;
+	    gc_base_free (alt);
+	  }
+
+	/* It might be that the tuple BIN_LVAL(e) is never evaluated;
+	   this forces us to do as in the NODE_IFSTMT case, and
+	   call set_monotony_unknown_mayset() to say that all assignments
+	   inside tuples force the assigned-to variable to be
+	   MONO_UNKNOWN */
+	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	return m;
+      }
+    case NODE_DB_SINGLETON:
+      { /* Recall db_maps are compared for inclusion;
+	   the only case where a singleton can grow is when it is constant
+	*/
+	monotony m;
+	node_expr_t *l;
+
+	m = MONO_CONST;
+	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
+	  if (compute_monotony (ctx, BIN_LVAL(l), vars)!=MONO_CONST)
+	    {
+	      m = MONO_UNKNOWN;
+	      break;
+	    }
+	return m;
+      }
     case NODE_REGSPLIT:
       {
 	size_t i, n;
 
-	n = REGSPLIT_DEST_VARS(e)->vars_nb;
+	if (REGSPLIT_DEST_VARS(e)!=NULL)
+	  n = REGSPLIT_DEST_VARS(e)->vars_nb;
+	else n = 0;
 	if (compute_monotony (ctx, REGSPLIT_STRING(e), vars)==MONO_CONST)
 	  {
 	    for (i=0; i<n; i++)
@@ -1926,8 +2237,7 @@ monotony m_random (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
  * @param ctx Orchids context.
  * @param rulefile File to parse.
  **/
-static void
-compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
+static void compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
 {
   int ret;
   FILE *issdlin;
@@ -2136,12 +2446,39 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
       check_expect_condition (ctx, BIN_LVAL(e));
       check_expect_condition (ctx, BIN_RVAL(e));
       break;
+    case NODE_DB_PATTERN:
+      check_expect_condition (ctx, BIN_LVAL(e));
+      {
+	node_expr_t *l;
+
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  if (!is_logical_variable(BIN_LVAL(l)))
+	    check_expect_condition (ctx, BIN_LVAL(l));
+      }
+      break;
+    case NODE_DB_COLLECT:
+      {
+	node_expr_t *l;
+
+	check_expect_condition (ctx, BIN_LVAL(e));
+	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  check_expect_condition (ctx, BIN_LVAL(l));
+      }
+      break;
+    case NODE_DB_SINGLETON:
+      {
+	node_expr_t *l;
+
+	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
+	  check_expect_condition (ctx, BIN_LVAL(l));
+      }
+      break;
     case NODE_MONOP:
       check_expect_condition (ctx, MON_VAL(e));
       break;
     case NODE_REGSPLIT:
       check_expect_condition (ctx, REGSPLIT_STRING(e));
-      if (REGSPLIT_DEST_VARS(e)->vars_nb!=0)
+      if (REGSPLIT_DEST_VARS(e)!=NULL && REGSPLIT_DEST_VARS(e)->vars_nb!=0)
 	{
 	  if (e->file!=NULL)
 	    fprintf (stderr, "%s:", STR(e->file));
@@ -2345,7 +2682,6 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
   trans->an_flags = 0;
   return trans;
 }
-
 
 node_rule_t *build_rule(rule_compiler_t *ctx,
 			symbol_token_t   *sym,
@@ -2594,49 +2930,52 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
       ctx->nerrors++;
     }
   vars = n->dest_vars;
-  nb = vars->vars_nb;
-  for (i=0; i<nb; i++)
+  if (vars!=NULL)
     {
-      var = vars->vars[i];
-      for (j=0; j<i; j++)
+      nb = vars->vars_nb;
+      for (i=0; i<nb; i++)
 	{
-	  varj = vars->vars[j];
-	  if (var==varj) /* == is OK, since variables are hash-consed */
+	  var = vars->vars[i];
+	  for (j=0; j<i; j++)
 	    {
-	      if (varj->file!=NULL)
-		fprintf (stderr, "%s:", STR(varj->file));
-	      /* printing STR(varj->file) is legal, since it
-		 was created NUL-terminated, on purpose */
-	      fprintf (stderr, "%u: duplicate variable %s in split regex.\n",
-		       varj->lineno,
-		       var->stype->name);
-	      ctx->nerrors++;
-	      break;
+	      varj = vars->vars[j];
+	      if (var==varj) /* == is OK, since variables are hash-consed */
+		{
+		  if (varj->file!=NULL)
+		    fprintf (stderr, "%s:", STR(varj->file));
+		  /* printing STR(varj->file) is legal, since it
+		     was created NUL-terminated, on purpose */
+		  fprintf (stderr, "%u: duplicate variable %s in split regex.\n",
+			   varj->lineno,
+			   var->stype->name);
+		  ctx->nerrors++;
+		  break;
+		}
 	    }
+	  if (j<i) /* duplicate variable */
+	    continue;
+	  vartype = var->stype;
+	  if (vartype==NULL)
+	    {
+	      set_type (ctx, var, &t_str);
+	      /* set type of variable to type of expression */
+	    }
+	  else /* variable already has a type */
+	    if (strcmp(vartype->name, "str")) /* and the type is not str */
+	      {
+		if (var->file!=NULL)
+		  fprintf (stderr, "%s:", STR(var->file));
+		/* printing STR(var->file) is legal, since it
+		   was created NUL-terminated, on purpose */
+		fprintf (stderr, "%u: type error:"
+			 " split regex assigns value of type str"
+			 " to variable %s of type %s.\n",
+			 var->lineno,
+			 ((node_expr_symbol_t *)var)->name,
+			 vartype->name);
+		ctx->nerrors++;
+	      }
 	}
-      if (j<i) /* duplicate variable */
-	continue;
-      vartype = var->stype;
-      if (vartype==NULL)
-	{
-	  set_type (ctx, var, &t_str);
-	  /* set type of variable to type of expression */
-	}
-      else /* variable already has a type */
-	if (strcmp(vartype->name, "str")) /* and the type is not str */
-	  {
-	    if (var->file!=NULL)
-	      fprintf (stderr, "%s:", STR(var->file));
-	    /* printing STR(var->file) is legal, since it
-	       was created NUL-terminated, on purpose */
-	    fprintf (stderr, "%u: type error:"
-		     " split regex assigns value of type str"
-		     " to variable %s of type %s.\n",
-		     var->lineno,
-		     ((node_expr_symbol_t *)var)->name,
-		     vartype->name);
-	    ctx->nerrors++;
-	  }
     }
 }
 
@@ -2680,8 +3019,8 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
   GC_TOUCH (ctx->gc_ctx, n->split_pat = pattern);
   n->dest_vars = dest_list;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  REGEXNUM(TERM_DATA(pattern)) = dest_list->vars_nb;
-  if (dest_list->vars_nb!=REGEX(TERM_DATA(pattern)).re_nsub)
+  REGEXNUM(TERM_DATA(pattern)) = (dest_list==NULL)?0:dest_list->vars_nb;
+  if (REGEXNUM(TERM_DATA(pattern))!=REGEX(TERM_DATA(pattern)).re_nsub)
     {
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file));
@@ -2690,7 +3029,7 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
       fprintf (stderr, "%u: split regex produces %zd substrings, bound to %zd variables.\n",
 	       n->lineno,
 	       REGEX(TERM_DATA(pattern)).re_nsub,
-	       dest_list->vars_nb);
+	       REGEXNUM(TERM_DATA(pattern)));
       ctx->nerrors++;
     }
   add_parent (ctx, source, (node_expr_t *)n);
@@ -2743,6 +3082,31 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	      strcmp(rtype->name, "timeval"))
 	    goto type_error;
 	  set_type (ctx, myself, &t_timeval);
+	  return;
+	}
+      if (memcmp(ltype->name, "db[", 3)==0)
+	{
+	  if (BIN_OP(n)==OP_ADD)
+	    {
+	      if (strcmp(ltype->name, "db[*]")==0 &&
+		  memcmp(rtype->name, "db[", 3)==0)
+		set_type (ctx, myself, rtype);
+	      else if (strcmp(rtype->name, "db[*]")==0 ||
+		       strcmp(ltype->name, rtype->name)==0)
+		set_type (ctx, myself, ltype);
+	      else goto type_error;
+	    }
+	  else if (BIN_OP(n)==OP_SUB)
+	    {
+	      if (strcmp(ltype->name, "db[*]")==0 &&
+		  memcmp(rtype->name, "db[", 3)==0)
+		;
+	      else if (strcmp(rtype->name, "db[*]")==0 ||
+		       strcmp(ltype->name, rtype->name)==0)
+		;
+	      else goto type_error;
+	      set_type (ctx, myself, ltype);
+	    }
 	  return;
 	}
       /*FALLTHROUGH*/ /* all the other cases as for *, / */
@@ -3105,13 +3469,22 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CLE:
       op_name = "<=";
     cgt:
+      if (strcmp(ltype->name, "db[*]")==0 &&
+	  memcmp(rtype->name, "db[", 3)==0)
+	break;
+      if (strcmp(rtype->name, "db[*]")==0 &&
+	  memcmp(ltype->name, "db[", 3)==0)
+	break;
       if (strcmp(ltype->name, rtype->name) ||
 	  (strcmp(ltype->name, "int") &&
 	   strcmp(ltype->name, "uint") &&
 	   strcmp(ltype->name, "float") &&
 	   strcmp(ltype->name, "str") &&
 	   strcmp(ltype->name, "ctime") &&
-	   strcmp(ltype->name, "timeval")))
+	   strcmp(ltype->name, "timeval") &&
+	   memcmp(ltype->name, "db[", 3) /* OK for any database type as well,
+					    provided that they are equal */
+	   ))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3650,6 +4023,37 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
   return (node_expr_t *)n;
 }
 
+node_expr_t *build_db_nothing(rule_compiler_t *ctx)
+{
+  ovm_var_t *empty;
+  node_expr_term_t  *n;
+
+  GC_START(ctx->gc_ctx, 1);
+  empty = (ovm_var_t *)db_empty (ctx->gc_ctx);
+  GC_UPDATE(ctx->gc_ctx, 0, empty);
+
+  n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
+				     &node_expr_term_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_CONST;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_CONST,
+		    h_pair (T_DB_EMPTY, H_NULL));
+  /* hash = '(NODE_CONST T_DB_EMPTY)' mod bigprime */
+  n->stype = NULL; /* not known yet */
+  n->compute_stype = NULL;
+  n->npending_argtypes = 0;
+  n->parents = NULL;
+  GC_TOUCH (ctx->gc_ctx, n->data = empty);
+  n->res_id = ctx->statics_nb;
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  set_type (ctx, (node_expr_t *)n, &t_db_empty);
+  statics_add(ctx, empty);
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
 static void compute_stype_event (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
@@ -3713,6 +4117,341 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
   n->npending_argtypes = nrecs;
   if (nrecs==0) /* if empty event, call compute_stype right away */
     compute_stype_event (ctx, (node_expr_t *)n);
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+static type_t *type_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
+				 unsigned char tag)
+{
+  static strhash_t *type_hash = NULL;
+  type_t *type;
+  size_t len;
+
+  if (type_hash==NULL)
+    {
+      type_hash = new_strhash(gc_ctx, 31);
+      strhash_add(gc_ctx, type_hash, &t_int, t_int.name);
+      strhash_add(gc_ctx, type_hash, &t_uint, t_uint.name);
+      strhash_add(gc_ctx, type_hash, &t_float, t_float.name);
+      strhash_add(gc_ctx, type_hash, &t_bstr, t_bstr.name);
+      strhash_add(gc_ctx, type_hash, &t_str, t_str.name);
+      strhash_add(gc_ctx, type_hash, &t_ctime, t_ctime.name);
+      strhash_add(gc_ctx, type_hash, &t_timeval, t_timeval.name);
+      strhash_add(gc_ctx, type_hash, &t_ipv4, t_ipv4.name);
+      strhash_add(gc_ctx, type_hash, &t_ipv6, t_ipv6.name);
+      strhash_add(gc_ctx, type_hash, &t_regex, t_regex.name);
+      strhash_add(gc_ctx, type_hash, &t_snmpoid, t_snmpoid.name);
+      strhash_add(gc_ctx, type_hash, &t_event, t_event.name);
+      strhash_add(gc_ctx, type_hash, &t_mark, t_mark.name);
+    }
+  type = strhash_get(type_hash, type_name);
+  if (type==NULL && forcenew)
+    {
+      len = strlen(type_name);
+      type = gc_base_malloc (gc_ctx, sizeof(type_t) + len+1);
+      strcpy (((char *)type)+sizeof(type_t), type_name);
+      type->name = ((char *)type)+sizeof(type_t);
+      type->tag = tag;
+      strhash_add(gc_ctx, type_hash, type, type->name);
+    }
+  return type;
+}
+
+static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_bin_t *n = (node_expr_bin_t *)myself;
+  node_expr_t *l, *e;
+  char *type_name, *s, *arg_type_name;
+  size_t nargs;
+  size_t len;
+  type_t *argtype, *vartype;
+
+  type_name = BIN_LVAL(n)->stype->name;
+  if (memcmp(type_name, "db[", 3)!=0)
+    {
+      if (myself->file!=NULL)
+	fprintf (stderr, "%s:", STR(myself->file));
+      /* printing STR(myself->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: type error: database expected, got %s.\n",
+	       myself->lineno,
+	       type_name);
+      ctx->nerrors++;
+    }
+  else if (strcmp(type_name, "db[*]")==0)
+    { /* database is empty: we do not give a type to any of
+	 the logical variables */
+    }
+  else /* type is now of the form db[type1,type2,...,typen],
+	  where each typei is a single string with no [, ], or comma in it;
+       */
+    {
+      s = type_name+3;
+      nargs = 0;
+      for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(n))
+	{
+	  if (s[0]==']')
+	    {
+	      if (myself->file!=NULL)
+		fprintf (stderr, "%s:", STR(myself->file));
+	      /* printing STR(myself->file) is legal, since it
+		 was created NUL-terminated, on purpose */
+	      fprintf (stderr, "%u: too many arguments, expected %zd only.\n",
+		       myself->lineno,
+		       nargs);
+	      ctx->nerrors++;
+	      break;
+	    }
+	  s++;
+	  len = strcspn(s,",]");
+	  nargs++;
+	  arg_type_name = gc_base_malloc (ctx->gc_ctx, len+1);
+	  memcpy (arg_type_name, s, len);
+	  arg_type_name[len] = 0;
+	  argtype = type_from_string (ctx->gc_ctx, arg_type_name, 0, 0);
+	  gc_base_free (arg_type_name);
+	  e = BIN_LVAL(n);
+	  if (is_logical_variable(e))
+	    {
+	      vartype = e->stype;
+	      if (vartype==NULL)
+		{
+		  set_type (ctx, e, argtype);
+		  /* set type of logical variable to type of field */
+		}
+	      else /* logical variable already has a type */
+		if (strcmp(vartype->name, argtype->name))
+		  /* and the types are not the same: error */
+		  {
+		    if (n->file!=NULL)
+		      fprintf (stderr, "%s:", STR(n->file));
+		    /* printing STR(n->file) is legal, since it
+		       was created NUL-terminated, on purpose */
+		    fprintf (stderr, "%u: type error: logical variable %s of type %s cannot match field of type %s.\n",
+			     n->lineno,
+			     SYM_NAME(e),
+			     vartype->name, argtype->name);
+		    ctx->nerrors++;
+		  }
+	    }
+	  else
+	    {
+	      vartype = e->stype;
+	      if (vartype!=NULL && strcmp(vartype->name, argtype->name)!=0)
+		  {
+		    if (n->file!=NULL)
+		      fprintf (stderr, "%s:", STR(n->file));
+		    /* printing STR(n->file) is legal, since it
+		       was created NUL-terminated, on purpose */
+		    fprintf (stderr, "%u: type error: pattern of type %s cannot match field of type %s.\n",
+			     n->lineno,
+			     vartype->name, argtype->name);
+		    ctx->nerrors++;
+		  }
+	    }
+	  s += len;
+	}
+      if (s[0]!=']')
+	{
+	  while (s[0]!=']')
+	    {
+	      s++;
+	      len = strcspn(s,",]");
+	      nargs++;
+	      s += len;
+	    }
+	  if (myself->file!=NULL)
+	    fprintf (stderr, "%s:", STR(myself->file));
+	  /* printing STR(myself->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: too few arguments, expected %zd.\n",
+		   myself->lineno,
+		   nargs);
+	  ctx->nerrors++;
+	}
+    }
+}
+
+
+node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_expr_t *db)
+{
+  node_expr_bin_t *n;
+  node_expr_t *l, *e;
+  size_t nrecs;
+
+  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_DB_PATTERN;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_DB_PATTERN,
+		    h_cons (db, tuple->hash));
+  /* hash = '(NODE_DB_PATTERN db arg1 ... argn)' mod bigprime */
+  /* note that tuple->hash is correct, because tuples are never empty */
+  n->stype = NULL;
+  n->compute_stype = compute_stype_db_pattern;
+  n->parents = NULL;
+  n->op = -1;
+  GC_TOUCH (ctx->gc_ctx, n->lval = db);
+  GC_TOUCH (ctx->gc_ctx, n->rval = tuple);
+  GC_START(ctx->gc_ctx, 1);
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  add_parent (ctx, db, (node_expr_t *)n);
+  for (l=tuple, nrecs=1; l!=NULL; l=BIN_RVAL(l))
+    {
+      e = BIN_LVAL(l);
+      if (!is_logical_variable(e))
+	{
+	  add_parent (ctx, e, (node_expr_t *)n);
+	  nrecs++;
+	}
+    }
+  n->npending_argtypes = nrecs;
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+static void buf_puts (gc_t *gc_ctx, char *s, char **bufp, size_t *lenp, size_t *sizep)
+{
+  size_t slen, newsize;
+
+  slen = strlen(s);
+  newsize = slen+(*lenp);
+  if (newsize>=(*sizep))
+    {
+      if (newsize < (*sizep) + 128)
+	newsize = (*sizep) + 128;
+      *bufp = gc_base_realloc (gc_ctx, *bufp, newsize);
+      *sizep = newsize;
+    }
+  strcpy ((*bufp)+(*lenp), s);
+  *lenp += slen;
+}
+
+static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_mon_t *n = (node_expr_mon_t *)myself;
+  node_expr_t *tuple, *l;
+  char *buf;
+  size_t len, bufsize;
+  char *delim;
+  type_t *t;
+
+  tuple = MON_VAL(n);
+  bufsize = 128;
+  len = 0;
+  buf_puts (ctx->gc_ctx, "db[", &buf, &len, &bufsize);
+  delim = "";
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      buf_puts (ctx->gc_ctx, delim, &buf, &len, &bufsize);
+      delim = ",";
+      buf_puts (ctx->gc_ctx, BIN_LVAL(l)->stype->name, &buf, &len, &bufsize);
+    }
+  buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
+  t = type_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
+  gc_base_free (buf);
+  set_type (ctx, (node_expr_t *)n, t);
+}
+
+node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
+{
+  node_expr_mon_t *n;
+  node_expr_t *l;
+  size_t nrecs;
+
+  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t), &node_expr_mon_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_DB_SINGLETON;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_DB_SINGLETON,
+		    ((tuple==NULL)?H_NULL:tuple->hash));
+  /* hash = '(NODE_DB_SINGLETON arg1 ... argn)' mod bigprime
+     where tuple = (arg1 ... argn) */
+  /* note that tuple->hash is correct, because tuples are never empty */
+  n->stype = NULL;
+  n->compute_stype = compute_stype_db_singleton;
+  n->parents = NULL;
+  n->op = -1;
+  GC_TOUCH (ctx->gc_ctx, n->val = tuple);
+  GC_START(ctx->gc_ctx, 1);
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  nrecs = 0;
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
+      nrecs++;
+    }
+  n->npending_argtypes = nrecs; /* not 0 because tuples are non-empty */
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_bin_t *n = (node_expr_bin_t *)myself;
+  node_expr_t *tuple, *l;
+  char *buf;
+  size_t len, bufsize;
+  char *delim;
+  type_t *t;
+
+  tuple = BIN_LVAL(n);
+  bufsize = 128;
+  len = 0;
+  buf_puts (ctx->gc_ctx, "db[", &buf, &len, &bufsize);
+  delim = "";
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      buf_puts (ctx->gc_ctx, delim, &buf, &len, &bufsize);
+      delim = ",";
+      buf_puts (ctx->gc_ctx, BIN_LVAL(l)->stype->name, &buf, &len, &bufsize);
+    }
+  buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
+  t = type_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
+  gc_base_free (buf);
+  set_type (ctx, (node_expr_t *)n, t);
+}
+
+
+node_expr_t *build_db_collect(rule_compiler_t *ctx, node_expr_t *tuple,
+			      node_expr_t *patterns)
+{
+  node_expr_bin_t *n;
+  node_expr_t *l;
+  size_t nrecs;
+
+  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_DB_COLLECT;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_DB_COLLECT,
+		    h_cons (tuple, (patterns==NULL)?H_NULL:patterns->hash));
+  /* hash = '(NODE_DB_COLLECT tuple pat1 ... patn)' mod bigprime */
+  /* note that tuple->hash is correct, because tuples are never empty */
+  n->stype = NULL;
+  n->compute_stype = compute_stype_db_collect;
+  n->parents = NULL;
+  n->op = -1;
+  GC_TOUCH (ctx->gc_ctx, n->lval = tuple);
+  GC_TOUCH (ctx->gc_ctx, n->rval = patterns);
+  GC_START(ctx->gc_ctx, 1);
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  nrecs = 0;
+  for (l=patterns; l!=NULL; l=BIN_RVAL(l))
+    {
+      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
+      nrecs++;
+    }
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
+      nrecs++;
+    }
+  n->npending_argtypes = nrecs; /* not 0 because tuples are non-empty */
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
 }
@@ -4272,8 +5011,7 @@ static unsigned long objhash_rule_instance(void *state_inst)
 }
 
 
-static int
-objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
+static int objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
 {
   state_instance_t *si1;
   state_instance_t *si2;
@@ -4298,18 +5036,79 @@ objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
     var2 = ovm_read_value (si2->env, sync_var);
 
     /* call comparison functions */
-    ret = issdl_cmp(var1, var2);
-    if (ret) {
-      DebugLog(DF_ENG, DS_INFO, "si1=%p %c si2=%p\n",
-               si1, ret > 0 ? '>' : '<', si2);
-      return ret;
-    }
+    ret = issdl_cmp (var1, var2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+    if (CMP_LESS(ret))
+      {
+	DebugLog(DF_ENG, DS_INFO, "si1=%p < si2=%p\n", si1, si2);
+	return -1;
+      }
+    if (CMP_GREATER(ret))
+      {
+	DebugLog(DF_ENG, DS_INFO, "si1=%p > si2=%p\n", si1, si2);
+	return 1;
+      }
+    /* the case CMP_INCOMPARABLE(ret) should not happen,
+       because of typing; so, if we are here, this is because var1==var2
+    */
   }
 
   /* If we are here, the two state instances are synchronized */
   DebugLog(DF_ENG, DS_INFO, "si1=%p == si2=%p\n", si1, si2);
 
   return 0;
+}
+
+static int get_and_check_syncvar (rule_compiler_t *ctx,
+				  node_rule_t *node_rule,
+				  char *varname)
+{
+  node_expr_t *sync_var;
+  type_t *t;
+
+  sync_var = strhash_get (ctx->rule_env, varname);
+  if (sync_var==NULL)
+    {
+      if (node_rule->file!=NULL)
+	fprintf (stderr, "%s:", STR(node_rule->file));
+      /* printing STR(node_rule->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: synchronization variable %s not mentioned in rule %s.\n",
+	       node_rule->line, varname, node_rule->name);
+      ctx->nerrors++;
+      return -1;
+    }
+  t = sync_var->stype;
+  if (t==NULL)
+    {
+      if (node_rule->file!=NULL)
+	fprintf (stderr, "%s:", STR(node_rule->file));
+      /* printing STR(node_rule->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: synchronization variable %s never assigned to in rule %s.\n",
+	       node_rule->line, varname, node_rule->name);
+      ctx->nerrors++;
+      return SYM_RES_ID(sync_var);
+    }
+  if (strcmp (t->name, "int") &&
+      strcmp (t->name, "uint") &&
+      strcmp (t->name, "str") &&
+      strcmp (t->name, "bstr") &&
+      strcmp (t->name, "ipv4") &&
+      strcmp (t->name, "ipb6") &&
+      strcmp (t->name, "float") &&
+      strcmp (t->name, "ctime") &&
+      strcmp (t->name, "timeval") &&
+      strcmp (t->name, "snmpoid"))
+    {
+      if (node_rule->file!=NULL)
+	fprintf (stderr, "%s:", STR(node_rule->file));
+      /* printing STR(node_rule->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: type error: synchronization variable %s:%s does not have a basic type.\n",
+	       node_rule->line, varname, t->name);
+      ctx->nerrors++;
+    }
+  return SYM_RES_ID(sync_var);
 }
 
 /*!!!*/
@@ -4481,7 +5280,6 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   size_t  s, t, m, n;
   int32_t tid;
   struct stat filestat;
-  node_expr_t *sync_var;
   node_expr_t *l;
 
   DebugLog(DF_OLC, DS_INFO,
@@ -4565,20 +5363,9 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 					rule->sync_vars_sz * sizeof (int32_t));
       for (s = 0; s < rule->sync_vars_sz; s++)
 	{
-	  sync_var = strhash_get(ctx->rule_env,
-				 node_rule->sync_vars->vars[s]);
-	  if (sync_var == NULL)
-	    {
-	      DebugLog(DF_OLC, DS_ERROR,
-		       "Unknown reference to variable %s\n",
-		       node_rule->sync_vars->vars[s]);
-	      exit(EXIT_FAILURE);
-	    }
-	  DebugLog(DF_OLC, DS_INFO,
-		   "Found syncvar $%s resid=%i\n",
-		   node_rule->sync_vars->vars[s],
-		   SYM_RES_ID(sync_var));
-	  rule->sync_vars[s] = SYM_RES_ID(sync_var);
+	  rule->sync_vars[s] =
+	    get_and_check_syncvar (ctx, node_rule,
+				   node_rule->sync_vars->vars[s]);
 	}
       rule->sync_lock = new_objhash (ctx->gc_ctx, 1021);
       rule->sync_lock->hash = objhash_rule_instance;
@@ -4720,6 +5507,9 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
       code.used_fields_sz = 0;
       code.flags = 0;
       code.ctx = ctx;
+      code.stack_level = 0;
+      code.logicals_size = 0;
+      code.logicals = NULL;
 
       INIT_LABELS(ctx, code.labels);
 
@@ -4757,7 +5547,8 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
  * @param state State to compile.
  * @return An allocated byte code buffer.
  **/
-static void compile_actions_bytecode(node_expr_t *actionlist, bytecode_buffer_t *code)
+static void compile_actions_bytecode(node_expr_t *actionlist,
+				     bytecode_buffer_t *code)
 {
   for (; actionlist!=NULL; actionlist=BIN_RVAL(actionlist))
     compile_bytecode_stmt(BIN_LVAL(actionlist), code);
@@ -4788,6 +5579,9 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
   code.used_fields_sz = 0;
   code.flags = 0;
   code.ctx = ctx;
+  code.stack_level = 0;
+  code.logicals_size = 0;
+  code.logicals = NULL;
 
   INIT_LABELS(ctx, code.labels);
 
@@ -4836,24 +5630,29 @@ static void compile_bytecode_stmt(node_expr_t *expr,
       EXIT_IF_BYTECODE_BUFF_FULL(2);
       code->bytecode[ code->pos++ ] = OP_POP;
       code->bytecode[ code->pos++ ] = SYM_RES_ID(BIN_LVAL(expr));
+      code->stack_level--;
       break;
 
     case NODE_BINOP:
       /* No: binops are expressions that return values, so
 	 the following old code is wrong.
-      compile_bytecode_stmt(expr->bin.lval, code);
-      compile_bytecode_stmt(expr->bin.rval, code);
+      compile_bytecode_stmt(gc_ctx, expr->bin.lval, code);
+      compile_bytecode_stmt(gc_ctx, expr->bin.rval, code);
       code->bytecode[ code->pos++ ] = expr->bin.op;
       break;
       */
       /*FALLTHROUGH*/
   case NODE_MONOP: /*FALLTHROUGH*/
   case NODE_EVENT: /*FALLTHROUGH*/
+  case NODE_DB_PATTERN: /*FALLTHROUGH*/
+  case NODE_DB_COLLECT: /*FALLTHROUGH*/
+  case NODE_DB_SINGLETON: /*FALLTHROUGH*/
   case NODE_CALL:
       compile_bytecode_expr(expr, code);
       EXIT_IF_BYTECODE_BUFF_FULL(1);
       /* Trash the function result */
       code->bytecode[ code->pos++ ] = OP_TRASH;
+      code->stack_level--;
       break;
 
   case NODE_COND:
@@ -4874,7 +5673,9 @@ static void compile_bytecode_stmt(node_expr_t *expr,
       /* size of a regsplit compiled code:
 	 2 PUSHSTATIC 1 REGSPLIT n POPs
 	 = 3 + 2n */
-      n = REGSPLIT_DEST_VARS(expr)->vars_nb;
+      if (REGSPLIT_DEST_VARS(expr)!=NULL)
+	n = REGSPLIT_DEST_VARS(expr)->vars_nb;
+      else n = 0;
       EXIT_IF_BYTECODE_BUFF_FULL(3 + 2 * n);
       
       /* XXX actually, split string can only be in static env */
@@ -4890,6 +5691,7 @@ static void compile_bytecode_stmt(node_expr_t *expr,
 	  code->bytecode[ code->pos++ ] = OP_POP;
 	  code->bytecode[ code->pos++ ] = SYM_RES_ID(REGSPLIT_DEST_VARS(expr)->vars[i]);
 	}
+      code->stack_level--;
       break;
     }
     
@@ -4898,18 +5700,29 @@ static void compile_bytecode_stmt(node_expr_t *expr,
       int label_then = NEW_LABEL(code->labels);
       int label_else = NEW_LABEL(code->labels);
       int label_end = NEW_LABEL(code->labels);
+      int save_stack_level;
 
+      save_stack_level = code->stack_level;
       compile_bytecode_cond(IF_COND(expr), code,
 			    label_then, label_else);
+      /* now compile then branch;
+	 first set label_then to here */
       SET_LABEL (code->ctx, code->labels,  code->pos, label_then);
+      code->stack_level = save_stack_level;
       compile_actions_bytecode(IF_THEN(expr), code);
       EXIT_IF_BYTECODE_BUFF_FULL(2);
       code->bytecode[ code->pos++ ] = OP_JMP;
       PUT_LABEL (code->ctx, code->labels, code, label_end);
-
+      /* now compile else branch;
+	 set label_else to here
+	 and do not forget to reinstall stack_level
+      */
       SET_LABEL (code->ctx, code->labels, code->pos, label_else);
+      code->stack_level = save_stack_level;
       compile_actions_bytecode(IF_ELSE(expr), code);
       SET_LABEL (code->ctx, code->labels, code->pos, label_end);
+      /* finally, proceed: reinstall old stack level first */
+      code->stack_level = save_stack_level;
       break;
     }
   case NODE_UNKNOWN:
@@ -4919,10 +5732,11 @@ static void compile_bytecode_stmt(node_expr_t *expr,
     // XXX Should discard expression with no side effect
 #if 0
     DPRINTF( ("Rule compiler expr : should be discarded %i\n", expr->type) );
-    compile_bytecode_expr(expr, code);
+    compile_bytecode_expr(gc_ctx, expr, code);
     EXIT_IF_BYTECODE_BUFF_FULL(1);
     /* Trash the result */
     code->bytecode[ code->pos++ ] = OP_TRASH;
+    code->stack_level--;
 #endif
     break;
   default:
@@ -4930,6 +5744,224 @@ static void compile_bytecode_stmt(node_expr_t *expr,
     /* No side effect, discard stmt */
     break;
   }
+}
+
+static int nlogicals_in_tuple (node_expr_t *tuple)
+{
+  int maxvar=0;
+  int var;
+
+  for (; tuple!=NULL; tuple=BIN_RVAL(tuple))
+    {
+      if (is_logical_variable(BIN_LVAL(tuple)))
+	{
+	  var = SYM_RES_ID(BIN_LVAL(tuple));
+	  if (var>=maxvar)
+	    maxvar = var+1;
+	}
+    }
+  return maxvar;
+}
+
+static int nlogicals_in_db_patterns(node_expr_t *patterns)
+{
+  int maxvar=0;
+  int var;
+
+  for (; patterns!=NULL; patterns = BIN_RVAL(patterns))
+    {
+      var = nlogicals_in_tuple(BIN_RVAL(BIN_LVAL(patterns)));
+      if (var>maxvar)
+	maxvar = var;
+    }
+  return maxvar;
+}
+
+
+static void compile_bytecode_db_filter (int nvars,
+					node_expr_t *pattern,
+					bytecode_buffer_t *code,
+					int *varpos,
+					int *n)
+  /* (possibly) compile an OP_DB_FILTER opcode
+   ==> filtered-db
+  */
+{
+  int i, nfields, nconsts, nfields_res;
+  node_expr_t *l;
+  int *pos; /* will map (logical) variable numbers to field positions */
+  int var;
+  db_var_or_cst *vals;
+
+  compile_bytecode_expr (BIN_LVAL(pattern), code);
+  pos = gc_base_malloc (code->ctx->gc_ctx, nvars*sizeof(int));
+  for (i=0; i<nvars; i++)
+    varpos[i] = pos[i] = -1;
+  nfields_res = 0;
+  nconsts = 0;
+  nfields = list_len(BIN_RVAL(pattern));
+  EXIT_IF_BYTECODE_BUFF_FULL(4+nfields);
+  vals = &code->bytecode[code->pos+4];
+  for (l=BIN_RVAL(pattern), i=0; l!=NULL; l=BIN_RVAL(l), i++)
+    {
+      if (is_logical_variable(BIN_LVAL(l)))
+	{
+	  var = SYM_RES_ID(BIN_LVAL(l));
+	  if (pos[var] < 0)
+	    {
+	      vals[i] = DB_VAR_NONE; /* no condition on this field */
+	      pos[var] = i;
+	      varpos[var] = nfields_res++;
+	    }
+	  else
+	    {
+	      vals[i] = DB_MAKE_VAR(pos[var]); /* must match field number
+						  pos[var], a strictly
+						  lower field number */
+	    }
+	}
+      else /* must evaluate pattern argument, which will be compared
+	      against current field, literally */
+	{
+	  compile_bytecode_expr (BIN_LVAL(l), code);
+	  nconsts++;
+	}
+    }
+  gc_base_free (pos);
+  if (nfields==nfields_res) /* then no filtering really has to take
+			       place, so we don't compile the
+			       OP_DB_FILTER opcode after all */
+    ;
+  else
+    {
+      code->bytecode[code->pos++] = OP_DB_FILTER;
+      code->bytecode[code->pos++] = (bytecode_t)nfields_res;
+      code->bytecode[code->pos++] = (bytecode_t)nfields;
+      code->bytecode[code->pos++] = (bytecode_t)nconsts;
+      code->pos += nfields;
+      code->stack_level -= nconsts;
+    }
+  *n = nfields_res;
+}
+
+static void compile_bytecode_db_patterns (int nvars,
+					  node_expr_t *patterns,
+					  bytecode_buffer_t *code,
+					  int *varpos,
+					  int *n)
+/* patterns should not be NULL here */
+{
+  int *varpos_right;
+  int i, ii, j, nfields1, nfields2;
+  db_var_or_cst *vals;
+
+  if (BIN_RVAL(patterns)==NULL)
+    {
+      compile_bytecode_db_filter (nvars, BIN_LVAL(patterns),
+				  code, varpos, n);
+    }
+  else
+    {
+      varpos_right = gc_base_malloc (code->ctx->gc_ctx, nvars*sizeof(int));
+      compile_bytecode_db_filter (nvars, BIN_LVAL(patterns),
+				  code, varpos, &nfields1);
+      compile_bytecode_db_patterns (nvars, BIN_RVAL(patterns),
+				    code, varpos_right, &nfields2);
+      EXIT_IF_BYTECODE_BUFF_FULL(3+nfields2);
+      vals = &code->bytecode[code->pos+3];
+      for (i=0; i<nfields2; i++)
+	vals[i] = DB_VAR_NONE;
+      for (i=0; i<nvars; i++)
+	{
+	  if (varpos[i] >= 0 && varpos_right[i] >= 0)
+	    vals[varpos_right[i]] = DB_MAKE_VAR(varpos[i]);
+	}
+      for (i=0, j=nfields1; i<nfields2; i++)
+	{
+	  if (vals[i]==DB_VAR_NONE)
+	    j++;
+	}
+      *n = j;
+      for (i=0; i<nvars; i++)
+	if (varpos[i] < 0 && varpos_right[i] >= 0)
+	  {
+	    for (ii=0, j=nfields1; ii<varpos_right[i]; ii++)
+	      if (vals[ii]==DB_VAR_NONE)
+		j++;
+	    varpos[i] = j;
+	  }
+      code->bytecode[code->pos++] = OP_DB_JOIN;
+      code->bytecode[code->pos++] = nfields1;
+      code->bytecode[code->pos++] = nfields2;
+      code->pos += nfields2;
+      code->stack_level--;
+      gc_base_free (varpos_right);
+    }
+}
+
+static void compile_bytecode_db_collect (node_expr_t *head,
+					 node_expr_t *patterns,
+					 bytecode_buffer_t *code)
+/* patterns is not NULL */
+{
+  int *varpos;
+  int i;
+  int nvars, nfields;
+  size_t newsz, oldsz;
+  int *old_logicals;
+  unsigned int label_end = NEW_LABEL(code->labels);
+
+  nvars = nlogicals_in_db_patterns(patterns);
+  varpos = gc_base_malloc (code->ctx->gc_ctx, nvars*sizeof(int));
+  compile_bytecode_db_patterns(nvars, patterns, code, varpos, &nfields);
+  /* XXX Test whether we are lucky, and the join we have just computed
+     is the final database, directly. */
+  EXIT_IF_BYTECODE_BUFF_FULL(3);
+  code->bytecode[code->pos++] = OP_DB_MAP;
+  PUT_LABEL (code->ctx, code->labels, code, label_end);
+  code->bytecode[code->pos++] = nfields;
+  old_logicals = code->logicals;
+  newsz = nvars;
+  oldsz = code->logicals_size;
+  if (newsz < oldsz)
+    {
+      code->logicals = gc_base_malloc (code->ctx->gc_ctx, oldsz*sizeof(int));
+      for (i=0; i<oldsz; i++)
+	code->logicals[i] = old_logicals[i];
+      newsz = oldsz;
+    }
+  else
+    {
+      code->logicals = gc_base_malloc (code->ctx->gc_ctx, newsz*sizeof(int));
+      for (i=0; i<oldsz; i++)
+	code->logicals[i] = old_logicals[i];
+      for (; i<newsz; i++)
+	code->logicals[i] = -1;
+    }
+  for (i=0; i<nvars; i++)
+    if (varpos[i] >= 0)
+      code->logicals[i] = code->stack_level + varpos[i];
+  gc_base_free(varpos);
+  compile_bytecode_expr (head, code);
+  gc_base_free(code->logicals);
+  code->logicals = old_logicals;
+  code->logicals_size = oldsz;
+  SET_LABEL (code->ctx, code->labels, code->pos, label_end);
+  /* code->stack_level += 0; */
+}
+
+static void compile_bytecode_db_singleton(node_expr_t *tuple,
+					  bytecode_buffer_t *code)
+{
+  node_expr_t *l;
+  int nfields;
+
+  for (l=tuple, nfields=0; l!=NULL; l=BIN_RVAL(l), nfields++)
+    compile_bytecode_expr (BIN_LVAL(l), code);
+  EXIT_IF_BYTECODE_BUFF_FULL(2);
+  code->bytecode[ code->pos++ ] = OP_DB_SINGLE;
+  code->bytecode[ code->pos++ ] = nfields;
+  code->stack_level -= nfields-1;
 }
 
 /**
@@ -4948,6 +5980,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       code->bytecode[ code->pos++ ] = SYM_RES_ID(BIN_LVAL(expr));
       code->bytecode[ code->pos++ ] = OP_PUSH;
       code->bytecode[ code->pos++ ] = SYM_RES_ID(BIN_LVAL(expr));
+      /*code->stack_level += 0; */
       break;
 
       /* binary operator */
@@ -4956,6 +5989,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       compile_bytecode_expr(BIN_RVAL(expr), code);
       EXIT_IF_BYTECODE_BUFF_FULL(1);
       code->bytecode[ code->pos++ ] = BIN_OP(expr);
+      code->stack_level--;
       break;
 
       /* unary operator */
@@ -4963,6 +5997,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       compile_bytecode_expr(MON_VAL(expr), code);
       EXIT_IF_BYTECODE_BUFF_FULL(1);
       code->bytecode[ code->pos++ ] = MON_OP(expr);
+      /*code->stack_level += 0; */
       break;
 
       /* meta-event */
@@ -4973,6 +6008,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	{
 	  EXIT_IF_BYTECODE_BUFF_FULL(1);
 	  code->bytecode[code->pos++] = OP_EMPTY_EVENT;
+	  code->stack_level++;
 	}
       {
 	node_expr_t *l;
@@ -4988,8 +6024,18 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	    EXIT_IF_BYTECODE_BUFF_FULL(2);
 	    code->bytecode[code->pos++] = OP_ADD_EVENT;
 	    code->bytecode[code->pos++] = (bytecode_t)res_id;
+	    code->stack_level--;
 	  }
       }
+      break;
+
+    case NODE_DB_COLLECT:
+      compile_bytecode_db_collect(BIN_LVAL(expr), BIN_RVAL(expr),
+				  code);
+      break;
+
+    case NODE_DB_SINGLETON:
+      compile_bytecode_db_singleton(MON_VAL(expr), code);
       break;
 
     case NODE_COND:
@@ -5007,6 +6053,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       SET_LABEL (code->ctx, code->labels, code->pos, label_else);
       code->bytecode[ code->pos++ ] = OP_PUSHZERO;
       SET_LABEL (code->ctx, code->labels, code->pos, label_end);
+      code->stack_level++;
       break;
     }
 
@@ -5014,6 +6061,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       EXIT_IF_BYTECODE_BUFF_FULL(2);
       code->bytecode[ code->pos++ ] = OP_PUSHFIELD;
       code->bytecode[ code->pos++ ] = SYM_RES_ID(expr);
+      code->stack_level++;
       {
 	size_t i, idx, shift;
 	size_t n;
@@ -5036,21 +6084,36 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       break;
 
     case NODE_VARIABLE:
-      EXIT_IF_BYTECODE_BUFF_FULL(2);
-      code->bytecode[ code->pos++ ] = OP_PUSH;
-      code->bytecode[ code->pos++ ] = SYM_RES_ID(expr);
+      if (SYM_RES_ID(expr)<code->logicals_size &&
+	  code->logicals[SYM_RES_ID(expr)]>=0)
+	{ /* logical variable: already somewhere on the stack */
+	  EXIT_IF_BYTECODE_BUFF_FULL(2);
+	  code->bytecode[ code->pos++ ] = OP_DUP;
+	  code->bytecode[ code->pos++ ] =
+	    code->stack_level - code->logicals[SYM_RES_ID(expr)];
+	}
+      else
+	{
+	  EXIT_IF_BYTECODE_BUFF_FULL(2);
+	  code->bytecode[ code->pos++ ] = OP_PUSH;
+	  code->bytecode[ code->pos++ ] = SYM_RES_ID(expr);
+	}
+      code->stack_level++;
       break;
 
     case NODE_CONST:
       EXIT_IF_BYTECODE_BUFF_FULL(2);
       code->bytecode[ code->pos++ ] = OP_PUSHSTATIC;
       code->bytecode[ code->pos++ ] = TERM_RES_ID(expr);
+      code->stack_level++;
       break;
 
     case NODE_CALL:
       {
 	node_expr_t *params;
+	int save_stack_level;
 
+	save_stack_level = code->stack_level;
 	for (params = CALL_PARAMS(expr); params!=NULL;
 	     params = BIN_RVAL(params))
 	  compile_bytecode_expr(BIN_LVAL(params), code);
@@ -5058,17 +6121,19 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	  if (expr->call.paramlist)
 	  if (expr->call.paramlist->params_nb)
           for (i = expr->call.paramlist->params_nb - 1; i >= 0; --i)
-	  compile_bytecode_expr(expr->call.paramlist->params[i], code);
+	  compile_bytecode_expr(gc_ctx, expr->call.paramlist->params[i], code);
 	*/
 	EXIT_IF_BYTECODE_BUFF_FULL(2);
 	code->bytecode[ code->pos++ ] = OP_CALL;
 	code->bytecode[ code->pos++ ] = CALL_RES_ID(expr);
+	code->stack_level = save_stack_level+1;
 	break;
       }
     case NODE_REGSPLIT:
     case NODE_IFSTMT:
       DPRINTF( ("Rule compiler expr : statement encountered (%i)\n", expr->type) );
       break;
+    case NODE_DB_PATTERN: /*should not happen */
     default:
       DPRINTF( ("unknown node type (%i)\n", expr->type) );
   }
@@ -5108,6 +6173,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	  PUT_LABEL (code->ctx, code->labels, code, label_then);
 	  code->bytecode[ code->pos++ ] = OP_JMP;
 	  PUT_LABEL (code->ctx, code->labels, code, label_else);
+	  code->stack_level -= 2;
 	  return;
 	case ANDAND:
 	  {
@@ -5140,6 +6206,9 @@ static void compile_bytecode_cond(node_expr_t *expr,
     case NODE_BINOP:
     case NODE_MONOP:
     case NODE_EVENT:
+    case NODE_DB_PATTERN:
+    case NODE_DB_COLLECT:
+    case NODE_DB_SINGLETON:
     case NODE_CALL:
     case NODE_REGSPLIT:
     case NODE_FIELD:
@@ -5152,6 +6221,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
       PUT_LABEL (code->ctx, code->labels, code, label_then);
       code->bytecode[ code->pos++ ] = OP_JMP;
       PUT_LABEL (code->ctx, code->labels, code, label_else);
+      code->stack_level--;
       return;
     case NODE_IFSTMT:
     case NODE_UNKNOWN:
@@ -5365,6 +6435,16 @@ static void fprintf_term_expr(FILE *fp, node_expr_t *expr)
     }
 }
 
+static void fprintf_tuple(FILE *fp, node_expr_t *expr)
+{
+  int i;
+
+  for (i=1; expr!=NULL; expr=BIN_RVAL(expr), i++)
+    {
+      fprintf (fp, "    %d. ", i);
+      fprintf_expr (fp, BIN_LVAL(expr));
+    }
+}
 
 void fprintf_expr(FILE *fp, node_expr_t *expr)
 {
@@ -5418,6 +6498,28 @@ void fprintf_expr(FILE *fp, node_expr_t *expr)
 		    SYM_NAME(field_name), SYM_RES_ID(field_name));
 	  }
       }
+      break;
+    case NODE_DB_COLLECT:
+      {
+	node_expr_t *l;
+	node_expr_t *pat;
+
+	for (l=BIN_RVAL(expr); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    fputs ("for [", fp);
+	    pat = BIN_LVAL(l);
+	    fprintf_tuple (fp, BIN_RVAL(pat));
+	    fputs ("    ] in ", fp);
+	    fprintf_expr (fp, BIN_LVAL(pat));
+	  }
+	fputs ("collect ", fp);
+	fprintf_expr (fp, BIN_LVAL(expr));
+      }
+      break;
+    case NODE_DB_SINGLETON:
+      fputs ("db_singleton ", fp);
+      fprintf_tuple (fp, MON_VAL(expr));
+      break;
     default:
       fprintf_term_expr(fp, expr);
       break;

@@ -64,7 +64,7 @@
 ** () OP_ALENGTH [] ..., a => ..., array_length
 ** returns the array a length on the stack. (may be implemented as a OP_CALL)
 **
-** () OP_CALL [p] ..., argn, ..., arg2, arg1 => ..., retval
+** () OP_CALL [p] ..., arg1, arg2, ..., argn => ..., retval
 ** call the p-th procedure. procedure implementation should only have a
 ** reference of the current stack.
 **
@@ -297,12 +297,58 @@
  **/
 #define OP_ADD_EVENT 36
 
-/* XXX Add Past Instruction */
+/**
+ * Filter a database db by equality and constant fields
+ * OP_DB_FILTER [nfields_res] [nfields] [nconsts] [vals[0] ... vals[nfields-1]]
+ * db, cst[0], ..., cst[nconsts-1] ==> new-db
+ **/
+#define OP_DB_FILTER 37
+
+/**
+ * Join two databases
+ * OP_DB_JOIN [nfields1] [nfields2] [vals[0] ... vals[nfields2-1]]
+ *  db1, db2 ==> new-db
+ **/
+#define OP_DB_JOIN 38
+
+/**
+ * Project a database onto subfields, possibly adding constant fields
+ * OP_DB_PROJ [nfields_res] [nconsts] [vals[0] ... vals[nfields_res-1]]
+ * db, cst[0], ..., cst[nconsts-1] ==> new-db
+ **/
+#define OP_DB_PROJ 39
+
+/**
+ * Take a union of databases indexed by another one
+ * OP_DB_MAP [offset] [nfields]
+ * followed by some OP_END terminated bytecode sequence (with the effect
+ * ... val1, ..., valn => ..., dbb
+ * where n==nfields)
+ * will have the effect:
+ * ..., db => ..., db'
+ * where db' is the union of all the databases dbb, when
+ * the tuple val1, ..., valn ranges over the database db;
+ * then proceeds offset places later inside the bytecode (just like OP_JMP)
+ **/
+#define OP_DB_MAP 40
+
+
+/**
+ * Create a database with a single tuple
+ * OP_DB_SINGLE [nconsts]
+ * cst[0], ..., cst[nconsts-1] ==> new-db
+ **/
+#define OP_DB_SINGLE 41
+
+/**
+ * Copy a value already on the stack
+ **/
+#define OP_DUP 42
 
 /**
  ** Number of total opcodes.
  **/
-#define OPCODE_NUM 37
+#define OPCODE_NUM 43
 
 #endif /* OVM_H */
 

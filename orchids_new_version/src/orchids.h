@@ -748,6 +748,9 @@ struct type_heap_s; /* defined in rule_compiler.h */
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
+/**   @var rule_compiler_s::type_stack
+ **     Stack of nodes whose type we do not know yet
+ **/
 struct rule_compiler_s
 {
   gc_header_t       gc;
@@ -781,7 +784,7 @@ struct rule_compiler_s
   rule_t           *first_rule;
   rule_t           *last_rule;
   /* Type-checking: */
-  struct type_heap_s *type_stack; /* stack of nodes whose type we now know */
+  struct type_heap_s *type_stack;
   int nerrors;
 };
 
@@ -1781,6 +1784,53 @@ char *time_convert(char *str, char *end, struct timeval *tv);
 char *orchids_atoi (char *str, size_t len, long *result);
 char *orchids_atoui (char *str, size_t len, unsigned long *result);
 char *orchids_atof (char *str, size_t len, double *result);
+
+/* In db.c: */
+void db_init (gc_t *gc_ctx);
+
+struct db_map;
+typedef struct db_map db_map;
+db_map *db_union (gc_t *gc_ctx, int nfields, db_map *m1, db_map *m2);
+db_map *db_diff (gc_t *gc_ctx, int nfields, db_map *m1, db_map *m2);
+int db_included (int nfields, db_map *m1, db_map *m2);
+
+/* slightly slower functions, not requiring an nfields argument: */
+db_map *db_union_lazy (gc_t *gc_ctx, db_map *m1, db_map *m2);
+db_map *db_diff_lazy (gc_t *gc_ctx, db_map *m1, db_map *m2);
+int db_included_lazy (db_map *m1, db_map *m2);
+
+unsigned long issdl_hash (ovm_var_t *var);
+
+struct db_proj_spec;
+db_map *db_proj (gc_t *gc_ctx, struct db_proj_spec *spec, db_map *m);
+
+struct db_filter_spec;
+db_map *db_filter (gc_t *gc_ctx, struct db_filter_spec *spec, db_map *m);
+
+struct db_join_spec;
+db_map *db_join (gc_t *gc_ctx, struct db_join_spec *spec,
+		 db_map *m1, db_map *m2);
+
+db_map *db_empty (gc_t *gc_ctx);
+db_map *db_singleton (gc_t *gc_ctx, ovm_var_t **tuple, int nfields);
+
+int db_sweep (gc_t *gc_ctx, int nfields, db_map *m,
+	      int (*do_sweep) (gc_t *gc_ctx, int nfields, db_map *singleton, void *data),
+	      void *data);
+db_map *db_collect (gc_t *gc_ctx, int nfields_res, int nfields, db_map *m,
+		    db_map *(*do_collect) (gc_t *gc_ctx, int nfields_res, int nfields,
+					   db_map *singleton, void *data),
+		    void *data);
+db_map *db_collect_lazy (gc_t *gc_ctx, int nfields_res, db_map *m,
+			 db_map *(*do_collect) (gc_t *gc_ctx,
+						int nfields_res,
+						int nfields,
+						db_map *singleton,
+						void *data),
+			 void *data);
+void *db_transitive_closure (gc_t *gc_ctx, int nfields, int nio,
+			     unsigned long *inp_fields, unsigned long *out_fields,
+			     db_map *m);
 
 /* In mod_utils.c */
 char *orchids_atoui_hex (char *s, char *end, unsigned long *ip);

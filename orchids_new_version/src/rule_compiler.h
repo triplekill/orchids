@@ -37,6 +37,9 @@
 #define NODE_COND     10
 #define NODE_CONS     11
 #define NODE_EVENT    12
+#define NODE_DB_PATTERN 13
+#define NODE_DB_COLLECT 14
+#define NODE_DB_SINGLETON 15
 
 #define EXIT_IF_BYTECODE_BUFF_FULL(x)		\
   do { \
@@ -620,6 +623,13 @@ typedef struct	labels_s {
 /**   @var bytecode_buffer_s::used_fields
  **     Used field bit array.
  **/
+/**   @var bytecode_buffer_s::stack_level
+ **     Current stack depth
+ **/
+/**   @var bytecode_buffer_s::logicals
+ **     Resizable array, mapping each (logical) variable to the
+ **     offset at which it can be found in the stack, or -1 if not
+ **/
 
 #define BYTECODE_BUF_SZ 16384
 #define MAX_FIELD_SZ 256
@@ -632,6 +642,9 @@ struct bytecode_buffer_s
   int used_fields[MAX_FIELD_SZ];
   unsigned long flags;
   labels_t	labels;
+  int stack_level;
+  size_t logicals_size;
+  int *logicals;
   rule_compiler_t *ctx;
 };
 
@@ -886,7 +899,15 @@ node_expr_t *
 build_string(rule_compiler_t *ctx, char *str);
 
 /**
+ * Build a db_nothing expression node.
+ * @param ctx Rule compiler context.
+ * @return A new allocated integer expression node.
+ **/
+node_expr_t *build_db_nothing(rule_compiler_t *ctx);
+
+/**
  * Build an event expression node.
+ * @param ctx Rule compiler context.
  * @param op The operator identifier.
  * @param left_node The expression to add fields to, or NULL
  * @param right_node The NODE_CONS based list of OP_ADD_EVENT binop nodes
@@ -894,6 +915,29 @@ build_string(rule_compiler_t *ctx, char *str);
  **/
 node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
 			      node_expr_t *left_node, node_expr_t *right_node);
+
+/**
+ * Build a database pattern specification node.
+ * @param ctx Rule compiler context.
+ * @param tuple The linked list of all tuple arguments
+ * @param db The expression that denotes the database we must sweep through
+ **/
+node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_expr_t *db);
+
+/**
+ * Build a database comprehension expression.
+ * @param ctx Rule compiler context.
+ * @param expr The expression denoting databases whose union we will finally take
+ * @param patterns The db_patterns describing the comprehension
+ **/
+node_expr_t *build_db_collect(rule_compiler_t *ctx, node_expr_t *expr, node_expr_t *patterns);
+
+/**
+ * Build a singleton expression
+ * @param ctx Rule compiler context.
+ * @param tuple The linked list of all tuple arguments
+ **/
+node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple);
 
 /**
  * Create a sub-state name for nested anonymous states.

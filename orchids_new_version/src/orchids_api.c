@@ -837,7 +837,10 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
     {
       /* Check for conditional dissectors */
       DebugLog(DF_CORE, DS_DEBUG, "Resolve conditional dissector\n");
-      /* XXX: Fix this / check if event is present */
+      /* XXX: Fix this / check if event is present
+       JGL: should be corrected now, since typing checks whether
+       plugged modules fit with each other now
+      */
       cond_dissect = hash_get(sender->sub_dissectors,
 			      issdl_get_data(event->next->value),
 			      issdl_get_data_len(event->next->value));
