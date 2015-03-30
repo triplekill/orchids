@@ -53,8 +53,11 @@
 #define T_FLOAT           16
 #define T_EVENT           17
 #define T_STATE_INSTANCE  18
+#define T_DB_EMPTY        19
+#define T_DB_MAP          20
+#define T_DB_SINGLETON    21
 
-#define T_EXTERNAL	  19
+#define T_EXTERNAL	  22
 
 
 /* ToDo -- coming soon */
@@ -70,6 +73,8 @@
 /* T_SPLIT is for environments; see env_split_t in orchids.h */
 #define T_HEAP 253
 /* T_HEAP is for skew heaps, as used in register_rtaction() and others in evt_mgr.c */
+#define T_DB_SMALL_TABLE 252
+/* T_DB_SMALL_TABLE is for collision lists (db_small_table) in databases, see db.c */
 
 /* Types, for the type checker.
    Not to be confused with the run-time type tags T_*
@@ -83,7 +88,7 @@ struct type_s {
 extern type_t t_int, t_uint, t_float,
   t_bstr, t_str, t_ctime, t_timeval, t_ipv4, t_ipv6,
   t_regex, t_snmpoid, t_event, t_mark,
-  t_any;
+  t_db_empty, t_any;
 
 #define STR_PAD_LEN 4
 
@@ -147,7 +152,7 @@ struct ovm_var_s
 typedef void *(*issdl_getdata_t)(ovm_var_t *data);
 typedef size_t (*issdl_getdata_len_t)(ovm_var_t *data);
 
-typedef int (*var_cmp_t)(ovm_var_t *var1, ovm_var_t *var2);
+typedef int (*var_cmp_t)(ovm_var_t *var1, ovm_var_t *var2, int dir);
 typedef ovm_var_t *(*var_add_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_sub_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_opp_t)(gc_t *gc_ctx, ovm_var_t *var);
@@ -616,12 +621,35 @@ issdl_test(ovm_var_t *var);
  ** otherwise).
  ** @param var1  The first variable to compare.
  ** @param var2  The second variable to compare.
- ** @return      An integer equal to 0 if var1 is equal to var2, less than
- **              0 if var1 is less than var2, or greater than 0 if var1 is
- **              greater than var2.
+ ** @param dir   A flag
+ ** @return      An integer:
+ **              If dir & CMP_LEQ_MASK, result has CMP_LEQ_MASK set
+ **              iff var1<=var2, unset otherwise (i.e., unset if var1>var2
+ **              on totally ordered types;
+ **              databases are *not* totally ordered)
+ **              If dir & CMP_GEQ_MASK, result has CMP_GEQ_MASK set
+ **              iff var1>=var2, unset otherwise (same comment as above).
+ **              In particular, if dir==CMP_LEQ_MASK | CMP_GEQ_MASK,
+ **              you will get CMP_LEQ_MASK if var1<var2,
+ **              CMP_GEQ_MASK if var1>var2,
+ **              CMP_LEQ_MASK | CMP_GEQ_MASK if var1==var2,
+ **              0 if var1 and var2 are incomparable (including cases of
+ **              type error).
  **/
-int
-issdl_cmp(ovm_var_t *var1, ovm_var_t *var2);
+#define CMP_LEQ_MASK 0x2
+#define CMP_GEQ_MASK 0x1
+#define CMP_LT CMP_LEQ_MASK
+#define CMP_GT CMP_GEQ_MASK
+#define CMP_EQ (CMP_LEQ_MASK | CMP_GEQ_MASK)
+#define CMP_ERROR (0)
+#define CMP_EQUAL(res) ((res)==(CMP_LEQ_MASK | CMP_GEQ_MASK))
+#define CMP_DIFFERENT(res) (!CMP_EQUAL(res))
+#define CMP_LEQ(res) (((res) & CMP_LEQ_MASK) != 0)
+#define CMP_GEQ(res) (((res) & CMP_GEQ_MASK) != 0)
+#define CMP_LESS(res) ((res)==CMP_LEQ_MASK)
+#define CMP_GREATER(res) ((res)==CMP_GEQ_MASK)
+#define CMP_INCOMPARABLE(res) ((res)==0)
+int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 
 
 /**

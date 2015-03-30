@@ -38,22 +38,19 @@ static void *vstring_get_data(ovm_var_t *str);
 static size_t vstring_get_data_len(ovm_var_t *str);
 static ovm_var_t *vstr_clone(gc_t *gc_ctx, ovm_var_t *var);
 
-static void *
-regex_get_data(ovm_var_t *regex);
+static void * regex_get_data(ovm_var_t *regex);
+static size_t regex_get_data_len(ovm_var_t *regex);
 
-static size_t
-regex_get_data_len(ovm_var_t *regex);
-
-static int str_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int str_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *str_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
-static int vstr_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int vstr_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *vstr_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 static void *int_get_data(ovm_var_t *i);
 static size_t int_get_data_len(ovm_var_t *i);
 static ovm_var_t *int_clone (gc_t *gc_ctx, ovm_var_t *var);
-static int int_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int int_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *int_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *int_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *int_opp(gc_t *gc_ctx, ovm_var_t *var);
@@ -69,7 +66,7 @@ static ovm_var_t *int_not(gc_t *gc_ctx, ovm_var_t *var);
 static void *uint_get_data(ovm_var_t *i);
 static size_t uint_get_data_len(ovm_var_t *i);
 static ovm_var_t *uint_clone (gc_t *gc_ctx, ovm_var_t *var);
-static int uint_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int uint_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *uint_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_opp(gc_t *gc_ctx, ovm_var_t *var);
@@ -84,7 +81,7 @@ static ovm_var_t *uint_not(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *ipv4_get_data(ovm_var_t *addr);
 static size_t ipv4_get_data_len(ovm_var_t *addr);
-static int ipv4_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int ipv4_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *ipv4_clone(gc_t *gc_ctx, ovm_var_t *var);
 static ovm_var_t *ipv4_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ipv4_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
@@ -94,7 +91,7 @@ static ovm_var_t *ipv4_not(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *ipv6_get_data(ovm_var_t *addr);
 static size_t ipv6_get_data_len(ovm_var_t *addr);
-static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int ipv6_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *ipv6_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ipv6_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ipv6_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
@@ -104,12 +101,12 @@ static void *timeval_get_data(ovm_var_t *str);
 static size_t timeval_get_data_len(ovm_var_t *str);
 static ovm_var_t *timeval_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *timeval_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
-static int timeval_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int timeval_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *timeval_clone(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *float_get_data(ovm_var_t *i);
 static size_t float_get_data_len(ovm_var_t *i);
-static int float_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int float_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 
 static ovm_var_t *float_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *float_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
@@ -121,10 +118,14 @@ static ovm_var_t *float_clone(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *ctime_get_data(ovm_var_t *t);
 static size_t ctime_get_data_len(ovm_var_t *i);
-static int ctime_cmp(ovm_var_t *var1, ovm_var_t *var2);
+static int ctime_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
 static ovm_var_t *ctime_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ctime_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *ctime_clone(gc_t *gc_ctx, ovm_var_t *var);
+
+static int db_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir);
+static ovm_var_t *db_add (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
+static ovm_var_t *db_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 static void * extern_get_data(ovm_var_t *address);
 static size_t extern_get_data_len(ovm_var_t *address);
