@@ -2907,6 +2907,43 @@ static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
   GC_TOUCH (ctx->gc_ctx, node->parents = l);
 }
 
+static type_t *stype_join (type_t *t1, type_t *t2)
+{
+  /* NULL is bottom: */
+  if (t1==NULL)
+    return t2;
+  if (t2==NULL)
+    return t1;
+  /* if t1==t2, this is their join: */
+  if (strcmp(t1->name, t2->name)==0)
+    return t1;
+  /* "*" is top: */
+  if (strcmp(t1->name, "*")==0)
+    return t1;
+  if (strcmp(t2->name, "*")==0)
+    return t2;
+  /* database types: db[*] <= db[type1, ..., typen] */
+  if (strcmp(t1->name, "db[*]")==0 && memcmp(t2->name, "db[", 3)==0)
+    return t2;
+  if (strcmp(t2->name, "db[*]")==0 && memcmp(t1->name, "db[", 3)==0)
+    return t1;
+  return &t_any; /* error---equated with top, "*" */
+}
+
+static int stype_below_str (type_t *t, char *s)
+{
+  if (t==NULL) /* NULL is bottom */
+    return 1;
+  if (strcmp(s, "*")==0) /* "*" is top */
+    return 1;
+  if (strcmp(t->name, s)==0)
+    return 1;
+  /* database types: db[*] <= db[type1, ..., typen] */
+  if (strcmp(t->name, "db[*]")==0 && memcmp(s, "db[", 3)==0)
+    return 1;
+  return 0;
+}
+
 static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_regsplit_t *n = (node_expr_regsplit_t *)myself;
@@ -2918,7 +2955,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 
   set_type (ctx, myself, NULL);
   str = n->string;
-  if (str->stype!=NULL && strcmp(str->stype->name, "str"))
+  if (!stype_below_str(str->stype, "str"))
     {
       if (str->file!=NULL)
 	fprintf (stderr, "%s:", STR(str->file));
@@ -2961,7 +2998,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 	      /* set type of variable to type of expression */
 	    }
 	  else /* variable already has a type */
-	    if (strcmp(vartype->name, "str")) /* and the type is not str */
+	    if (!stype_below_str(vartype, "str")) /* and the type is not str */
 	      {
 		if (var->file!=NULL)
 		  fprintf (stderr, "%s:", STR(var->file));
@@ -3040,7 +3077,7 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
-  type_t *ltype, *rtype;
+  type_t *ltype, *rtype, *restype;
   char *op_name;
 
   ltype = BIN_LVAL(n)->stype;
@@ -3112,40 +3149,42 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
       /*FALLTHROUGH*/ /* all the other cases as for *, / */
     case OP_MUL:
     case OP_DIV:
-      if (strcmp(ltype->name, rtype->name))
+      restype = stype_join (ltype, rtype);
+      if (restype==&t_any)
 	goto type_error;
-      if (strcmp(ltype->name, "int") &&
-	  strcmp(ltype->name, "uint") &&
-	  strcmp(ltype->name, "float"))
+      if (strcmp(restype->name, "int") &&
+	  strcmp(restype->name, "uint") &&
+	  strcmp(restype->name, "float"))
 	goto type_error;
-      set_type (ctx, myself, ltype);
+      set_type (ctx, myself, restype);
       return;
     case OP_MOD:
-      if (strcmp(ltype->name, rtype->name))
+      restype = stype_join (ltype, rtype);
+      if (restype==&t_any)
 	goto type_error;
-      if (strcmp(ltype->name, "int") &&
-	  strcmp(ltype->name, "uint"))
+      if (strcmp(restype->name, "int") &&
+	  strcmp(restype->name, "uint"))
 	goto type_error;
       set_type (ctx, myself, ltype);
       return;
     case OP_AND:
     case OP_OR:
     case OP_XOR:
-      if (strcmp(ltype->name, "int")==0 ||
-	  strcmp(ltype->name, "uint")==0 ||
-	  strcmp(ltype->name, "ipv4")==0)
+      if (stype_below_str(ltype, "int") ||
+	  stype_below_str(ltype, "uint") ||
+	  stype_below_str(ltype, "ipv4"))
 	{
-	  if (strcmp(rtype->name, "int") &&
-	      strcmp(rtype->name, "uint") &&
-	      strcmp(rtype->name, "ipv4"))
+	  if (!stype_below_str(rtype, "int") &&
+	      !stype_below_str(rtype, "uint") &&
+	      !stype_below_str(rtype, "ipv4"))
 	    goto type_error;
 	  set_type (ctx, myself, ltype);
 	  return;
 	}
-      if (strcmp(ltype->name, "ipv6")==0 &&
-	  strcmp(rtype->name, "ipv6")==0)
+      restype = stype_join (ltype, rtype);
+      if (stype_below_str(restype, "ipv6"))
 	{
-	  set_type (ctx, myself, ltype);
+	  set_type (ctx, myself, restype);
 	  return;
 	}
       goto type_error;
@@ -3156,7 +3195,7 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 				       serves to build a pair (field, val)
 				       Do not confuse with event nodes.
 				    */
-      if (strcmp(ltype->name, rtype->name))
+      if (!stype_below_str(rtype, ltype->name))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3385,7 +3424,7 @@ node_expr_t *build_expr_action(rule_compiler_t *ctx,
 static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
-  type_t *ltype, *rtype;
+  type_t *ltype, *rtype, *restype;
   char *op_name;
 
   set_type (ctx, myself, &t_int); /* return type is boolean, whatever happens */
@@ -3401,7 +3440,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OROR:
       op_name = "||";
     bin_cond:
-      if (strcmp(ltype->name, "int") || strcmp(rtype->name, "int"))
+      if (!stype_below_str(ltype, "int") || !stype_below_str(rtype, "int"))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3414,7 +3453,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
 	}
       break;
     case BANG:
-      if (strcmp(rtype->name, "int"))
+      if (!stype_below_str(rtype, "int"))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3431,7 +3470,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CNRM:
       op_name = "!~";
     crm:
-      if (strcmp(ltype->name, "str") || strcmp(rtype->name, "regex"))
+      if (!stype_below_str(ltype, "str") || !stype_below_str(rtype, "regex"))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3452,9 +3491,9 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CNEQ:
       op_name = "!=";
     ceq:
-      if (strcmp(ltype->name, "ipv4")==0 && strcmp(rtype->name, "ipv4")==0)
+      if (stype_below_str(ltype, "ipv4")==0 && stype_below_str(rtype, "ipv4")==0)
 	break;
-      if (strcmp(ltype->name, "ipv6")==0 && strcmp(rtype->name, "ipv6")==0)
+      if (stype_below_str(ltype, "ipv6")==0 && stype_below_str(rtype, "ipv6")==0)
 	break;
       goto cgt;
     case OP_CGT:
@@ -3469,21 +3508,18 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CLE:
       op_name = "<=";
     cgt:
-      if (strcmp(ltype->name, "db[*]")==0 &&
-	  memcmp(rtype->name, "db[", 3)==0)
-	break;
-      if (strcmp(rtype->name, "db[*]")==0 &&
-	  memcmp(ltype->name, "db[", 3)==0)
-	break;
-      if (strcmp(ltype->name, rtype->name) ||
-	  (strcmp(ltype->name, "int") &&
-	   strcmp(ltype->name, "uint") &&
-	   strcmp(ltype->name, "float") &&
-	   strcmp(ltype->name, "str") &&
-	   strcmp(ltype->name, "ctime") &&
-	   strcmp(ltype->name, "timeval") &&
-	   memcmp(ltype->name, "db[", 3) /* OK for any database type as well,
-					    provided that they are equal */
+      restype = stype_join (ltype, rtype);
+      if (restype==&t_any ||
+	  (strcmp(restype->name, "int") &&
+	   strcmp(restype->name, "uint") &&
+	   strcmp(restype->name, "float") &&
+	   strcmp(restype->name, "str") &&
+	   strcmp(restype->name, "ctime") &&
+	   strcmp(restype->name, "timeval") &&
+	   memcmp(restype->name, "db[", 3) /* OK for any database type
+					      as well,
+					      provided that they are equal
+					      or one is db[*] */
 	   ))
 	{
 	  if (n->file!=NULL)
@@ -3554,8 +3590,15 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
     }
   else /* variable already has a type */
     if (strcmp(vartype->name, type->name))
-      /* and the types are not the same: error
-       note that types are compared by their name field */
+      /* if the types are not the same: error
+	 (even if type of value or of variable is "*"...
+	 otherwise we would have to update the type of the variable
+	 to the stype_join() of vartype and type,
+	 and trigger a recomputation of all the types depending
+	 on the type of the variable; this would need to change the
+	 typing system so that it could iterate more than once on
+	 each son-to-parent typing relationship);
+	 note that types are compared by their name field */
       {
 	if (n->file!=NULL)
 	  fprintf (stderr, "%s:", STR(n->file));
@@ -3630,12 +3673,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
       for (l = CALL_PARAMS(n), i=1; l!=NULL; l=BIN_RVAL(l), i++)
 	{
 	  arg = BIN_LVAL(l);
-	  if (arg->stype==NULL)
-	    // error, or null type (convertible to anything)
-	    continue;
-	  if (strcmp(sig[i]->name, "*")==0)
-	    continue; /* t_any: argument accepts any type */
-	  if (strcmp(arg->stype->name, sig[i]->name))
+	  if (!stype_below_str(arg->stype, sig[i]->name))
 	    break; // incompatible types
 	}
       if (l==NULL) /* went through to the end of the latter loop: signature
@@ -3758,13 +3796,12 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_if_t *ifn = (node_expr_if_t *)myself;
   type_t *condtype;
-  /*type_t *thentype;*/
-  /*type_t *elsetype;*/
+  /*type_t *restype, *thentype, *elsetype;*/
 
   condtype = IF_COND(ifn)->stype;
   if (condtype!=NULL)
     {
-      if (strcmp(condtype->name, "int"))
+      if (!stype_below_str(condtype, "int"))
 	{
 	  if (myself->file!=NULL)
 	    fprintf (stderr, "%s:", STR(myself->file));
@@ -3789,12 +3826,13 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 			     nodes created by add_boolean_check(). */
     {
       thentype = IF_THEN(ifn)->stype;
-      set_type (ctx, myself, thentype);
       if (IF_ELSE(ifn)!=NULL)
 	{
 	  elsetype = IF_ELSE(ifn)->stype;
-	  if (thentype!=NULL && elsetype!=NULL && strcmp(thentype->name, elsetype->name))
+	  restype = stype_join (thentype, elsetype);
+	  if (thentype!=NULL && elsetype!=NULL && restype==&t_any)
 	    {
+	      set_type (ctx, myself, NULL);
 	      if (myself->file!=NULL)
 		fprintf (stderr, "%s:", STR(myself->file));
 	      /* printing STR(myself->file) is legal, since it
@@ -3805,7 +3843,11 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 		       elsetype->name);
 	      ctx->nerrors++;
 	    }
+	  else
+	    set_type (ctx, myself, restype);
 	}
+      else
+	set_type (ctx, myself, thentype);
     }
 #endif
 }
@@ -4062,7 +4104,7 @@ static void compute_stype_event (rule_compiler_t *ctx, node_expr_t *myself)
   evt = BIN_LVAL(n);
   if (evt!=NULL)
     {
-      if (evt->stype!=NULL && strcmp(evt->stype->name, "event"))
+      if (!stype_below_str(evt->stype, "event"))
 	{
 	  if (myself->file!=NULL)
 	    fprintf (stderr, "%s:", STR(myself->file));
@@ -4121,7 +4163,7 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
   return (node_expr_t *)n;
 }
 
-static type_t *type_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
+static type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
 				 unsigned char tag)
 {
   static strhash_t *type_hash = NULL;
@@ -4158,6 +4200,28 @@ static type_t *type_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
   return type;
 }
 
+static void compute_stype_db_pattern_empty(rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_bin_t *n = (node_expr_bin_t *)myself;
+  node_expr_t *l, *e;
+  type_t *vartype;
+
+  for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(l))
+    {
+      e = BIN_LVAL(l);
+      if (is_logical_variable(e))
+	{
+	  vartype = e->stype;
+	  if (vartype==NULL) /* if logical variable does not have a type
+				yet, then set it to the bottom type;
+				this will trigger the propagation of types
+				through the expressions that contain
+				the logical variable e */
+	    set_type (ctx, e, NULL);
+	}
+    }
+}
+
 static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
@@ -4165,9 +4229,15 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
   char *type_name, *s, *arg_type_name;
   size_t nargs;
   size_t len;
-  type_t *argtype, *vartype;
+  type_t *db_type, *argtype, *vartype;
 
-  type_name = BIN_LVAL(n)->stype->name;
+  db_type = BIN_LVAL(n)->stype;
+  if (db_type==NULL)
+    {
+      compute_stype_db_pattern_empty(ctx, myself);
+      return;
+    }
+  type_name = db_type->name;
   if (memcmp(type_name, "db[", 3)!=0)
     {
       if (myself->file!=NULL)
@@ -4180,8 +4250,11 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
       ctx->nerrors++;
     }
   else if (strcmp(type_name, "db[*]")==0)
-    { /* database is empty: we do not give a type to any of
-	 the logical variables */
+    { /* database is empty: set the types of all logical variables
+	 in the pattern to NULL (bottom), and do not type-check
+	 the literal expressions to match to verify that they
+	 have basic types */
+      compute_stype_db_pattern_empty (ctx, myself);
     }
   else /* type is now of the form db[type1,type2,...,typen],
 	  where each typei is a single string with no [, ], or comma in it;
@@ -4189,7 +4262,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
     {
       s = type_name+3;
       nargs = 0;
-      for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(n))
+      for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(l))
 	{
 	  if (s[0]==']')
 	    {
@@ -4209,9 +4282,9 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	  arg_type_name = gc_base_malloc (ctx->gc_ctx, len+1);
 	  memcpy (arg_type_name, s, len);
 	  arg_type_name[len] = 0;
-	  argtype = type_from_string (ctx->gc_ctx, arg_type_name, 0, 0);
+	  argtype = stype_from_string (ctx->gc_ctx, arg_type_name, 0, 0);
 	  gc_base_free (arg_type_name);
-	  e = BIN_LVAL(n);
+	  e = BIN_LVAL(l);
 	  if (is_logical_variable(e))
 	    {
 	      vartype = e->stype;
@@ -4238,7 +4311,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	  else
 	    {
 	      vartype = e->stype;
-	      if (vartype!=NULL && strcmp(vartype->name, argtype->name)!=0)
+	      if (stype_join(vartype, argtype)==&t_any)
 		  {
 		    if (n->file!=NULL)
 		      fprintf (stderr, "%s:", STR(n->file));
@@ -4350,7 +4423,7 @@ static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *mysel
       buf_puts (ctx->gc_ctx, BIN_LVAL(l)->stype->name, &buf, &len, &bufsize);
     }
   buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
-  t = type_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
+  t = stype_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
   gc_base_free (buf);
   set_type (ctx, (node_expr_t *)n, t);
 }
@@ -4410,7 +4483,7 @@ static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
       buf_puts (ctx->gc_ctx, BIN_LVAL(l)->stype->name, &buf, &len, &bufsize);
     }
   buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
-  t = type_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
+  t = stype_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
   gc_base_free (buf);
   set_type (ctx, (node_expr_t *)n, t);
 }
@@ -5909,8 +5982,10 @@ static void compile_bytecode_db_collect (node_expr_t *head,
   int nvars, nfields;
   size_t newsz, oldsz;
   int *old_logicals;
+  int save_stack_level;
   unsigned int label_end = NEW_LABEL(code->labels);
 
+  save_stack_level = code->stack_level;
   nvars = nlogicals_in_db_patterns(patterns);
   varpos = gc_base_malloc (code->ctx->gc_ctx, nvars*sizeof(int));
   compile_bytecode_db_patterns(nvars, patterns, code, varpos, &nfields);
@@ -5943,11 +6018,13 @@ static void compile_bytecode_db_collect (node_expr_t *head,
       code->logicals[i] = code->stack_level + varpos[i];
   gc_base_free(varpos);
   compile_bytecode_expr (head, code);
+  EXIT_IF_BYTECODE_BUFF_FULL(1);
+  code->bytecode[code->pos++] = OP_END;
   gc_base_free(code->logicals);
   code->logicals = old_logicals;
   code->logicals_size = oldsz;
   SET_LABEL (code->ctx, code->labels, code->pos, label_end);
-  /* code->stack_level += 0; */
+  code->stack_level = save_stack_level+1;
 }
 
 static void compile_bytecode_db_singleton(node_expr_t *tuple,
