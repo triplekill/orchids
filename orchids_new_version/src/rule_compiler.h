@@ -40,6 +40,7 @@
 #define NODE_DB_PATTERN 13
 #define NODE_DB_COLLECT 14
 #define NODE_DB_SINGLETON 15
+#define NODE_RETURN 16
 
 #define EXIT_IF_BYTECODE_BUFF_FULL(x)		\
   do { \
@@ -73,9 +74,6 @@ typedef struct node_expr_if_s node_expr_if_t;
   type_t *stype; /* static type, used in static type checking (&t_int,	\
 		    &t_str, etc.) */					\
   void (*compute_stype) (rule_compiler_t *ctx, node_expr_t *myself);	\
-  size_t npending_argtypes; /* number of argument types we still need	\
-			       to know before we can call compute_stype	\
-			       below */					\
   node_expr_t *parents; /* list of nodes of which this node is an	\
 			   argument, for type checking */
 
@@ -806,6 +804,14 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
 			      node_expr_t *arg_node);
 
 /**
+ * Build a return expression node.
+ * @param arg_node The argument of the return expression.
+ * @return A new allocated expression node.
+ **/
+node_expr_t *build_expr_return(rule_compiler_t *ctx,
+			       node_expr_t *arg_node);
+
+/**
  * Build a cons node.
  * @param left_node The left part of the binary expression.
  * @param right_node The right part of the binary expression.
@@ -927,10 +933,16 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
 /**
  * Build a database comprehension expression.
  * @param ctx Rule compiler context.
- * @param expr The expression denoting databases whose union we will finally take
+ * @param actions The list of actions to be done for each match
+ * @param collect The expression denoting databases whose union we will finally take
+ * @param returns The list of return statements inside actions
  * @param patterns The db_patterns describing the comprehension
  **/
-node_expr_t *build_db_collect(rule_compiler_t *ctx, node_expr_t *expr, node_expr_t *patterns);
+node_expr_t *build_db_collect(rule_compiler_t *ctx,
+			      node_expr_t *actions,
+			      node_expr_t *collect,
+			      node_expr_t *returns,
+			      node_expr_t *patterns);
 
 /**
  * Build a singleton expression

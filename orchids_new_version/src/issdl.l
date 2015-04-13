@@ -97,6 +97,7 @@ static size_t qstr_sz_g;
 "in"       { return (IN);       }
 "collect"  { return (COLLECT);  }
 "nothing"  { return (NOTHING);  }
+"return"   { return (RETURN);   }
 "{"        { return (O_BRACE);  }
 "}"        { return (C_BRACE);  }
 "("        { return (O_PARENT); }

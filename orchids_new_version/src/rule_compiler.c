@@ -125,6 +125,51 @@ static int is_logical_variable(node_expr_t *e)
   return 1;
 }
 
+static type_t *stype_new (gc_t *gc_ctx, char *type_name, unsigned char tag)
+{
+  type_t *type;
+  size_t len;
+
+  len = strlen(type_name);
+  type = gc_base_malloc (gc_ctx, sizeof(type_t) + len+1);
+  strcpy (((char *)type)+sizeof(type_t), type_name);
+  type->name = ((char *)type)+sizeof(type_t);
+  type->tag = tag;
+  return type;
+}
+
+static type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
+				 unsigned char tag)
+{
+  static strhash_t *type_hash = NULL;
+  type_t *type;
+
+  if (type_hash==NULL)
+    {
+      type_hash = new_strhash(gc_ctx, 31);
+      strhash_add(gc_ctx, type_hash, &t_int, t_int.name);
+      strhash_add(gc_ctx, type_hash, &t_uint, t_uint.name);
+      strhash_add(gc_ctx, type_hash, &t_float, t_float.name);
+      strhash_add(gc_ctx, type_hash, &t_bstr, t_bstr.name);
+      strhash_add(gc_ctx, type_hash, &t_str, t_str.name);
+      strhash_add(gc_ctx, type_hash, &t_ctime, t_ctime.name);
+      strhash_add(gc_ctx, type_hash, &t_timeval, t_timeval.name);
+      strhash_add(gc_ctx, type_hash, &t_ipv4, t_ipv4.name);
+      strhash_add(gc_ctx, type_hash, &t_ipv6, t_ipv6.name);
+      strhash_add(gc_ctx, type_hash, &t_regex, t_regex.name);
+      strhash_add(gc_ctx, type_hash, &t_snmpoid, t_snmpoid.name);
+      strhash_add(gc_ctx, type_hash, &t_event, t_event.name);
+      strhash_add(gc_ctx, type_hash, &t_mark, t_mark.name);
+    }
+  type = strhash_get(type_hash, type_name);
+  if (type==NULL && forcenew)
+    {
+      type = stype_new (gc_ctx, type_name, tag);
+      strhash_add(gc_ctx, type_hash, type, type->name);
+    }
+  return type;
+}
+
 static int rule_compiler_mark_hash_walk_func (void *elt, void *data)
 {
   GC_TOUCH ((gc_t *)data, elt);
@@ -168,6 +213,7 @@ static void rule_compiler_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 		       rule_compiler_mark_hash_walk_func, (void *)gc_ctx);
   GC_TOUCH (gc_ctx, ctx->first_rule);
   GC_TOUCH (gc_ctx, ctx->last_rule);
+  GC_TOUCH (gc_ctx, ctx->returns);
   GC_TOUCH (gc_ctx, ctx->type_stack);
 }
 
@@ -291,6 +337,9 @@ static int rule_compiler_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   err = (*do_subfield) (gtc, (gc_header_t *)ctx->last_rule, data);
   if (err)
     return err;
+  err = (*do_subfield) (gtc, (gc_header_t *)ctx->returns, data);
+  if (err)
+    return err;
   err = (*do_subfield) (gtc, (gc_header_t *)ctx->type_stack, data);
   if (err)
     return err;
@@ -341,6 +390,7 @@ rule_compiler_t *new_rule_compiler_ctx(gc_t *gc_ctx)
   ctx->dyn_var_name = NULL; /* temporary */
   ctx->first_rule = NULL;
   ctx->last_rule = NULL;
+  ctx->returns = NULL;
   ctx->type_stack = NULL;
   ctx->nerrors = 0;
   GC_UPDATE(gc_ctx, 0, ctx);
@@ -891,28 +941,200 @@ static size_t list_len (node_expr_t *l)
 }
 
 
-static node_expr_t *pop_type_node (gc_t *gc_ctx, struct type_heap_s **rtp);
+static node_expr_t *pop_type_node (gc_t *gc_ctx, struct type_heap_s **rtp, type_t **tp);
+static int stype_below (type_t *t, type_t *model);
+static type_t *stype_join (type_t *t1, type_t *t2);
 
-static void type_check (rule_compiler_t *ctx)
+static void type_solve (rule_compiler_t *ctx)
 {
   node_expr_t *e, *l, *parent;
+  type_t *t;
 
   GC_START(ctx->gc_ctx, 2);
+  /* Compute types by solving a fixed point system */
   while (ctx->type_stack!=NULL)
     {
-      e = pop_type_node (ctx->gc_ctx, &ctx->type_stack);
+      e = pop_type_node (ctx->gc_ctx, &ctx->type_stack, &t);
       GC_UPDATE(ctx->gc_ctx, 0, e);
+      if (stype_below (t, e->stype))
+	continue;
+      if (e->stype==&t_any)
+	continue; /* no need to propagate a type error */
+      /* t should not be equal to &t_any (bad taste) */
+      t = stype_join (t, e->stype);
+      if (t==&t_any)
+	{
+	  if (e->file!=NULL)
+	    fprintf (stderr, "%s:", STR(e->file));
+	  /* printing STR(e->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: type error: expresssion cannot have both types %s and %s.\n",
+		   e->lineno, e->stype->name, t->name);
+	  ctx->nerrors++;
+	  continue; /* no need to propagate a type error */
+	}
+      if (e->stype!=NULL && strcmp(e->stype->name, t->name)==0)
+	continue; /* type did not change: continue */
+      e->stype = t; /* type changed: update e's type, and propagate: */
       l = e->parents;
       GC_UPDATE(ctx->gc_ctx, 1, l);
-      GC_TOUCH(ctx->gc_ctx, e->parents = NULL); /* remove cycles */
+      //GC_TOUCH(ctx->gc_ctx, e->parents = NULL); /* remove cycles */
       for (; l!=NULL; l = BIN_RVAL(l))
 	{
 	  parent = BIN_LVAL(l);
-	  if (--parent->npending_argtypes==0)
-	    (*parent->compute_stype) (ctx, parent);
+	  /*if (--parent->npending_argtypes==0)*/
+	  (*parent->compute_stype) (ctx, parent);
 	}
     }
   GC_END(ctx->gc_ctx);
+}
+
+static void type_explore_expr (rule_compiler_t *ctx,
+			       node_expr_t *expr)
+{
+  node_expr_t *l;
+
+  if (expr==NULL)
+    return;
+  switch (expr->type)
+    {
+    case NODE_FIELD:
+    case NODE_VARIABLE:
+    case NODE_CONST:
+      break;
+    case NODE_ASSOC:
+      type_explore_expr (ctx, BIN_RVAL(expr));
+      break;
+    case NODE_BINOP:
+    case NODE_COND:
+      type_explore_expr (ctx, BIN_LVAL(expr));
+      type_explore_expr (ctx, BIN_RVAL(expr));
+      break;
+    case NODE_MONOP:
+    case NODE_RETURN:
+      type_explore_expr (ctx, MON_VAL(expr));
+      break;
+    case NODE_EVENT:
+      type_explore_expr (ctx, BIN_LVAL(expr));
+      for (l=BIN_RVAL(expr); l!=NULL; l=BIN_RVAL(l))
+	type_explore_expr (ctx, BIN_RVAL(BIN_LVAL(l)));
+      break;
+    case NODE_DB_PATTERN: 
+      type_explore_expr (ctx, BIN_LVAL(expr));
+      for (l=BIN_RVAL(expr); l!=NULL; l=BIN_RVAL(l))
+	if (!is_logical_variable(BIN_LVAL(l)))
+	  type_explore_expr (ctx, BIN_LVAL(l));
+      break;
+    case NODE_DB_COLLECT:
+      /* (NODE_DB_COLLECT returns (actions . collect) pat1 ... patn) */
+      /* explore patterns first: */
+      for (l=BIN_RVAL(BIN_RVAL(expr)); l!=NULL; l=BIN_RVAL(l))
+	type_explore_expr (ctx, BIN_LVAL(l));
+      /* explore actions second: */
+      for (l=BIN_LVAL(BIN_LVAL(BIN_RVAL(expr))); l!=NULL; l=BIN_RVAL(l))
+	type_explore_expr (ctx, BIN_LVAL(l));
+      /* then explore collect: */
+      type_explore_expr (ctx, BIN_RVAL(BIN_LVAL(BIN_RVAL(expr))));
+      /* we don't need to explore returns, which is just a list
+	 of 'return' statements found inside actions */
+      break;
+    case NODE_DB_SINGLETON:
+      for (l=MON_VAL(expr); l!=NULL; l=BIN_RVAL(l))
+	type_explore_expr (ctx, BIN_LVAL(l));
+      break;
+    case NODE_CALL:
+      for (l=CALL_PARAMS(expr); l!=NULL; l=BIN_RVAL(l))
+	type_explore_expr (ctx, BIN_LVAL(l));
+      break;
+    case NODE_IFSTMT:
+      type_explore_expr (ctx, IF_COND(expr));
+      type_explore_expr (ctx, IF_THEN(expr));
+      type_explore_expr (ctx, IF_ELSE(expr));
+      break;
+    case NODE_REGSPLIT:
+      type_explore_expr (ctx, REGSPLIT_STRING(expr));
+      break;
+    case NODE_UNKNOWN:
+    default:
+      DebugLog(DF_OLC, DS_ERROR, "type_explore_expr on type %i.\n",
+	       expr->type);
+      exit(EXIT_FAILURE);
+      break;
+    }
+  (*expr->compute_stype) (ctx, expr);
+}
+
+#define type_explore_stmt(ctx,expr) type_explore_expr(ctx,expr)
+
+static void type_explore_actions (rule_compiler_t *ctx,
+				  node_expr_t *actionlist)
+{
+  node_expr_t *l;
+
+  for (l=actionlist; l!=NULL; l=BIN_RVAL(l))
+    type_explore_stmt (ctx, BIN_LVAL(l));
+}
+
+static void type_explore_state (rule_compiler_t *ctx,
+				node_state_t *state);
+
+static void type_explore_transition (rule_compiler_t *ctx,
+				     node_trans_t *trans)
+{
+  if (trans->cond!=NULL)
+    type_explore_expr (ctx, trans->cond);
+  if (trans->sub_state_dest==NULL)
+    {
+      node_state_t *s;
+
+      s = strhash_get(ctx->statenames_hash, trans->dest);
+      if (s==NULL)
+	{
+	  if (trans->file!=NULL)
+	    fprintf (stderr, "%s:", STR(trans->file));
+	  /* printing STR(trans->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: error: unresolved state name %s\n",
+		   trans->lineno, trans->dest);
+	  ctx->nerrors++;
+	}
+    }
+  else type_explore_state (ctx, trans->sub_state_dest);
+}
+
+static void type_explore_transitions (rule_compiler_t *ctx,
+				      node_expr_t *translist)
+{
+  node_expr_t *l;
+
+  for (l=translist; l!=NULL; l=BIN_RVAL(l))
+    type_explore_transition (ctx, (node_trans_t *)BIN_LVAL(l));
+}
+
+static void type_explore_state (rule_compiler_t *ctx,
+				node_state_t *state)
+{
+  type_explore_actions (ctx, state->actionlist);
+  type_explore_transitions (ctx, state->translist);
+}
+
+static void type_explore_rule (rule_compiler_t *ctx,
+			       node_rule_t *node_rule)
+{
+  node_expr_t *states;
+
+  for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
+    {
+      type_explore_state (ctx, (node_state_t *)BIN_LVAL(states));
+    }
+  /* we don't check the type of synchronization variables here;
+     this will be done in get_and_check_syncvar(), in a later phase */
+}
+
+static void type_check (rule_compiler_t *ctx, node_rule_t *node_rule)
+{
+  type_explore_rule (ctx, node_rule);
+  type_solve (ctx);
 }
 
 /* Sets of variable numbers are implemented as sorted lists
@@ -1220,6 +1442,9 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
 	  }
 	break;
       }
+    case NODE_RETURN:
+      res = node_expr_vars (gc_ctx, MON_VAL(e));
+      break;
     case NODE_BINOP:
     case NODE_CONS:
     case NODE_EVENT:
@@ -1274,17 +1499,18 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
       }
       break;
     case NODE_DB_COLLECT:
-      /* e is db_collect(expr, pat1, pat2, ..., patn)
-	 mayread(e) = (mayread(expr) - quantified_vars(pat1, ..., patn))
+      /* e is db_collect(returns, (actions . expr), pat1, pat2, ..., patn)
+	 mayread(e) = (mayread(actions.expr) - quantified_vars(pat1, ..., patn))
 	              U union {mayread (pati) | i=1...n}
 	 mustset(e) = union {mustset (pati) | i=1...n}
-	 Note that mustset(e) does not contain mustset(expr),
+	 Note that mustset(e) does not contain mustset(actions.expr),
 	 since the comprehension may be over an empty domain, in which case
-	 expr will not be run.
+	 actions.expr will not be run.
        */
       {
 	node_expr_t *l;
 
+	e = BIN_RVAL(e); /* skip 'returns' part */
 	res = node_expr_vars (gc_ctx, BIN_LVAL(e));
 	GC_UPDATE(gc_ctx, 0, res.mayread);
 	/* and forget about newres.mustset */
@@ -1648,6 +1874,7 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
 	fprintf (stderr, "%s:", state->file);
       fprintf (stderr, "%u: Error: state %s is part of a cycle of gotos\n",
 	       state->line, state->name);
+      ctx->nerrors++;
       return;
     }
   state->an_flags |= AN_EPSILON_REACHABLE;
@@ -1791,6 +2018,7 @@ static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
       set_monotony_unknown_mayset (ctx, BIN_LVAL(e), vars);
       set_monotony_unknown_mayset (ctx, BIN_RVAL(e), vars);
       break;
+    case NODE_RETURN:
     case NODE_MONOP:
       set_monotony_unknown_mayset (ctx, MON_VAL(e), vars);
       break;
@@ -1822,11 +2050,9 @@ static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
       }
     case NODE_DB_COLLECT:
       {
-	node_expr_t *l;
-
+	e = BIN_RVAL(e); /* skip 'returns' part */
 	set_monotony_unknown_mayset (ctx, BIN_RVAL(e), vars);
-	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
-	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	set_monotony_unknown_mayset (ctx, BIN_LVAL(e), vars);
 	break;
       }
     case NODE_DB_SINGLETON:
@@ -1872,6 +2098,8 @@ static only_depends_on (gc_t *gc_ctx, node_expr_t *e, varset_t *vars)
 	if (!only_depends_on (gc_ctx, BIN_LVAL(l), vars))
 	  return 0;
       return 1;
+    case NODE_RETURN:
+      return only_depends_on (gc_ctx, MON_VAL(e), vars);
     case NODE_BINOP:
     case NODE_EVENT:
     case NODE_CONS:
@@ -2032,6 +2260,20 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	gc_base_free(args);
 	return res;
       }
+    case NODE_RETURN:
+      /* return compute_monotony (ctx, MON_VAL(e), vars); */
+      /* No: 'return' never returns, i.e., never proceeds to the next
+	 instruction.  Hence the final value of compute_monotony()
+	 in this case should be top: MONO_CONST, and all vars
+	 set to MONO_CONST */
+      {
+	size_t nvars, i;
+
+	nvars = ctx->rule_env->elmts;
+	for (i=0; i<nvars; i++)
+	  vars[i] = MONO_CONST;
+	return MONO_CONST;
+      }
     case NODE_BINOP:
       {
 	monotony ma, mb;
@@ -2090,14 +2332,28 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
     case NODE_DB_COLLECT:
       {
 	monotony m;
-	node_expr_t *l;
 	monotony *alt;
 	size_t nvars;
 	size_t varsz;
 	varset_t *bound;
+	node_expr_t *l;
 
+	if (BIN_LVAL(e)!=NULL)
+	  { /* If there are any 'return' statements,
+	       we just decide that the whole db_collect
+	       has unknown monotonicity.  This is brutal,
+	       but at least it is correct.
+	       In general, the only purpose of 'return' statements
+	       here is to install exceptions to the case where
+	       'collect' is computed, inside 'if' statements... in
+	       which case the monotonicity will turn out to be
+	       unknown anyway.
+	    */
+	    m = MONO_UNKNOWN;
+	    return m;
+	  }
 	m = MONO_CONST;
-	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	for (l=BIN_RVAL(BIN_RVAL(e)); l!=NULL; l=BIN_RVAL(l))
 	  {
 	    m &= compute_monotony (ctx, BIN_LVAL(l), vars);
 	  }
@@ -2111,20 +2367,20 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	    varsz = nvars*sizeof(monotony);
 	    alt = gc_base_malloc (ctx->gc_ctx, varsz);
 	    memcpy (alt, vars, varsz);
-	    bound = vs_bound_vars_db_pattern (ctx->gc_ctx, BIN_RVAL(e));
+	    bound = vs_bound_vars_db_pattern (ctx->gc_ctx, BIN_RVAL(BIN_RVAL(e)));
 	    (void) vs_sweep (bound, do_set_mono_const, alt);
-	    if (compute_monotony (ctx, BIN_LVAL(e), alt)!=MONO_CONST)
+	    (void) compute_monotony (ctx, BIN_LVAL(BIN_LVAL(BIN_RVAL(e))), alt);
+	    if (compute_monotony (ctx, BIN_RVAL(BIN_LVAL(BIN_RVAL(e))), alt)!=MONO_CONST)
 	      m = MONO_UNKNOWN;
 	    gc_base_free (alt);
 	  }
 
-	/* It might be that the tuple BIN_LVAL(e) is never evaluated;
+	/* It might be that the actions.expr BIN_LVAL(e) is never evaluated;
 	   this forces us to do as in the NODE_IFSTMT case, and
 	   call set_monotony_unknown_mayset() to say that all assignments
-	   inside tuples force the assigned-to variable to be
+	   inside actions.expr force the assigned-to variable to be
 	   MONO_UNKNOWN */
-	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
-	  set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
+	set_monotony_unknown_mayset (ctx, BIN_LVAL(e), vars);
 	return m;
       }
     case NODE_DB_SINGLETON:
@@ -2290,7 +2546,6 @@ static void compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
 #endif /* ENABLE_PREPROC */
   ctx->rule_compiler->issdlin = NULL;
 
-  type_check (ctx->rule_compiler);
   gettimeofday(&ctx->last_rule_act, NULL);
 }
 
@@ -2342,12 +2597,17 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
   state->flags = flags;
   /* add state name in current compiler context */
   if (strhash_get(ctx->statenames_hash, sym->name)) {
-    DebugLog(DF_OLC, DS_FATAL,
-             "state %s already defined.\n", sym->name);
-    exit(EXIT_FAILURE);
+    if (sym->file!=NULL)
+      fprintf (stderr, "%s:", STR(sym->file));
+    /* printing STR(sym->file) is legal, since it
+       was created NUL-terminated, on purpose */
+    fprintf (stderr, "%u: error: duplicate state name %s\n",
+	     sym->line, sym->name);
+    ctx->nerrors++;
   }
-  gc_strhash_add(ctx->gc_ctx, ctx->statenames_hash,
-		 (gc_header_t *)state, state->name);
+  else
+    gc_strhash_add(ctx->gc_ctx, ctx->statenames_hash,
+		   (gc_header_t *)state, state->name);
   return state;
 }
 
@@ -2458,11 +2718,9 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
       break;
     case NODE_DB_COLLECT:
       {
-	node_expr_t *l;
-
+	e = BIN_RVAL(e); /* skip 'returns' part */
 	check_expect_condition (ctx, BIN_LVAL(e));
-	for (l=BIN_LVAL(e); l!=NULL; l=BIN_RVAL(l))
-	  check_expect_condition (ctx, BIN_LVAL(l));
+	check_expect_condition (ctx, BIN_RVAL(e));
       }
       break;
     case NODE_DB_SINGLETON:
@@ -2473,6 +2731,7 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
 	  check_expect_condition (ctx, BIN_LVAL(l));
       }
       break;
+    case NODE_RETURN:
     case NODE_MONOP:
       check_expect_condition (ctx, MON_VAL(e));
       break;
@@ -2627,7 +2886,6 @@ static void add_boolean_check (rule_compiler_t *ctx,
   /* hash = '(NODE_IFSTMT expr NULL NULL)' mod bigprime */
   bool_check->stype = NULL; /* not known yet */
   bool_check->compute_stype = compute_stype_ifstmt;
-  bool_check->npending_argtypes = 1;
   bool_check->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, bool_check->cond = expr);
   bool_check->then = NULL;
@@ -2711,6 +2969,7 @@ typedef struct type_heap_s type_heap_t;
 struct type_heap_s {
   gc_header_t gc;
   node_expr_t *e;
+  type_t *stype;
   type_heap_t *left;
   type_heap_t *right;
 } ;
@@ -2778,14 +3037,21 @@ static int expr_node_cmp (node_expr_t *e1, node_expr_t *e2)
       if (cmp)
 	return cmp;
     }
-  return e1->lineno - e2->lineno;
+  if (e1->lineno < e2->lineno)
+    return -1;
+  if (e1->lineno > e2->lineno)
+    return 1;
+  return (e1 - e2);
 }
 
-static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp, node_expr_t *e)
+static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp,
+			    node_expr_t *e, type_t *t)
 {
   type_heap_t *rt;
   type_heap_t *left;
   node_expr_t *olde;
+  type_t *oldt;
+  int cmp;
 
   GC_START(gc_ctx, 1);
   while ((rt = *rtp) != NULL)
@@ -2801,13 +3067,17 @@ static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp, node_expr_t *e)
       rt->left = rt->right;
       rt->right = left;
 
-      if (expr_node_cmp(e, rt->e) < 0)
+      cmp = expr_node_cmp(e, rt->e);
+      if (cmp < 0)
 	{ /* Store e into root, then insert the old
 	     value of rt->entry into rt->left subheap */
 	  olde = rt->e;
+	  oldt = rt->stype;
 	  GC_UPDATE(gc_ctx, 0, olde);
 	  GC_TOUCH (gc_ctx, rt->e = e);
+	  rt->stype = t;
 	  e = olde;
+	  t = oldt;
 	  rtp = &rt->left;
 	}
       else
@@ -2818,6 +3088,7 @@ static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp, node_expr_t *e)
   rt = gc_alloc (gc_ctx, sizeof(type_heap_t), &type_heap_class);
   rt->gc.type = T_NULL;
   GC_TOUCH (gc_ctx, rt->e = e);
+  rt->stype = t;
   rt->left = NULL;
   rt->right = NULL;
   GC_TOUCH (gc_ctx, *rtp = rt);
@@ -2875,7 +3146,8 @@ static void type_heap_merge (gc_t *gc_ctx, type_heap_t *h1, type_heap_t *h2,
     }
 }
 
-static node_expr_t *pop_type_node (gc_t *gc_ctx, type_heap_t **rtp)
+static node_expr_t *pop_type_node (gc_t *gc_ctx, type_heap_t **rtp,
+				   type_t **stypep)
 {
   type_heap_t *rt = *rtp;
   node_expr_t *e;
@@ -2884,27 +3156,11 @@ static node_expr_t *pop_type_node (gc_t *gc_ctx, type_heap_t **rtp)
     return NULL;
   GC_START(gc_ctx, 1);
   e = rt->e;
+  *stypep = rt->stype;
   GC_UPDATE(gc_ctx, 0, e);
   type_heap_merge (gc_ctx, rt->left, rt->right, rtp);
   GC_END(gc_ctx);
   return e;
-}
-
-static void set_type (rule_compiler_t *ctx, node_expr_t *myself,
-		      type_t *stype)
-{
-  myself->stype = stype;
-  /* Now add myself to the stack of nodes whose type we now know */
-  push_type_node (ctx->gc_ctx, &ctx->type_stack, myself);
-}
-
-static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
-			node_expr_t *parent)
-{
-  node_expr_t *l;
-
-  l = build_expr_cons (ctx, parent, node->parents);
-  GC_TOUCH (ctx->gc_ctx, node->parents = l);
 }
 
 static type_t *stype_join (type_t *t1, type_t *t2)
@@ -2919,10 +3175,11 @@ static type_t *stype_join (type_t *t1, type_t *t2)
     return t1;
   /* "*" is top: */
   if (strcmp(t1->name, "*")==0)
-    return t1;
+    return &t_any;
   if (strcmp(t2->name, "*")==0)
-    return t2;
-  /* database types: db[*] <= db[type1, ..., typen] */
+    return &t_any;
+  /* database types: db[*] <= db[type1, ..., typen]
+  */
   if (strcmp(t1->name, "db[*]")==0 && memcmp(t2->name, "db[", 3)==0)
     return t2;
   if (strcmp(t2->name, "db[*]")==0 && memcmp(t1->name, "db[", 3)==0)
@@ -2930,18 +3187,36 @@ static type_t *stype_join (type_t *t1, type_t *t2)
   return &t_any; /* error---equated with top, "*" */
 }
 
-static int stype_below_str (type_t *t, char *s)
+static int stype_below (type_t *t, type_t *model)
 {
   if (t==NULL) /* NULL is bottom */
     return 1;
-  if (strcmp(s, "*")==0) /* "*" is top */
+  if (strcmp(model->name, "*")==0) /* "*" is top */
     return 1;
-  if (strcmp(t->name, s)==0)
+  if (strcmp(t->name, model->name)==0)
     return 1;
   /* database types: db[*] <= db[type1, ..., typen] */
-  if (strcmp(t->name, "db[*]")==0 && memcmp(s, "db[", 3)==0)
+  if (strcmp(t->name, "db[*]")==0 && memcmp(model->name, "db[", 3)==0)
     return 1;
   return 0;
+}
+
+static void set_type (rule_compiler_t *ctx, node_expr_t *myself,
+		      type_t *stype)
+{
+  if (stype_below (stype, myself->stype))
+    return;
+  /* Now add myself to the stack of nodes whose type we now know */
+  push_type_node (ctx->gc_ctx, &ctx->type_stack, myself, stype);
+}
+
+static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
+			node_expr_t *parent)
+{
+  node_expr_t *l;
+
+  l = build_expr_cons (ctx, parent, node->parents);
+  GC_TOUCH (ctx->gc_ctx, node->parents = l);
 }
 
 static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *myself)
@@ -2953,9 +3228,9 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
   node_expr_t *var, *varj;
   type_t *vartype;
 
-  set_type (ctx, myself, NULL);
+  set_type (ctx, myself, &t_void);
   str = n->string;
-  if (!stype_below_str(str->stype, "str"))
+  if (!stype_below(str->stype, &t_str))
     {
       if (str->file!=NULL)
 	fprintf (stderr, "%s:", STR(str->file));
@@ -2966,6 +3241,9 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 	       str->stype->name);
       ctx->nerrors++;
     }
+  if (str->stype==NULL || str->stype==&t_any)
+    return; /* stop here if we have not yet learned that str was of string "str",
+	       or if a type error occurred in typing str */
   vars = n->dest_vars;
   if (vars!=NULL)
     {
@@ -2998,7 +3276,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 	      /* set type of variable to type of expression */
 	    }
 	  else /* variable already has a type */
-	    if (!stype_below_str(vartype, "str")) /* and the type is not str */
+	    if (!stype_below(vartype, &t_str)) /* and the type is not str */
 	      {
 		if (var->file!=NULL)
 		  fprintf (stderr, "%s:", STR(var->file));
@@ -3050,7 +3328,6 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
   /* hash = '(NODE_REGSPLIT source pattern x1 ... xn)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_string_split;
-  n->npending_argtypes = 1;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->string = source);
   GC_TOUCH (ctx->gc_ctx, n->split_pat = pattern);
@@ -3083,8 +3360,11 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
   ltype = BIN_LVAL(n)->stype;
   rtype = BIN_RVAL(n)->stype;
   if (ltype==NULL || rtype==NULL)
+    return; /* not enough info yet */
+  if (ltype==&t_any || rtype==&t_any)
     {
-      set_type (ctx, myself, NULL);
+      set_type (ctx, myself, &t_any); /* propagate type error, but don't
+					 bother user with spurious messages */
       return;
     }
   switch (BIN_OP(n))
@@ -3123,27 +3403,9 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	}
       if (memcmp(ltype->name, "db[", 3)==0)
 	{
-	  if (BIN_OP(n)==OP_ADD)
-	    {
-	      if (strcmp(ltype->name, "db[*]")==0 &&
-		  memcmp(rtype->name, "db[", 3)==0)
-		set_type (ctx, myself, rtype);
-	      else if (strcmp(rtype->name, "db[*]")==0 ||
-		       strcmp(ltype->name, rtype->name)==0)
-		set_type (ctx, myself, ltype);
-	      else goto type_error;
-	    }
-	  else if (BIN_OP(n)==OP_SUB)
-	    {
-	      if (strcmp(ltype->name, "db[*]")==0 &&
-		  memcmp(rtype->name, "db[", 3)==0)
-		;
-	      else if (strcmp(rtype->name, "db[*]")==0 ||
-		       strcmp(ltype->name, rtype->name)==0)
-		;
-	      else goto type_error;
-	      set_type (ctx, myself, ltype);
-	    }
+	  restype = stype_join (ltype, rtype);
+	  if (restype==&t_any)
+	    goto type_error;
 	  return;
 	}
       /*FALLTHROUGH*/ /* all the other cases as for *, / */
@@ -3170,32 +3432,33 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_AND:
     case OP_OR:
     case OP_XOR:
-      if (stype_below_str(ltype, "int") ||
-	  stype_below_str(ltype, "uint") ||
-	  stype_below_str(ltype, "ipv4"))
+      if (strcmp(ltype->name, "int")==0 ||
+	  strcmp(ltype->name, "uint")==0 ||
+	  strcmp(ltype->name, "ipv4")==0)
 	{
-	  if (!stype_below_str(rtype, "int") &&
-	      !stype_below_str(rtype, "uint") &&
-	      !stype_below_str(rtype, "ipv4"))
+	  if (strcmp(rtype->name, "int") &&
+	      strcmp(rtype->name, "uint") &&
+	      strcmp(rtype->name, "ipv4"))
 	    goto type_error;
 	  set_type (ctx, myself, ltype);
 	  return;
 	}
       restype = stype_join (ltype, rtype);
-      if (stype_below_str(restype, "ipv6"))
+      if (stype_below(restype, &t_ipv6))
 	{
 	  set_type (ctx, myself, restype);
 	  return;
 	}
       goto type_error;
     case OP_ADD_EVENT:
-      set_type (ctx, myself, NULL); /* OP_ADD_EVENT, used as a binop
-				       tag, does not actually
-				       return an event per se; it only
-				       serves to build a pair (field, val)
-				       Do not confuse with event nodes.
-				    */
-      if (!stype_below_str(rtype, ltype->name))
+      set_type (ctx, myself, &t_void); /* OP_ADD_EVENT, used as a binop
+					  tag, does not actually
+					  return an event per se; it only
+					  serves to build a pair (field, val)
+					  Do not confuse with event nodes.
+				       */
+      restype = stype_join (ltype, rtype);
+      if (restype==&t_any)
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3235,7 +3498,7 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	   n->lineno,
 	   ltype->name, op_name, rtype->name);
   ctx->nerrors++;
-  set_type (ctx, myself, NULL);
+  set_type (ctx, myself, &t_any);
 }
 
 node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
@@ -3259,7 +3522,6 @@ node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
   /* hash = '(NODE_BINOP op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_binop;
-  n->npending_argtypes = 2;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -3280,7 +3542,12 @@ static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself)
   atype = MON_VAL(n)->stype;
   if (atype==NULL)
     {
-      set_type (ctx, myself, NULL);
+      return; /* not enough info yet */
+    }
+  if (atype==&t_any)
+    {
+      set_type (ctx, myself, &t_any); /* propagate error, but do not emit
+					 any spurious error message */
       return;
     }
   switch (MON_OP(n))
@@ -3328,7 +3595,7 @@ static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself)
 	   n->lineno,
 	   op_name, atype->name);
   ctx->nerrors++;
-  set_type (ctx, myself, NULL);
+  set_type (ctx, myself, &t_any);
 }
 
 node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
@@ -3349,12 +3616,63 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
   /* hash = '(NODE_MONOP op arg_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_monop;
-  n->npending_argtypes = 1;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->val = arg_node);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   add_parent (ctx, arg_node, (node_expr_t *)n);
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+static void compute_stype_return (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  /*node_expr_mon_t *n = (node_expr_mon_t *)myself;*/
+  /*type_t *atype;*/
+
+  /*atype = MON_VAL(n)->stype;*/
+  set_type (ctx, myself, &t_void);
+}
+
+node_expr_t *build_expr_return(rule_compiler_t *ctx,
+			       node_expr_t *arg_node)
+{
+  node_expr_mon_t *n;
+  node_expr_t *l, *rest;
+
+  GC_START(ctx->gc_ctx, 1);
+  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
+		&node_expr_mon_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_RETURN;
+  GC_TOUCH (ctx->gc_ctx, n->file = arg_node->file);
+  n->lineno = arg_node->lineno;
+  n->hash = h_pair (NODE_RETURN,
+		    h_cons (arg_node, H_NULL));
+  /* hash = '(NODE_RETURN arg_node)' mod bigprime */
+  n->stype = NULL; /* not known yet */
+  n->compute_stype = compute_stype_return;
+  n->parents = NULL;
+  n->op = -1;
+  GC_TOUCH (ctx->gc_ctx, n->val = arg_node);
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  add_parent (ctx, arg_node, (node_expr_t *)n);
+  if (ctx->returns==NULL)
+    {
+      if (arg_node->file!=NULL)
+	fprintf (stderr, "%s:", STR(arg_node->file));
+      /* STR() is NUL-terminated by construction */
+      fprintf (stderr, "%u: Error: return not in scope of a database collect expression\n",
+	       arg_node->lineno);
+      ctx->nerrors++;
+    }
+  else
+    {
+      rest = BIN_LVAL(ctx->returns);
+      l = build_expr_cons (ctx, (node_expr_t *)n, rest);
+      GC_TOUCH (ctx->gc_ctx, BIN_LVAL(ctx->returns) = l);
+      l->hash = h_cons ((node_expr_t *)n, (rest==NULL)?H_NULL:rest->hash);
+    }
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
 }
@@ -3374,7 +3692,6 @@ node_expr_t *build_expr_cons(rule_compiler_t *ctx,
   n->hash = h_cons (left_node, (right_node==NULL)?H_NULL:right_node->hash);
   n->stype = NULL;
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   n->op = 0;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -3397,8 +3714,6 @@ node_expr_t *expr_cons_reverse(rule_compiler_t *ctx, node_expr_t *l)
   return res;
 }
 
-static type_t t_void = { "void", T_NULL };
-
 static void compute_stype_action (rule_compiler_t *ctx, node_expr_t *myself)
 {
   /* just discard the result of the expression */
@@ -3414,7 +3729,6 @@ node_expr_t *build_expr_action(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   n = build_expr_cons (ctx, action, rest);
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  n->npending_argtypes = 1;
   n->compute_stype = compute_stype_action;
   add_parent (ctx, action, (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
@@ -3432,6 +3746,8 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
   rtype = BIN_RVAL(n)->stype;
   if (ltype==NULL || rtype==NULL)
     return;
+  if (ltype==&t_any || rtype==&t_any)
+    return;
   switch (BIN_OP(n))
     {
     case ANDAND:
@@ -3440,7 +3756,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OROR:
       op_name = "||";
     bin_cond:
-      if (!stype_below_str(ltype, "int") || !stype_below_str(rtype, "int"))
+      if (!stype_below(ltype, &t_int) || !stype_below(rtype, &t_int))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3453,7 +3769,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
 	}
       break;
     case BANG:
-      if (!stype_below_str(rtype, "int"))
+      if (!stype_below(rtype, &t_int))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3470,7 +3786,7 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CNRM:
       op_name = "!~";
     crm:
-      if (!stype_below_str(ltype, "str") || !stype_below_str(rtype, "regex"))
+      if (!stype_below(ltype, &t_str) || !stype_below(rtype, &t_regex))
 	{
 	  if (n->file!=NULL)
 	    fprintf (stderr, "%s:", STR(n->file));
@@ -3491,9 +3807,9 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
     case OP_CNEQ:
       op_name = "!=";
     ceq:
-      if (stype_below_str(ltype, "ipv4")==0 && stype_below_str(rtype, "ipv4")==0)
+      if (stype_below(ltype, &t_ipv4)==0 && stype_below(rtype, &t_ipv4)==0)
 	break;
-      if (stype_below_str(ltype, "ipv6")==0 && stype_below_str(rtype, "ipv6")==0)
+      if (stype_below(ltype, &t_ipv6)==0 && stype_below(rtype, &t_ipv6)==0)
 	break;
       goto cgt;
     case OP_CGT:
@@ -3560,7 +3876,6 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
   /* hash = '(NODE_COND op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_cond;
-  n->npending_argtypes = left_node?2:1;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -3583,33 +3898,20 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
   if (type==NULL)
     return;
   vartype = n->lval->stype;
-  if (vartype==NULL)
+  vartype = stype_join (vartype, type);
+  if (vartype==&t_any) /* type error */
     {
-      set_type (ctx, (node_expr_t *)n->lval, type);
-      /* set type of variable to type of expression */
+      if (n->file!=NULL)
+	fprintf (stderr, "%s:", STR(n->file));
+      /* printing STR(n->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s.\n",
+	       n->lineno,
+	       type->name, ((node_expr_symbol_t *)n->lval)->name,
+	       vartype->name);
+      ctx->nerrors++;
     }
-  else /* variable already has a type */
-    if (strcmp(vartype->name, type->name))
-      /* if the types are not the same: error
-	 (even if type of value or of variable is "*"...
-	 otherwise we would have to update the type of the variable
-	 to the stype_join() of vartype and type,
-	 and trigger a recomputation of all the types depending
-	 on the type of the variable; this would need to change the
-	 typing system so that it could iterate more than once on
-	 each son-to-parent typing relationship);
-	 note that types are compared by their name field */
-      {
-	if (n->file!=NULL)
-	  fprintf (stderr, "%s:", STR(n->file));
-	/* printing STR(n->file) is legal, since it
-	   was created NUL-terminated, on purpose */
-	fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s.\n",
-		 n->lineno,
-		 type->name, ((node_expr_symbol_t *)n->lval)->name,
-		 vartype->name);
-	ctx->nerrors++;
-      }
+  else set_type (ctx, (node_expr_t *)n->lval, vartype);
 }
 
 node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
@@ -3630,8 +3932,6 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
   /* hash = '(NODE_ASSOC var expr)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = compute_stype_assoc;
-  n->npending_argtypes = 1; /* we are just waiting for the rval(=expr)
-			       to be typed */
   n->parents = NULL;
   n->op = EQ;
   GC_TOUCH (ctx->gc_ctx, n->lval = var);
@@ -3654,7 +3954,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
   f = n->f;
   if (f==NULL) // function was not found
     {
-      set_type (ctx, myself, NULL);
+      set_type (ctx, myself, &t_any);
       return; // do not do anything
     }
   nparams = list_len (CALL_PARAMS(n));
@@ -3665,7 +3965,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
       fprintf (stderr, "%u: function %s expects %d arguments, but is applied to %zd arguments.\n",
 	       myself->lineno, f->name, f->args_nb, nparams);
       ctx->nerrors++;
-      set_type (ctx, myself, NULL);
+      set_type (ctx, myself, &t_any);
       return;
     }
   for (sigs=f->sigs; (sig = *sigs)!=NULL; sigs++)
@@ -3673,7 +3973,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
       for (l = CALL_PARAMS(n), i=1; l!=NULL; l=BIN_RVAL(l), i++)
 	{
 	  arg = BIN_LVAL(l);
-	  if (!stype_below_str(arg->stype, sig[i]->name))
+	  if (!stype_below(arg->stype, sig[i]))
 	    break; // incompatible types
 	}
       if (l==NULL) /* went through to the end of the latter loop: signature
@@ -3702,7 +4002,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
 	}
       fprintf (stderr, ").\n");
       ctx->nerrors++;
-      set_type (ctx, myself, NULL);
+      set_type (ctx, myself, &t_any);
     }
 }
 
@@ -3732,7 +4032,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   issdl_function_t *func;
   ovm_var_t *currfile;
   size_t len;
-  size_t n;
   node_expr_t *l;
 
   GC_START(ctx->gc_ctx, 2);
@@ -3767,12 +4066,8 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   call_node->lineno = sym->line;
   call_node->stype = NULL; /* not known yet */
   call_node->compute_stype = compute_stype_call;
-  for (n=0, l=paramlist; l!=NULL; l=BIN_RVAL(l))
-    {
-      n++;
-      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)call_node);
-    }
-  call_node->npending_argtypes = n;
+  for (l=paramlist; l!=NULL; l=BIN_RVAL(l))
+    add_parent (ctx, BIN_LVAL(l), (node_expr_t *)call_node);
   call_node->symbol = sym->name;
   GC_TOUCH (ctx->gc_ctx, call_node->paramlist = paramlist);
   func = strhash_get(ctx->functions_hash, sym->name);
@@ -3786,8 +4081,6 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
       ctx->nerrors++;
     }
   call_node->f = func;
-  if (n==0) /* if no pending arg types, call compute_stype directly */
-    compute_stype_call (ctx, (node_expr_t *)call_node);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)call_node;
 }
@@ -3799,21 +4092,18 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
   /*type_t *restype, *thentype, *elsetype;*/
 
   condtype = IF_COND(ifn)->stype;
-  if (condtype!=NULL)
+  if (!stype_below(condtype, &t_int))
     {
-      if (!stype_below_str(condtype, "int"))
-	{
-	  if (myself->file!=NULL)
-	    fprintf (stderr, "%s:", STR(myself->file));
-	  /* printing STR(myself->file) is legal, since it
-	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: type error: condition of type %s, should be int.\n",
-		   myself->lineno,
-		   condtype->name);
-	  ctx->nerrors++;
-	}
+      if (myself->file!=NULL)
+	fprintf (stderr, "%s:", STR(myself->file));
+      /* printing STR(myself->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: type error: condition of type %s, should be int.\n",
+	       myself->lineno,
+	       condtype->name);
+      ctx->nerrors++;
     }
-  set_type (ctx, myself, NULL); /* does not return anything */
+  set_type (ctx, myself, &t_void); /* does not return anything */
 #if 0
   /* the following code is commented out; its purpose was to check
      that the two branches of the conditional had the same type;
@@ -3873,7 +4163,6 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
   /* hash = '(NODE_IFSTMT cond then els)' mod bigprime */
   i->stype = NULL; /* not known yet */
   i->compute_stype = compute_stype_ifstmt;
-  i->npending_argtypes = (els==NULL)?2:3;
   i->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, i->cond = cond);
   GC_TOUCH (ctx->gc_ctx, i->then = then);
@@ -3911,7 +4200,6 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   /* hash = '(NODE_FIELD n a m e)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   n->name = fieldname;
   n->res_id = f->id;
@@ -3943,7 +4231,6 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
@@ -3982,7 +4269,6 @@ node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
   /* hash = '(NODE_CONST T_UINT i)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = integer);
   n->res_id = ctx->statics_nb;
@@ -4015,7 +4301,6 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
   /* hash = '(NODE_CONST T_FLOAT byte1 ... byten)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = fpdouble);
   n->res_id = ctx->statics_nb;
@@ -4054,7 +4339,6 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
   /* hash = '(NODE_CONST T_STR c h a r s)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH(ctx->gc_ctx, n->data = string);
   n->res_id = ctx->statics_nb;
@@ -4085,12 +4369,11 @@ node_expr_t *build_db_nothing(rule_compiler_t *ctx)
   /* hash = '(NODE_CONST T_DB_EMPTY)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = empty);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_db_empty);
+  set_type (ctx, (node_expr_t *)n, &t_db_any);
   statics_add(ctx, empty);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -4104,7 +4387,7 @@ static void compute_stype_event (rule_compiler_t *ctx, node_expr_t *myself)
   evt = BIN_LVAL(n);
   if (evt!=NULL)
     {
-      if (!stype_below_str(evt->stype, "event"))
+      if (!stype_below(evt->stype, &t_event))
 	{
 	  if (myself->file!=NULL)
 	    fprintf (stderr, "%s:", STR(myself->file));
@@ -4125,7 +4408,6 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
 {
   node_expr_bin_t *n;
   node_expr_t *l;
-  size_t nrecs;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
@@ -4146,80 +4428,12 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
   GC_TOUCH (ctx->gc_ctx, n->rval = right_node);
   GC_START(ctx->gc_ctx, 1);
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  for (nrecs=0, l=right_node; l!=NULL; l=BIN_RVAL(l))
-    {
-      nrecs++;
-      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
-    }
+  for (l=right_node; l!=NULL; l=BIN_RVAL(l))
+    add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
   if (left_node!=NULL)
-    {
-      add_parent (ctx, left_node, (node_expr_t *)n);
-      nrecs++;
-    }
-  n->npending_argtypes = nrecs;
-  if (nrecs==0) /* if empty event, call compute_stype right away */
-    compute_stype_event (ctx, (node_expr_t *)n);
+    add_parent (ctx, left_node, (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
-}
-
-static type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
-				 unsigned char tag)
-{
-  static strhash_t *type_hash = NULL;
-  type_t *type;
-  size_t len;
-
-  if (type_hash==NULL)
-    {
-      type_hash = new_strhash(gc_ctx, 31);
-      strhash_add(gc_ctx, type_hash, &t_int, t_int.name);
-      strhash_add(gc_ctx, type_hash, &t_uint, t_uint.name);
-      strhash_add(gc_ctx, type_hash, &t_float, t_float.name);
-      strhash_add(gc_ctx, type_hash, &t_bstr, t_bstr.name);
-      strhash_add(gc_ctx, type_hash, &t_str, t_str.name);
-      strhash_add(gc_ctx, type_hash, &t_ctime, t_ctime.name);
-      strhash_add(gc_ctx, type_hash, &t_timeval, t_timeval.name);
-      strhash_add(gc_ctx, type_hash, &t_ipv4, t_ipv4.name);
-      strhash_add(gc_ctx, type_hash, &t_ipv6, t_ipv6.name);
-      strhash_add(gc_ctx, type_hash, &t_regex, t_regex.name);
-      strhash_add(gc_ctx, type_hash, &t_snmpoid, t_snmpoid.name);
-      strhash_add(gc_ctx, type_hash, &t_event, t_event.name);
-      strhash_add(gc_ctx, type_hash, &t_mark, t_mark.name);
-    }
-  type = strhash_get(type_hash, type_name);
-  if (type==NULL && forcenew)
-    {
-      len = strlen(type_name);
-      type = gc_base_malloc (gc_ctx, sizeof(type_t) + len+1);
-      strcpy (((char *)type)+sizeof(type_t), type_name);
-      type->name = ((char *)type)+sizeof(type_t);
-      type->tag = tag;
-      strhash_add(gc_ctx, type_hash, type, type->name);
-    }
-  return type;
-}
-
-static void compute_stype_db_pattern_empty(rule_compiler_t *ctx, node_expr_t *myself)
-{
-  node_expr_bin_t *n = (node_expr_bin_t *)myself;
-  node_expr_t *l, *e;
-  type_t *vartype;
-
-  for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(l))
-    {
-      e = BIN_LVAL(l);
-      if (is_logical_variable(e))
-	{
-	  vartype = e->stype;
-	  if (vartype==NULL) /* if logical variable does not have a type
-				yet, then set it to the bottom type;
-				this will trigger the propagation of types
-				through the expressions that contain
-				the logical variable e */
-	    set_type (ctx, e, NULL);
-	}
-    }
 }
 
 static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
@@ -4233,8 +4447,11 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 
   db_type = BIN_LVAL(n)->stype;
   if (db_type==NULL)
+    return;
+  if (db_type==&t_any)
     {
-      compute_stype_db_pattern_empty(ctx, myself);
+      set_type (ctx, myself, &t_any); /* propagate error, but do not bother
+					 user with spurious error messages */
       return;
     }
   type_name = db_type->name;
@@ -4244,22 +4461,21 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	fprintf (stderr, "%s:", STR(myself->file));
       /* printing STR(myself->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: type error: database expected, got %s.\n",
+      fprintf (stderr, "%u: type error: database type expected, got %s.\n",
 	       myself->lineno,
 	       type_name);
       ctx->nerrors++;
+      set_type (ctx, myself, &t_any);
     }
   else if (strcmp(type_name, "db[*]")==0)
-    { /* database is empty: set the types of all logical variables
-	 in the pattern to NULL (bottom), and do not type-check
-	 the literal expressions to match to verify that they
-	 have basic types */
-      compute_stype_db_pattern_empty (ctx, myself);
+    { /* database is empty: do not do anything */
+      ;
     }
   else /* type is now of the form db[type1,type2,...,typen],
 	  where each typei is a single string with no [, ], or comma in it;
        */
     {
+      set_type (ctx, myself, &t_void);
       s = type_name+3;
       nargs = 0;
       for (l=BIN_RVAL(n); l!=NULL; l=BIN_RVAL(l))
@@ -4274,6 +4490,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 		       myself->lineno,
 		       nargs);
 	      ctx->nerrors++;
+	      set_type (ctx, myself, &t_any);
 	      break;
 	    }
 	  s++;
@@ -4287,15 +4504,8 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	  e = BIN_LVAL(l);
 	  if (is_logical_variable(e))
 	    {
-	      vartype = e->stype;
-	      if (vartype==NULL)
-		{
-		  set_type (ctx, e, argtype);
-		  /* set type of logical variable to type of field */
-		}
-	      else /* logical variable already has a type */
-		if (strcmp(vartype->name, argtype->name))
-		  /* and the types are not the same: error */
+	      vartype = stype_join (e->stype, argtype);
+	      if (vartype==&t_any)
 		  {
 		    if (n->file!=NULL)
 		      fprintf (stderr, "%s:", STR(n->file));
@@ -4304,9 +4514,11 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 		    fprintf (stderr, "%u: type error: logical variable %s of type %s cannot match field of type %s.\n",
 			     n->lineno,
 			     SYM_NAME(e),
-			     vartype->name, argtype->name);
+			     e->stype->name, argtype->name);
+		    set_type (ctx, myself, &t_any);
 		    ctx->nerrors++;
 		  }
+	      else set_type (ctx, e, vartype);
 	    }
 	  else
 	    {
@@ -4320,6 +4532,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 		    fprintf (stderr, "%u: type error: pattern of type %s cannot match field of type %s.\n",
 			     n->lineno,
 			     vartype->name, argtype->name);
+		    set_type (ctx, myself, &t_any);
 		    ctx->nerrors++;
 		  }
 	    }
@@ -4341,6 +4554,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	  fprintf (stderr, "%u: too few arguments, expected %zd.\n",
 		   myself->lineno,
 		   nargs);
+	  set_type (ctx, myself, &t_any);
 	  ctx->nerrors++;
 	}
     }
@@ -4351,7 +4565,6 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
 {
   node_expr_bin_t *n;
   node_expr_t *l, *e;
-  size_t nrecs;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
   n->gc.type = T_NULL;
@@ -4371,18 +4584,32 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
   GC_START(ctx->gc_ctx, 1);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   add_parent (ctx, db, (node_expr_t *)n);
-  for (l=tuple, nrecs=1; l!=NULL; l=BIN_RVAL(l))
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
     {
       e = BIN_LVAL(l);
       if (!is_logical_variable(e))
-	{
-	  add_parent (ctx, e, (node_expr_t *)n);
-	  nrecs++;
-	}
+	add_parent (ctx, e, (node_expr_t *)n);
     }
-  n->npending_argtypes = nrecs;
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static int is_basic_type (type_t *t)
+{
+  if (t==NULL)
+    return 1;
+  if (strcmp (t->name, "int") &&
+      strcmp (t->name, "uint") &&
+      strcmp (t->name, "str") &&
+      strcmp (t->name, "bstr") &&
+      strcmp (t->name, "ipv4") &&
+      strcmp (t->name, "ipb6") &&
+      strcmp (t->name, "float") &&
+      strcmp (t->name, "ctime") &&
+      strcmp (t->name, "timeval") &&
+      strcmp (t->name, "snmpoid"))
+    return 0;
+  return 1;
 }
 
 static void buf_puts (gc_t *gc_ctx, char *s, char **bufp, size_t *lenp, size_t *sizep)
@@ -4410,8 +4637,35 @@ static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *mysel
   size_t len, bufsize;
   char *delim;
   type_t *t;
+  int err;
 
   tuple = MON_VAL(n);
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      t = BIN_LVAL(l)->stype;
+      if (t==NULL || t==&t_any)
+	return; /* not enough info yet (NULL), or type error that we just
+		   propagate, without any spurious error message */
+    }
+  err = 0;
+  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+    {
+      t = BIN_LVAL(l)->stype;
+      if (!is_basic_type (t))
+	{
+	  if (BIN_LVAL(l)->file!=NULL)
+	    fprintf (stderr, "%s:", STR(BIN_LVAL(l)->file));
+	  /* printing STR(BIN_LVAL(l)->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: type error: tuple argument has non-basic type %s.\n",
+	       BIN_LVAL(l)->lineno, t->name);
+	  set_type (ctx, myself, &t_any);
+	  ctx->nerrors++;
+	  err++;
+	}
+    }
+  if (err)
+    return;
   bufsize = 128;
   len = 0;
   buf_puts (ctx->gc_ctx, "db[", &buf, &len, &bufsize);
@@ -4425,14 +4679,13 @@ static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *mysel
   buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
   t = stype_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
   gc_base_free (buf);
-  set_type (ctx, (node_expr_t *)n, t);
+  set_type (ctx, myself, t);
 }
 
 node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
 {
   node_expr_mon_t *n;
   node_expr_t *l;
-  size_t nrecs;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t), &node_expr_mon_class);
   n->gc.type = T_NULL;
@@ -4451,13 +4704,8 @@ node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
   GC_TOUCH (ctx->gc_ctx, n->val = tuple);
   GC_START(ctx->gc_ctx, 1);
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  nrecs = 0;
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
-    {
-      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
-      nrecs++;
-    }
-  n->npending_argtypes = nrecs; /* not 0 because tuples are non-empty */
+    add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
 }
@@ -4465,66 +4713,72 @@ node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
 static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
-  node_expr_t *tuple, *l;
-  char *buf;
-  size_t len, bufsize;
-  char *delim;
-  type_t *t;
+  node_expr_t *collect;
+  node_expr_t *returns, *l;
+  type_t *t, *rett, *restype;
 
-  tuple = BIN_LVAL(n);
-  bufsize = 128;
-  len = 0;
-  buf_puts (ctx->gc_ctx, "db[", &buf, &len, &bufsize);
-  delim = "";
-  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
+  returns = BIN_LVAL(n);
+  collect = BIN_RVAL(BIN_LVAL(BIN_RVAL(n)));
+  t = collect->stype;
+  for (l=returns; l!=NULL; l=BIN_RVAL(l))
     {
-      buf_puts (ctx->gc_ctx, delim, &buf, &len, &bufsize);
-      delim = ",";
-      buf_puts (ctx->gc_ctx, BIN_LVAL(l)->stype->name, &buf, &len, &bufsize);
+      rett = MON_VAL(BIN_LVAL(l))->stype;
+      restype = stype_join (t, rett);
+      if (restype==&t_any)
+	{
+	  if (BIN_LVAL(l)->file!=NULL)
+	    fprintf (stderr, "%s:", STR(BIN_LVAL(l)->file));
+	  /* printing STR(BIN_LVAL(l)->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: type error: return %s, expected %s.\n",
+		   BIN_LVAL(l)->lineno,
+		   t->name, rett->name);
+	  ctx->nerrors++;
+	  t = &t_any;
+	  break;
+	}
+      t = restype;
     }
-  buf_puts (ctx->gc_ctx, "]", &buf, &len, &bufsize);
-  t = stype_from_string (ctx->gc_ctx, buf, 1, T_DB_MAP);
-  gc_base_free (buf);
   set_type (ctx, (node_expr_t *)n, t);
 }
 
 
-node_expr_t *build_db_collect(rule_compiler_t *ctx, node_expr_t *tuple,
+node_expr_t *build_db_collect(rule_compiler_t *ctx,
+			      node_expr_t *actions,
+			      node_expr_t *collect,
+			      node_expr_t *returns,
 			      node_expr_t *patterns)
 {
   node_expr_bin_t *n;
   node_expr_t *l;
-  size_t nrecs;
+  node_expr_t *action;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
   n->gc.type = T_NULL;
   n->type = NODE_DB_COLLECT;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
+  GC_START(ctx->gc_ctx, 1);
+  action = build_expr_cons (ctx, actions, collect);
+  GC_UPDATE(ctx->gc_ctx, 0, action);
   n->hash = h_pair (NODE_DB_COLLECT,
-		    h_cons (tuple, (patterns==NULL)?H_NULL:patterns->hash));
-  /* hash = '(NODE_DB_COLLECT tuple pat1 ... patn)' mod bigprime */
-  /* note that tuple->hash is correct, because tuples are never empty */
+		    h_cons (returns,
+			    h_cons (action,
+				    (patterns==NULL)?H_NULL:patterns->hash)));
+  /* hash = '(NODE_DB_COLLECT returns (actions . collect) pat1 ... patn)' mod bigprime */
   n->stype = NULL;
   n->compute_stype = compute_stype_db_collect;
   n->parents = NULL;
   n->op = -1;
-  GC_TOUCH (ctx->gc_ctx, n->lval = tuple);
-  GC_TOUCH (ctx->gc_ctx, n->rval = patterns);
-  GC_START(ctx->gc_ctx, 1);
+  action = build_expr_cons (ctx, action, patterns);
+  GC_TOUCH (ctx->gc_ctx, n->rval = action);
+  GC_TOUCH (ctx->gc_ctx, n->lval = returns);
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  nrecs = 0;
   for (l=patterns; l!=NULL; l=BIN_RVAL(l))
-    {
-      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
-      nrecs++;
-    }
-  for (l=tuple; l!=NULL; l=BIN_RVAL(l))
-    {
-      add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
-      nrecs++;
-    }
-  n->npending_argtypes = nrecs; /* not 0 because tuples are non-empty */
+    add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
+  for (l=returns; l!=NULL; l=BIN_RVAL(l))
+    add_parent (ctx, BIN_LVAL(l), (node_expr_t *)n);
+  add_parent (ctx, collect, (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
 }
@@ -4564,7 +4818,6 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
   /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
@@ -4610,7 +4863,6 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
   /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
@@ -4639,7 +4891,6 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   
   /* resolve host name */
@@ -4712,7 +4963,6 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -4785,7 +5035,6 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -4821,7 +5070,6 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -4869,7 +5117,6 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -4915,7 +5162,6 @@ node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -4963,7 +5209,6 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
   /* hash = '(NODE_CONST T_REGEX r e g e x)' mod bigprime */
   n->stype = NULL; /* not known yet */
   n->compute_stype = NULL;
-  n->npending_argtypes = 0;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -5162,16 +5407,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
       ctx->nerrors++;
       return SYM_RES_ID(sync_var);
     }
-  if (strcmp (t->name, "int") &&
-      strcmp (t->name, "uint") &&
-      strcmp (t->name, "str") &&
-      strcmp (t->name, "bstr") &&
-      strcmp (t->name, "ipv4") &&
-      strcmp (t->name, "ipb6") &&
-      strcmp (t->name, "float") &&
-      strcmp (t->name, "ctime") &&
-      strcmp (t->name, "timeval") &&
-      strcmp (t->name, "snmpoid"))
+  if (!is_basic_type(t))
     {
       if (node_rule->file!=NULL)
 	fprintf (stderr, "%s:", STR(node_rule->file));
@@ -5377,6 +5613,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 
   check_var_usage (ctx, node_rule);
   check_epsilon_transitions (ctx, node_rule);
+  type_check (ctx, node_rule);
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
@@ -5728,6 +5965,13 @@ static void compile_bytecode_stmt(node_expr_t *expr,
       code->stack_level--;
       break;
 
+  case NODE_RETURN:
+    compile_bytecode_expr (MON_VAL(expr), code);
+    EXIT_IF_BYTECODE_BUFF_FULL(1);
+    code->bytecode[code->pos++] = OP_END;
+    code->stack_level--;
+    break;
+
   case NODE_COND:
     {
       unsigned int label_end = NEW_LABEL(code->labels);
@@ -5972,7 +6216,8 @@ static void compile_bytecode_db_patterns (int nvars,
     }
 }
 
-static void compile_bytecode_db_collect (node_expr_t *head,
+static void compile_bytecode_db_collect (node_expr_t *actions,
+					 node_expr_t *head,
 					 node_expr_t *patterns,
 					 bytecode_buffer_t *code)
 /* patterns is not NULL */
@@ -5983,6 +6228,7 @@ static void compile_bytecode_db_collect (node_expr_t *head,
   size_t newsz, oldsz;
   int *old_logicals;
   int save_stack_level;
+  node_expr_t *l;
   unsigned int label_end = NEW_LABEL(code->labels);
 
   save_stack_level = code->stack_level;
@@ -6017,6 +6263,8 @@ static void compile_bytecode_db_collect (node_expr_t *head,
     if (varpos[i] >= 0)
       code->logicals[i] = code->stack_level + varpos[i];
   gc_base_free(varpos);
+  for (l=actions; l!=NULL; l=BIN_RVAL(l))
+    compile_bytecode_stmt(BIN_LVAL(l), code);
   compile_bytecode_expr (head, code);
   EXIT_IF_BYTECODE_BUFF_FULL(1);
   code->bytecode[code->pos++] = OP_END;
@@ -6107,7 +6355,10 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       break;
 
     case NODE_DB_COLLECT:
-      compile_bytecode_db_collect(BIN_LVAL(expr), BIN_RVAL(expr),
+      expr = BIN_RVAL(expr); /* skip 'returns' part */
+      compile_bytecode_db_collect(BIN_LVAL(BIN_LVAL(expr)),
+				  BIN_RVAL(BIN_LVAL(expr)),
+				  BIN_RVAL(expr),
 				  code);
       break;
 
@@ -6208,6 +6459,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       }
     case NODE_REGSPLIT:
     case NODE_IFSTMT:
+    case NODE_RETURN:
       DPRINTF( ("Rule compiler expr : statement encountered (%i)\n", expr->type) );
       break;
     case NODE_DB_PATTERN: /*should not happen */
@@ -6302,6 +6554,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
       return;
     case NODE_IFSTMT:
     case NODE_UNKNOWN:
+    case NODE_RETURN:
       DPRINTF( ("Rule compiler cond : statement encountered (%i)\n", expr->type) );
       return;
     default:
@@ -6557,6 +6810,10 @@ void fprintf_expr(FILE *fp, node_expr_t *expr)
 	fprintf(fp, "call %s\n", CALL_SYM(expr));
 	break;
       }
+    case NODE_RETURN:
+      fputs ("return ", fp);
+      fprintf_expr (fp, MON_VAL(expr));
+      break;
     case NODE_EVENT:
       if (BIN_LVAL(expr)!=NULL)
 	fprintf_expr(fp, BIN_LVAL(expr));
@@ -6581,6 +6838,7 @@ void fprintf_expr(FILE *fp, node_expr_t *expr)
 	node_expr_t *l;
 	node_expr_t *pat;
 
+	expr = BIN_RVAL(expr); /* skip 'returns' part */
 	for (l=BIN_RVAL(expr); l!=NULL; l=BIN_RVAL(l))
 	  {
 	    fputs ("for [", fp);
@@ -6590,13 +6848,55 @@ void fprintf_expr(FILE *fp, node_expr_t *expr)
 	    fprintf_expr (fp, BIN_LVAL(pat));
 	  }
 	fputs ("collect ", fp);
-	fprintf_expr (fp, BIN_LVAL(expr));
+	fprintf_expr (fp, BIN_LVAL(BIN_LVAL(expr)));
+	fprintf_expr (fp, BIN_RVAL(BIN_LVAL(expr)));
       }
       break;
     case NODE_DB_SINGLETON:
       fputs ("db_singleton ", fp);
       fprintf_tuple (fp, MON_VAL(expr));
       break;
+    case NODE_CONS:
+      {
+	node_expr_t *l;
+
+	for (l=expr; l!=NULL; l=BIN_RVAL(l))
+	  fprintf_expr (fp, BIN_LVAL(l));
+      }
+      break;
+    case NODE_IFSTMT:
+      fputs ("if: ", fp);
+      fprintf_expr (fp, IF_COND (expr));
+      fputs ("then: ", fp);
+      fprintf_expr (fp, IF_THEN (expr));
+      fputs ("else: ", fp);
+      fprintf_expr (fp, IF_ELSE (expr));
+      break;
+    case NODE_ASSOC:
+      fprintf (fp, "%s = ", SYM_NAME(BIN_LVAL(expr)));
+      fprintf_expr (fp, BIN_RVAL(expr));
+      break;
+    case NODE_REGSPLIT:
+      {
+	size_t i, n;
+	char *delim;
+
+	fprintf (fp, "split %s ", REGEXSTR(REGSPLIT_PAT(expr)));
+	if (REGSPLIT_DEST_VARS(expr)!=NULL)
+	  {
+	    delim = "/";
+	    n = REGSPLIT_DEST_VARS(expr)->vars_nb;
+	    for (i=0; i<n; i++)
+	      {
+		fputs (delim, fp);
+		delim = ",";
+		fputs (SYM_NAME(REGSPLIT_DEST_VARS(expr)->vars[i]), fp);
+	      }
+	    fputs ("/ ", fp);
+	  }
+	fprintf_expr (fp, REGSPLIT_STRING(expr));
+	break;
+      }
     default:
       fprintf_term_expr(fp, expr);
       break;
@@ -6629,6 +6929,9 @@ static void fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
       break;
     case NODE_CALL:
       fprintf(fp, "%s() ", CALL_SYM(expr));
+      break;
+    case NODE_RETURN:
+      fprintf (fp, "return");
       break;
     default:
       fprintf(fp, "unknown node type (%i)\n", expr->type);

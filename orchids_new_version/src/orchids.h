@@ -748,6 +748,10 @@ struct type_heap_s; /* defined in rule_compiler.h */
 /**   @var rule_compiler_s::last_rule
  **     Last rule in the list
  **/
+/**   @var rule_compiler_s::returns
+ **     Stack (list) of lists of 'return expr' expression nodes
+ **     Each level of the stack is for a different scope.
+ **/
 /**   @var rule_compiler_s::type_stack
  **     Stack of nodes whose type we do not know yet
  **/
@@ -783,6 +787,7 @@ struct rule_compiler_s
   int32_t           dyn_var_name_sz;
   rule_t           *first_rule;
   rule_t           *last_rule;
+  struct node_expr_s *returns;
   /* Type-checking: */
   struct type_heap_s *type_stack;
   int nerrors;

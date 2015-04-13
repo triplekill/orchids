@@ -122,10 +122,11 @@ type_t t_regex = { "regex", T_REGEX };
 type_t t_snmpoid = { "snmpoid", T_SNMPOID };
 type_t t_event = { "event", T_EVENT };
 type_t t_mark = { "mark", T_STATE_INSTANCE };
+type_t t_db_any = { "db[*]", T_DB_EMPTY };
 
 /* Special types */
+type_t t_void = { "void", T_NULL };
 type_t t_any = { "*", 128 };
-type_t t_db_empty = { "db[*]", T_DB_EMPTY };
 
 static int resolve_ipv4_g = 0;
 static int resolve_ipv6_g = 0;

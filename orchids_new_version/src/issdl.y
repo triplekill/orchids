@@ -81,12 +81,12 @@ extern int display_func(void *data, void *param);
 %left O_AND
 %left EQCOMPARE NOTEQUAL REGEX_MATCH REGEX_NOTMATCH
 %left GREATER LESS GREATER_EQ LESS_EQ
+%nonassoc COLLECT
 %left O_PLUS O_PLUS_EVENT O_MINUS
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS O_NOT BANG
-%nonassoc COLLECT
 
-%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN /* Special keywords */
+%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN RETURN /* Special keywords */
 %token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT O_DB C_DB EQ /* Punctuation */
 %token SEMICOLUMN SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_IPV6 KW_TIMEVAL KW_REGEX
@@ -106,7 +106,7 @@ extern int display_func(void *data, void *param);
 %type <node_state> state statedefs
 %type <node_expr> states statelist
 %type <node_rule> rule
-%type <node_expr> actionlist actions actionblock
+%type <node_expr> actionlist actions actionblock optional_actionblock
 %type <node_expr> action ifstatement
 %type <node_expr> transitionlist transitions
 %type <node_trans> transition
@@ -114,7 +114,8 @@ extern int display_func(void *data, void *param);
 %type <node_syncvarlist> sync_var_list synchro
 
 %type <string> string
-%type <depth> o_split o_parent eq ifkw o_brace o_open_event o_plus_event o_db for and
+%type <depth> o_split return o_parent eq ifkw o_brace o_brace_new_scope
+%type <depth> o_open_event o_plus_event o_db for and
 %type <depth> expect goto statekw rulekw o_minus
 
 %%
@@ -251,6 +252,9 @@ optional_var_list : { $$ = NULL; }
 o_split : SPLIT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
+return : RETURN { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
 action:
   expr SEMICOLUMN
   { RESULT($$, $1); }
@@ -258,6 +262,8 @@ action:
   { RESULT_DROP($$,$1, build_string_split(compiler_ctx_g, $6, $2, $4)); }
 | ifstatement
   { RESULT($$, $1); }
+| return expr SEMICOLUMN
+  { RESULT_DROP($$,$1, build_expr_return(compiler_ctx_g, $2)); }
 ;
 
 o_parent : O_PARENT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
@@ -359,8 +365,11 @@ expr:
 | NOTHING { RESULT($$, build_db_nothing(compiler_ctx_g)); }
 | o_db db_tuple C_DB
   { RESULT_DROP($$,$1,build_db_singleton(compiler_ctx_g,$2)); }
-| db_patterns COLLECT expr
-  { RESULT($$, build_db_collect(compiler_ctx_g,$3,$1)); }
+| db_patterns optional_actionblock COLLECT expr
+  { RESULT($$, build_db_collect(compiler_ctx_g,$2,$4,
+				BIN_LVAL(compiler_ctx_g->returns),$1));
+    GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns = BIN_RVAL(compiler_ctx_g->returns));
+  }
 ;
 
 
@@ -435,6 +444,15 @@ transitionlist: /* returns reversed list of transitions */
 o_brace : O_BRACE { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
+o_brace_new_scope : O_BRACE
+{
+  GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns =
+	    build_expr_cons (compiler_ctx_g, NULL,
+			     compiler_ctx_g->returns));
+  $$ = COMPILE_GC_DEPTH(compiler_ctx_g);
+}
+;
+
 o_open_event : O_OPEN_EVENT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
@@ -451,6 +469,19 @@ actionblock:
   { $$ = NULL; }
 | action
   {  RESULT($$, build_expr_action(compiler_ctx_g, $1, NULL)); }
+
+optional_actionblock:
+{
+  GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns =
+	    build_expr_cons (compiler_ctx_g, NULL,
+			     compiler_ctx_g->returns));
+  $$ = NULL;
+}
+| o_brace_new_scope C_BRACE
+  { $$ = NULL; }
+| o_brace_new_scope actions C_BRACE
+  { RESULT_DROP($$,$1, $2); }
+;
 
 ifkw : IF { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
