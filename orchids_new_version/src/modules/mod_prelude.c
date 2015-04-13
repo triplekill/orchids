@@ -29,7 +29,7 @@ input_module_t mod_prelude;
 #define RETURN_OVM_INT(x) return ovm_int_new(gc_ctx, x)
 #define RETURN_OVM_UINT(x) return ovm_uint_new(gc_ctx, x)
 
-static type_t t_prelude = { "prelude", NULL, T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_prelude = { "prelude", T_EXTERNAL }; /* convertible with xmldoc type */
 
 field_t prelude_fields[MAX_PRELUDE_FIELDS] = {
 { "prelude.ptr",		   &t_prelude, "prelude alert pointer"           }

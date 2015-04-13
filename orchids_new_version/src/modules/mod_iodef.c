@@ -598,7 +598,7 @@ static void set_csirt_name(orchids_t *ctx, mod_entry_t *mod,
   cfg->CSIRT_name = dir->args;
 }
 
-static type_t t_iodef = { "xmldoc", NULL, T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_iodef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
 
 static const type_t *iodef_new_report_sig[] = { &t_iodef };
 static const type_t **iodef_new_report_sigs[] = { iodef_new_report_sig, NULL };

@@ -48,7 +48,7 @@
 
 input_module_t mod_idmef;
 
-static type_t t_idmef = { "xmldoc", NULL, T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_idmef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
 
 field_t idmef_fields[MAX_IDMEF_FIELDS] = {
   { "idmef.ptr",		    &t_idmef ,"idmef xml doc"   }

@@ -450,7 +450,7 @@ issdl_dump_xml(orchids_t *ctx, state_instance_t *state)
 }
 #endif
 
-static type_t t_xmldoc = { "xmldoc", NULL, T_EXTERNAL };
+static type_t t_xmldoc = { "xmldoc", T_EXTERNAL };
 
 static const type_t *xml_set_str_sig[] = { &t_int, &t_xmldoc, &t_str, &t_str }; /* returns 0 or 1, in fact */
 static const type_t **xml_set_str_sigs[] = { xml_set_str_sig, NULL };
