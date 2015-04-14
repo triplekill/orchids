@@ -57,7 +57,7 @@ typedef struct idmef_buf_t
 struct ovm_var_s;
 struct ovm_var_s *idmef_generate_alert(orchids_t	*ctx,
 				       mod_entry_t	*mod,
-				       state_instance_t *state)
+				       state_instance_t *state);
 
 static int idmef_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
 

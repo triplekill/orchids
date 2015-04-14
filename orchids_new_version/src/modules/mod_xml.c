@@ -31,6 +31,7 @@
 #include "orchids.h"
 #include "lang.h"
 #include "ovm.h"
+#include "mod_utils.h"
 #include "mod_xml.h"
 
 
@@ -236,7 +237,7 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var1, *var2, *var3, *var4;
   char *str2, *str3, *str4;
-  xml_doc_t	*xml_doc;
+  xmlDocPtr doc;
   xmlNode	*node = NULL;
   xmlChar	*prop_name;
   xmlChar	*prop_value;
@@ -274,7 +275,8 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  if ((xml_doc = EXTPTR(var1)) == NULL)
+  doc = XMLDOC_RW(ctx->gc_ctx, state, var1);
+  if (doc==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "error : xmldoc is null\n");
       STACK_DROP(ctx->ovm_stack, 4);
@@ -283,7 +285,8 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str2 = ovm_strdup (ctx->gc_ctx, var2);
-  if (!(node = xml_walk_and_create(xml_doc->xpath_ctx, BAD_CAST str2)))
+  if (!(node = xml_walk_and_create(XMLPATHCTX(var1),
+				   BAD_CAST str2)))
     {
       gc_base_free (str2);
       STACK_DROP(ctx->ovm_stack, 4);
@@ -292,9 +295,9 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str3 = ovm_strdup (ctx->gc_ctx, var3);
-  prop_name = xmlEncodeEntitiesReentrant(xml_doc->doc, BAD_CAST str3);
+  prop_name = xmlEncodeEntitiesReentrant(doc, BAD_CAST str3);
   str4 = ovm_strdup (ctx->gc_ctx, var4);
-  prop_value = xmlEncodeEntitiesReentrant(xml_doc->doc, BAD_CAST str4);
+  prop_value = xmlEncodeEntitiesReentrant(doc, BAD_CAST str4);
   xmlSetProp(node, prop_name, prop_value);
   gc_base_free (str2);
   gc_base_free (str3);
@@ -403,14 +406,14 @@ void free_xml_doc(void *ptr)
 /**
  * Create a new extern variable for xml documents
  */
-static xml_free (void *obj)
+static void xml_free (void *obj)
 {
   xmlFreeDoc (obj);
 }
 
 static void *xml_copy (void *obj)
 {
-  return xmlCopy (obj, 1);
+  return xmlCopyDoc (obj, 1);
 }
 
 static thread_local_class_t xml_thread_local_class = {
@@ -422,7 +425,6 @@ ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx
 		       char *description)
 {
   ovm_var_t *res;
-  xml_doc_trie_t *trie;
   xml_doc_t *xdoc;
 
   xdoc = gc_base_malloc(gc_ctx, sizeof(xml_doc_t));
@@ -475,6 +477,7 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_dump_xml,
                          "xml_dump",
 			 1, xml_dump_sigs,
+			 m_random,
                          "dump xml doc on stderr");
 #endif
 
@@ -482,18 +485,21 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_xml_get_string,
                          "xml_get_str",
 			 2, xml_get_str_sigs,
+			 m_random,
                          "get a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_string,
                          "xml_set_str",
 			 3, xml_set_str_sigs,
+			 m_random,
                          "set a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_attr_string,
                          "xml_set_prop",
 			 4, xml_set_prop_sigs,
+			 m_random,
                          "set a node property following an xpath request");
 
   return NULL;

@@ -44,6 +44,7 @@
 #include "evt_mgr.h"
 #include "mod_mgr.h"
 #include "util/hash.h"
+#include "mod_utils.h"
 #include "mod_iodef.h"
 #include "file_cache.h"
 #include "html_output.h"
@@ -429,7 +430,7 @@ static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
 
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
-  res = generate_report (ctx, mod_entry, state);
+  res = iodef_generate_report (ctx, mod_entry, state);
   PUSH_VALUE(ctx, res);
 }
 
@@ -622,12 +623,14 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			issdl_generate_report,
 			"iodef_new_report",
 			 0, iodef_new_report_sigs,
+			 m_random,
 			"generate a report using the iodef template");
 
   register_lang_function(ctx,
 			issdl_iodef_write_report,
 			"iodef_write_report",
 			 0, iodef_write_report_sigs,
+			 m_random,
 			"write iodef report into the report folder");
 
 

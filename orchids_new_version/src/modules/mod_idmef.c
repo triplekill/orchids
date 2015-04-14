@@ -44,6 +44,7 @@
 
 #include "mod_mgr.h"
 #include "mod_idmef.h"
+#include "mod_utils.h"
 #include "mod_xml.h"
 
 input_module_t mod_idmef;
@@ -51,7 +52,7 @@ input_module_t mod_idmef;
 static type_t t_idmef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
 
 field_t idmef_fields[MAX_IDMEF_FIELDS] = {
-  { "idmef.ptr",		    &t_idmef ,"idmef xml doc"   }
+  { "idmef.ptr", &t_idmef, MONO_UNKNOWN, "idmef xml doc"   }
 };
 
 static ovm_var_t* parse_idmef_datetime(gc_t *gc_ctx, char *datetime)
@@ -141,9 +142,9 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
     char	*text;
     int		text_len;
 
-    if ((text = xml_get_string(xml_doc, cfg->field_xpath[c])) != NULL)
+    if ((text = xml_get_string((xml_doc_t *)EXTPTR(doc), cfg->field_xpath[c])) != NULL)
     {
-      switch (idmef_fields[c].type)
+      switch (idmef_fields[c].type->tag)
       {
 	case T_STR :
 	case T_VSTR :
@@ -466,12 +467,14 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 issdl_idmef_new_alert,
 			 "idmef_new_alert",
 			 0, idmef_new_alert_sigs,
+			 m_random,
 			 "generate an idmef alert");
 
   register_lang_function(ctx,
 			 issdl_idmef_write_alert,
 			 "idmef_write_alert",
 			 0, idmef_write_alert_sigs,
+			 m_random,
 			 "write idmef alert into the report folder");
 
   return cfg;
@@ -487,7 +490,7 @@ static void idmef_postconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 static void add_field(orchids_t *ctx, char *field_name, char *path,
-		      idmef_cfg_t *cfg, int type)
+		      idmef_cfg_t *cfg, type_t *type)
 {
   if (cfg->nb_fields == MAX_IDMEF_FIELDS)
   {
@@ -530,13 +533,13 @@ static void dir_add_field(orchids_t *ctx, mod_entry_t *mod,
   *pos = '\0';
 
   if (!strcmp(dir->directive, "str_field"))
-    add_field(ctx, dir->args, pos + 1, mod->config, T_STR);
+    add_field(ctx, dir->args, pos + 1, mod->config, &t_str);
   else if (!strcmp(dir->directive, "time_field"))
-    add_field(ctx, dir->args, pos + 1, mod->config, T_CTIME);
+    add_field(ctx, dir->args, pos + 1, mod->config, &t_ctime);
   else if (!strcmp(dir->directive, "ipv4_field"))
-    add_field(ctx, dir->args, pos + 1, mod->config, T_IPV4);
+    add_field(ctx, dir->args, pos + 1, mod->config, &t_ipv4);
   else if (!strcmp(dir->directive, "int_field"))
-    add_field(ctx, dir->args, pos + 1, mod->config, T_INT);
+    add_field(ctx, dir->args, pos + 1, mod->config, &t_int);
 }
 
 static void dir_set_analyzer_info(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)

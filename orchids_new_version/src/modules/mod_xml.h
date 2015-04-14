@@ -20,8 +20,10 @@
    This is similar to the notion of buffer-local variable in Emacs.
 */
 
+struct thread_local_obj_s;
+
 typedef struct xml_doc_s {
-  thread_local_obj_t *tl; /* see mod_utils.h; objets stored are of C type xmlDocPtr */
+  struct thread_local_obj_s *tl; /* see mod_utils.h; objets stored are of C type xmlDocPtr */
   xmlXPathContextPtr xpath_ctx;
 } xml_doc_t;
 
@@ -34,8 +36,8 @@ ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx
 
 #define XMLPATHCTX(var) ((xml_doc_t *)EXTPTR(var))->xpath_ctx
 
-char*xml_get_string(xml_doc_t	*xml_doc,
-		    char	*path);
+char *xml_get_string(xml_doc_t	*xml_doc,
+		     char	*path);
 
 xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
 				xmlChar	*path);
