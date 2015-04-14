@@ -41,6 +41,7 @@
 #define NODE_DB_COLLECT 14
 #define NODE_DB_SINGLETON 15
 #define NODE_RETURN 16
+#define NODE_BREAK 17
 
 #define EXIT_IF_BYTECODE_BUFF_FULL(x)		\
   do { \
@@ -810,6 +811,12 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
  **/
 node_expr_t *build_expr_return(rule_compiler_t *ctx,
 			       node_expr_t *arg_node);
+
+/**
+ * Build a break expression node.
+ * @return A new allocated expression node.
+ **/
+node_expr_t *build_expr_break(rule_compiler_t *ctx);
 
 /**
  * Build a cons node.

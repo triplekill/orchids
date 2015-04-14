@@ -1762,11 +1762,19 @@ db_map *db_collect (gc_t *gc_ctx, int nfields_res, int nfields, db_map *m,
       GC_START(gc_ctx,2);
       left = db_collect (gc_ctx, nfields_res, nfields, m->what.branch.left,
 			 do_collect, data);
-      GC_UPDATE(gc_ctx,0,left);
-      right = db_collect (gc_ctx, nfields_res, nfields, m->what.branch.right,
-			  do_collect, data);
-      GC_UPDATE(gc_ctx,1,right);
-      res = db_union (gc_ctx, nfields_res, left, right);
+      if (left!=NULL)
+	{
+	  GC_UPDATE(gc_ctx,0,left);
+	  right = db_collect (gc_ctx, nfields_res, nfields, m->what.branch.right,
+			      do_collect, data);
+	  if (right!=NULL)
+	    {
+	      GC_UPDATE(gc_ctx,1,right);
+	      res = db_union (gc_ctx, nfields_res, left, right);
+	    }
+	  else res = left; /* and break there */
+	}
+      else res = NULL;
       GC_END(gc_ctx);
       break;
     case T_DB_SINGLETON:

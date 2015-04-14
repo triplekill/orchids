@@ -346,9 +346,14 @@
 #define OP_DUP 42
 
 /**
+ * Push NULL
+ **/
+#define OP_PUSHNULL 43
+
+/**
  ** Number of total opcodes.
  **/
-#define OPCODE_NUM 43
+#define OPCODE_NUM 44
 
 #endif /* OVM_H */
 

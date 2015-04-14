@@ -116,6 +116,11 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 		  offset, OP_PUSHONE);
 	  offset += 1;
 	  break;
+	case OP_PUSHNULL:
+	  fprintf(fp, "0x%04x: %08x             | pushnull\n",
+		  offset, OP_PUSHNULL);
+	  offset += 1;
+	  break;
 	case OP_PUSHSTATIC:
 	  fprintf(fp, "0x%04x: %08x %08lx    | pushstatic [%lu]\n",
 		  offset, OP_PUSHSTATIC, code[1], code[1]);
@@ -379,6 +384,11 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 	case OP_PUSHONE:
 	  fprintf(fp, "0x%04x: %02x       | pushone\n",
 		  offset, OP_PUSHONE);
+	  offset += 1;
+	  break;
+	case OP_PUSHNULL:
+	  fprintf(fp, "0x%04x: %02x       | pushnull\n",
+		  offset, OP_PUSHNULL);
 	  offset += 1;
 	  break;
 	case OP_PUSHSTATIC:
@@ -1541,12 +1551,17 @@ static int ovm_db_filter(isn_param_t *param)
   ip += spec.nfields;
   param->ip = ip;
   m = (db_map *)STACK_ELT(ctx->ovm_stack, nconsts+1);
-  spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
-  spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
-  for (i=0; i<nconsts; i++)
-    spec.hash[i] = issdl_hash(spec.constants[i]);
-  res = db_filter (ctx->gc_ctx, &spec, m);
-  gc_base_free(spec.hash);
+  if (m==NULL)
+    res = NULL;
+  else
+    {
+      spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
+      spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
+      for (i=0; i<nconsts; i++)
+	spec.hash[i] = issdl_hash(spec.constants[i]);
+      res = db_filter (ctx->gc_ctx, &spec, m);
+      gc_base_free(spec.hash);
+    }
   STACK_DROP(ctx->ovm_stack, nconsts+1);
   PUSH_VALUE(ctx,res);
   return 0;
@@ -1568,7 +1583,10 @@ static int ovm_db_join(isn_param_t *param)
   param->ip = ip;
   m1 = (db_map *)STACK_ELT(ctx->ovm_stack, 2);
   m2 = (db_map *)STACK_ELT(ctx->ovm_stack, 1);
-  res = db_join (ctx->gc_ctx, &spec, m1, m2);
+  if (m1==NULL || m2==NULL)
+    res = NULL;
+  else
+    res = db_join (ctx->gc_ctx, &spec, m1, m2);
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx,res);
   return 0;
@@ -1590,12 +1608,17 @@ static int ovm_db_proj(isn_param_t *param)
   ip += spec.nsubfields;
   param->ip = ip;
   m = (db_map *)STACK_ELT(ctx->ovm_stack, nconsts+1);
-  spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
-  spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
-  for (i=0; i<nconsts; i++)
-    spec.hash[i] = issdl_hash(spec.constants[i]);
-  res = db_proj (ctx->gc_ctx, &spec, m);
-  gc_base_free(spec.hash);
+  if (m==NULL)
+    res = NULL;
+  else
+    {
+      spec.constants = (ovm_var_t **)&STACK_ELT(ctx->ovm_stack, nconsts);
+      spec.hash = gc_base_malloc (ctx->gc_ctx, nconsts*sizeof(unsigned long));
+      for (i=0; i<nconsts; i++)
+	spec.hash[i] = issdl_hash(spec.constants[i]);
+      res = db_proj (ctx->gc_ctx, &spec, m);
+      gc_base_free(spec.hash);
+    }
   STACK_DROP(ctx->ovm_stack, nconsts+1);
   PUSH_VALUE(ctx,res);
   return 0;
@@ -1643,7 +1666,10 @@ static int ovm_db_map(isn_param_t *param)
   data.si = param->state;
   data.ip = ip+3;
   m = (db_map *)STACK_ELT(data.ctx->ovm_stack, 1);
-  res = db_collect_lazy (data.ctx->gc_ctx, nfields, m, do_ovm_db_map, &data);
+  if (m==NULL)
+    res = NULL;
+  else
+    res = db_collect_lazy (data.ctx->gc_ctx, nfields, m, do_ovm_db_map, &data);
   STACK_DROP(data.ctx->ovm_stack, 1);
   PUSH_VALUE(data.ctx, res);
   return 0;
@@ -1677,6 +1703,12 @@ static int ovm_dup(isn_param_t *param)
   return 0;
 }
 
+static int ovm_push_null(isn_param_t *param)
+{
+  DebugLog(DF_OVM, DS_DEBUG, "OP_PUSHNULL\n");
+  PUSH_VALUE(param->ctx, NULL);
+  return 0;
+}
 
 static ovm_insn_rec_t ops_g[] = {
   { NULL,           1, "end"        },
@@ -1722,6 +1754,7 @@ static ovm_insn_rec_t ops_g[] = {
   { ovm_db_map, 0, "db_map" },
   { ovm_db_single, 0, "db_single" },
   { ovm_dup, 0, "dup" },
+  { ovm_push_null, 0, "pushnull" },
   { NULL,           0, NULL         }
 };
 
@@ -1777,6 +1810,7 @@ static char *op_name[] = {
   "db_map",
   "db_single",
   "dup",
+  "pushnull",
   NULL
 };
 

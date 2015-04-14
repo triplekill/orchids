@@ -1001,6 +1001,7 @@ static void type_explore_expr (rule_compiler_t *ctx,
     case NODE_FIELD:
     case NODE_VARIABLE:
     case NODE_CONST:
+    case NODE_BREAK:
       break;
     case NODE_ASSOC:
       type_explore_expr (ctx, BIN_RVAL(expr));
@@ -1036,7 +1037,7 @@ static void type_explore_expr (rule_compiler_t *ctx,
       /* then explore collect: */
       type_explore_expr (ctx, BIN_RVAL(BIN_LVAL(BIN_RVAL(expr))));
       /* we don't need to explore returns, which is just a list
-	 of 'return' statements found inside actions */
+	 of 'return' and 'break' statements found inside actions */
       break;
     case NODE_DB_SINGLETON:
       for (l=MON_VAL(expr); l!=NULL; l=BIN_RVAL(l))
@@ -1407,6 +1408,7 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
     {
     case NODE_FIELD:
     case NODE_CONST:
+    case NODE_BREAK:
       break;
     case NODE_VARIABLE:
       res.mayread = vs_one_element (gc_ctx, SYM_RES_ID(e));
@@ -2002,6 +2004,7 @@ static void set_monotony_unknown_mayset (rule_compiler_t *ctx,
     case NODE_FIELD:
     case NODE_CONST:
     case NODE_VARIABLE:
+    case NODE_BREAK:
       break;
     case NODE_CALL:
       {
@@ -2261,11 +2264,12 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	return res;
       }
     case NODE_RETURN:
+    case NODE_BREAK:
       /* return compute_monotony (ctx, MON_VAL(e), vars); */
       /* No: 'return' never returns, i.e., never proceeds to the next
 	 instruction.  Hence the final value of compute_monotony()
 	 in this case should be top: MONO_CONST, and all vars
-	 set to MONO_CONST */
+	 set to MONO_CONST.  Same thing for 'break'. */
       {
 	size_t nvars, i;
 
@@ -2688,6 +2692,7 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
     case NODE_FIELD:
     case NODE_CONST:
     case NODE_VARIABLE:
+    case NODE_BREAK:
       break;
     case NODE_CALL:
       {
@@ -3664,6 +3669,51 @@ node_expr_t *build_expr_return(rule_compiler_t *ctx,
       /* STR() is NUL-terminated by construction */
       fprintf (stderr, "%u: Error: return not in scope of a database collect expression\n",
 	       arg_node->lineno);
+      ctx->nerrors++;
+    }
+  else
+    {
+      rest = BIN_LVAL(ctx->returns);
+      l = build_expr_cons (ctx, (node_expr_t *)n, rest);
+      GC_TOUCH (ctx->gc_ctx, BIN_LVAL(ctx->returns) = l);
+      l->hash = h_cons ((node_expr_t *)n, (rest==NULL)?H_NULL:rest->hash);
+    }
+  GC_END(ctx->gc_ctx);
+  return (node_expr_t *)n;
+}
+
+static void compute_stype_break (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  set_type (ctx, myself, &t_void);
+}
+
+node_expr_t *build_expr_break(rule_compiler_t *ctx)
+{
+  node_expr_mon_t *n;
+  node_expr_t *l, *rest;
+
+  GC_START(ctx->gc_ctx, 1);
+  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
+		&node_expr_mon_class);
+  n->gc.type = T_NULL;
+  n->type = NODE_BREAK;
+  GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
+  n->lineno = ctx->issdllineno;
+  n->hash = h_pair (NODE_BREAK, H_NULL);
+  /* hash = '(NODE_BREAK)' mod bigprime */
+  n->stype = NULL; /* not known yet */
+  n->compute_stype = compute_stype_break;
+  n->parents = NULL;
+  n->op = -1;
+  n->val = NULL;
+  GC_UPDATE(ctx->gc_ctx, 0, n);
+  if (ctx->returns==NULL)
+    {
+      if (ctx->currfile!=NULL)
+	fprintf (stderr, "%s:", STR(ctx->currfile));
+      /* STR() is NUL-terminated by construction */
+      fprintf (stderr, "%u: Error: break not in scope of a database collect expression\n",
+	       ctx->issdllineno);
       ctx->nerrors++;
     }
   else
@@ -4714,7 +4764,7 @@ static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
   node_expr_t *collect;
-  node_expr_t *returns, *l;
+  node_expr_t *returns, *l, *ret;
   type_t *t, *rett, *restype;
 
   returns = BIN_LVAL(n);
@@ -4722,7 +4772,10 @@ static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
   t = collect->stype;
   for (l=returns; l!=NULL; l=BIN_RVAL(l))
     {
-      rett = MON_VAL(BIN_LVAL(l))->stype;
+      ret = BIN_LVAL(l);
+      if (ret->type==NODE_BREAK)
+	continue; /* 'break' does not contribute to the final type */
+      rett = MON_VAL(ret)->stype;
       restype = stype_join (t, rett);
       if (restype==&t_any)
 	{
@@ -5972,6 +6025,13 @@ static void compile_bytecode_stmt(node_expr_t *expr,
     code->stack_level--;
     break;
 
+  case NODE_BREAK:
+    EXIT_IF_BYTECODE_BUFF_FULL(2);
+    code->bytecode[code->pos++] = OP_PUSHNULL;
+    code->bytecode[code->pos++] = OP_END;
+    /* code->stack_level += 0; */
+    break;
+
   case NODE_COND:
     {
       unsigned int label_end = NEW_LABEL(code->labels);
@@ -6460,6 +6520,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
     case NODE_REGSPLIT:
     case NODE_IFSTMT:
     case NODE_RETURN:
+    case NODE_BREAK:
       DPRINTF( ("Rule compiler expr : statement encountered (%i)\n", expr->type) );
       break;
     case NODE_DB_PATTERN: /*should not happen */
@@ -6555,6 +6616,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
     case NODE_IFSTMT:
     case NODE_UNKNOWN:
     case NODE_RETURN:
+    case NODE_BREAK:
       DPRINTF( ("Rule compiler cond : statement encountered (%i)\n", expr->type) );
       return;
     default:
@@ -6814,6 +6876,9 @@ void fprintf_expr(FILE *fp, node_expr_t *expr)
       fputs ("return ", fp);
       fprintf_expr (fp, MON_VAL(expr));
       break;
+    case NODE_BREAK:
+      fputs ("break\n", fp);
+      break;
     case NODE_EVENT:
       if (BIN_LVAL(expr)!=NULL)
 	fprintf_expr(fp, BIN_LVAL(expr));
@@ -6932,6 +6997,9 @@ static void fprintf_term_expr_infix(FILE *fp, node_expr_t *expr)
       break;
     case NODE_RETURN:
       fprintf (fp, "return");
+      break;
+    case NODE_BREAK:
+      fprintf (fp, "break");
       break;
     default:
       fprintf(fp, "unknown node type (%i)\n", expr->type);

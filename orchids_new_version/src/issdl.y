@@ -86,7 +86,7 @@ extern int display_func(void *data, void *param);
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS O_NOT BANG
 
-%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN RETURN /* Special keywords */
+%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN RETURN BREAK /* Special keywords */
 %token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT O_DB C_DB EQ /* Punctuation */
 %token SEMICOLUMN SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_IPV6 KW_TIMEVAL KW_REGEX
@@ -114,7 +114,7 @@ extern int display_func(void *data, void *param);
 %type <node_syncvarlist> sync_var_list synchro
 
 %type <string> string
-%type <depth> o_split return o_parent eq ifkw o_brace o_brace_new_scope
+%type <depth> o_split return break o_parent eq ifkw o_brace o_brace_new_scope
 %type <depth> o_open_event o_plus_event o_db for and
 %type <depth> expect goto statekw rulekw o_minus
 
@@ -255,6 +255,9 @@ o_split : SPLIT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 return : RETURN { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
+break : BREAK { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
 action:
   expr SEMICOLUMN
   { RESULT($$, $1); }
@@ -264,6 +267,8 @@ action:
   { RESULT($$, $1); }
 | return expr SEMICOLUMN
   { RESULT_DROP($$,$1, build_expr_return(compiler_ctx_g, $2)); }
+| break
+  { RESULT_DROP($$,$1, build_expr_break(compiler_ctx_g)); }
 ;
 
 o_parent : O_PARENT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
