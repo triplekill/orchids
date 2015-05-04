@@ -9,7 +9,6 @@ EXTRA_DIST =                  \
   07_mod_snare.conf.dist      \
   08_mod_rawsnare.conf.dist   \
   09_mod_netfilter.conf.dist  \
-  10_mod_prolog.conf.dist     \
   12_mod_generic.conf.dist    \
   13_mod_pcap.conf.dist       \
   14_mod_wifi.conf.dist       \
@@ -17,7 +16,6 @@ EXTRA_DIST =                  \
   16_mod_ruletrace.conf.dist  \
   17_mod_prelude.conf.dist    \
   18_mod_htmlstate.conf.dist  \
-  19_mod_prolog_history.conf.dist \
   20_mod_idmef.conf.dist \
   21_mod_iodef.conf.dist
 
@@ -30,7 +28,6 @@ orchidsconfd_DATA =         \
   07_mod_snare.conf         \
   08_mod_rawsnare.conf      \
   09_mod_netfilter.conf     \
-  10_mod_prolog.conf        \
   12_mod_generic.conf       \
   13_mod_pcap.conf          \
   14_mod_wifi.conf          \
@@ -38,7 +35,6 @@ orchidsconfd_DATA =         \
   16_mod_ruletrace.conf     \
   17_mod_prelude.conf	    \
   18_mod_htmlstate.conf     \
-  19_mod_prolog_history.conf \
   20_mod_idmef.conf \
   21_mod_iodef.conf
 

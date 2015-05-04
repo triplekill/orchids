@@ -28,11 +28,6 @@ pkglib_LTLIBRARIES = \
 
 
 
-if USE_SWIPROLOG
-pkglib_LTLIBRARIES += mod_prolog.la
-pkglib_LTLIBRARIES += mod_prolog_history.la
-endif
-
 if HAVE_LIBPCAP
 pkglib_LTLIBRARIES += mod_pcap.la
 pkglib_LTLIBRARIES += mod_prism2.la
@@ -75,30 +70,6 @@ mod_wifi_la_SOURCES = mod_wifi.c mod_wifi.h compat.h
 mod_wifi_la_LDFLAGS = -module -avoid-version
 mod_wifi_la_LIBADD = $(PCAPLIB)
 mod_wifi_la_CFLAGS = $(PCAPINC)
-endif
-
-if USE_SWIPROLOG
-mod_prolog_la_SOURCES = mod_prolog.c mod_prolog.h
-mod_prolog_la_LDFLAGS = -module -avoid-version $(SWIPL_LDFLAGS)
-mod_prolog_la_LIBADD = $(SWIPL_LDADD)
-mod_prolog_la_CFLAGS = $(SWIPL_CFLAGS)
-mod_prolog_la_DEPENDENCIES = mod_prolog.prc
-
-mod_prolog_history_la_SOURCES = mod_prolog_history.c mod_prolog_history.h
-mod_prolog_history_la_LDFLAGS = -module -avoid-version
-
-pkgdata_DATA = mod_prolog.prc
-
-# original line was:
-# pl -f none -F none -g true \
-# -t "consult([]),qsave_program('mod_prolog.prc',[toplevel=prolog,initfile=none])"
-#
-
-mod_prolog.prc:
-	$(SWIPL) -f none -F none -g true \
--t "consult([]),qsave_program('mod_prolog.prc',[toplevel=prolog])"
-
-
 endif
 
 mod_rawsnare_la_SOURCES = mod_rawsnare.c mod_rawsnare.h rawsnare.h
