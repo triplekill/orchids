@@ -22,8 +22,6 @@ LoadModule generic
 LoadModule netfilter
 LoadModule snmptrap
 LoadModule consoles
-LoadModule prolog
-#LoadModule prolog_history
 LoadModule period
 LoadModule pcap
 LoadModule wifi
@@ -32,3 +30,6 @@ LoadModule sharedvars
 LoadModule mark
 #LoadModule ruletrace
 #LoadModule prelude
+LoadModule xml
+LoadModule idmef
+LoadModule iodef

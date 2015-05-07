@@ -604,9 +604,7 @@ static void action_insert (gc_t *gc_ctx, action_tree_t **atpp,
   int i;
 
   for (s=ap->name; (c = *s++)!=0; )
-    { /* atp should always be non-NULL here. */
-      i = (int)(unsigned int)(unsigned char)c;
-      atpp = &atp->what.proceed[i];
+    {
       atp = *atpp;
       if (atp==NULL)
 	{
@@ -618,13 +616,19 @@ static void action_insert (gc_t *gc_ctx, action_tree_t **atpp,
 	}
       else if (atp->tag==TAG_END)
 	{
-	  DebugLog(DF_CORE,DS_ERROR,"field name has a prefix that was already registered as a field name\n");
+	  DebugLog(DF_CORE,DS_ERROR,
+		   "field name '%s' has a prefix that was already registered as a field name\n",
+		   ap->name);
 	  return;
 	}
+      i = (int)(unsigned int)(unsigned char)c;
+      atpp = &atp->what.proceed[i];
     }
-  if (atp!=NULL)
+  if (*atpp!=NULL)
     {
-      DebugLog(DF_CORE,DS_ERROR,"field name is equal to or a prefix of an already registered field name\n");
+      DebugLog(DF_CORE,DS_ERROR,
+	       "field name '%s' is equal to or a prefix of an already registered field name\n",
+	       ap->name);
       return;
     }
   atp = *atpp = gc_base_malloc (gc_ctx,
@@ -638,13 +642,8 @@ action_tree_t *compile_actions(gc_t *gc_ctx, action_t *actions)
 {
   action_tree_t *atp;
   action_t *ap;
-  int i;
 
-  atp = gc_base_malloc (gc_ctx, sizeof (action_tree_t));
-  atp->tag = TAG_PROCEED;
-  for (i=0; i<256; i++)
-    atp->what.proceed[i] = NULL;
-
+  atp = NULL;
   for (ap=actions; ap->name!=NULL; ap++)
     action_insert(gc_ctx, &atp, ap);
   return atp;

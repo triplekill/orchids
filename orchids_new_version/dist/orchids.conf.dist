@@ -19,15 +19,6 @@ MaxMemorySize 134217728
 
 SetModuleDir @@LIBDIR@@/orchids
 
-# Define preprocessor command for each rule file suffix.
-
-AddPreprocessorCmd .cpp.rule  cpp
-AddPreprocessorCmd  .m4.rule  m4
-
-# The default preprocessor is normally the "cat" command
-# It is set here to cpp for convenience
-SetDefaultPreprocessorCmd     cpp
-
 # This is the runtime user id in which Orchids will drop root provoleges.
 
 RuntimeUser @@RUNUSER@@

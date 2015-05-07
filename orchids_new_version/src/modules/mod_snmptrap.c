@@ -67,11 +67,11 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
 
   switch (TYPE(e))
     {
-    case T_BSTR: packet = BSTR(event->value);
-      packet_len = BSTRLEN(event->value);
+    case T_BSTR: packet = BSTR(e->value);
+      packet_len = BSTRLEN(e->value);
       break;
-    case T_VBSTR: packet = VBSTR(event->value);
-      packet_len = VBSTRLEN(event->value);
+    case T_VBSTR: packet = VBSTR(e->value);
+      packet_len = VBSTRLEN(e->value);
       break;
     default:
       DebugLog(DF_MOD, DS_DEBUG, "event not a binary string\n");
@@ -156,7 +156,15 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
   GC_UPDATE(gc_ctx, F_SPECIFIC_TRAPTYPE, val);
 
   val = ovm_ipv4_new (gc_ctx);
-  IPV4(val) = pdu.agent_addr;
+  IPV4(val).s_addr = htonl (*(in_addr_t *)pdu.agent_addr);
+  /* looking from code at
+     http://www.opensource.apple.com/source/net_snmp/net_snmp-9/net-snmp/apps/snmptrapd.c
+     the char agent_addr[4] array is just the in_addr_t we look for,
+     regardless of endianness;
+     (witness the following excerpt of the above:
+     host = gethostbyaddr((char *) pdu->agent_addr, 4, AF_INET);
+     )
+  */
   GC_UPDATE(gc_ctx, F_AGENT_ADDR, val);
 
   val = ovm_int_new (gc_ctx, pdu.time);
@@ -213,14 +221,15 @@ snmptrap_preconfig(orchids_t *ctx, mod_entry_t *mod)
   DebugLog(DF_MOD, DS_INFO, "load() snmptrap@%p\n", &mod_snmptrap);
 
 /*   init_snmp("mod_snmptrap"); */
-  init_mib();
+  netsnmp_init_mib();  /* used to be:  init_mib(),
+			  but that seems to be deprecated */
 #ifdef ORCHIDS_DEBUG
   snmp_set_do_debugging(10);
 #endif /* ORCHIDS_DEBUG */
 
   /* hard coded callback registration.
   ** optional goes in config directives */
-  port = Xzmalloc(ctx->gc_ctx, sizeof (int));
+  port = gc_base_malloc(ctx->gc_ctx, sizeof (int));
   *port = 162;
   register_conditional_dissector(ctx, mod, "udp",
 				 (void *)port, sizeof (int),
@@ -262,7 +271,8 @@ add_mib(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 
   DebugLog(DF_MOD, DS_INFO, "Adding MIB module '%s'\n", dir->args);
 
-  t = read_module(dir->args);
+  t = netsnmp_read_module (dir->args); /* was:  t = read_module(dir->args),
+					  but that seems to be deprecated */
   if (!t) {
     DebugLog(DF_MOD, DS_ERROR, "Error while adding MIB module '%s'\n", dir->args);
   }
@@ -295,6 +305,7 @@ static char *snmptrap_dependencies[] = {
 input_module_t mod_snmptrap = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
+  0,			    /* flags */
   "snmptrap",               /* module name */
   "CeCILL2",                /* module license */
   snmptrap_dependencies,    /* module dependencies */

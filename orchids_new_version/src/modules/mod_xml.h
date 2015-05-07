@@ -27,7 +27,7 @@ typedef struct xml_doc_s {
   xmlXPathContextPtr xpath_ctx;
 } xml_doc_t;
 
-extern char *xml_description;
+char *xml_desc (void);
 
 ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx,
 		       char *description);
@@ -45,10 +45,9 @@ xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
 char validate_xml_with_schema(xmlSchemaPtr	schema,
 			      char		*doc);
 
-xmlNode*
-new_xs_datetime_node(xmlNode	*parent,
-		     const char	*name,
-		     struct tm *time);
+xmlNode *new_xs_datetime_node(xmlNode *parent,
+			      const char *name,
+			      struct tm *time);
 
 xmlNodePtr
 xml_walk_and_create (xmlXPathContextPtr ctx,

@@ -134,7 +134,7 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
 		     BAD_CAST ("http://iana.org/idmef"));
 
   GC_START(gc_ctx, MAX_IDMEF_FIELDS+1);
-  val = ovm_xml_new (gc_ctx, doc, xpath_ctx, xml_description);
+  val = ovm_xml_new (gc_ctx, doc, xpath_ctx, xml_desc());
   GC_UPDATE (gc_ctx, F_PTR, val);
 
   for (c = 1; c < cfg->nb_fields; c++)
@@ -364,7 +364,7 @@ ovm_var_t *idmef_generate_alert(orchids_t	*ctx,
 	     xmlEncodeEntities(alert_root->doc,
 			       BAD_CAST buff));
 
-  return ovm_xml_new (ctx->gc_ctx, alert_doc, alert_ctx, xml_description);
+  return ovm_xml_new (ctx->gc_ctx, alert_doc, alert_ctx, xml_desc());
 }
 
 
@@ -396,7 +396,7 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 
   cfg = (idmef_cfg_t *)mod_entry->config;
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_description)
+  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_desc())
     {
       DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
       STACK_DROP(ctx->ovm_stack, 1);
@@ -576,28 +576,22 @@ static void dir_set_report_dir(orchids_t *ctx, mod_entry_t *mod,
 }
 
 static mod_cfg_cmd_t idmef_cfgcmds[] = {
-  { "str_field", dir_add_field, "Add a new field corresponding to a XPath query."},
-  { "time_field", dir_add_field, "Add a new field corresponding to a XPath query."},
-  { "ipv4_field", dir_add_field, "Add a new field corresponding to a XPath query."},
-  { "int_field", dir_add_field, "Add a new field corresponding to a XPath query."},
+  { "str_field", dir_add_field, "add a new field corresponding to a XPath query" },
+  { "time_field", dir_add_field, "add a new field corresponding to a XPath query" },
+  { "ipv4_field", dir_add_field, "add a new field corresponding to a XPath query" },
+  { "int_field", dir_add_field, "add a new field corresponding to a XPath query" },
 
-  { "AnalyzerId", dir_set_analyzer_info, "Set analyzer id."},
-  { "AnalyzerName", dir_set_analyzer_info, "Set analyzer name."},
-  { "AnalyzerNodeLocation", dir_set_analyzer_info, "Set analyzer location."},
-  { "AnalyzerNodeAddress", dir_set_analyzer_info, "Set analyzer address."},
-  { "AnalyzerNodeName", dir_set_analyzer_info, "Set analyzer node name."},
+  { "AnalyzerId", dir_set_analyzer_info, "set analyzer id" },
+  { "AnalyzerName", dir_set_analyzer_info, "set analyzer name" },
+  { "AnalyzerNodeLocation", dir_set_analyzer_info, "set analyzer location" },
+  { "AnalyzerNodeAddress", dir_set_analyzer_info, "set analyzer address" },
+  { "AnalyzerNodeName", dir_set_analyzer_info, "set analyzer node name" },
 
-  { "IDMEFOutputDir", dir_set_report_dir, "Write IDMEF reports in the directory."},
+  { "IDMEFOutputDir", dir_set_report_dir, "write IDMEF reports into given directory" },
   { NULL, NULL, NULL }
 };
 
-
-static char *idmef_deps[] = {
-  "udp",
-  "textfile",
-  NULL
-};
-
+char *idmef_deps[] = { "xml", NULL };
 
 input_module_t mod_idmef = {
   MOD_MAGIC,

@@ -8,7 +8,7 @@ SUBDIRS = conf.d htmlstate rules
 orchidsconf_DATA = orchids.conf orchids-rules.conf orchids-modules.conf \
 			orchids-inputs.conf
 
-%.conf: $(srcdir)/%.conf.dist
+%.conf: $(srcdir)/%.conf.dist $(srcdir)/../config.log
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
             -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
             -e 's#@@LIBDIR@@#$(libdir)#g' \

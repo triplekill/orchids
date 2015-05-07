@@ -420,7 +420,7 @@ ovm_var_t *iodef_generate_report(orchids_t	*ctx,
     xmlFreeDoc(iodef_doc);
   }
 
-  return ovm_xml_new (ctx->gc_ctx, report_doc, report_ctx, xml_description);
+  return ovm_xml_new (ctx->gc_ctx, report_doc, report_ctx, xml_desc());
 }
 
 static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
@@ -453,7 +453,7 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
   cfg = (iodef_cfg_t *)mod_entry->config;
 
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_description)
+  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_desc())
     {
       DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
       STACK_DROP(ctx->ovm_stack, 1);
@@ -649,13 +649,27 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return (mod_cfg);
 }
 
+static void set_full_dump(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  int flag;
+
+  DebugLog(DF_MOD, DS_INFO, "setting FullDump to %s\n", dir->args);
+
+  flag = strtol(dir->args, (char **)NULL, 10);
+  if (flag)
+    ((iodef_cfg_t *)mod->config)->full_dump = 1;
+}
+
 static mod_cfg_cmd_t iodef_dir[] =
 {
-  { "IODEFTemplatesDir", set_iodef_conf_dir, "Set IODEF templates directory"},
-  { "IODEFOutputDir", set_report_dir, "Write IODEF reports in a directory"},
-  { "CSIRTName", set_csirt_name, "Set CSIRT name."},
+  { "IODEFTemplatesDir", set_iodef_conf_dir, "set IODEF templates directory" },
+  { "IODEFOutputDir", set_report_dir, "write IODEF reports in a directory" },
+  { "CSIRTName", set_csirt_name, "set CSIRT name." },
+  { "FullDump", set_full_dump, "will output full dumps if non-zero" },
   { NULL, NULL }
 };
+
+char *iodef_deps[] = { "xml", NULL };
 
 input_module_t mod_iodef = {
   MOD_MAGIC,
@@ -663,7 +677,7 @@ input_module_t mod_iodef = {
   0,			    /* flags */
   "iodef",
   "CeCILL2",
-  NULL,
+  iodef_deps,
   iodef_dir,
   iodef_preconfig,
   NULL,

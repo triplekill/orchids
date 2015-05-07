@@ -547,7 +547,7 @@ set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int flag;
 
-  DebugLog(DF_MOD, DS_INFO, "setting ProoceedAll to %s\n", dir->args);
+  DebugLog(DF_MOD, DS_INFO, "setting ProceedAll to %s\n", dir->args);
 
   flag = strtol(dir->args, (char **)NULL, 10);
   if (flag)

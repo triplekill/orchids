@@ -46,8 +46,7 @@ struct snmptrap_config_s
 };
 
 
-static int
-snmptrap_dissector(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data);
+static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data);
 
 
 static void *

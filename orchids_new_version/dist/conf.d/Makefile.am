@@ -39,7 +39,7 @@ orchidsconfd_DATA =         \
   21_mod_iodef.conf
 
 
-%.conf: $(srcdir)/%.conf.dist
+%.conf: $(srcdir)/%.conf.dist $(srcdir)/../../config.log
 	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
             -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
             -e 's#@@LIBDIR@@#$(libdir)#g' \

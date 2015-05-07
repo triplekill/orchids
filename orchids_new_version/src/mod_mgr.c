@@ -51,7 +51,7 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
   if (mod_handle == NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
-	       "error: dlopen(%s): %s\n", mod_fname, dlerror());
+	       "dlopen(%s): %s\n", mod_fname, dlerror());
       return NULL;
     }
 
@@ -68,7 +68,7 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
 
   //gc_check(ctx->gc_ctx);
   DebugLog(DF_CORE, DS_NOTICE,
-	   "module [%s] successfully loaded: symbol mod_%s found at %x\n",
+	   "module '%s' successfully loaded: symbol mod_%s found at %x\n",
 	   name, name, mod);
 
   if (add_module(ctx, mod, mod_handle) < 0)
@@ -126,7 +126,7 @@ int add_module(orchids_t *ctx, input_module_t *mod, void *dlhandle)
       for (d = mod->dependencies; *d!=NULL; d++)
 	if (find_module(ctx, *d) == NULL)
 	  {
-	    fprintf (stderr, "Unable to load module %s: depends on module %s, which is not loaded.\n",
+	    fprintf (stderr, "Unable to load module '%s': depends on module '%s', which is not loaded.\n",
 		     mod->name, *d);
 	    return -1;
 	  }

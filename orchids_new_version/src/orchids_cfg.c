@@ -452,7 +452,7 @@ static int proceed_includes(gc_t *gc_ctx,
     {
       if (ret == GLOB_NOMATCH)
 	fprintf(stderr,
-		"WARNING: Pattern returned no match.\n");
+		"WARNING: no match found for 'Include %s'\n", pattern);
       else
 	fprintf(stderr,
 		"WARNING: glob() error.\n");
@@ -756,7 +756,7 @@ static void set_poll_period(orchids_t *ctx, mod_entry_t *mod,
   /* keep a minimal (reasonable) value of 1 second */
   if (time.tv_sec < 1)
     {
-      DebugLog(DF_CORE, DS_WARN, "Warning, PollPeriod too small, set to 1\n");
+      DebugLog(DF_CORE, DS_WARN, "PollPeriod too small, set to 1\n");
       time.tv_sec = 1;
       time.tv_usec = 0;
     }
@@ -856,13 +856,13 @@ static void module_config(orchids_t *ctx, mod_entry_t *mod,
   m = find_module_entry(ctx, mod_name);
   if (m==NULL)
     {
-      DebugLog(DF_CORE, DS_WARN, "WARNING: module %s not loaded...\n", mod_name);
+      DebugLog(DF_CORE, DS_WARN, "module '%s' not loaded, configuration skipped\n", mod_name);
       return;
     }
   c = m->mod->cfg_cmds;
   if (c == NULL)
     {
-      DebugLog(DF_CORE, DS_INFO, "Module %s has no directive table.\n",
+      DebugLog(DF_CORE, DS_INFO, "module '%s' has no directive table.\n",
 	       m->mod->name);
       return;
     }
@@ -878,7 +878,7 @@ static void module_config(orchids_t *ctx, mod_entry_t *mod,
       else
 	{
 	  DebugLog(DF_CORE, DS_WARN,
-		   "no handler defined in module [%s] for [%s] directive\n",
+		   "no handler defined in module '%s' for directive '%s'\n",
 		   m->mod->name, d->directive);
 	}
     }
@@ -1288,7 +1288,7 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
 
 static mod_cfg_cmd_t config_dir_g[] =
 {
-  { "PollPeriod", set_poll_period, "Set Poll Period (en Second)" },
+  { "PollPeriod", set_poll_period, "Set Poll Period (in Seconds)" },
 #ifdef ORCHIDS_STATIC
   { "AddModule" , config_add_module, "Activate a (built-in) module"},
 #endif /* ORCHIDS_STATIC */
@@ -1334,6 +1334,9 @@ static void proceed_config_tree(orchids_t *ctx)
 	}
       else
 	{
+	  fprintf (stderr, "%s:%u: unknown directive %s (ignored)\n",
+		   d->file, d->line, d->directive);
+	  fflush (stderr);
 	  DebugLog(DF_CORE, DS_WARN,
 		   "No handler defined for [%s] directive\n", d->directive);
 	}

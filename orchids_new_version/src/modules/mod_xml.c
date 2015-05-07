@@ -37,8 +37,12 @@
 
 input_module_t mod_xml;
 
+static char *xml_description = "xml document";
 
-char * xml_description = "xml document";
+char *xml_desc(void)
+{
+  return xml_description;
+}
 
 /**
  * Return a node for a XPath request, create nodes automatically
@@ -103,8 +107,8 @@ xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
   return node;
 }
 
-xmlNode* new_xs_datetime_node(xmlNode	*parent,
-			      const char	*name,
+xmlNode *new_xs_datetime_node(xmlNode *parent,
+			      const char *name,
 			      struct tm *time)
 {
   char		buff[128];

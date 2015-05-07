@@ -19,8 +19,6 @@
 # include "config.h"
 #endif
 
-#ifdef HAVE_LIBAUDIT_H
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -243,8 +241,6 @@ input_module_t mod_auditd = {
   dissect_auditd,	    /* auditd conditional dissector */
   &t_str		    /* type of fields it expects to dissect */
 };
-
-#endif /* HAVE_LIBAUDIT_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
