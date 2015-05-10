@@ -13,6 +13,7 @@ pkglib_LTLIBRARIES = \
   mod_sockunix.la \
   mod_syslog.la \
   mod_textfile.la \
+  mod_binfile.la \
   mod_bintotext.la \
   mod_udp.la \
   mod_win32evt.la \
@@ -101,6 +102,9 @@ mod_syslog_la_LDFLAGS = -module -avoid-version
 
 mod_textfile_la_SOURCES = mod_textfile.c mod_textfile.h
 mod_textfile_la_LDFLAGS = -module -avoid-version
+
+mod_binfile_la_SOURCES = mod_binfile.c mod_binfile.h
+mod_binfile_la_LDFLAGS = -module -avoid-version
 
 mod_bintotext_la_SOURCES = mod_bintotext.c mod_bintotext.h
 mod_bintotext_la_LDFLAGS = -module -avoid-version

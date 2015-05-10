@@ -74,13 +74,13 @@ static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
 }
 
 
-static int process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
+static int textfile_process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
 {
   char s_buff[BUFF_SZ];
-  char* d_buff = NULL;
-  char* buff = NULL;
+  char *d_buff = NULL;
+  char *buff = NULL;
   unsigned int buff_sz = BUFF_SZ;
-  int	eof = 0;
+  int eof = 0;
   /* read and process new lines */
 
   buff_sz = BUFF_SZ;
@@ -123,11 +123,9 @@ static int process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf)
 	{
 	  /* update line # */
 	  tf->line++;
-	  /* update crc */
-	  tf->hash = crc32(tf->hash, buff, strlen(buff));
 	  DebugLog(DF_MOD, DS_DEBUG,
-		   "read line %i crc(0x%08X) %s",
-		   tf->line, tf->hash, buff);
+		   "read line %i %s",
+		   tf->line, buff);
 
 	  textfile_buildevent(ctx, mod, tf, buff);
 	  if (buff == d_buff)
@@ -148,7 +146,7 @@ static int textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
   /*  DebugLog(DF_MOD, DS_TRACE, "textfile_callback();\n"); */
 
   cfg = (textfile_config_t *)mod->config;
-  for (tf = cfg->file_list; tf; tf = tf->next)
+  for (tf = cfg->file_list; tf!=NULL; tf = tf->next)
     {
       if (tf->eof)
 	{
@@ -172,7 +170,7 @@ static int textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 	      /* Update file stat */
 	      tf->file_stat = st;
 	      /* read and process new lines */
-	      eof &= process_new_lines(ctx, mod, tf);
+	      eof &= textfile_process_new_lines(ctx, mod, tf);
 	    }
 #ifdef ORCHIDS_DEBUG
 	  else if (st.st_mtime < tf->file_stat.st_mtime)
@@ -188,7 +186,7 @@ static int textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 #endif
 	}
       else
-	eof &= process_new_lines(ctx, mod, tf);
+	eof &= textfile_process_new_lines(ctx, mod, tf);
     }
 
   if (cfg->exit_process_all_data && eof)
@@ -217,7 +215,7 @@ static int textsocket_try_reconnect(orchids_t *ctx, heap_entry_t *he)
   strncpy(sunx.sun_path, STR(f->file_name), STRLEN(f->file_name));
   sunx.sun_path[sizeof(sunx.sun_path)-1] = '\0';
   n = connect(fd, (struct sockaddr *)&sunx, SUN_LEN(&sunx));
-  if (n)
+  if (n!=0)
     {
        close(fd);
        DebugLog(DF_MOD, DS_DEBUG,
@@ -373,8 +371,7 @@ textfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static void
-textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_TRACE,
            "textfile_postconfig() -- registering file polling if needed...\n");
@@ -382,15 +379,14 @@ textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
   /* register real-time action for file polling, if requested. */
   DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
   register_rtcallback(ctx,
-		      rtaction_read_files,
+		      rtaction_read_textfiles,
 		      NULL,
 		      mod,
 		      INITIAL_MODTEXT_POLL_DELAY);
 }
 
 
-static void
-textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
+static void textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
 {
   textfile_config_t *cfg;
   textfile_t *tf;
@@ -400,24 +396,25 @@ textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
 
   cfg = (textfile_config_t *)mod->config;
 
-  /* if we don't have to compute hashes, just fseek to the end-of-file */
-  for (tf = cfg->file_list; tf; tf = tf->next) {
-    DebugLog(DF_MOD, DS_DEBUG, "process next file in textfile_postcompil\n");
-    /* read and process new lines */
-    process_new_lines(ctx, mod, tf);
-  }
+  /* fseek to the end-of-file */
+  for (tf = cfg->file_list; tf!=NULL; tf = tf->next)
+    (void) fseek (tf->fd, 0, SEEK_END);
 }
 
 
-static void
-add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   char filepath[PATH_MAX];
   textfile_config_t *cfg;
   struct stat sbuf;
 
   cfg = (textfile_config_t *)mod->config;
-  Xrealpath(dir->args, filepath);
+  if (realpath(dir->args, filepath)==NULL)
+    {
+      fprintf (stderr, "%s: %u: could not find real path of file '%s'\n",
+	       dir->file, dir->line, dir->args);
+      exit(EXIT_FAILURE);
+    }
   if (filepath[0] == '\0')
     {
       DebugLog(DF_MOD, DS_ERROR, "mod_textfile: file name is empty.\n");
@@ -455,7 +452,13 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
-      fd = Xsocket(AF_UNIX, SOCK_STREAM, 0);
+      fd = socket(AF_UNIX, SOCK_STREAM, 0);
+      if (fd<0)
+	{
+	  fprintf (stderr, "%s: %u: could not open Unix socket '%s'\n",
+		   dir->file, dir->line, filepath);
+	  exit(EXIT_FAILURE);
+	}
       /*
       Xbind(fd, (struct sockaddr *) &sunx,
             sizeof(sunx.sun_family) + strlen(sunx.sun_path));
@@ -465,7 +468,12 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       strncpy(sunx.sun_path, filepath, sizeof(sunx.sun_path));
       sunx.sun_path[sizeof(sunx.sun_path)-1] = '\0';
       len = SUN_LEN(&sunx);
-      Xconnect(fd, (struct sockaddr *)&sunx, len);
+      if (connect(fd, (struct sockaddr *)&sunx, len) < 0)
+	{
+	  fprintf (stderr, "%s: %u: could not connect to Unix socket '%s': errno=%d: %s",
+		   dir->file, dir->line, filepath, errno, strerror(errno));
+	  exit (EXIT_FAILURE);
+	}
 
       f->fd = fd;
       add_input_descriptor(ctx, mod, textsocket_callback, fd, (void *)f);
@@ -495,7 +503,13 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
-      fd = Xopen(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
+      fd = open(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
+      if (fd < 0)
+	{
+	  fprintf (stderr, "%s: %u: could not open file '%s' for reading\n",
+		   dir->file, dir->line, filepath);
+	  exit (EXIT_FAILURE);
+	}
 
       f->fd = fd;
       add_input_descriptor(ctx, mod, textsocket_callback, fd, (void *)f);
@@ -515,11 +529,16 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
-      f->fd = Xfopen(filepath, "r");
+      f->fd = fopen(filepath, "r");
+      if (f==NULL)
+	{
+	  fprintf (stderr, "%s: %u: could not open file '%s' for reading\n",
+		   dir->file, dir->line, filepath);
+	  exit (EXIT_FAILURE);
+	}
       Xfstat(fileno(f->fd), &f->file_stat);
 
       f->line = 0;
-      f->hash = 0;
       f->eof = 0;
 
       DebugLog(DF_MOD, DS_INFO, "adding next file to polled inputs (fp=%p fd=%i).\n",
@@ -542,33 +561,28 @@ add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static void
-set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void textfile_set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int flag;
 
   DebugLog(DF_MOD, DS_INFO, "setting ProceedAll to %s\n", dir->args);
 
   flag = strtol(dir->args, (char **)NULL, 10);
-  if (flag)
-    ((textfile_config_t *)mod->config)->process_all_data = 1;
+  ((textfile_config_t *)mod->config)->process_all_data = flag;
 }
 
-static void
-set_exit_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void textfile_setexit_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int flag;
 
   DebugLog(DF_MOD, DS_INFO, "setting ExitAfterProoceedAll to %s\n", dir->args);
 
   flag = strtol(dir->args, (char **)NULL, 10);
-  if (flag)
-    ((textfile_config_t *)mod->config)->exit_process_all_data = 1;
+  ((textfile_config_t *)mod->config)->exit_process_all_data = flag;
 }
 
 
-static void
-set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void textfile_setpoll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int value;
 
@@ -583,7 +597,7 @@ set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static int rtaction_read_files(orchids_t *ctx, heap_entry_t *he)
+static int rtaction_read_textfiles(orchids_t *ctx, heap_entry_t *he)
 {
   mod_entry_t *mod;
   textfile_config_t *cfg;
@@ -607,11 +621,11 @@ static int rtaction_read_files(orchids_t *ctx, heap_entry_t *he)
 
 static mod_cfg_cmd_t textfile_dir[] =
 {
-  { "AddInputFile", add_input_file, "Add a file as input source" },
-  { "ProcessAll", set_process_all, "Process all lines from start" },
-  { "ExitAfterProcessAll", set_exit_process_all, "Exit after processing all files" },
-  { "SetPollPeriod", set_poll_period, "Set poll period in second for files" },
-  { "INPUT", add_input_file, "Add a file as input source" },
+  { "AddInputFile", add_input_textfile, "Add a text file as input source" },
+  { "ProcessAll", textfile_set_process_all, "Process all lines from start" },
+  { "ExitAfterProcessAll", textfile_setexit_process_all, "Exit after processing all files" },
+  { "SetPollPeriod", textfile_setpoll_period, "Set poll period in second for files" },
+  { "INPUT", add_input_textfile, "Add a text file as input source" },
   { NULL, NULL }
 };
 

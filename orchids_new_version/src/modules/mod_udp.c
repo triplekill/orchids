@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <time.h> /* for strftime() and localtime() */
 #include <string.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -36,7 +37,7 @@
 
 input_module_t mod_udp;
 
-static int create_udp_socket(int udp_port)
+static int create_udp_socket(const char *file, uint32_t line, int udp_port)
 {
   int fd, on = 1;
   struct sockaddr_in sin;
@@ -47,9 +48,21 @@ static int create_udp_socket(int udp_port)
   sin.sin_family = AF_INET;
   sin.sin_port = htons(udp_port);
 
-  Xsetsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
+    {
+      fprintf (stderr, "%s: %u: could not set udp socket options: %s\n",
+	       file, line,
+	       strerror(errno));
+      exit(EXIT_FAILURE);
+    }
 
-  Xbind(fd, (struct sockaddr *) &sin, sizeof(sin));
+  if (bind(fd, (struct sockaddr *) &sin, sizeof(sin)) < 0)
+    {
+      fprintf (stderr, "%s: %u: could not bind udp port %d: %s\n",
+	       file, line,
+	       udp_port, strerror(errno));
+      exit(EXIT_FAILURE);
+    }
 
   return fd;
 }
@@ -142,7 +155,7 @@ static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t
   }
 
   uc = gc_base_malloc (ctx->gc_ctx, sizeof(struct udp_config));
-  sd = create_udp_socket(port);
+  sd = create_udp_socket(dir->file, dir->line, port);
   GC_START(ctx->gc_ctx, 2);
   var = ovm_uint_new (ctx->gc_ctx, port);
   uc->port = var;

@@ -1,5 +1,5 @@
 /**
- ** @file mod_textfile.c
+ ** @file mod_textfile.h
  ** textfile input module, for text log files.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
@@ -49,7 +49,6 @@ struct textfile_s
   FILE *fd;
   struct stat file_stat;
   unsigned int line;
-  unsigned int hash;
   unsigned char eof;
 };
 
@@ -102,19 +101,15 @@ static void
 textfile_postcompil(orchids_t *ctx, mod_entry_t *mod);
 
 
-static void
-add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
-static void
-set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void textfile_setprocess_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void textfile_setexit_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void textfile_setpoll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
-static void
-set_poll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-static int rtaction_read_files(orchids_t *ctx, heap_entry_t *he);
+static int rtaction_read_textfiles(orchids_t *ctx, heap_entry_t *he);
 
 
 #endif /* MOD_TEXTFILE_H */

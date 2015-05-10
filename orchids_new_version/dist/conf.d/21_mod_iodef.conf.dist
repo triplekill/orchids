@@ -6,10 +6,4 @@
   IODEFTemplatesDir @@ETCDIR@@/orchids/iodef
   IODEFOutputDir @@VARDIR@@/orchids/reports
   CSIRTName Orchids.LSV
-
-  # Uncomment the following line if you want the the IODEF reports to be validated
-  # (not implemented yet... may never be)
-  #  IODEFSchema @@ETCDIR@@/orchids/iodef/iodef.xsd
-  # Add all events data in the report (additional data)
-  FullDump 0
 </module>

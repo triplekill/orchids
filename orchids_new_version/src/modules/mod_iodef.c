@@ -642,13 +642,15 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   mod_cfg->schema = NULL;
     // XXX: Not implemented  => Use a contact database (xml file provided)
   mod_cfg->contacts = NULL;
+#ifdef IODEF_FULLDUMP
   mod_cfg->full_dump = 0;
-
+#endif
   iodef_cfg = mod_cfg;
 
   return (mod_cfg);
 }
 
+#ifdef IODEF_FULLDUMP
 static void set_full_dump(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int flag;
@@ -659,13 +661,16 @@ static void set_full_dump(orchids_t *ctx, mod_entry_t *mod, config_directive_t *
   if (flag)
     ((iodef_cfg_t *)mod->config)->full_dump = 1;
 }
+#endif
 
 static mod_cfg_cmd_t iodef_dir[] =
 {
   { "IODEFTemplatesDir", set_iodef_conf_dir, "set IODEF templates directory" },
   { "IODEFOutputDir", set_report_dir, "write IODEF reports in a directory" },
   { "CSIRTName", set_csirt_name, "set CSIRT name." },
+#ifdef IODEF_FULLDUMP
   { "FullDump", set_full_dump, "will output full dumps if non-zero" },
+#endif
   { NULL, NULL }
 };
 

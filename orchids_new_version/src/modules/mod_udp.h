@@ -34,8 +34,7 @@ struct udp_config {
   ovm_var_t *tag;
 };
 
-static int
-create_udp_socket(int udp_port);
+static int create_udp_socket(const char *file, uint32_t line, int udp_port);
 
 
 static int

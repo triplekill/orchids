@@ -27,6 +27,10 @@
 
 #include "mod_xml.h"
 
+#undef IODEF_FULLDUMP
+/* IODEF_FULLDUMP is not implemented; [jgl] and I don't see what the
+   purpose could have been anyway yet */
+
 typedef struct iodef_cfg_s iodef_cfg_t;
 struct iodef_cfg_s {
     char*	CSIRT_name;
@@ -36,7 +40,9 @@ struct iodef_cfg_s {
     xmlSchemaPtr	schema;
     // XXX: Not implemented  => Use a contact database (xml file provided)
     xmlNodePtr	contacts;
+#ifdef IODEF_FULLDUMP
     int		full_dump;
+#endif
 };
 
 struct ovm_var_s;

@@ -2,6 +2,7 @@ orchidsconfddir = $(sysconfdir)/orchids/conf.d
 
 EXTRA_DIST =                  \
   01_mod_textfile.conf.dist   \
+  01_mod_binfile.conf.dist    \
   02_mod_syslog.conf.dist     \
   03_mod_udp.conf.dist        \
   04_mod_sockunix.conf.dist   \
