@@ -156,14 +156,9 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
   GC_UPDATE(gc_ctx, F_SPECIFIC_TRAPTYPE, val);
 
   val = ovm_ipv4_new (gc_ctx);
-  IPV4(val).s_addr = htonl (*(in_addr_t *)pdu.agent_addr);
-  /* looking from code at
-     http://www.opensource.apple.com/source/net_snmp/net_snmp-9/net-snmp/apps/snmptrapd.c
-     the char agent_addr[4] array is just the in_addr_t we look for,
-     regardless of endianness;
-     (witness the following excerpt of the above:
-     host = gethostbyaddr((char *) pdu->agent_addr, 4, AF_INET);
-     )
+  IPV4(val).s_addr = ntohl (*(in_addr_t *)pdu.agent_addr);
+  /* the agent_addr field is in network byte order, so we must
+     convert it to host byte order.
   */
   GC_UPDATE(gc_ctx, F_AGENT_ADDR, val);
 
