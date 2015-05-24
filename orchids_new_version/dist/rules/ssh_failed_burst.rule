@@ -71,7 +71,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     }
     $last = TIME_FIELD;
 
-    // We don't need the event information anymore
+    // We do not need the event information anymore
     drop_event();
 
     expect ((CONDITION)

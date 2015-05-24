@@ -521,6 +521,7 @@ transition:
 
 void issdlerror(rule_compiler_t *ctx, char *s)
 {
+  fprintf (stderr, "%s:%u: %s\n", ctx->issdlcurrentfile, ctx->issdllineno, s);
   DebugLog(DF_OLC, DS_ERROR, "%s on line %i.\n", s,
 	   ctx->issdllineno);
   // DebugLog(DF_OLC, DS_DEBUG, "have to clear current compiler context (XXX: ToDo)\n");

@@ -74,7 +74,7 @@ static size_t qstr_sz_g;
 %}
 
 /* eXclusive state COMMENT */
-%x COMMENT QSTR
+%x COMMENT ONELINECOMMENT QSTR
 
 %option nounput never-interactive reentrant bison-bridge
 
@@ -145,12 +145,18 @@ static size_t qstr_sz_g;
 <COMMENT>"*/" { BEGIN INITIAL; }
 <COMMENT>"/*" { DPRINTF( ("warning! '/*' in comment.\n") ); }
 
+"//"       { BEGIN ONELINECOMMENT; }
+<ONELINECOMMENT>. ;
+<ONELINECOMMENT>\n { ++issdllineno_g; BEGIN INITIAL; }
+
  /* Handle output of CPP line control */
 ^"# "[0-9]+" \"".+"\""(" "[1-4]){0,4}\n {
   int line, flag1, flag2, flag3, flag4;
   char file[1024];
   int ret;
   filestack_t *fs;
+  size_t len;
+  ovm_var_t *currfile;
 
   /*
     CPP output line control code:
@@ -168,8 +174,10 @@ static size_t qstr_sz_g;
   flag4 = 0;
   line = 0;
   file[0] = '\0';
+//fprintf (stderr, "[cpp] %s", issdltext);
   ret = sscanf(issdltext, "# %i \"%1024[^\"]\" %i %i %i %i",
                &line, file, &flag1, &flag2, &flag3, &flag4);
+//fprintf (stderr, "[cpp] ret=%d\n", ret);
   DebugLog(DF_OLC, DS_DEBUG, ">>> CPP sscanf(\"%s\") = %i\n", issdltext, ret);
 
   if ((ret >= 2) && (ret <= 6)) {
@@ -195,9 +203,17 @@ static size_t qstr_sz_g;
     }
     /* Other flags are specific to C */
 
+//fprintf (stderr, "[cpp] switch to \"%s\"\n\n", file);
+//fflush (stderr);
     if (issdlcurrentfile_g)
       gc_base_free (issdlcurrentfile_g);
     issdlcurrentfile_g = gc_strdup((ctx)->gc_ctx, file);
+    len = strlen(file);
+    currfile = ovm_str_new((ctx)->gc_ctx, len+1);
+    strcpy(STR(currfile), file);
+    /* add final NUL byte so as to ease printing */
+    STRLEN(currfile) = len;
+    GC_TOUCH ((ctx)->gc_ctx, (ctx)->currfile = currfile);
     issdllineno_g = line;
 
   } else {
@@ -229,6 +245,7 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
  /* Symbol names (same as a C declaration) */
 [a-z_][A-Za-z0-9_\.]* {
   issdllval.sym.file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
+//fprintf (stderr, "SYMNAME '%s', in file \"%s\"\n", issdltext, issdllval.sym.file);
   issdllval.sym.line = issdllineno_g;
   issdllval.sym.name = gc_strdup((ctx)->gc_ctx, issdltext);
   DebugLog(DF_OLC, DS_DEBUG,

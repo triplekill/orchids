@@ -766,7 +766,7 @@ struct rule_compiler_s
   /* For the lex scanner: */
   void             *scanner;
   unsigned int      issdllineno;
-  char             *issdlcurrentfile;
+  char             *issdlcurrentfile; /* a gc_malloc()ed copy of STR(currfile) */
   FILE             *issdlin;
   SLIST_HEAD(filestack, struct filestack_s) issdlfilestack;
   char              qstr_buf[QSTRMAX];

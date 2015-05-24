@@ -948,7 +948,7 @@ static type_t *stype_join (type_t *t1, type_t *t2);
 static void type_solve (rule_compiler_t *ctx)
 {
   node_expr_t *e, *l, *parent;
-  type_t *t;
+  type_t *t, *newt;
 
   GC_START(ctx->gc_ctx, 2);
   /* Compute types by solving a fixed point system */
@@ -961,8 +961,8 @@ static void type_solve (rule_compiler_t *ctx)
       if (e->stype==&t_any)
 	continue; /* no need to propagate a type error */
       /* t should not be equal to &t_any (bad taste) */
-      t = stype_join (t, e->stype);
-      if (t==&t_any)
+      newt = stype_join (t, e->stype);
+      if (newt==&t_any)
 	{
 	  if (e->file!=NULL)
 	    fprintf (stderr, "%s:", STR(e->file));
@@ -973,9 +973,9 @@ static void type_solve (rule_compiler_t *ctx)
 	  ctx->nerrors++;
 	  continue; /* no need to propagate a type error */
 	}
-      if (e->stype!=NULL && strcmp(e->stype->name, t->name)==0)
+      if (e->stype!=NULL && strcmp(e->stype->name, newt->name)==0)
 	continue; /* type did not change: continue */
-      e->stype = t; /* type changed: update e's type, and propagate: */
+      e->stype = newt; /* type changed: update e's type, and propagate: */
       l = e->parents;
       GC_UPDATE(ctx->gc_ctx, 1, l);
       //GC_TOUCH(ctx->gc_ctx, e->parents = NULL); /* remove cycles */
@@ -1076,21 +1076,17 @@ static void type_explore_actions (rule_compiler_t *ctx,
     type_explore_stmt (ctx, BIN_LVAL(l));
 }
 
-static void type_explore_state (rule_compiler_t *ctx,
-				node_state_t *state);
-
-static void type_explore_transition (rule_compiler_t *ctx,
-				     node_trans_t *trans)
+static node_state_t *trans_dest_state (rule_compiler_t *ctx, node_trans_t *trans)
 {
-  if (trans->cond!=NULL)
-    type_explore_expr (ctx, trans->cond);
-  if (trans->sub_state_dest==NULL)
-    {
-      node_state_t *s;
+  node_state_t *s;
 
+  s = trans->sub_state_dest;
+  if (s==NULL)
+    {
       s = strhash_get(ctx->statenames_hash, trans->dest);
-      if (s==NULL)
+      if (s==NULL && !(trans->an_flags & AN_NONEXISTENT_TARGET_ALREADY_SAID))
 	{
+	  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
 	  if (trans->file!=NULL)
 	    fprintf (stderr, "%s:", STR(trans->file));
 	  /* printing STR(trans->file) is legal, since it
@@ -1100,7 +1096,22 @@ static void type_explore_transition (rule_compiler_t *ctx,
 	  ctx->nerrors++;
 	}
     }
-  else type_explore_state (ctx, trans->sub_state_dest);
+  return s;
+}
+
+static void type_explore_state (rule_compiler_t *ctx,
+				node_state_t *state);
+
+static void type_explore_transition (rule_compiler_t *ctx,
+				     node_trans_t *trans)
+{
+  node_state_t *s;
+
+  if (trans->cond!=NULL)
+    type_explore_expr (ctx, trans->cond);
+  s = trans_dest_state (ctx, trans);
+  if (s!=NULL)
+    type_explore_state (ctx, s);
 }
 
 static void type_explore_transitions (rule_compiler_t *ctx,
@@ -1115,6 +1126,9 @@ static void type_explore_transitions (rule_compiler_t *ctx,
 static void type_explore_state (rule_compiler_t *ctx,
 				node_state_t *state)
 {
+  if (state->an_flags & AN_EXPLORED)
+    return; /* already explored */
+  state->an_flags |= AN_EXPLORED;
   type_explore_actions (ctx, state->actionlist);
   type_explore_transitions (ctx, state->translist);
 }
@@ -1124,6 +1138,7 @@ static void type_explore_rule (rule_compiler_t *ctx,
 {
   node_expr_t *states;
 
+  type_explore_state (ctx, node_rule->init);
   for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
     {
       type_explore_state (ctx, (node_state_t *)BIN_LVAL(states));
@@ -1667,6 +1682,9 @@ static node_state_t *find_state_by_name (node_rule_t *rule, char *name)
   node_expr_t *l;
   node_state_t *state;
 
+  state = (node_state_t *)rule->init;
+  if (state->name!=NULL && strcmp(state->name, name)==0)
+    return state;
   for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
     {
       state = (node_state_t *)BIN_LVAL(l);
@@ -1677,7 +1695,6 @@ static node_state_t *find_state_by_name (node_rule_t *rule, char *name)
 }
 
 static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
-				 char *file, unsigned int line,
 				 node_state_t *state)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -1685,18 +1702,28 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
   node_expr_t *l;
   node_trans_t *trans;
   node_expr_vars_t action_res, cond_res;
+  char *file;
+  unsigned int line;
 
   GC_START(gc_ctx, 4);
   action_res = node_expr_vars (gc_ctx, state->actionlist);
   GC_UPDATE(gc_ctx, 0, action_res.mayread);
   GC_UPDATE(gc_ctx, 1, action_res.mustset);
   vs = vs_diff (gc_ctx, action_res.mayread, state->mustset);
+  file = rule->file;
+  line = rule->line;
+  if (state->actionlist!=NULL)
+    {
+      file = STR(BIN_LVAL(state->actionlist)->file);
+      /* STR() is NUL-terminated by construction */
+      line = BIN_LVAL(state->actionlist)->lineno;
+    }
   for (; vs!=VS_EMPTY; vs = vs->next)
     {
       if (file!=NULL)
 	fprintf (stderr, "%s:", file);
-      fprintf (stderr, "%u: Error: variable %s may be used initialized here.\n",
-	       line, ctx->dyn_var_name[vs->n]);
+      fprintf (stderr, "%u: error: variable %s may be used initialized in action list of state '%s'.\n",
+	       line, ctx->dyn_var_name[vs->n], state->name);
       ctx->nerrors++;
     }
   action_res.mustset = vs_union (gc_ctx, state->mustset, action_res.mustset);
@@ -1711,56 +1738,51 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
       GC_UPDATE(gc_ctx, 2, cond_res.mayread);
       GC_UPDATE(gc_ctx, 3, cond_res.mustset);
       vs = vs_diff (gc_ctx, cond_res.mayread, action_res.mustset);
+      file = trans->file;
+      line = trans->lineno;
       for (; vs!=VS_EMPTY; vs = vs->next)
 	{
-	  if (trans->file!=NULL)
-	    fprintf (stderr, "%s:", trans->file);
-	  fprintf (stderr, "%u: Error: variable %s may be used initialized here.\n",
-		   trans->lineno, ctx->dyn_var_name[vs->n]);
+	  if (file!=NULL)
+	    fprintf (stderr, "%s:", file);
+	  fprintf (stderr, "%u: error: variable %s may be used initialized in expect clause.\n",
+		   line, ctx->dyn_var_name[vs->n]);
 	  ctx->nerrors++;
 	}
       if (trans->sub_state_dest!=NULL)
-	check_state_mustset (ctx, rule, trans->file, trans->lineno,
-			     trans->sub_state_dest);
+	check_state_mustset (ctx, rule, trans->sub_state_dest);
     }
   GC_END(gc_ctx);
 }
 
-static void check_rule_mustset (rule_compiler_t *ctx, node_rule_t *rule)
+static void check_rule_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
+				      node_state_t *state)
 {
   char *file;
   unsigned int line;
+
+  file = state->file;
+  line = (unsigned int)state->line;
+  if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
+    {
+      if (file!=NULL)
+	fprintf (stderr, "%s:", file);
+      fprintf (stderr, "%u: Warning: state %s is unreachable, hence useless\n",
+	       line, state->name);
+    }
+  else check_state_mustset (ctx, rule, state);
+}
+
+static void check_rule_mustset (rule_compiler_t *ctx, node_rule_t *rule)
+{
   node_expr_t *l;
   node_state_t *state;
 
+  state = (node_state_t *)rule->init;
+  check_rule_state_mustset (ctx, rule, state);
   for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
     {
       state = (node_state_t *)BIN_LVAL(l);
-      if (state->actionlist!=NULL)
-	{
-	  file = STR(BIN_LVAL(state->actionlist)->file);
-	  /* STR() is NUL-terminated by construction */
-	  line = BIN_LVAL(state->actionlist)->lineno;
-	}
-      else if (state->translist!=NULL)
-	{
-	  file = STR(BIN_LVAL(state->translist)->file);
-	  /* STR() is NUL-terminated by construction */
-	  line = BIN_LVAL(state->translist)->lineno;
-	}
-      else
-	{
-	  file = rule->file;
-	  line = (unsigned int)rule->line;
-	}
-      if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
-	{
-	  if (file!=NULL)
-	    fprintf (stderr, "%s:", file);
-	  fprintf (stderr, "%u: Warning: state %s is unreachable, hence useless\n",
-		   line, state->name);
-	}
-      else check_state_mustset (ctx, rule, file, line, state);
+      check_rule_state_mustset (ctx, rule, state);
     }
 }
 
@@ -1774,7 +1796,7 @@ static void check_var_usage (rule_compiler_t *ctx, node_rule_t *rule)
   node_expr_vars_t action_res, cond_res;
 
   GC_START(gc_ctx, 4);
-  work = Xmalloc (sizeof(an_worklist_t));
+  work = gc_base_malloc (ctx->gc_ctx, sizeof(an_worklist_t));
   work->next = NULL;
   work->state = rule->init;
   rule->init->an_flags |= AN_MUSTSET_REACHABLE; /* and its mustset
@@ -1851,7 +1873,7 @@ static void check_var_usage (rule_compiler_t *ctx, node_rule_t *rule)
 	  if (target!=NULL)
 	    {
 	      next = work;
-	      work = Xmalloc (sizeof(an_worklist_t));
+	      work = gc_base_malloc (gc_ctx, sizeof(an_worklist_t));
 	      work->next = next;
 	      work->state = target;
 	    }
@@ -1866,6 +1888,7 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
 {
   node_expr_t *l;
   node_trans_t *trans;
+  node_state_t *s;
 
   if (state->an_flags & AN_EPSILON_DONE)
     return; /* already dealt with in a previous call to
@@ -1887,7 +1910,11 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
 	continue;
       if (trans->cond==NULL) /* epsilon transition, i.e.,
 				goto without an expect */
-	mark_epsilon_reachable (ctx, trans->sub_state_dest);
+	{
+	  s = trans_dest_state (ctx, trans);
+	  if (s!=NULL)
+	    mark_epsilon_reachable (ctx, s);
+	}
     }
   state->an_flags &= ~AN_EPSILON_REACHABLE;
   state->an_flags |= AN_EPSILON_DONE;
@@ -1899,6 +1926,8 @@ static void check_epsilon_transitions (rule_compiler_t *ctx, node_rule_t *rule)
   node_expr_t *l;
   node_state_t *state;
 
+  state = (node_state_t *)rule->init;
+  mark_epsilon_reachable (ctx, state);
   for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
     {
       state = (node_state_t *)BIN_LVAL(l);
@@ -2905,15 +2934,28 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
 				      symbol_token_t *sym)
 {
   node_trans_t *trans;
+  char *file;
+  unsigned int line;
 
+  if (cond!=NULL)
+    {
+      file = gc_strdup (ctx->gc_ctx, STR(cond->file));
+      /* STR(cond->file) was NUL-terminated by construction */
+      line = cond->lineno;
+    }
+  else
+    {
+      file = sym->file;
+      line = sym->line;
+    }
   GC_START(ctx->gc_ctx,1);
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
   trans->gc.type = T_NULL;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
-  trans->file = sym->file;
-  trans->lineno = sym->line;
+  trans->file = file;
+  trans->lineno = line;
   trans->dest = sym->name;
   trans->sub_state_dest = NULL; /* not set */
   trans->an_flags = 0;
@@ -2931,7 +2973,20 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
 					node_state_t *substate)
 {
   node_trans_t *trans;
+  char *file;
+  unsigned int line;
 
+  if (cond!=NULL)
+    {
+      file = gc_strdup (ctx->gc_ctx, STR(cond->file));
+      /* STR(cond->file) was NUL-terminated by construction */
+      line = cond->lineno;
+    }
+  else
+    {
+      file = NULL;
+      line = -1;
+    }
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
   trans->gc.type = T_NULL;
@@ -2939,8 +2994,8 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   check_expect_condition (ctx, cond);
   trans->dest = NULL; /* not set */
-  trans->file = NULL; /* not set */
-  trans->lineno = -1; /* not set */
+  trans->file = file;
+  trans->lineno = line;
   GC_TOUCH (ctx->gc_ctx, trans->sub_state_dest = substate);
   trans->an_flags = 0;
   return trans;
@@ -3196,6 +3251,8 @@ static int stype_below (type_t *t, type_t *model)
 {
   if (t==NULL) /* NULL is bottom */
     return 1;
+  if (model==NULL)
+    return 0;
   if (strcmp(model->name, "*")==0) /* "*" is top */
     return 1;
   if (strcmp(t->name, model->name)==0)
@@ -3941,15 +3998,15 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
 static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 {
   node_expr_bin_t *n = (node_expr_bin_t *)myself;
-  type_t *type, *vartype;
+  type_t *type, *vartype, *newtype;
 
   type = n->rval->stype;
   set_type (ctx, myself, type);
   if (type==NULL)
     return;
   vartype = n->lval->stype;
-  vartype = stype_join (vartype, type);
-  if (vartype==&t_any) /* type error */
+  newtype = stype_join (vartype, type);
+  if (newtype==&t_any) /* type error */
     {
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file));
@@ -3961,7 +4018,7 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 	       vartype->name);
       ctx->nerrors++;
     }
-  else set_type (ctx, (node_expr_t *)n->lval, vartype);
+  else set_type (ctx, (node_expr_t *)n->lval, newtype);
 }
 
 node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
@@ -4226,6 +4283,19 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
   return (node_expr_t *)i;
 }
 
+static void compute_stype_fieldname (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_symbol_t *n = (node_expr_symbol_t *)myself;
+  field_record_t *f;
+
+  f = strhash_get(ctx->fields_hash, n->name);
+  if (f == NULL) {
+    DebugLog(DF_OLC, DS_FATAL, "field %s not registered\n", n->name);
+    exit(EXIT_FAILURE);
+  }
+  set_type (ctx, (node_expr_t *)n, f->type);
+}
+
 node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
 {
   field_record_t *f;
@@ -4249,15 +4319,19 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
 		    h_string (fieldname));
   /* hash = '(NODE_FIELD n a m e)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_fieldname;
   n->parents = NULL;
   n->name = fieldname;
   n->res_id = f->id;
   n->mono = f->mono;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, f->type);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_dummy (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  return; /* and do nothing */
 }
 
 node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
@@ -4280,7 +4354,7 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_dummy;
   n->parents = NULL;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
@@ -4293,6 +4367,13 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
   dynamic_add(ctx, varname);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_integer (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_uint);
 }
 
 node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
@@ -4318,15 +4399,21 @@ node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_UINT i)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_integer;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = integer);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_uint);
   statics_add(ctx, integer);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_double (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_float);
 }
 
 node_expr_t *build_double(rule_compiler_t *ctx, double f)
@@ -4350,15 +4437,21 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_FLOAT byte1 ... byten)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_double;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = fpdouble);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_float);
   statics_add(ctx, fpdouble);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_string (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_str);
 }
 
 node_expr_t *build_string(rule_compiler_t *ctx, char *str)
@@ -4388,15 +4481,21 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
 			    h_string (str)));
   /* hash = '(NODE_CONST T_STR c h a r s)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_string;
   n->parents = NULL;
   GC_TOUCH(ctx->gc_ctx, n->data = string);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_str);
   statics_add(ctx, string);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_db_empty (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_db_any);
 }
 
 node_expr_t *build_db_nothing(rule_compiler_t *ctx)
@@ -4418,12 +4517,11 @@ node_expr_t *build_db_nothing(rule_compiler_t *ctx)
 		    h_pair (T_DB_EMPTY, H_NULL));
   /* hash = '(NODE_CONST T_DB_EMPTY)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_db_empty;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = empty);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_db_any);
   statics_add(ctx, empty);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -4836,6 +4934,13 @@ node_expr_t *build_db_collect(rule_compiler_t *ctx,
   return (node_expr_t *)n;
 }
 
+static void compute_stype_ipv4 (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_ipv4);
+}
+
 node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 {
   ovm_var_t *addr;
@@ -4870,15 +4975,21 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 				   sizeof(struct in_addr))));
   /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_ipv4;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_ipv4);
   statics_add(ctx, addr);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_ipv6 (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_ipv6);
 }
 
 node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
@@ -4915,12 +5026,11 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 				   sizeof(struct in6_addr))));
   /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_ipv6;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_ipv6);
   statics_add(ctx, addr);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -4966,7 +5076,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
     GC_TOUCH (ctx->gc_ctx, n->data = addr);
     n->res_id = ctx->statics_nb;
     GC_UPDATE(ctx->gc_ctx, 0, n);
-    set_type (ctx, (node_expr_t *)n, &t_ipv4);
+    n->compute_stype = compute_stype_ipv4;
   }
   else
   {
@@ -4981,7 +5091,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
     GC_TOUCH (ctx->gc_ctx, n->data = addr);
     n->res_id = ctx->statics_nb;
     GC_UPDATE(ctx->gc_ctx, 0, n);
-    set_type (ctx, (node_expr_t *)n, &t_ipv6);
+    n->compute_stype = compute_stype_ipv6;
   }
    
   freeaddrinfo(sa);
@@ -4993,6 +5103,12 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
   return (node_expr_t *)n;
 }
 
+static void compute_stype_ctime (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_ctime);
+}
 
 node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 {
@@ -5015,12 +5131,11 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_ctime;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_ctime);
   statics_add(ctx, time);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -5087,15 +5202,21 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_ctime;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_ctime);
   statics_add(ctx, time);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_timeval (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_timeval);
 }
 
 node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
@@ -5122,12 +5243,11 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 					    H_NULL))));
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_timeval;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_timeval);
   statics_add(ctx, timeval);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -5169,15 +5289,21 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
 					    H_NULL))));
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_timeval;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_timeval);
   statics_add(ctx, timeval);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
+}
+
+static void compute_stype_regex (rule_compiler_t *ctx, node_expr_t *myself)
+{
+  node_expr_t *n = (node_expr_t *)myself;
+
+  set_type (ctx, n, &t_regex);
 }
 
 node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
@@ -5214,12 +5340,11 @@ node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_regex;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_regex);
   statics_add(ctx, regex);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -5261,12 +5386,11 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
 			    h_string (regex_str)));
   /* hash = '(NODE_CONST T_REGEX r e g e x)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = compute_stype_regex;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  set_type (ctx, (node_expr_t *)n, &t_regex);
   statics_add(ctx, regex);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;

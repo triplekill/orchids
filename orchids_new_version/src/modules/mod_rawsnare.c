@@ -58,10 +58,10 @@ static int read_io(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, io->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, io->t_process.pid);
+  val = ovm_uint_new (gc_ctx, io->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, io->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, io->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -101,10 +101,10 @@ static int read_pc(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, pc->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, pc->t_process.pid);
+  val = ovm_uint_new (gc_ctx, pc->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, pc->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, pc->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -128,10 +128,10 @@ static int read_exec(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, ex->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, ex->t_process.pid);
+  val = ovm_uint_new (gc_ctx, ex->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, ex->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, ex->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -169,10 +169,10 @@ static int read_net(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, net->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, net->t_process.pid);
+  val = ovm_uint_new (gc_ctx, net->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, net->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, net->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -197,14 +197,14 @@ static int read_net(gc_t *gc_ctx,
   IPV4(val).s_addr = inet_addr(net->t_connection.src_ip);
   GC_TOUCH (gc_ctx, attr[F_SRCIP] = val);
 
-  val = ovm_int_new (gc_ctx, net->t_connection.src_port);
+  val = ovm_uint_new (gc_ctx, net->t_connection.src_port);
   GC_TOUCH (gc_ctx, attr[F_SRCPORT] = val);
 
   val = ovm_ipv4_new (gc_ctx);
   IPV4(val).s_addr = inet_addr(net->t_connection.dst_ip);
   GC_TOUCH (gc_ctx, attr[F_DSTIP] = val);
 
-  val = ovm_int_new (gc_ctx, net->t_connection.dst_port);
+  val = ovm_uint_new (gc_ctx, net->t_connection.dst_port);
   GC_TOUCH (gc_ctx, attr[F_DSTPORT] = val);
 
   return 0;
@@ -223,10 +223,10 @@ static int read_pt(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, pt->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, pt->t_process.pid);
+  val = ovm_uint_new (gc_ctx, pt->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, pt->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, pt->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -247,7 +247,7 @@ static int read_pt(gc_t *gc_ctx,
     }
 #endif
 
-  val = ovm_int_new (gc_ctx, pt->pid);
+  val = ovm_uint_new (gc_ctx, pt->pid);
   GC_TOUCH (gc_ctx, attr[F_PTRACEPID] = val);
 
   val = ovm_uint_new (gc_ctx, (unsigned long)(void *) pt->addr);
@@ -272,10 +272,10 @@ static int read_kill(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, kill->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, kill->t_process.pid);
+  val = ovm_uint_new (gc_ctx, kill->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, kill->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, kill->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -295,7 +295,7 @@ static int read_kill(gc_t *gc_ctx,
     }
 #endif
 
-  val = ovm_int_new (gc_ctx, kill->pid);
+  val = ovm_uint_new (gc_ctx, kill->pid);
   GC_TOUCH (gc_ctx, attr[F_KILLPID] = val);
 
   return 0;
@@ -327,10 +327,10 @@ static int read_ch(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, ch->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, ch->t_process.pid);
+  val = ovm_uint_new (gc_ctx, ch->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, ch->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, ch->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -370,10 +370,10 @@ static int read_cp(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, cp->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, cp->t_process.pid);
+  val = ovm_uint_new (gc_ctx, cp->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, cp->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, cp->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -412,10 +412,10 @@ static int read_su(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, su->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, su->t_process.pid);
+  val = ovm_uint_new (gc_ctx, su->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, su->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, su->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -423,13 +423,13 @@ static int read_su(gc_t *gc_ctx,
   VSTRLEN(val) = strlen(su->t_process.name);
   GC_TOUCH (gc_ctx, attr[F_PROCNAME] = val);
 
-  val = ovm_int_new (gc_ctx, su->t_target.id);
+  val = ovm_uint_new (gc_ctx, su->t_target.id);
   GC_TOUCH (gc_ctx, attr[F_TARGETID] = val);
 
-  val = ovm_int_new (gc_ctx, su->t_target.rid);
+  val = ovm_uint_new (gc_ctx, su->t_target.rid);
   GC_TOUCH (gc_ctx, attr[F_TARGETRID] = val);
 
-  val = ovm_int_new (gc_ctx, su->t_target.sid);
+  val = ovm_uint_new (gc_ctx, su->t_target.sid);
   GC_TOUCH (gc_ctx, attr[F_TARGETSID] = val);
 
   return 0;
@@ -448,10 +448,10 @@ static int read_ad(gc_t *gc_ctx,
   val = ovm_int_new (gc_ctx, ad->t_return.returncode);
   GC_TOUCH (gc_ctx, attr[F_RETCODE] = val);
 
-  val = ovm_int_new (gc_ctx, ad->t_process.pid);
+  val = ovm_uint_new (gc_ctx, ad->t_process.pid);
   GC_TOUCH (gc_ctx, attr[F_PID] = val);
 
-  val = ovm_int_new (gc_ctx, ad->t_process.ppid);
+  val = ovm_uint_new (gc_ctx, ad->t_process.ppid);
   GC_TOUCH (gc_ctx, attr[F_PPID] = val);
 
   val = ovm_vstr_new (gc_ctx, delegate);
@@ -502,7 +502,7 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
 
   snare_hdr = (header_token_t *) BSTR(event->value);
 
-  val = ovm_int_new (gc_ctx, snare_hdr->event_class);
+  val = ovm_uint_new (gc_ctx, snare_hdr->event_class);
   GC_UPDATE(gc_ctx, F_CLASS, val);
 
   val = ovm_uint_new (gc_ctx, snare_hdr->event_id);
@@ -560,14 +560,14 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
 
 static field_t rawsnare_fields[] = {
   { "rawsnare.time",       &t_timeval, MONO_MONO,  "event time"           },
-  { "rawsnare.class",      &t_int, MONO_UNKNOWN,      "snare event class"    },
+  { "rawsnare.class",      &t_uint, MONO_UNKNOWN,      "snare event class"    },
   { "rawsnare.syscall",    &t_uint, MONO_UNKNOWN,     "system call number"   },
   { "rawsnare.ruid",       &t_uint, MONO_UNKNOWN,      "user id"              },
   { "rawsnare.rgid",       &t_uint, MONO_UNKNOWN,      "main group id"        },
   { "rawsnare.euid",       &t_uint, MONO_UNKNOWN,      "effective user id"    },
   { "rawsnare.egid",       &t_uint, MONO_UNKNOWN,      "effective id"         },
-  { "rawsnare.pid",        &t_int, MONO_UNKNOWN,      "process id"           },
-  { "rawsnare.ppid",       &t_int, MONO_UNKNOWN,      "parent process id"    },
+  { "rawsnare.pid",        &t_uint, MONO_UNKNOWN,      "process id"           },
+  { "rawsnare.ppid",       &t_uint, MONO_UNKNOWN,      "parent process id"    },
   { "rawsnare.procname",   &t_str, MONO_UNKNOWN,     "process name"         },
   { "rawsnare.retcode",    &t_int, MONO_UNKNOWN,      "return code"          },
   { "rawsnare.workdir",    &t_str, MONO_UNKNOWN,     "working directory"    },
@@ -579,20 +579,20 @@ static field_t rawsnare_fields[] = {
   { "rawsnare.dst_path",   &t_str, MONO_UNKNOWN,     "destination path"     },
   { "rawsnare.sockcall",   &t_uint, MONO_UNKNOWN,     "socket_call number"   },
   { "rawsnare.dst_ip",     &t_ipv4, MONO_UNKNOWN,     "destination ip"       },
-  { "rawsnare.dst_port",   &t_int, MONO_UNKNOWN,      "destination port"     },
+  { "rawsnare.dst_port",   &t_uint, MONO_UNKNOWN,      "destination port"     },
   { "rawsnare.src_ip",     &t_ipv4, MONO_UNKNOWN,     "source ip"            },
-  { "rawsnare.src_port",   &t_int, MONO_UNKNOWN,      "source port"          },
+  { "rawsnare.src_port",   &t_uint, MONO_UNKNOWN,      "source port"          },
   { "rawsnare.owner_uid",  &t_uint, MONO_UNKNOWN,      "owner user id"        },
   { "rawsnare.owner_gid",  &t_uint, MONO_UNKNOWN,      "owner group id"       },
-  { "rawsnare.target_id",  &t_int, MONO_UNKNOWN,      "caller user/group id" },
-  { "rawsnare.target_rid", &t_int, MONO_UNKNOWN,      "real user/group id"   },
-  { "rawsnare.target_sid", &t_int, MONO_UNKNOWN,      "saved user/group id"  },
+  { "rawsnare.target_id",  &t_uint, MONO_UNKNOWN,      "caller user/group id" },
+  { "rawsnare.target_rid", &t_uint, MONO_UNKNOWN,      "real user/group id"   },
+  { "rawsnare.target_sid", &t_uint, MONO_UNKNOWN,      "saved user/group id"  },
   { "rawsnare.mod_name",   &t_str, MONO_UNKNOWN,     "module name"          },
   { "rawsnare.ptrace_req", &t_uint, MONO_UNKNOWN,     "ptrace request"       },
-  { "rawsnare.ptrace_pid", &t_int, MONO_UNKNOWN,      "ptrace pid"           },
+  { "rawsnare.ptrace_pid", &t_uint, MONO_UNKNOWN,      "ptrace pid"           },
   { "rawsnare.ptrace_addr",&t_uint, MONO_UNKNOWN,     "ptrace address"       },
   { "rawsnare.ptrace_data",&t_uint, MONO_UNKNOWN,     "ptrace data"          },
-  { "rawsnare.kill_pid",   &t_int, MONO_UNKNOWN,      "kill dest pid"        },
+  { "rawsnare.kill_pid",   &t_uint, MONO_UNKNOWN,      "kill dest pid"        },
   { "rawsnare.kill_sig",   &t_uint, MONO_UNKNOWN,     "signal to send"       },
 };
 

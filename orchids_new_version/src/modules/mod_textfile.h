@@ -77,37 +77,16 @@ struct textsock_s
   int fd;
 };
 
-static void
-textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf);
-
-
-static int
-textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy);
-
-
-static void
-add_input_file(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
-static void *
-textfile_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-textfile_postconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-textfile_postcompil(orchids_t *ctx, mod_entry_t *mod);
-
-
+static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod, textfile_t *tf, char *buf);
+static int textfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy);
+static void *textfile_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void textfile_postconfig(orchids_t *ctx, mod_entry_t *mod);
+static void textfile_postcompil(orchids_t *ctx, mod_entry_t *mod);
 static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
-
-static void textfile_setprocess_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void textfile_set_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 static void textfile_setexit_process_all(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 static void textfile_setpoll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
 
 static int rtaction_read_textfiles(orchids_t *ctx, heap_entry_t *he);
 

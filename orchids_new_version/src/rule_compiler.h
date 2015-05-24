@@ -416,6 +416,7 @@ struct node_state_s
 #define AN_MUSTSET_REACHABLE 0x1
 #define AN_EPSILON_REACHABLE 0x2
 #define AN_EPSILON_DONE 0x4
+#define AN_EXPLORED 0x8
   varset_t *mustset;
 };
 
