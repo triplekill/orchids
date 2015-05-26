@@ -4205,7 +4205,7 @@ static issdl_function_t issdl_function_g[] = {
     1, str_of_timeval_sigs,
     m_unknown_1,
     "convert a timeval to a string" },
-  { issdl_time_from_str, 29, "time_from_str",
+  { issdl_time_from_str, 29, "ctime_from_str",
     1, ctime_of_str_sigs,
     m_unknown_1,
     "convert a string to a time" },

@@ -20,13 +20,14 @@
  *
  * [IPS] To block the attacker in real time. See rule anti_ssh_scan.rule
  *
- * XXX ===> Need to check what appens if events are not in the right order
+ * XXX ===> Need to check what happens if events are not in the right order
  */
 rule ssh_failed_burst synchronize (AGGR_VARS)
 {
   state init
   {
-    $start_new = 1;
+    $total = 0;
+    $nb_burst = 0;
     expect (CONDITION)
       goto first;
   }
@@ -34,18 +35,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   state first
   {
     AGGR_INIT
-
-    if ($start_new == 1)
-    {
-      $total = 0;
-      $total_begin = TIME_FIELD;
-      $nb_burst = 0;
-    }
-    else
-    {
-      $total = $total + $count;
-      $nb_burst = $nb_burst + 1;
-    }
+    $total_begin = TIME_FIELD;
     $count = 0;
     $begin = TIME_FIELD;
     $last = TIME_FIELD;
@@ -70,9 +60,6 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
       $diff_last = TIME_FIELD - $last;
     }
     $last = TIME_FIELD;
-
-    // We do not need the event information anymore
-    drop_event();
 
     expect ((CONDITION)
 	    && (AGGR_COND)
@@ -99,13 +86,14 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
 
   state alert
   {
-    $m = "Alert : Burst ==> More than " + str_from_int(THRESH) + ". Source : " + str_from_ipv4($source)  +". Burst started at " + str_from_time($begin);
+    $m = "Alert : Burst ==> More than " + str_from_uint(THRESH) + ". Source : " + str_from_ipv4($source)  +". Burst started at " + str_from_ctime($begin);
     print ($m);
-    $start_new = 0;
 
     // [DEV] we should discard all previous states.
     mark_cut($mark);
 
+    $total = $total + $count;
+    $nb_burst = $nb_burst + 1;
     goto first;
   }
 
@@ -113,10 +101,9 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   {
     if ($nb_burst > 0)
     {
-      $m = "Alert : Multiple burst : " + str_from_int($nb_burst) + " consecutive bursts. Total : " + str_from_int($count)  +". Bursts started at " + str_from_time($total_begin) + " Source : " + str_from_ipv4($source);
+      $m = "Alert : Multiple burst : " + str_from_uint($nb_burst) + " consecutive bursts. Total : " + str_from_uint($count)  +". Bursts started at " + str_from_ctime($total_begin) + " Source : " + str_from_ipv4($source);
       print ($m);
     }
-    $start_new = 1;
 
     // Here we start a new burst detection by going back to the first state.
     // [DEV] we should discard all previous states.

@@ -629,7 +629,7 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx,
 			issdl_iodef_write_report,
 			"iodef_write_report",
-			 0, iodef_write_report_sigs,
+			 1, iodef_write_report_sigs,
 			 m_random,
 			"write iodef report into the report folder");
 

@@ -962,7 +962,7 @@ static void type_solve (rule_compiler_t *ctx)
 	continue; /* no need to propagate a type error */
       /* t should not be equal to &t_any (bad taste) */
       newt = stype_join (t, e->stype);
-      if (newt==&t_any)
+      if (newt==&t_any && t!=&t_any)
 	{
 	  if (e->file!=NULL)
 	    fprintf (stderr, "%s:", STR(e->file));
@@ -1051,6 +1051,10 @@ static void type_explore_expr (rule_compiler_t *ctx,
       type_explore_expr (ctx, IF_COND(expr));
       type_explore_expr (ctx, IF_THEN(expr));
       type_explore_expr (ctx, IF_ELSE(expr));
+      break;
+    case NODE_CONS:
+      type_explore_expr (ctx, BIN_LVAL(expr));
+      type_explore_expr (ctx, BIN_RVAL(expr));
       break;
     case NODE_REGSPLIT:
       type_explore_expr (ctx, REGSPLIT_STRING(expr));
@@ -4006,7 +4010,7 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
     return;
   vartype = n->lval->stype;
   newtype = stype_join (vartype, type);
-  if (newtype==&t_any) /* type error */
+  if (newtype==&t_any && vartype!=NULL && type!=NULL && vartype!=&t_any) /* type error */
     {
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file));
@@ -4018,7 +4022,7 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 	       vartype->name);
       ctx->nerrors++;
     }
-  else set_type (ctx, (node_expr_t *)n->lval, newtype);
+  set_type (ctx, (node_expr_t *)n->lval, newtype);
 }
 
 node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
@@ -4064,12 +4068,25 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
       set_type (ctx, myself, &t_any);
       return; // do not do anything
     }
+  /* First check that no argument has type "*" */
+  for (l=CALL_PARAMS(n); l!=NULL; l=BIN_RVAL(l))
+    {
+      arg = BIN_LVAL(l);
+      if (arg->stype==&t_any)
+	break;
+    }
+  if (l!=NULL) /* Some argument has type "*": this means
+		  a type error, which we just propagate with no new error message */
+    {
+      set_type (ctx, myself, &t_any);
+      return;
+    }
   nparams = list_len (CALL_PARAMS(n));
   if (nparams!=f->args_nb)
     {
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file)); // NUL-terminated by construction
-      fprintf (stderr, "%u: function %s expects %d arguments, but is applied to %zd arguments.\n",
+      fprintf (stderr, "%u: error: function %s expects %d arguments, but is applied to %zd arguments.\n",
 	       myself->lineno, f->name, f->args_nb, nparams);
       ctx->nerrors++;
       set_type (ctx, myself, &t_any);
@@ -4096,7 +4113,7 @@ static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself)
 
       if (n->file!=NULL)
 	fprintf (stderr, "%s:", STR(n->file)); // NUL-terminated by construction
-      fprintf (stderr, "%u: ill-typed function application %s",
+      fprintf (stderr, "%u: error: ill-typed function application %s",
 	       myself->lineno, f->name);
       for (l=CALL_PARAMS(n); l!=NULL; l=BIN_RVAL(l))
 	{
@@ -4183,7 +4200,7 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
       if (currfile!=NULL)
 	fprintf (stderr, "%s:", STR(currfile));
       /* NUL-terminated, see above */
-      fprintf (stderr, "%u: unknown function %s.\n",
+      fprintf (stderr, "%u: error: unknown function %s.\n",
 	       sym->line, sym->name);
       ctx->nerrors++;
     }
@@ -4240,8 +4257,7 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
 		       elsetype->name);
 	      ctx->nerrors++;
 	    }
-	  else
-	    set_type (ctx, myself, restype);
+	  set_type (ctx, myself, restype);
 	}
       else
 	set_type (ctx, myself, thentype);
@@ -4653,7 +4669,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	  if (is_logical_variable(e))
 	    {
 	      vartype = stype_join (e->stype, argtype);
-	      if (vartype==&t_any)
+	      if (vartype==&t_any && e->stype!=NULL && argtype!=NULL)
 		  {
 		    if (n->file!=NULL)
 		      fprintf (stderr, "%s:", STR(n->file));
@@ -4666,12 +4682,12 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 		    set_type (ctx, myself, &t_any);
 		    ctx->nerrors++;
 		  }
-	      else set_type (ctx, e, vartype);
+	      set_type (ctx, e, vartype);
 	    }
 	  else
 	    {
 	      vartype = e->stype;
-	      if (stype_join(vartype, argtype)==&t_any)
+	      if (stype_join(vartype, argtype)==&t_any && vartype!=NULL && argtype!=NULL)
 		  {
 		    if (n->file!=NULL)
 		      fprintf (stderr, "%s:", STR(n->file));
@@ -4791,9 +4807,14 @@ static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *mysel
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
     {
       t = BIN_LVAL(l)->stype;
-      if (t==NULL || t==&t_any)
-	return; /* not enough info yet (NULL), or type error that we just
-		   propagate, without any spurious error message */
+      if (t==NULL) /* not enough info yet (NULL) */
+	return;
+      if (t==&t_any)
+	{
+	  set_type (ctx, myself, &t_any);
+	  return; /* type error that we just propagate,
+		     without any spurious error message */
+	}
     }
   err = 0;
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
@@ -4877,14 +4898,17 @@ static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself)
       restype = stype_join (t, rett);
       if (restype==&t_any)
 	{
-	  if (BIN_LVAL(l)->file!=NULL)
-	    fprintf (stderr, "%s:", STR(BIN_LVAL(l)->file));
-	  /* printing STR(BIN_LVAL(l)->file) is legal, since it
-	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: type error: return %s, expected %s.\n",
-		   BIN_LVAL(l)->lineno,
-		   t->name, rett->name);
-	  ctx->nerrors++;
+	  if (t!=NULL && rett!=NULL)
+	    {
+	      if (BIN_LVAL(l)->file!=NULL)
+		fprintf (stderr, "%s:", STR(BIN_LVAL(l)->file));
+	      /* printing STR(BIN_LVAL(l)->file) is legal, since it
+		 was created NUL-terminated, on purpose */
+	      fprintf (stderr, "%u: type error: return %s, expected %s.\n",
+		       BIN_LVAL(l)->lineno,
+		       t->name, rett->name);
+	      ctx->nerrors++;
+	    }
 	  t = &t_any;
 	  break;
 	}

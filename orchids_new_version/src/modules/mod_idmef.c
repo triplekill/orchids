@@ -473,7 +473,7 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx,
 			 issdl_idmef_write_alert,
 			 "idmef_write_alert",
-			 0, idmef_write_alert_sigs,
+			 1, idmef_write_alert_sigs,
 			 m_random,
 			 "write idmef alert into the report folder");
 

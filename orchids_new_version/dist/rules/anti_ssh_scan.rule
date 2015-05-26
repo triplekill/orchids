@@ -15,53 +15,44 @@
 rule anti_ssh_scan synchronize($attacker) {
 
   state init {
-    $attempts = 1;
-
     expect (.sshd.action == "Failed")
-      goto update_counter;
+      goto start;
+  }
+
+  state start {
+    $attempts = 1;
+    $start_time = .udp.time;
+    $attacker = .sshd.src_ip;
+    goto failed_loop;
   }
 
   state update_counter {
-    if ($attempts == 0)
-    {
-      $start_time = .udp.time;
-      $attacker = .sshd.src_ip;
-    }
-
     $attempts = $attempts + 1;
+    if ($attempts >= MAX_ATTEMPT)
+      {
+        $cmd = RCMD( FIREWALL, BLOCKIP_CMD( str_from_ipv4( $attacker ) ) );
+        report();
+        kill_threads();
+      }
     goto failed_loop;
   }
 
   state failed_loop {
-    $attempts = $attempts + 1;
-
+  /*!!! should really cut() here */
    /* Capture other network activities of the suspected attacker. */
-   expect (    .netfilter.src == $attacker
+   expect (.netfilter.src == $attacker
         && .nfhub.desc != "ssh"
         && .nfhub.desc != "ssh*")
      goto failed_loop;
 
-   /* Log successful loggin of the attacker. */
-   expect (    .sshd.src_ip == $attacker
+   /* Log successful logging of the attacker. */
+   expect (.sshd.src_ip == $attacker
         && .sshd.action == "Accepted")
      goto failed_loop;
 
    /* Count the number of failed attempts. */
-   expect (    .sshd.action == "Failed"
-        && $attacker == .sshd.src_ip
-        && $attempts < MAX_ATTEMPT)
+   expect (.sshd.action == "Failed"
+        && $attacker == .sshd.src_ip)
      goto update_counter;
-
-   /* If the limit is reached, block the attacked. */
-   expect (    .sshd.action == "Failed"
-        && $attacker == .sshd.src_ip
-        &&  $attempts >= MAX_ATTEMPT )
-     goto block_attacker;
-  }
-
-  state block_attacker {
-    $cmd = RCMD( FIREWALL, BLOCKIP_CMD( str_from_ipv4( $attacker ) ) );
-
-    report();
   }
 }

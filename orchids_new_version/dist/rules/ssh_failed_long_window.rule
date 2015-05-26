@@ -38,8 +38,8 @@ rule ssh_failed_long_window
     $count = 0;
     // Retreive the last time a rule instance has been started
     $tmp = "long_win_foren" + str_from_ipv4($source);
-    $last_rule_start = get_shared_var($tmp);
-    set_shared_var($tmp, TIME_FIELD);
+    $last_rule_start = ctime_from_str(get_shared_var($tmp));
+    set_shared_var($tmp, str_from_ctime(TIME_FIELD));
     $start = 1;
     if ($last_rule_start == 0)
       $last_rule_start = TIME_FIELD;
@@ -96,9 +96,9 @@ rule ssh_failed_long_window
 
   state alert
   {
-    $m = "More than " + str_from_int(THRESH) + " events in less than " + str_from_int(WINDOW) + " seconds from " + $source ;
-
     $str_source = str_from_ipv4($source);
+    $m = "More than " + str_from_uint(THRESH) + " events in less than " + str_from_ctime(WINDOW) + " seconds from " + $str_source ;
+
 
     $idmef = idmef_new_alert();
     xml_set_prop($idmef,
@@ -119,9 +119,8 @@ rule ssh_failed_long_window
 	"/*/idmef:Alert/idmef:Assessment/idmef:Impact",
 	"Brute force detected");
     idmef_write_alert($idmef);
-    xml_free($idmef);
 
-    $m = "Alert : More than " + str_from_int(THRESH) + " events in less than " + str_from_int(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
+    $m = "Alert : More than " + str_from_uint(THRESH) + " events in less than " + str_from_ctime(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
     print ($m);
     kill_threads();
   }
