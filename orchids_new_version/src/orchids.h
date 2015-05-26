@@ -766,7 +766,12 @@ struct rule_compiler_s
   /* For the lex scanner: */
   void             *scanner;
   unsigned int      issdllineno;
-  char             *issdlcurrentfile; /* a gc_malloc()ed copy of STR(currfile) */
+  char             *issdlcurrentfile; /* the current file; should be distinguished
+					 from STR(...->currfile).  E.g., in file
+					 "a.rule", preprocessed through cpp
+					 and after a line command '# 1 "b.rule"',
+					 issdlcurrentfile would be a.rule,
+					 with STR(...->currfile) would be b.rule. */
   FILE             *issdlin;
   SLIST_HEAD(filestack, struct filestack_s) issdlfilestack;
   char              qstr_buf[QSTRMAX];

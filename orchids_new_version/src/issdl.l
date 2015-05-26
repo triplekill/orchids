@@ -185,7 +185,8 @@ static size_t qstr_sz_g;
     if (flag1 == 1) {
       /* If 1 is set, push new file and set line counter */
       fs = gc_base_malloc ((ctx)->gc_ctx, sizeof (filestack_t));
-      fs->file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
+      fs->file = gc_strdup((ctx)->gc_ctx, STR((ctx)->currfile));
+      /* OK since STR((ctx)->currfile) is NUL-terminated, on purpose */
       fs->line = issdllineno_g;
       SLIST_INSERT_HEAD(&issdlfilestack_g, fs, elmt);
     }
@@ -205,9 +206,6 @@ static size_t qstr_sz_g;
 
 //fprintf (stderr, "[cpp] switch to \"%s\"\n\n", file);
 //fflush (stderr);
-    if (issdlcurrentfile_g)
-      gc_base_free (issdlcurrentfile_g);
-    issdlcurrentfile_g = gc_strdup((ctx)->gc_ctx, file);
     len = strlen(file);
     currfile = ovm_str_new((ctx)->gc_ctx, len+1);
     strcpy(STR(currfile), file);
@@ -215,7 +213,6 @@ static size_t qstr_sz_g;
     STRLEN(currfile) = len;
     GC_TOUCH ((ctx)->gc_ctx, (ctx)->currfile = currfile);
     issdllineno_g = line;
-
   } else {
     fprintf(stderr, "warning: syntax error in cpp line control syntax.\n");
   }
@@ -244,7 +241,10 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 
  /* Symbol names (same as a C declaration) */
 [a-z_][A-Za-z0-9_\.]* {
-  issdllval.sym.file = gc_strdup((ctx)->gc_ctx, issdlcurrentfile_g);
+  issdllval.sym.file = gc_strdup((ctx)->gc_ctx, (ctx)->issdlcurrentfile);
+  /* file is not currfile, rather issdlcurrentfile---the real file, that is.
+  This will be needed in modules/html_output.c, which needs to find back
+  the file to be printed, which contains the rule. */
 //fprintf (stderr, "SYMNAME '%s', in file \"%s\"\n", issdltext, issdllval.sym.file);
   issdllval.sym.line = issdllineno_g;
   issdllval.sym.name = gc_strdup((ctx)->gc_ctx, issdltext);
