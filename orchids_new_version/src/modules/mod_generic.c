@@ -43,7 +43,9 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 			   void *data)
 {
   char *txt_line;
+#ifdef HAVE_REGNEXEC
   int txt_len;
+#endif
   generic_vmod_t *vmod;
   generic_field_t *field, *field2;
   generic_match_t *match;
@@ -53,7 +55,9 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   char *buf;
 #endif
   generic_hook_t *hook;
+#if 0
   field_table_t *fields;
+#endif
   int err;
 
   err = 0;
@@ -64,9 +68,15 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
     }
   switch (TYPE(event->value))
     {
-    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
+    case T_STR: txt_line = STR(event->value); 
+#ifdef HAVE_REGNEXEC
+		txt_len = STRLEN(event->value);
+#endif
       break;
-    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
+    case T_VSTR: txt_line = VSTR(event->value); 
+#ifdef HAVE_REGNEXEC
+		 txt_len = VSTRLEN(event->value);
+#endif
       break;
     default:
       DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
@@ -112,11 +122,11 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 
 	  DebugLog(DF_MOD, DS_DEBUG, "regexec() MATCH\n");
 
+#if 0
 	  fields = vmod->fields;
 	  /* Should reset all fields to NULL,
 	     but instead we shall reset only the fields read to NULL
 	     on successful match. */
-#if 0
 	  for (i=0, n = fields->nfields; i<n; i++)
 	    fields->field_values[i] = NULL;
 #endif
@@ -138,7 +148,7 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		{
 		case T_STR:
 		  res = ovm_vstr_new(ctx->gc_ctx, event->value);
-		  VSTR(res) = &txt_line[regmatch[ field->substring ].rm_so];
+		  VSTR(res) = buff;
 		  VSTRLEN(res) = res_sz;
 		  break;
 		case T_INT:
@@ -160,7 +170,7 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  break;
 		case T_IPV6:
 		  res = ovm_ipv6_new(ctx->gc_ctx);
-		  if (inet_pton(AF_INET6, buff, &IPV4(res)) != 1)
+		  if (inet_pton(AF_INET6, buff, &IPV6(res)) != 1)
 		    {
 		      DebugLog(DF_MOD, DS_ERROR,
 			       "Error in IPV6 conversion\n");

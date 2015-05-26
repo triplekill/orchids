@@ -53,8 +53,8 @@
 #include "lang.h"
 #include "lang_priv.h"
 
-#define TIME_MAX ((time_t)((1L<<(sizeof(time_t)*8-1))-1))
-#define TIME_MIN ((time_t)((1L<<(sizeof(time_t)*8-1))))
+#define TIME_MAX ((time_t)((unsigned long)(1L<<(sizeof(time_t)*8-1))-1))
+#define TIME_MIN ((time_t)((unsigned long)(1L<<(sizeof(time_t)*8-1))))
 
 /**
  ** Table of data types natively recognized in the Orchids language.

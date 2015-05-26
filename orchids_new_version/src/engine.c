@@ -568,10 +568,14 @@ void inject_event(orchids_t *ctx, event_t *event)
   int sret = 0;
   int ret = 0;
   int passed_threads = 0;
+#ifdef TIMEOUT_OBSOLETE
   time_t cur_time;
+#endif
   gc_t *gc_ctx = ctx->gc_ctx;
 
+#ifdef TIMEOUT_OBSOLETE
   cur_time = time(NULL);
+#endif
 
   DebugLog(DF_ENG, DS_INFO, "inject_event() (one-evt)\n");
 

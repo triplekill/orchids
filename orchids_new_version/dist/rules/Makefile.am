@@ -6,17 +6,20 @@ orchidsrule_DATA = \
   linux64syscall.h \
   linuxsignal.h \
   linuxptrace.h \
-  pid_tracker.rule \
-  apachessl.rule \
-  portscan.rule \
-  dhcp_lease_check.rule \
-  password_sniff.rule \
-  anti_ssh_scan.rule \
-  lin24_ptrace.rule\
-  listen_atm_vcc.rule\
-  lock_lease_dos.rule\
-  leak_memory.rule\
-  ssh_failed_burst.rule\
-  ssh_failed_long_window.rule
+  pid_tracker.pprule \
+  apachessl.pprule \
+  portscan.pprule \
+  dhcp_lease_check.pprule \
+  password_sniff.pprule \
+  anti_ssh_scan.pprule \
+  lin24_ptrace.pprule\
+  listen_atm_vcc.pprule\
+  lock_lease_dos.pprule\
+  leak_memory.pprule\
+  ssh_failed_burst.pprule\
+  ssh_failed_long_window.pprule
 
 EXTRA_DIST = $(orchidsrule_DATA) test/*.rule
+
+%.pprule: $(srcdir)/%.rule
+	$(CPP) $< > $@

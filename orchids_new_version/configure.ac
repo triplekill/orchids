@@ -74,6 +74,8 @@ else
    AC_SUBST(YACC, bison)
 fi
 
+AC_CHECK_CPP
+
 dnl AC_PATH_PROG(GNUPLOT, gnuplot)
 dnl AM_CONDITIONAL(HAVE_GNUPLOT, test x$HAVE_GNUPLOT = xyes)
 dnl AC_DEFINE([HAVE_GNUPLOT], 1, [Set to 1 if Gnuplot is present])
