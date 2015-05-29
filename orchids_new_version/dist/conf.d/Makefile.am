@@ -22,6 +22,7 @@ EXTRA_DIST =                  \
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
+  01_mod_binfile.conf       \
   02_mod_syslog.conf        \
   03_mod_udp.conf           \
   04_mod_sockunix.conf      \

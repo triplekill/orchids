@@ -86,7 +86,7 @@ static void reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
   for (r = ctx->first_rule_instance; r; r = next_rule) {
     next_rule = r->next;
     if (r == rule) {
-      DebugLog(DF_ENG, DS_TRACE, "ripping killed rule %p\n", r);
+      DebugLog(DF_ENG, DS_TRACE, "reaping killed rule %p\n", r);
       if (prev_rule!=NULL)
         GC_TOUCH (ctx->gc_ctx, prev_rule->next = next_rule);
       else
@@ -426,7 +426,7 @@ static void create_rule_initial_threads(orchids_t *ctx,
     new_rule->threads = 0;
     new_rule->flags = 0;
     new_rule->sync_lock_list = NULL;
-    GC_UPDATE (gc_ctx, 0, new_rule); /* useless, because of the following line */
+    //GC_UPDATE (gc_ctx, 0, new_rule); /* useless, because of the following line */
     GC_TOUCH (gc_ctx, init->rule_instance = new_rule); /* move in create_init_inst() ? */
     /* link rule */
 /*     ctx->state_instances++;
@@ -662,7 +662,7 @@ void inject_event(orchids_t *ctx, event_t *event)
     if ( THREAD_IS_KILLED(t) )
       {
 	ctx->last_ruleinst_act = ctx->cur_loop_time;
-	DebugLog(DF_ENG, DS_DEBUG, "Rip and overide killed thread (%p)\n", t);
+	DebugLog(DF_ENG, DS_DEBUG, "Reap and override killed thread (%p)\n", t);
 	t->state_instance->rule_instance->threads--;
 	ctx->threads--;
 	if ( NO_MORE_THREAD(t->state_instance->rule_instance) )
@@ -756,7 +756,7 @@ void inject_event(orchids_t *ctx, event_t *event)
 	KILL_THREAD(ctx, t);
 	/* Initial thread reaper: an initial thread can't be free()d at
 	 * the next loop because initial environment can make references
-	 * to the current event.  In the case of the event didn't match
+	 * to the current event.  In case the event didn't match
 	 * any transition, it will be free()d _before_ the initial
 	 * environment, so we'll lose the reference.  */
 

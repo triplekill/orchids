@@ -268,8 +268,9 @@ static void binfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
   cfg = (binfile_config_t *)mod->config;
 
   /* fseek to the end-of-file */
-  for (bf = cfg->file_list; bf!=NULL; bf = bf->next)
-    (void) lseek (bf->fd, 0, SEEK_END);
+  if (!cfg->process_all_data)
+    for (bf = cfg->file_list; bf!=NULL; bf = bf->next)
+      (void) lseek (bf->fd, 0, SEEK_END);
 }
 
 
