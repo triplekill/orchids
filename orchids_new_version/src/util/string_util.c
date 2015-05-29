@@ -59,10 +59,26 @@ size_t my_strspn(const char *pos, const char *eot, size_t n)
     {
       for (r = eot; *r != '\0'; ++r)
         if (*pos == *r)
-          return (token_size);
+          break;
+      if (*r=='\0')
+	break;
     }
 
-  return (token_size);
+  return token_size;
+}
+
+size_t my_strcspn(const char *pos, const char *eot, size_t n)
+{
+  size_t token_size;
+  const char *r;
+
+  for (token_size = 0; token_size < n; ++token_size, ++pos)
+    {
+      for (r = eot; *r != '\0'; ++r)
+        if (*pos == *r)
+          return token_size;
+    }
+  return token_size;
 }
 
 bool_t fnmatch_test(const char *pattern)

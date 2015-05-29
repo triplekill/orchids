@@ -397,8 +397,9 @@ static void textfile_postcompil(orchids_t *ctx, mod_entry_t *mod)
   cfg = (textfile_config_t *)mod->config;
 
   /* fseek to the end-of-file */
-  for (tf = cfg->file_list; tf!=NULL; tf = tf->next)
-    (void) fseek (tf->fd, 0, SEEK_END);
+  if (!cfg->process_all_data)
+    for (tf = cfg->file_list; tf!=NULL; tf = tf->next)
+      (void) fseek (tf->fd, 0, SEEK_END);
 }
 
 
@@ -407,23 +408,36 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
   char filepath[PATH_MAX];
   textfile_config_t *cfg;
   struct stat sbuf;
+  char *argstring, *filename;
 
   cfg = (textfile_config_t *)mod->config;
-  if (realpath(dir->args, filepath)==NULL)
+  argstring = dir->args;
+  argstring = dir_parse_string (ctx, dir->file, dir->line, argstring, &filename);
+  if (argstring==NULL)
     {
-      fprintf (stderr, "%s: %u: could not find real path of file '%s'\n",
+      fprintf (stderr, "%s:%u: missing file name\n", dir->file, dir->line);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  if (realpath(filename, filepath)==NULL)
+    {
+      fprintf (stderr, "%s:%u: could not find real path of file '%s'\n",
 	       dir->file, dir->line, dir->args);
+      fflush (stderr);
       exit(EXIT_FAILURE);
     }
+  gc_base_free (filename);
   if (filepath[0] == '\0')
     {
-      DebugLog(DF_MOD, DS_ERROR, "mod_textfile: file name is empty.\n");
-      return;
+      fprintf (stderr, "%s:%u: empty file name\n", dir->file, dir->line);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
     }
   if (stat(filepath, &sbuf))
     {
-      DebugLog(DF_MOD, DS_ERROR, "mod_textfile: file '%s' does not exist.\n", filepath);
-      return;
+      fprintf (stderr, "%s:%u: file '%s' does not exist\n", dir->file, dir->line, filepath);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
     }
 
   if (S_ISSOCK(sbuf.st_mode)) // warning, S_ISSOCK() is not POSIX...
@@ -455,7 +469,7 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       fd = socket(AF_UNIX, SOCK_STREAM, 0);
       if (fd<0)
 	{
-	  fprintf (stderr, "%s: %u: could not open Unix socket '%s'\n",
+	  fprintf (stderr, "%s:%u: could not open Unix socket '%s'\n",
 		   dir->file, dir->line, filepath);
 	  exit(EXIT_FAILURE);
 	}
@@ -470,7 +484,7 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       len = SUN_LEN(&sunx);
       if (connect(fd, (struct sockaddr *)&sunx, len) < 0)
 	{
-	  fprintf (stderr, "%s: %u: could not connect to Unix socket '%s': errno=%d: %s",
+	  fprintf (stderr, "%s:%u: could not connect to Unix socket '%s': errno=%d: %s",
 		   dir->file, dir->line, filepath, errno, strerror(errno));
 	  exit (EXIT_FAILURE);
 	}
@@ -506,7 +520,7 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       fd = open(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
       if (fd < 0)
 	{
-	  fprintf (stderr, "%s: %u: could not open file '%s' for reading\n",
+	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);
 	}
@@ -532,7 +546,7 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       f->fd = fopen(filepath, "r");
       if (f==NULL)
 	{
-	  fprintf (stderr, "%s: %u: could not open file '%s' for reading\n",
+	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);
 	}

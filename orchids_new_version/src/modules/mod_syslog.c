@@ -138,8 +138,8 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 	  ret = 1;
 	  goto end;
 	}
-      GC_UPDATE(gc_ctx, F_FACILITY, ((syslog_data_t *)data)->syslog_facility[syslog_priority >> 3]);
-      GC_UPDATE(gc_ctx, F_SEVERITY, ((syslog_data_t *)data)->syslog_severity[syslog_priority & 0x07]);
+      GC_UPDATE(gc_ctx, F_FACILITY, syslog_cfg->syslog_facility[syslog_priority >> 3]);
+      GC_UPDATE(gc_ctx, F_SEVERITY, syslog_cfg->syslog_severity[syslog_priority & 0x07]);
 
       txt_line += token_size + 2; /* number size and '<' '>' */
       txt_len -= token_size + 2;
@@ -203,45 +203,38 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 
   if (txt_len <= 0)
     {
-      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
+      DebugLog(DF_MOD, DS_WARN, "line terminated after time field, ignoring event\n");
       ret = 1;
       goto end;
     }
 
-  token_size = my_strspn(txt_line, " [:", txt_len);
-#ifdef NO_GCONFD_HACK
-  if (txt_line[token_size] == ' ') {
-#else
-  if (txt_line[token_size] == ' ' && txt_line[token_size+1] != '(') {
-#endif
-    DebugLog(DF_MOD, DS_DEBUG, "read host.\n");
-
-    val = ovm_vstr_new (gc_ctx, event->value);
-    VSTR(val) = txt_line;
-    VSTRLEN(val) = token_size;
-    GC_UPDATE(gc_ctx, F_HOST, val);
-
-    ++token_size; /* skip separator */
-    txt_line += token_size;
-    txt_len -= token_size;
-    /* XXX check sizes are always positive */
-    if (txt_len <= 0)
-      {
-	DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-	ret = 1;
-	goto end;
-      }
-  }
-  else
+  token_size = my_strspn(txt_line, " ", txt_len);
+  txt_line += token_size;
+  txt_len -= token_size;
+  token_size = get_next_token(txt_line, ' ', txt_len);
+  if (token_size==0)
     {
-      DebugLog(DF_MOD, DS_DEBUG, "read src retry.\n");
+      DebugLog(DF_MOD, DS_WARN, "host name absent, ignoring event\n");
+      ret = 1;
+      goto end;
     }
+  val = ovm_vstr_new (gc_ctx, event->value);
+  VSTR(val) = txt_line;
+  VSTRLEN(val) = token_size;
+  GC_UPDATE(gc_ctx, F_HOST, val);
 
-  /* Handle syslog message repetition */
-  if (!strncmp("last message repeated ", txt_line, 22))
+  txt_line += token_size;
+  txt_len -= token_size;
+  token_size = my_strspn(txt_line, " ", txt_len);
+  txt_line += token_size;
+  txt_len -= token_size;
+  /* We now expect 'prog[pid]' (where prog is a program... or a user id!)
+     but gconfd uses the non-standard syntax '(prog-pid)'.
+     Also, this is the place where we can expect to see the infamous
+     "last message repeated n times" */
+  if (txt_len>=22 && strncmp("last message repeated ", txt_line, 22)==0)
     {
       token_size = my_strspn(txt_line, "\r\n", txt_len);
-
       val = ovm_vstr_new (gc_ctx, event->value);
       VSTR(val) = txt_line;
       VSTRLEN(val) = token_size;
@@ -249,86 +242,96 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 
       txt_line += 22;
       txt_len -= 22;
-
-      token_size = get_next_uint(txt_line, &n, txt_len);
-      token_size++;
-      val = ovm_uint_new (gc_ctx, n);
-      GC_UPDATE(gc_ctx, F_REPEAT, val);
-
+      token_size = my_strspn(txt_line, " ", txt_len);
       txt_line += token_size;
       txt_len -= token_size;
-
-      GC_UPDATE (gc_ctx, F_PROG, ((syslog_data_t *)data)->syslog_str);
-
+      token_size = get_next_uint(txt_line, &n, txt_len);
+      val = ovm_uint_new (gc_ctx, n);
+      GC_UPDATE(gc_ctx, F_REPEAT, val);
+      GC_UPDATE (gc_ctx, F_PROG, syslog_cfg->syslog_str);
       REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
       goto end;
     }
+  else if (txt_len>=1 && txt_line[0]=='(') /* gconfd syntax */
+    {
+      txt_line++;
+      txt_len--;
+      token_size = my_strcspn(txt_line, "-)", txt_len);
+      if (token_size==0)
+	{
+	  DebugLog(DF_MOD, DS_WARN, "prog name absent, ignoring event\n");
+	  ret = 1;
+	  goto end;
+	}
+      val = ovm_vstr_new (gc_ctx, event->value);
+      VSTR(val) = txt_line;
+      VSTRLEN(val) = token_size;
+      GC_UPDATE(gc_ctx, F_PROG, val);
+      txt_line += token_size;
+      txt_len -= token_size;
+      if (txt_len>=1 && txt_line[0]=='-')
+	{
+	  txt_line++;
+	  txt_len--;
+	  token_size = get_next_uint(txt_line, &n, txt_len);
+	  val = ovm_uint_new (gc_ctx, n);
+	  GC_UPDATE(gc_ctx, F_PID, val);
+	  txt_line += token_size;
+	  txt_len -= token_size;
+	}
+      if (txt_len>=1 && txt_line[0]==')')
+	{
+	  txt_line++;
+	  txt_len--;
+	}
+    }
+  else /* usual syntax 'prog[pid]' */
+    {
+      token_size = my_strcspn (txt_line, " [:", txt_len);
+      if (token_size==0)
+	{
+	  DebugLog(DF_MOD, DS_WARN, "prog name absent, ignoring event\n");
+	  ret = 1;
+	  goto end;
+	}
+      val = ovm_vstr_new (gc_ctx, event->value);
+      VSTR(val) = txt_line;
+      VSTRLEN(val) = token_size;
+      GC_UPDATE(gc_ctx, F_PROG, val);
+      txt_line += token_size;
+      txt_len -= token_size;
+      if (txt_len>=1 && txt_line[0]=='[')
+	{
+	  txt_line++;
+	  txt_len--;
+	  token_size = get_next_uint (txt_line, &n, txt_len);
+	  val = ovm_uint_new (gc_ctx, n);
+	  GC_UPDATE(gc_ctx, F_PID, val);
+	  txt_line += token_size;
+	  txt_len -= token_size;
+	  if (txt_len>=1 && txt_line[0]==']')
+	    {
+	      txt_line++;
+	      txt_len--;
+	    }
+	}
+    }
 
-  token_size = my_strspn(txt_line, "[:", txt_len);
-
-  val = ovm_vstr_new (gc_ctx, event->value);
-  VSTR(val) = txt_line;
-#ifndef NO_GCONFD_HACK
-  if (!strncmp("gconfd", txt_line, 6)) {
-    VSTRLEN(val) = 6;
-  }
-  else {
-#endif
-    VSTRLEN(val) = token_size;
-#ifndef NO_GCONFD_HACK
-  }
-#endif
-  GC_UPDATE(gc_ctx, F_PROG, val);
-
+  token_size = my_strspn(txt_line, ": ", txt_len);
   txt_line += token_size;
   txt_len -= token_size;
 
-  /* XXX check sizes are always positive */
-  if (txt_len <= 0)
-    {
-      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-      ret = 1;
-      goto end;
-    }
-
-  /* look ahead */
-  if (*txt_line == '[')
-    { /* fill pid */
-      token_size = get_next_uint(txt_line + 1, &n, txt_len);
-      val = ovm_uint_new (gc_ctx, n);
-      GC_UPDATE(gc_ctx, F_PID, val);
-
-      if (strncmp(txt_line + token_size + 1, "]: ", 3))
-	{
-	  DebugLog(DF_MOD, DS_WARN, "syntax error.\n");
-	  /* XXX: Drop event ??? */
-	}
-      txt_line += token_size + 4; /* 1 for "[" and 3 for "]: " */
-      txt_len -= token_size + 4;
-    }
-  else if (*txt_line == ':')
-    { /* Skip ": " */
-      txt_line += 2;
-      txt_len -= 2;
-    }
-
-  if (txt_len <= 0)
-    {
-      DebugLog(DF_MOD, DS_WARN, "syntax error. ignoring event\n");
-      ret = 1;
-      goto end;
-    }
-
-  /* remaining string is the syslog message */
+  for (token_size = txt_len; token_size>=1
+	 && (txt_line[token_size-1]=='\n' || txt_line[token_size-1]=='\r'); )
+    token_size--;
   val = ovm_vstr_new (gc_ctx, event->value);
-  token_size = my_strspn(txt_line, "\r\n", txt_len);
   VSTR(val) = txt_line;
   VSTRLEN(val) = token_size;
   GC_UPDATE(gc_ctx, F_MSG, val);
 
   REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
 
-  end:
+ end:
   GC_END(gc_ctx);
   return ret;
 }
@@ -600,7 +603,9 @@ struct tm *syslog_getdate(const char *date, int date_len,
   *bytes_read += 4;
   if (date_len<3)
     return NULL;
-  if (isdigit(date[0]) && isdigit(date[1]) && date[2]==' ')
+  if (isspace(date[0]) && isdigit(date[1]) && isspace(date[2]))
+    t.tm_mday = (date[1]-'0');
+  else if (isdigit(date[0]) && isdigit(date[1]) && isspace(date[2]))
     t.tm_mday = (date[0]-'0')*10 + (date[1]-'0');
   else return NULL;
 

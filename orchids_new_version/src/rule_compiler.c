@@ -6049,6 +6049,7 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
     }
   else
     {
+      state->action = NULL;
       DebugLog(DF_OLC, DS_INFO, "state \"%s\" has no action\n", state->name);
     }
 }

@@ -1573,6 +1573,11 @@ proceed_post_config(orchids_t *ctx);
 void
 proceed_post_compil(orchids_t *ctx);
 
+char *dir_parse_id (orchids_t *ctx, const char *file, uint32_t line,
+		    char *argstring, char **value);
+char *dir_parse_string (orchids_t *ctx, const char *file, uint32_t line,
+			char *argstring, char **value);
+
 
 void
 fprintf_cfg_mib(FILE *fp, config_directive_t *section);
@@ -1602,9 +1607,8 @@ unsigned int crc32(unsigned int crc, char *buf, int len);
 
 /* string_util.c */
 size_t my_strspn(const char *pos, const char *eot, size_t n);
-
+size_t my_strcspn(const char *pos, const char *eot, size_t n);
 size_t get_next_uint(const char *istr, unsigned long *i, size_t n);
-
 size_t get_next_token(const char *pos, int c, size_t n);
 
 

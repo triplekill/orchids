@@ -1471,6 +1471,101 @@ void proceed_post_compil(orchids_t *ctx)
            (diff_time.tv_usec) % 1000);
 }
 
+char *dir_parse_id (orchids_t *ctx, const char *file, uint32_t line,
+		    char *argstring, char **value)
+{
+  char c;
+  char *s;
+
+  while (c = *argstring, c!=0 && isspace(c))
+    argstring++;
+  *value = NULL;
+  if (c==0)
+    return NULL;
+  s = gc_base_malloc (ctx->gc_ctx, strlen(argstring)+1);
+  *value = s;
+  while (c = *argstring, c!=0 && !isspace(c))
+    {
+      *s++ = c;
+      argstring++;
+    }
+  *s = '\0';
+  return argstring;
+}
+
+char *dir_parse_string (orchids_t *ctx, const char *file, uint32_t line,
+			char *argstring, char **value)
+{
+  char c;
+  char *s;
+  char *arg;
+
+  while (c = *argstring, c!=0 && isspace(c))
+    argstring++;
+  if (c!='"')
+    return dir_parse_id (ctx, file, line, argstring, value);
+  arg = argstring;
+  argstring++;
+  s = gc_base_malloc (ctx->gc_ctx, strlen(argstring)+1);
+  *value = s;
+  while (c = *argstring++, c!=0 && c!='"')
+    switch (c)
+      {
+      case '\\':
+	c = *argstring++;
+	switch (c)
+	  {
+	  case 0: goto unterm;
+	  case 'n': *s++ = '\n'; break;
+	  case 'r': *s++ = '\r'; break;
+	  case 't': *s++ = '\t'; break;
+	  case '0': case '1': case '2': case '3':
+	  case '4': case '5': case '6': case '7':
+	    {
+	      /* start of octal number */
+	      int i = (c - '0');
+
+	      c = *argstring++;
+	      switch (c)
+		{
+		case '0': case '1': case '2': case '3':
+		case '4': case '5': case '6': case '7':
+		  i = 8*i + (c - '0');
+		  c = *argstring++;
+		  switch (c)
+		    {
+		    case '0': case '1': case '2': case '3':
+		    case '4': case '5': case '6': case '7':
+		      i = 8*i + (c - '0');
+		      break;
+		    default: goto unterm;
+		    }
+		  break;
+		default: goto unterm;
+		}
+		*s++ = (char)i;
+	      }
+	      break;
+	  default:
+	    *s++ = c;
+	    break;
+	  }
+	break;
+      case '"':
+	goto end;
+      default:
+	*s++ = c;
+	break;
+      }
+ end:
+  *s = '\0';
+  return argstring;
+ unterm:
+  fprintf (stderr, "%s:%d: unterminated string %s\n", file, line, arg);
+  fflush (stderr);
+  exit (EXIT_FAILURE);
+
+}
 
 
 /*
