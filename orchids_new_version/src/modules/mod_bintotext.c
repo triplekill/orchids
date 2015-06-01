@@ -106,7 +106,7 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
     }
   line = ovm_vstr_new (gc_ctx, delegate);
   VSTR(line) = (char *)stream;
-  VSTRLEN(line) = stream_len-1; /* remove the final newline */
+  VSTRLEN(line) = stream_len; /* keep the final newline, just line mod_textfile */
   GC_UPDATE(gc_ctx, F_BINTOTEXT_LINE, line);
   REGISTER_EVENTS(ctx, mod, BINTOTEXT_FIELDS);
   GC_END(gc_ctx);
