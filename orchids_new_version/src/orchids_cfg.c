@@ -1138,6 +1138,7 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
   char	*mod_dissect_name;
   char	*cond_param_str;
   mod_entry_t *m_dissect;
+  void *data;
 
   mod_dissect_name = dir->args;
   while (*dir->args!=0 && !isblank(*dir->args))
@@ -1281,9 +1282,15 @@ static void add_cond_dissector(orchids_t *ctx, mod_entry_t *mod,
       exit(EXIT_FAILURE);
   }
 #endif
+  if (m_dissect->mod->pre_dissect!=NULL)
+    {
+      data = (*m_dissect->mod->pre_dissect)(ctx, m_dissect, mod_source_name,
+					    cond_param_str, strlen(cond_param_str));
+    }
+  else data = NULL;
   register_conditional_dissector(ctx, m_dissect, mod_source_name,
 				 cond_param_str, strlen(cond_param_str),
-				 NULL, dir->file, dir->line);
+				 data, dir->file, dir->line);
 }
 
 static mod_cfg_cmd_t config_dir_g[] =

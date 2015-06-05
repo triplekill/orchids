@@ -688,6 +688,7 @@ input_module_t mod_iodef = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

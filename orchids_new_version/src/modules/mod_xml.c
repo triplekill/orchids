@@ -521,6 +521,7 @@ input_module_t mod_xml = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

@@ -81,6 +81,11 @@ static gc_class_t heap_class = {
 
 /* Priority queues, implemented as skew heaps */
 
+
+#ifdef DEBUG_RTACTION
+void rtaction_print (heap_t *rt, int lmargin);
+#endif
+
 void register_rtaction (orchids_t *ctx, heap_entry_t *he)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -89,6 +94,10 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
   heap_t *left;
   struct heap_entry_s *he2;
 
+#ifdef DEBUG_RTACTION
+  fprintf (stderr, "* register_rtaction: he->data=0x%p\n", he->data);
+  fflush (stderr);
+#endif
   GC_START(gc_ctx, 1);
   GC_UPDATE(gc_ctx, 0, he->gc_data);
   rtp = &ctx->rtactionlist;
@@ -127,6 +136,11 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
   rt->right = NULL;
   GC_TOUCH (gc_ctx, *rtp = rt);
   GC_END(gc_ctx);
+#ifdef DEBUG_RTACTION
+  fprintf (stderr, "* at end of register_rtaction:\n");
+  rtaction_print (ctx->rtactionlist, 0);
+  fflush (stderr);
+#endif
 }
 
 
@@ -295,6 +309,11 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 #endif
 
   he = get_next_rtaction(ctx);
+#ifdef DEBUG_RTACTION
+  fprintf (stderr, "* after get_next_rtaction (1): he->data=0x%p\n", he->data);
+  rtaction_print (ctx->rtactionlist, 0);
+  fflush (stderr);
+#endif
 
   for (;;) {
     gc (ctx->gc_ctx);
@@ -312,7 +331,17 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 	    GC_END(ctx->gc_ctx);
 	  }
 	else gc_base_free (he);
+#ifdef DEBUG_RTACTION
+	fprintf (stderr, "* before get_next_rtaction (2):\n");
+	rtaction_print (ctx->rtactionlist, 0);
+	fflush (stderr);
+#endif
 	he = get_next_rtaction(ctx);
+#ifdef DEBUG_RTACTION
+	fprintf (stderr, "* after get_next_rtaction (2): he->data=0x%p\n", he->data);
+	rtaction_print (ctx->rtactionlist, 0);
+	fflush (stderr);
+#endif
       }
 
     if (he!=NULL)
@@ -376,6 +405,11 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 	    }
 	  else gc_base_free (he);
 	  he = get_next_rtaction(ctx);
+#ifdef DEBUG_RTACTION
+	  fprintf (stderr, "* after get_next_rtaction (3): he->data=0x%p\n", he->data);
+	  rtaction_print (ctx->rtactionlist, 0);
+	  fflush (stderr);
+#endif
 	} while (he!=NULL && timercmp (&he->date, &cur_time, <=));
 	/* Here, the do {} while construct is for handling the special case
 	 * when action execution is longer than the delay

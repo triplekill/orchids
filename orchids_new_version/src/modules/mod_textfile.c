@@ -656,6 +656,7 @@ input_module_t mod_textfile = {
   textfile_postconfig,
   textfile_postcompil,
   NULL,
+  NULL,
   NULL
 };
 

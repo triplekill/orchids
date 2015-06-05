@@ -431,7 +431,7 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	arg_wrap:
 	  add_fields_to_event_stride(ctx, mod, evtp, (ovm_var_t **)GC_DATA(),
 				     F_OPENBSM_ARG_START+2*num-2,
-				     F_OPENBSM_ARG_END+2*num-1);
+				     F_OPENBSM_ARG_START+2*num-1);
 	  GC_END(gc_ctx);
 	arg_end:
 	  break;
@@ -1303,20 +1303,30 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 static int openbsm_dissect (orchids_t *ctx, mod_entry_t *mod,
 			    event_t *event, void *data)
 {
-  return blox_dissect (ctx, mod, event, mod->config);
+  return blox_dissect (ctx, mod, event, data);
+}
+
+static void *openbsm_predissect(orchids_t *ctx, mod_entry_t *mod,
+				char *parent_modname,
+				char *cond_param_str,
+				int cond_param_size)
+{
+  blox_hook_t *hook;
+
+  hook = init_blox_hook (ctx, mod->config);
+  return hook;
 }
 
 static void *openbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  blox_hook_t *hook;
+  blox_config_t *bcfg;
 
   register_fields(ctx, mod, openbsm_fields, OPENBSM_FIELDS);
-
-  hook = init_blox_hook (ctx, mod, 1,
-			 openbsm_compute_length,
-			 openbsm_subdissect,
-			 NULL);
-  return hook;
+  bcfg = init_blox_config (ctx, mod, 1,
+			   openbsm_compute_length,
+			   openbsm_subdissect,
+			   NULL);
+  return bcfg;
 }
 
 input_module_t mod_openbsm = {
@@ -1330,6 +1340,7 @@ input_module_t mod_openbsm = {
   openbsm_preconfig,
   NULL,
   NULL,
+  openbsm_predissect,
   openbsm_dissect,
   &t_bstr		    /* type of fields it expects to dissect */
 };

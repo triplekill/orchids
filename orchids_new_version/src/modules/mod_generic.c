@@ -563,6 +563,7 @@ input_module_t mod_generic = {
   generic_preconfig,
   generic_postconfig,
   NULL,
+  NULL,
   generic_dissect,
   &t_str		    /* type of fields it expects to dissect */
 };

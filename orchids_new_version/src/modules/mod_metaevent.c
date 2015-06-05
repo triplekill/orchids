@@ -335,6 +335,7 @@ input_module_t mod_metaevent = {
                                and after all module configuration*/
   metaevent_postcompil,
   NULL,
+  NULL,
   NULL
 };
 

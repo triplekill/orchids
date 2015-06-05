@@ -177,6 +177,7 @@ input_module_t mod_netfilter = {
   netfilter_preconfig,         /* Pre-config function */
   NULL,                        /* Post-config function */
   NULL,                        /* Post-compil function */
+  NULL,
   netfilter_dissect,           /* netfilter conditional dissector */
   &t_str                       /* type of fields it expects to dissect */
 };

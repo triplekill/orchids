@@ -514,6 +514,7 @@ input_module_t mod_binfile = {
   binfile_postconfig,
   binfile_postcompil,
   NULL,
+  NULL,
   NULL
 };
 

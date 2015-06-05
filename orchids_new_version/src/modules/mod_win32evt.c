@@ -473,6 +473,7 @@ input_module_t mod_win32evt = {
   win32evt_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
   win32evt_postcompil,
+  NULL,
   win32evt_dissect,
   &t_bstr		    /* type of fields it expects to dissect */
 };

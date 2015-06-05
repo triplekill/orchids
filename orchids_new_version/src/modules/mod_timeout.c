@@ -173,6 +173,7 @@ input_module_t mod_timeout = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

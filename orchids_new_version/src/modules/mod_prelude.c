@@ -739,6 +739,7 @@ input_module_t mod_prelude = {
   mod_prelude_postconfig,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

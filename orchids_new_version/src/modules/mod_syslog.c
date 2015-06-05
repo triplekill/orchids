@@ -518,6 +518,7 @@ input_module_t mod_syslog = {
   syslog_preconfig,
   NULL,
   NULL,
+  NULL,
   syslog_dissect,
   &t_str		    /* type of fields it expects to dissect */
 };

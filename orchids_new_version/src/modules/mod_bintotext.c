@@ -115,7 +115,7 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
 static int bintotext_dissect (orchids_t *ctx, mod_entry_t *mod,
 			      event_t *event, void *data)
 {
-  return blox_dissect (ctx, mod, event, mod->config);
+  return blox_dissect (ctx, mod, event, data);
 }
 
 static field_t bintotext_fields[] = {
@@ -123,17 +123,28 @@ static field_t bintotext_fields[] = {
   { "bintotext.line", &t_str, MONO_UNKNOWN, "extracted line of text" }
 };
 
-static void *bintotext_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *bintotext_predissect(orchids_t *ctx, mod_entry_t *mod,
+				  char *parent_modname,
+				  char *cond_param_str,
+				  int cond_param_size)
 {
   blox_hook_t *hook;
 
+  hook = init_blox_hook (ctx, mod->config);
+  return hook;
+}
+
+static void *bintotext_preconfig(orchids_t *ctx, mod_entry_t *mod)
+{
+  blox_config_t *bcfg;
+
   DebugLog(DF_MOD, DS_INFO, "load() bintotext@%p\n", &mod_bintotext);
   register_fields(ctx, mod, bintotext_fields, BINTOTEXT_FIELDS);
-  hook = init_blox_hook (ctx, mod, 1,
-			 bintotext_compute_length,
-			 bintotext_subdissect,
-			 NULL);
-  return hook;
+  bcfg = init_blox_config (ctx, mod, 1,
+			   bintotext_compute_length,
+			   bintotext_subdissect,
+			   NULL);
+  return bcfg;
 }
 
 input_module_t mod_bintotext = {
@@ -147,6 +158,7 @@ input_module_t mod_bintotext = {
   bintotext_preconfig,
   NULL,
   NULL,
+  bintotext_predissect,
   bintotext_dissect,
   &t_bstr, /* type of fields it expects to dissect */
 };

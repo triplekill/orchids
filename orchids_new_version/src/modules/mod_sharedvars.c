@@ -284,6 +284,7 @@ input_module_t mod_sharedvars = {
                                and after all module configuration*/
   sharedvars_postcompil,
   NULL,
+  NULL,
   NULL
 };
 

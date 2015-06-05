@@ -238,6 +238,7 @@ input_module_t mod_auditd = {
   auditd_preconfig,         /* called just after module registration */
   NULL,
   NULL,
+  NULL,
   dissect_auditd,	    /* auditd conditional dissector */
   &t_str		    /* type of fields it expects to dissect */
 };

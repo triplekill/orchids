@@ -64,6 +64,7 @@ input_module_t mod_stats = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

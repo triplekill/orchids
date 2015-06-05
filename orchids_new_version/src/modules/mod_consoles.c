@@ -268,6 +268,7 @@ input_module_t mod_consoles = {
   cons_preconfig,
   NULL, /* cons_postconfig */
   NULL, /* cons_postcompil */
+  NULL, /* cons_predissector */
   NULL, /* cons_dissector */
   NULL
 };

@@ -631,6 +631,7 @@ input_module_t mod_rawsnare = {
   rawsnare_preconfig,
   NULL,
   NULL,
+  NULL,
   rawsnare_dissect,
   &t_bstr		    /* type of fields it expects to dissect */
 };

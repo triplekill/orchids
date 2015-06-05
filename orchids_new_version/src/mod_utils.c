@@ -62,15 +62,79 @@ static void blox_skip(gc_t *gc_ctx, blox_hook_t *hook, long skip)
     }
 }
 
+#ifdef DEBUG_RTACTION
+static int rtaction_count_data (heap_t *rt, char *data)
+{
+  if (rt==NULL)
+    return 0;
+  return ((rt->entry->data==data)?1:0) + rtaction_count_data (rt->left, data)
+    + rtaction_count_data (rt->right, data);
+}
+
+static void rtaction_check_unique_data_1 (heap_t *rt, char *data, int limit)
+{
+  int n;
+
+  n = rtaction_count_data (rt, data);
+  if (n>limit)
+    {
+      fprintf (stderr, "non unique data 0x%p (count=%d)\n", data, n);
+      fflush (stderr);
+      abort ();
+    }
+}
+
+static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he);
+
+static void rtaction_check_unique_data (orchids_t *ctx, heap_t *rt)
+{
+  if (rt==NULL)
+    return;
+  if (rt->entry->cb==rtaction_further_blox)
+    rtaction_check_unique_data_1 (ctx->rtactionlist, rt->entry->data, 1);
+  rtaction_check_unique_data (ctx, rt->left);
+  rtaction_check_unique_data (ctx, rt->right);
+}
+
+#define rtaction_check(ctx) rtaction_check_unique_data(ctx, ctx->rtactionlist)
+
+void rtaction_print (heap_t *rt, int lmargin)
+{
+  int i;
+
+  for (i=0; i<lmargin; i++)
+    fputc (' ', stderr);
+  if (rt==NULL)
+    fputs ("- 0\n", stderr);
+  else
+    {
+      fprintf (stderr, "- [%ld:%d]", rt->entry->date.tv_sec, rt->entry->date.tv_usec);
+      if (rt->entry->cb==rtaction_further_blox)
+	fputs (" blox", stderr);
+      fprintf (stderr, " 0x%p\n", rt->entry->data);
+      rtaction_print (rt->left, lmargin+2);
+      rtaction_print (rt->right, lmargin+2);
+    }
+}
+#endif
+
 static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he)
 {
   blox_hook_t *hook = (blox_hook_t *)he->data;
-  mod_entry_t *mod = hook->mod;
+  blox_config_t *bcfg = hook->bcfg;
+  mod_entry_t *mod = bcfg->mod;
   event_t *event = (event_t *)((struct blox_he_data_s *)he->gc_data);
   gc_t *gc_ctx = ctx->gc_ctx;
   unsigned char *stream;
   size_t len, reclen;
 
+#ifdef DEBUG_RTACTION
+  fprintf (stderr, "* entering rtaction_further_blox: he->data=0x%p\n", he->data);
+  rtaction_print (ctx->rtactionlist, 0);
+  fflush (stderr);
+  rtaction_check (ctx);
+  rtaction_check_unique_data_1 (ctx->rtactionlist, he->data, 0);
+#endif
   switch (TYPE(hook->remaining))
     {
     case T_BSTR: stream = BSTR(hook->remaining);
@@ -103,29 +167,42 @@ static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he)
       stream += reclen;
       len -= reclen;
       hook->state = BLOX_INIT;
-      reclen = hook->n_first_bytes;
+      reclen = bcfg->n_first_bytes;
       goto again;
     default:
-      reclen = (*hook->compute_length) (stream, reclen, len,
+      reclen = (*bcfg->compute_length) (stream, reclen, len,
 					&hook->state,
-					hook->sd_data);
+					bcfg->sd_data);
       goto again;
     }
 
-  (*hook->subdissect) (ctx, mod, event, hook->remaining,
-		       stream, reclen, hook->sd_data);
+  (*bcfg->subdissect) (ctx, mod, event, hook->remaining,
+		       stream, reclen, bcfg->sd_data);
   blox_skip (gc_ctx, hook, reclen);
   hook->state = BLOX_INIT;
-  hook->n_bytes = hook->n_first_bytes;  
+  hook->n_bytes = bcfg->n_first_bytes;  
 
   if (reclen < len) /* call ourselves back, later */
     {
+      hook->flags &= ~BH_WAITING_FOR_INPUT;
       register_rtaction (ctx, he);
+#ifdef DEBUG_RTACTION
+      fprintf (stderr, "* calling register_rtaction at end of rtaction_further_blox:\n");
+      rtaction_print (ctx->rtactionlist, 0);
+      fflush (stderr);
+      rtaction_check (ctx);
+#endif
       return 0;
     }
   /* else fall back to the no_further_blox case: */
  no_further_blox:
-  gc_base_free (he->data);
+#ifdef DEBUG_RTACTION
+  fprintf (stderr, "* freeing he at end of rtaction_further_blox:\n");
+  rtaction_print (ctx->rtactionlist, 0);
+  fflush (stderr);
+  rtaction_check (ctx);
+#endif
+  hook->flags |= BH_WAITING_FOR_INPUT;
   gc_base_free (he);
   return 0;
 }
@@ -134,10 +211,12 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data)
 {
   blox_hook_t *hook = data;
+  blox_config_t *bcfg = hook->bcfg;
   unsigned char *stream, *remstream;
   size_t len, remlen;
   gc_t *gc_ctx = ctx->gc_ctx;
   size_t reclen;
+  ovm_var_t *concat;
 
   if (event->value==NULL)
     {
@@ -170,7 +249,13 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
     }
   /* By default, concatenate hook->remaining and stream. */
   if (remlen==0) /* unless no character remained */
-    ;
+    { /* in which case we reuse event->value, suitably copied to
+	 a virtual binary string, which will get updated in blox_skip() */
+      concat = ovm_vbstr_new (gc_ctx, event->value);
+      VBSTR(concat) = stream;
+      VBSTRLEN(concat) = len;
+      GC_TOUCH (gc_ctx, hook->remaining = concat);
+    }
   else if (len==0) /* or unless no new character is added */
     {
       stream = remstream;
@@ -178,14 +263,25 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
     }
   else /* default case */
     {
-      ovm_var_t *concat;
-
       concat = ovm_bstr_new (gc_ctx, remlen+len);
       memcpy (BSTR(concat), remstream, remlen);
       memcpy (BSTR(concat)+remlen, stream, len);
       GC_TOUCH (gc_ctx, hook->remaining = concat);
       stream = BSTR(concat);
       len += remlen;
+    }
+  /* If hook->flags has the BH_WAITING_FOR_INPUT flag set, then
+     we just have new input: try to dissect it, and register
+     rtaction_further_blox to schedule reading further data from
+     that input.
+     Otherwise, we just concatenate the additional input (stream)
+     into hook->remaining: there is already a rtaction_further_blox
+     action scheduled, which will read our data later.
+  */
+  if (!(hook->flags & BH_WAITING_FOR_INPUT))
+    { /* As we just said, we just concatenate; this has just been done,
+	 so there is nothing remaining to do */
+      return 0;
     }
   /* Now compute record length */
   reclen = hook->n_bytes;
@@ -208,39 +304,61 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       stream += reclen;
       len -= reclen;
       hook->state = BLOX_INIT;
-      reclen = hook->n_first_bytes;
+      reclen = bcfg->n_first_bytes;
       goto again;
     default:
-      reclen = (*hook->compute_length) (stream, reclen, len,
+      reclen = (*bcfg->compute_length) (stream, reclen, len,
 					&hook->state,
-					hook->sd_data);
+					bcfg->sd_data);
       goto again;
     }
 
-  (*hook->subdissect) (ctx, mod, event, hook->remaining,
+  (*bcfg->subdissect) (ctx, mod, event, hook->remaining,
 		       stream, reclen,
-		       hook->sd_data);
+		       bcfg->sd_data);
   blox_skip (gc_ctx, hook, reclen);
   hook->state = BLOX_INIT;
-  hook->n_bytes = hook->n_first_bytes;
+  hook->n_bytes = bcfg->n_first_bytes;
 
   /* If some bytes remain, register a real time callback
      to feed further records to the subdissector */
   if (reclen < len)
-    register_rtcallback (ctx,
-			 rtaction_further_blox,
-			 (gc_header_t *)event,
-			 (void *)hook,
-			 0);
+    {
+      hook->flags &= ~BH_WAITING_FOR_INPUT;
+      register_rtcallback (ctx,
+			   rtaction_further_blox,
+			   (gc_header_t *)event,
+			   (void *)hook,
+			   0);
+    }
   return 0;
 }
 
+blox_config_t *init_blox_config(orchids_t *ctx,
+				mod_entry_t *mod,
+				size_t n_first_bytes,
+				compute_length_fun compute_length,
+				subdissect_fun subdissect,
+				void *sd_data
+				)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  blox_config_t *cfg;
+
+  cfg = gc_base_malloc (gc_ctx, sizeof(blox_config_t));
+  if (cfg!=NULL)
+    {
+      cfg->n_first_bytes = n_first_bytes;
+      cfg->compute_length = compute_length;
+      cfg->subdissect = subdissect;
+      cfg->mod = mod;
+      cfg->sd_data = sd_data;
+    }
+  return cfg;
+}
+
 blox_hook_t *init_blox_hook(orchids_t *ctx,
-			    mod_entry_t *mod,
-			    size_t n_first_bytes,
-			    compute_length_fun compute_length,
-			    subdissect_fun subdissect,
-			    void *sd_data
+			    blox_config_t *bcfg
 			    )
 {
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -249,17 +367,16 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
   hook = gc_base_malloc (gc_ctx, sizeof(blox_hook_t));
   if (hook!=NULL)
     {
-      hook->n_first_bytes = n_first_bytes;
-      hook->n_bytes = n_first_bytes;
+      hook->bcfg = bcfg;
+      hook->n_bytes = bcfg->n_first_bytes;
       hook->state = BLOX_INIT;
-      hook->compute_length = compute_length;
-      hook->subdissect = subdissect;
+      hook->flags = BH_WAITING_FOR_INPUT;
+      /* The BH_WAITING_FOR_INPUT flag should be set exactly when
+	 there is no pending rtaction_further_blox action */
       hook->remaining = NULL;
       gc_add_root (gc_ctx, (gc_header_t **)&hook->remaining);
       hook->event = NULL;
       gc_add_root(gc_ctx, (gc_header_t **)&hook->event);
-      hook->mod = mod;
-      hook->sd_data = sd_data;
     }
   return hook;
 }

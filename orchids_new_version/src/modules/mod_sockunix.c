@@ -176,6 +176,7 @@ input_module_t mod_sockunix = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

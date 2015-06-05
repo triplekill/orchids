@@ -450,6 +450,7 @@ input_module_t mod_prolog = {
                                and after all module configuration*/
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

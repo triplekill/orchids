@@ -385,6 +385,7 @@ input_module_t mod_ruletrace = {
   ruletrace_postconfig,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

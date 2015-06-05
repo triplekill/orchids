@@ -496,6 +496,7 @@ input_module_t mod_wifi = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

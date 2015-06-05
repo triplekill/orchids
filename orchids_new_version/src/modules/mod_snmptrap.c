@@ -310,6 +310,7 @@ input_module_t mod_snmptrap = {
   snmptrap_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
   NULL,
+  NULL,
   snmptrap_dissect,
   &t_bstr		    /* type of fields it expects to dissect */
 };

@@ -604,6 +604,7 @@ input_module_t mod_idmef = {
   idmef_preconfig,
   idmef_postconfig,
   NULL,
+  NULL,
   idmef_dissect,
   &t_str		    /* type of fields it expects to dissect */
 };

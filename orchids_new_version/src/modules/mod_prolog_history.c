@@ -233,6 +233,7 @@ input_module_t mod_prolog_history = {
                                        and after all module configuration*/
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

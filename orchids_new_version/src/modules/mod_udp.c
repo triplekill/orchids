@@ -191,6 +191,7 @@ input_module_t mod_udp = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 

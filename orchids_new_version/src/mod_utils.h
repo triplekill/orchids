@@ -21,6 +21,7 @@
  *** of data coming typically from network connections in binary format
  ***/
 
+typedef struct blox_config_s blox_config_t;
 typedef struct blox_hook_s blox_hook_t;
 
 /* Blox states, as used in compute_length_fun() */
@@ -41,28 +42,39 @@ typedef void (*subdissect_fun) (orchids_t *ctx, mod_entry_t *mod,
 				unsigned char *stream, size_t stream_len,
 				void *sd_data);
 
-struct blox_hook_s {
+struct blox_config_s {
   size_t n_first_bytes; /* number of bytes to read off records to be able
 			   to compute length of record in state BLOX_INIT */
-  size_t n_bytes;
-  int state;
   compute_length_fun compute_length;
   subdissect_fun subdissect;
-  ovm_var_t *remaining; /* of type T_BSTR or T_VBSTR; this should be
-			 a root of the GC. */
-  event_t *event; /* should also be a root of the GC */
   mod_entry_t *mod;
   void *sd_data;
 };
 
+blox_config_t *init_blox_config(orchids_t *ctx,
+				mod_entry_t *mod,
+				size_t n_first_bytes,
+				compute_length_fun compute_length,
+				subdissect_fun subdissect,
+				void *sd_data
+				);
+
+struct blox_hook_s {
+  struct blox_config_s *bcfg;
+  size_t n_bytes;
+  int state;
+  int flags;
+#define BH_WAITING_FOR_INPUT 0x1
+  ovm_var_t *remaining; /* of type T_BSTR or T_VBSTR; this should be
+			 a root of the GC. */
+  event_t *event; /* should also be a root of the GC */
+};
+
 
 blox_hook_t *init_blox_hook(orchids_t *ctx,
-			    mod_entry_t *mod,
-			    size_t n_first_bytes,
-			    compute_length_fun compute_length,
-			    subdissect_fun subdissect,
-			    void *sd_data
+			    blox_config_t *bcfg
 			    );
+
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data);
 

@@ -884,6 +884,14 @@ typedef struct mod_entry_s mod_entry_t;
  **/
 typedef int (*dissect_t)(orchids_t *ctx, mod_entry_t *mod, struct event_s *e, void *data);
 
+/** @typedef pre_dissect_t
+ ** Preconfiguration function for dissectors.
+ **/
+typedef void *(*pre_dissect_t)(orchids_t *ctx, mod_entry_t *mod,
+			       char *parent_modname,
+			       char *cond_param_str,
+			       int cond_param_size);
+
 /**
  ** @struct conditional_dissector_record_s
  **   This structure is used to wrap a conditional dissector,
@@ -1415,6 +1423,11 @@ typedef void (*post_compil_t)(orchids_t *ctx, mod_entry_t *mod);
  **     Function to be executed after the rule compilation.
  **     This field may be NULL if there is nothing to execute.
  **/
+/**   @var input_module_s::pre_dissect
+ **     Function to be executed at each time a new conditional
+ **     dissector is registered that uses this module as dissector.
+ **     This field may be NULL if there is nothing to execute.
+ **/
 /**   @var input_module_s::dissect_fun
  **     Dissection function for module; can be NULL if no dissector
  **/
@@ -1434,6 +1447,7 @@ struct input_module_s
   pre_config_t           pre_config;
   post_config_t          post_config;
   post_compil_t          post_compil;
+  pre_dissect_t          pre_dissect;
   dissect_t		 dissect_fun;
   type_t                *dissect_type;
 };

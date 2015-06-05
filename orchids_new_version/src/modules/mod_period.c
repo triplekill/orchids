@@ -188,6 +188,7 @@ input_module_t mod_period = {
                                and after all module configuration*/
   period_postcompil,
   NULL,
+  NULL,
   NULL
 };
 

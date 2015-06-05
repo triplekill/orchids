@@ -221,6 +221,7 @@ input_module_t mod_pcap = {
   NULL,
   NULL,
   NULL,
+  NULL,
   NULL
 };
 
