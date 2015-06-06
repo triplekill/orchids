@@ -83,8 +83,8 @@ struct mod_generic_cfg_s {
   STAILQ_HEAD(globvmods, generic_vmod_t) vmod_globlist;
 };
 
-static int
-generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);;
+static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data,
+			   int dissection_level);
 
 
 static void *

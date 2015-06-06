@@ -86,6 +86,9 @@ static gc_class_t heap_class = {
 void rtaction_print (heap_t *rt, int lmargin);
 #endif
 
+#define he_before(he1,he2) (timercmp(&(he1)->date, &(he2)->date, < ) || \
+			    (timercmp(&(he1)->date, &(he2)->date, ==) && (he1)->pri > (he2)->pri))
+
 void register_rtaction (orchids_t *ctx, heap_entry_t *he)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -114,7 +117,7 @@ void register_rtaction (orchids_t *ctx, heap_entry_t *he)
       rt->left = rt->right;
       rt->right = left;
 
-      if (timercmp(&he->date, &rt->entry->date, < ))
+      if (he_before(he, rt->entry))
 	{ /* Store he into root, then insert the old
 	     value of rt->entry into rt->left subheap */
 	  he2 = rt->entry;
@@ -148,7 +151,8 @@ heap_entry_t *register_rtcallback(orchids_t *ctx,
 				  rtaction_cb_t cb,
 				  gc_header_t *gc_data,
 				  void *data,
-				  time_t delay)
+				  time_t delay,
+				  int pri)
 {
   heap_entry_t *he;
 
@@ -158,6 +162,7 @@ heap_entry_t *register_rtcallback(orchids_t *ctx,
   he->data = data;
   he->date = ctx->cur_loop_time;
   he->date.tv_sec += delay;
+  he->pri = pri;
   register_rtaction(ctx, he);
   return he;
 }
@@ -182,7 +187,7 @@ static void heap_merge (gc_t *gc_ctx, heap_t *h1, heap_t *h2,
 	}
       he1 = h1->entry;
       he2 = h2->entry;
-      if (timercmp (&he1->date, &he2->date, <))
+      if (he_before (he1, he2))
 	{
 	  /* We shall return h1, which has the least date. */
 	  GC_TOUCH (gc_ctx, *res = h1);
@@ -228,7 +233,7 @@ static heap_t *heap_merge (gc_t *gc_ctx, heap_t *h1, heap_t *h2)
     return h2;
   he1 = h1->entry;
   he2 = h2->entry;
-  if (timercmp (&he1->date, &he2->date, <))
+  if (he_before (he1, he2))
     {
       /* We shall return he1, which has the least date.
 	 First exchange its left and right parts.

@@ -63,10 +63,10 @@ static void *htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
   html_output_preconfig(ctx);
 
   /* register cache cleanup periodic job */
-  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, mod_cfg, 10);
+  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, mod_cfg, 10, 0);
 
   /* register regeneration job */
-  register_rtcallback(ctx, rtaction_html_regeneration, NULL, mod_cfg, 2);
+  register_rtcallback(ctx, rtaction_html_regeneration, NULL, mod_cfg, 2, 0);
 
 
 

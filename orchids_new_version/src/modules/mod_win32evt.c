@@ -398,14 +398,15 @@ read_record(const char *file)
 #endif
 
 
-static int win32evt_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int win32evt_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data,
+			    int dissection_level)
 {
   DebugLog(DF_MOD, DS_TRACE, "win32evt_dissector()\n");
 
   /* dissect event top attribute here, and add them to it */
 
   /* then, post resulting event */
-  post_event(ctx, mod, e);
+  post_event(ctx, mod, e, dissection_level);
 
   return (0);
 }

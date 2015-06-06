@@ -177,7 +177,7 @@ static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he)
     }
 
   (*bcfg->subdissect) (ctx, mod, event, hook->remaining,
-		       stream, reclen, bcfg->sd_data);
+		       stream, reclen, bcfg->sd_data, hook->dissector_level);
   blox_skip (gc_ctx, hook, reclen);
   hook->state = BLOX_INIT;
   hook->n_bytes = bcfg->n_first_bytes;  
@@ -208,7 +208,7 @@ static int rtaction_further_blox(orchids_t *ctx, heap_entry_t *he)
 }
 
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-		 void *data)
+		 void *data, int dissector_level)
 {
   blox_hook_t *hook = data;
   blox_config_t *bcfg = hook->bcfg;
@@ -315,10 +315,11 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 
   (*bcfg->subdissect) (ctx, mod, event, hook->remaining,
 		       stream, reclen,
-		       bcfg->sd_data);
+		       bcfg->sd_data, dissector_level);
   blox_skip (gc_ctx, hook, reclen);
   hook->state = BLOX_INIT;
   hook->n_bytes = bcfg->n_first_bytes;
+  hook->dissector_level = dissector_level;
 
   /* If some bytes remain, register a real time callback
      to feed further records to the subdissector */
@@ -329,7 +330,8 @@ int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 			   rtaction_further_blox,
 			   (gc_header_t *)event,
 			   (void *)hook,
-			   0);
+			   0,
+			   hook->dissector_level * 128);
     }
   return 0;
 }
@@ -369,6 +371,7 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
     {
       hook->bcfg = bcfg;
       hook->n_bytes = bcfg->n_first_bytes;
+      hook->dissector_level = 0; /* by default */
       hook->state = BLOX_INIT;
       hook->flags = BH_WAITING_FOR_INPUT;
       /* The BH_WAITING_FOR_INPUT flag should be set exactly when

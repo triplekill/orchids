@@ -107,7 +107,8 @@ static ovm_var_t* parse_idmef_datetime(gc_t *gc_ctx, char *datetime)
 static int load_idmef_xmlDoc(orchids_t *ctx,
 			     mod_entry_t *mod,
 			     const char	*txt_line,
-			     const size_t txt_len)
+			     const size_t txt_len,
+			     int dissector_level)
 {
   idmef_cfg_t	*cfg;
   xmlDocPtr	doc = NULL;
@@ -185,7 +186,7 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
     }
   }
 
-  REGISTER_EVENTS(ctx, mod, MAX_IDMEF_FIELDS);
+  REGISTER_EVENTS(ctx, mod, MAX_IDMEF_FIELDS, dissector_level);
   GC_END(gc_ctx);
   return 1;
 }
@@ -209,7 +210,8 @@ static char *my_strnstr (char *text, size_t len, char *pattern)
 static int idmef_dissect(orchids_t *ctx,
 			 mod_entry_t *mod,
 			 event_t *event,
-			 void *data)
+			 void *data,
+			 int dissector_level)
 {
   char *txt_line, *txt_end;
   size_t txt_len, msg_len;
@@ -243,7 +245,7 @@ static int idmef_dissect(orchids_t *ctx,
     else
       {
 	strncpy (cfg->buff+cfg->buff_len, txt_line, msg_len);
-	load_idmef_xmlDoc(ctx, mod, cfg->buff, cfg->buff_len + msg_len);
+	load_idmef_xmlDoc(ctx, mod, cfg->buff, cfg->buff_len + msg_len, dissector_level);
       }
     cfg->buff[0] = 0;
     cfg->buff_len = 0;

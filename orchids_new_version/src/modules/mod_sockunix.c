@@ -118,7 +118,7 @@ static int sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *dat
   memcpy(STR(var), from.sun_path, len);
   GC_UPDATE (gc_ctx, F_SOCKET, var);
 
-  REGISTER_EVENTS(ctx, mod, SOCKUNIX_FIELDS);
+  REGISTER_EVENTS(ctx, mod, SOCKUNIX_FIELDS, 0);
 
   GC_END(gc_ctx);
   return 0;

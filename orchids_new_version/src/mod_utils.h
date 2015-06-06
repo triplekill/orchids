@@ -40,7 +40,8 @@ typedef void (*subdissect_fun) (orchids_t *ctx, mod_entry_t *mod,
 				event_t *event,
 				ovm_var_t *delegate, /* for stream, stream_len */
 				unsigned char *stream, size_t stream_len,
-				void *sd_data);
+				void *sd_data,
+				int dissector_level);
 
 struct blox_config_s {
   size_t n_first_bytes; /* number of bytes to read off records to be able
@@ -62,6 +63,7 @@ blox_config_t *init_blox_config(orchids_t *ctx,
 struct blox_hook_s {
   struct blox_config_s *bcfg;
   size_t n_bytes;
+  int dissector_level;
   int state;
   int flags;
 #define BH_WAITING_FOR_INPUT 0x1
@@ -76,7 +78,7 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
 			    );
 
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-		 void *data);
+		 void *data, int dissector_level);
 
 /***
  *** Thread-local objects.

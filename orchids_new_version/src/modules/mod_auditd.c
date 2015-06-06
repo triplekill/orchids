@@ -128,7 +128,8 @@ static action_t auditd_actions[] = {
 };
 
 static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
-			  event_t *event, void *data)
+			  event_t *event, void *data,
+			  int dissection_level)
 {
   char *txt_line;
   int txt_len;
@@ -160,7 +161,7 @@ static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
   action_parse_event (octx, txt_line, txt_line+txt_len);
 
   /* then, post the Orchids event */
-  post_event(ctx, mod, *octx->out_event);
+  post_event(ctx, mod, *octx->out_event, dissection_level);
   GC_END(gc_ctx);
   return (0);
 }

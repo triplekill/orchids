@@ -110,7 +110,7 @@ static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data)
   var = ovm_uint_new(gc_ctx, (long)from.sin_port);
   GC_UPDATE(gc_ctx, F_SRC_PORT, var);
 
-  REGISTER_EVENTS(ctx, mod, UDP_FIELDS);
+  REGISTER_EVENTS(ctx, mod, UDP_FIELDS, 0);
   GC_END(gc_ctx);
   return 0;
 }

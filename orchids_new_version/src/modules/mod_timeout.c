@@ -65,7 +65,7 @@ static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he)
 
   add_fields_to_event(ctx, mod_entry_g, (event_t **)GC_LOOKUP(0),
 		      fields->field_values, TIMEOUT_FIELDS);
-  post_event (ctx, mod_entry_g, (event_t *)GC_LOOKUP(0));
+  post_event (ctx, mod_entry_g, (event_t *)GC_LOOKUP(0), 0);
 
   gc_base_free (he);
   GC_END(gc_ctx);
@@ -133,7 +133,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
 #endif
 
   register_rtcallback(ctx, timeout_rtcallback,
-		      (gc_header_t *)fields, NULL, INT(todelay) );
+		      (gc_header_t *)fields, NULL, INT(todelay), 0);
   GC_END(gc_ctx);
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_RETURN_TRUE(ctx);

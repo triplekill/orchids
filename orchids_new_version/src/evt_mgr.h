@@ -57,7 +57,8 @@ heap_entry_t *register_rtcallback(orchids_t *ctx,
 				  rtaction_cb_t cb,
 				  gc_header_t *gc_data,
 				  void *data,
-				  time_t delay);
+				  time_t delay,
+				  int pri);
 
 
 #endif /* EVT_MGR_H */

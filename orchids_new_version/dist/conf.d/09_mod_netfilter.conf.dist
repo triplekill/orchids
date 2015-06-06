@@ -3,10 +3,8 @@
 #
 
 <module netfilter>
-
-  # The module can hook the mod_udp module
-  # for parsing raw netfilter logs recieved by UDP
-  # AddUdpSource 6363
+  # No commands are known to the netfilter module
+  # In particular, 'AddHook' below will be skipped (bug).
 
   # The module can also unconditionnaly hook modules.
   # In this case, this is a wrapper module, dissected

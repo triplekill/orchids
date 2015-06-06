@@ -46,7 +46,7 @@
 
 input_module_t mod_binfile;
 
-static int binfile_process_new_lines(orchids_t *ctx, mod_entry_t *mod, binfile_t *bf)
+static int binfile_process_new_block(orchids_t *ctx, mod_entry_t *mod, binfile_t *bf)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
   ovm_var_t *val;
@@ -68,7 +68,7 @@ static int binfile_process_new_lines(orchids_t *ctx, mod_entry_t *mod, binfile_t
     {
       BSTRLEN(val) = len;
       GC_UPDATE(gc_ctx, BF_FILE, bf->file_name);
-      REGISTER_EVENTS(ctx, mod, BF_FIELDS);
+      REGISTER_EVENTS(ctx, mod, BF_FIELDS, 0);
     }
   GC_END(gc_ctx);
   bf->eof = eof;
@@ -109,7 +109,7 @@ static int binfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 	      /* Update file stat */
 	      bf->file_stat = st;
 	      /* read and process new lines */
-	      eof &= binfile_process_new_lines(ctx, mod, bf);
+	      eof &= binfile_process_new_block(ctx, mod, bf);
 	    }
 #ifdef ORCHIDS_DEBUG
 	  else if (st.st_mtime < bf->file_stat.st_mtime)
@@ -125,7 +125,7 @@ static int binfile_callback(orchids_t *ctx, mod_entry_t *mod, void *dummy)
 #endif
 	}
       else
-	eof &= binfile_process_new_lines(ctx, mod, bf);
+	eof &= binfile_process_new_block(ctx, mod, bf);
     }
 
   if (cfg->exit_process_all_data && eof)
@@ -201,7 +201,8 @@ static int binsocket_callback(orchids_t *ctx, mod_entry_t *mod,
       (void) register_rtcallback(ctx, binsocket_try_reconnect,
 				 NULL,
 				 data,
-				 cfg->poll_period);
+				 cfg->poll_period,
+				 0);
       res = 1; // a positive return value will force the event manager
       // to remove fd from the file descriptors watched by select().
     }
@@ -209,7 +210,7 @@ static int binsocket_callback(orchids_t *ctx, mod_entry_t *mod,
     {
       BSTRLEN(val) = len;
       GC_UPDATE(gc_ctx, BF_FILE, f->file_name);
-      REGISTER_EVENTS(ctx, mod, BF_FIELDS);
+      REGISTER_EVENTS(ctx, mod, BF_FIELDS, 0);
     }
   GC_END(gc_ctx);
   return res;
@@ -253,7 +254,8 @@ static void binfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 		      rtaction_read_binfiles,
 		      NULL,
 		      mod,
-		      INITIAL_MODBIN_POLL_DELAY);
+		      INITIAL_MODBIN_POLL_DELAY,
+		      0);
 }
 
 

@@ -47,7 +47,7 @@ static void issdl_inject_event(orchids_t *ctx, state_instance_t *state)
 			   rtaction_inject_event,
 			   (gc_header_t *)ptr,
 			   (void *)mod,
-			   0);
+			   0, 0);
     }
   STACK_DROP(ctx->ovm_stack, 1);
   PUSH_RETURN_TRUE(ctx);
@@ -63,7 +63,7 @@ static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
 
   evt = (event_t *)he->gc_data;
   mod = (mod_entry_t *)he->data;
-  post_event(ctx, mod, evt);
+  post_event(ctx, mod, evt, 0);
   gc_base_free (he);
   return 0;
 }

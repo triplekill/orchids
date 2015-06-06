@@ -36,7 +36,7 @@ input_module_t mod_snare;
 
 
 static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			 void *data)
+			 void *data, int dissector_level)
 {
   char *txt_line;
   size_t txt_len;
@@ -60,7 +60,7 @@ static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   if (ret != 0)
     DebugLog(DF_MOD, DS_WARN, "parse error\n");
   else
-    REGISTER_EVENTS(ctx, mod, SNARE_FIELDS);
+    REGISTER_EVENTS(ctx, mod, SNARE_FIELDS, dissector_level);
   GC_END(gc_ctx);
   return ret;
 }
@@ -110,12 +110,6 @@ static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return NULL;
 }
 
-int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-		    void *data)
-{
-  return snare_dissect(ctx, mod, event, data);
-}
-
 static char *snare_deps[] = {
   "udp",
   "textfile",
@@ -135,8 +129,8 @@ input_module_t mod_snare = {
   NULL,
   NULL,
   NULL,
-  NULL,
-  NULL
+  snare_dissect,
+  &t_str		    /* type of fields it expects to dissect */
 };
 
 

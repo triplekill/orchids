@@ -94,7 +94,7 @@ static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void
   VBSTRLEN(val) = packet_len - sizeof (prism2_hdr_t);
   GC_UPDATE (gc_ctx, F_FRAME, val);
 
-  REGISTER_EVENTS(ctx, mod, PRISM2_FIELDS);
+  REGISTER_EVENTS(ctx, mod, PRISM2_FIELDS, 0);
   GC_END(gc_ctx);
   return 0;
 }

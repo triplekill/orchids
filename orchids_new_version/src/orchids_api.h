@@ -349,9 +349,10 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event);
  ** @param ctx            Orchids application context.
  ** @param sender         The entry of the sender module.
  ** @param event          The event to post.
+ ** @param dissection_level 0 for the first dissector, 1 for a sub-dissector, 2 for a sub-sub-dissector, etc.
  **/
-void
-post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event);
+void post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event,
+		int dissection_level);
 
 /* One of the standard ways of posting events.
    This should be included inside the standard calls:
@@ -363,11 +364,11 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event);
    REGISTER_EVENTS(ctx, mod, <nevents>);
    GC_END(ctx-gc_ctx);
 */
-#define REGISTER_EVENTS(ctx, mod, nevents)				\
+#define REGISTER_EVENTS(ctx, mod, nevents, dissection_level)		\
   do {									\
     add_fields_to_event (ctx, mod, (event_t **)&GC_LOOKUP(nevents),	\
 			 (ovm_var_t **)GC_DATA(), nevents);		\
-    post_event (ctx, mod, (event_t *)GC_LOOKUP(nevents));		\
+    post_event (ctx, mod, (event_t *)GC_LOOKUP(nevents), dissection_level); \
   } while (0)
 
 /**

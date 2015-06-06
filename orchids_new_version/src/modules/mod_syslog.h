@@ -66,7 +66,8 @@ struct tm *syslog_getdate(const char *date, int date_len,
 			  int *year_present, int *bytes_read);
 
 
-static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data);
+static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data,
+			  int dissector_level);
 
 
 static void *

@@ -88,7 +88,7 @@ int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data
 
 
 static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			  void *data)
+			  void *data, int dissector_level)
 {
   syslog_data_t *syslog_cfg = mod->config;
   struct tm *t;
@@ -249,7 +249,7 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
       val = ovm_uint_new (gc_ctx, n);
       GC_UPDATE(gc_ctx, F_REPEAT, val);
       GC_UPDATE (gc_ctx, F_PROG, syslog_cfg->syslog_str);
-      REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
+      REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS, dissector_level);
       goto end;
     }
   else if (txt_len>=1 && txt_line[0]=='(') /* gconfd syntax */
@@ -329,7 +329,7 @@ static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
   VSTRLEN(val) = token_size;
   GC_UPDATE(gc_ctx, F_MSG, val);
 
-  REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS);
+  REGISTER_EVENTS(ctx, mod, SYSLOG_FIELDS, dissector_level);
 
  end:
   GC_END(gc_ctx);

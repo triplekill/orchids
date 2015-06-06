@@ -413,7 +413,7 @@ static int wifi_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *cap)
     }
   else
     {
-      REGISTER_EVENTS(ctx, mod, IEEE80211_FIELDS);
+      REGISTER_EVENTS(ctx, mod, IEEE80211_FIELDS, 0);
       if (GC_LOOKUP(IEEE80211_FIELDS)==NULL)
 	ret = -1;
     }

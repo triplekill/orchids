@@ -69,7 +69,7 @@ static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
   memcpy (STR(val), buf, len);
   GC_UPDATE(gc_ctx, F_LINE, val);
 
-  REGISTER_EVENTS(ctx, mod, TF_FIELDS);
+  REGISTER_EVENTS(ctx, mod, TF_FIELDS, 0);
   GC_END(gc_ctx);
 }
 
@@ -277,7 +277,8 @@ static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
       (void) register_rtcallback(ctx, textsocket_try_reconnect,
 				 NULL,
 				 data,
-				 cfg->poll_period);
+				 cfg->poll_period,
+				 0);
       return 1; // a positive return value will force the event manager
 	// to remove fd from the file descriptors watched by select().
     }
@@ -323,7 +324,7 @@ static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
 	      memcpy (STR(val), pstart, len);
 	      GC_UPDATE(gc_ctx, F_LINE, val);
 
-	      REGISTER_EVENTS(ctx, mod, TF_FIELDS);
+	      REGISTER_EVENTS(ctx, mod, TF_FIELDS, 0);
 	      GC_END(gc_ctx);
             }
           pstart = p;
@@ -382,7 +383,8 @@ static void textfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 		      rtaction_read_textfiles,
 		      NULL,
 		      mod,
-		      INITIAL_MODTEXT_POLL_DELAY);
+		      INITIAL_MODTEXT_POLL_DELAY,
+		      0);
 }
 
 

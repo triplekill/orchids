@@ -550,6 +550,7 @@ typedef int (*rtaction_cb_t)(orchids_t *ctx, heap_entry_t *he);
 
 struct heap_entry_s {
   timeval_t date;
+  int pri;
   rtaction_cb_t cb;
   gc_header_t *gc_data;
   void *data;
@@ -882,7 +883,8 @@ typedef struct mod_entry_s mod_entry_t;
  **   Dissector function pointer implemented in modules and registered
  **   into the module manager.
  **/
-typedef int (*dissect_t)(orchids_t *ctx, mod_entry_t *mod, struct event_s *e, void *data);
+typedef int (*dissect_t)(orchids_t *ctx, mod_entry_t *mod, struct event_s *e, void *data,
+			 int dissection_level);
 
 /** @typedef pre_dissect_t
  ** Preconfiguration function for dissectors.
@@ -898,9 +900,9 @@ typedef void *(*pre_dissect_t)(orchids_t *ctx, mod_entry_t *mod,
  **   the pointer to module responsible for the dissection and
  **   the abstract data for the dissector.  This structure was added
  **   during the modularization of Orchids, more precisely when Orchids
- **   start to build modules as shared objects.  A module configuration was
+ **   started to build modules as shared objects.  A module configuration was
  **   initially held in the ::input_module_s module structure.  This was
- **   incompatible with security measures in newer OS.  See for example:
+ **   incompatible with security measures in newer OSes.  See for example:
  **   http://www.akkadia.org/drepper/selinux-mem.html
  **/
 /** @var conditional_dissector_record_s::dissect

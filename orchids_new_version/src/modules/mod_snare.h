@@ -65,7 +65,7 @@ extern void snareparse_reset(void);
 
 
 static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			 void *data);
+			 void *data, int dissector_level);
 
 static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 

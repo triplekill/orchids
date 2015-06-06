@@ -99,7 +99,7 @@ static void libpcap_callback(u_char *data,
   memcpy(BSTR(var), pkt, pkthdr->len);
   GC_UPDATE(gc_ctx, F_PACKET, var);
 
-  REGISTER_EVENTS(ctx, mod, PCAP_FIELDS);
+  REGISTER_EVENTS(ctx, mod, PCAP_FIELDS, 0);
   GC_END(gc_ctx);
 }
 

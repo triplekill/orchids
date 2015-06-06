@@ -489,7 +489,8 @@ static int (*read_class[])(gc_t *gc_ctx,
 };
 
 
-static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data,
+			    int dissection_level)
 {
   header_token_t *snare_hdr;
   ovm_var_t *val;
@@ -547,7 +548,7 @@ static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, vo
 						 (ovm_var_t **)GC_DATA(),
 						 snare_hdr);
 
-      REGISTER_EVENTS(ctx, mod, RAWSNARE_FIELDS);
+      REGISTER_EVENTS(ctx, mod, RAWSNARE_FIELDS, dissection_level);
     }
   GC_END(gc_ctx);
   return err;

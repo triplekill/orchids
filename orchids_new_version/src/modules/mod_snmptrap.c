@@ -47,7 +47,8 @@ input_module_t mod_snmptrap;
 
 /* static long seq_g = 0; */
 
-static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data)
+static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *data,
+			    int dissector_level)
 {
   unsigned char *packet;
   size_t packet_len;
@@ -179,7 +180,7 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
     }
 
   /* then, post resulting event */
-  REGISTER_EVENTS(ctx, mod, SNMPTRAP_FIELDS);
+  REGISTER_EVENTS(ctx, mod, SNMPTRAP_FIELDS, dissector_level);
  end:
   GC_END (gc_ctx);
   return ret;

@@ -40,7 +40,7 @@ mod_generic_cfg_t *gen_cfg_g;
 
 
 static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			   void *data)
+			   void *data, int dissection_level)
 {
   char *txt_line;
 #ifdef HAVE_REGNEXEC
@@ -211,7 +211,7 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 	{
 	  vmod->fields->field_values[field2->field_id] = NULL;
 	}
-      post_event(ctx, &ctx->mods[vmod->mod_id], (event_t *)GC_LOOKUP(0));
+      post_event(ctx, &ctx->mods[vmod->mod_id], (event_t *)GC_LOOKUP(0), dissection_level);
       goto end;
     }
   }

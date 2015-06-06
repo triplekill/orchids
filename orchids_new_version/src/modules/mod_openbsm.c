@@ -255,7 +255,8 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 				event_t *event,
 				ovm_var_t *delegate,
 				unsigned char *stream, size_t stream_len,
-				void *sd_data)
+				void *sd_data,
+				int dissector_level)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
   unsigned char *stream_end = stream+stream_len;
@@ -1296,14 +1297,14 @@ static void openbsm_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	  break;
 	}
     }
-  post_event(ctx, mod, *evtp);
+  post_event(ctx, mod, *evtp, dissector_level);
   GC_END(gc_ctx);
 }
 
 static int openbsm_dissect (orchids_t *ctx, mod_entry_t *mod,
-			    event_t *event, void *data)
+			    event_t *event, void *data, int dissector_level)
 {
-  return blox_dissect (ctx, mod, event, data);
+  return blox_dissect (ctx, mod, event, data, dissector_level);
 }
 
 static void *openbsm_predissect(orchids_t *ctx, mod_entry_t *mod,

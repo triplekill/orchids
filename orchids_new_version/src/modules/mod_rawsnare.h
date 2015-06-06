@@ -103,7 +103,7 @@ static int read_ad(gc_t *gc_ctx,
 
 
 static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			    void *data);
+			    void *data, int dissection_level);
 
 static void *rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 

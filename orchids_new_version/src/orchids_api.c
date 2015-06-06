@@ -808,8 +808,7 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
 }
 
 
-void
-post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
+void post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event, int dissection_level)
 {
   int ret;
   conditional_dissector_record_t *cond_dissect;
@@ -825,7 +824,7 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
       /* check for unconditional dissector */
       DebugLog(DF_CORE, DS_DEBUG, "Call unconditional sub-dissector.\n");
       ret = (*sender->dissect) (ctx, sender->dissect_mod, event,
-				sender->data);
+				sender->data, dissection_level+1);
       /* Free and optionally inject event if sub-dissector failed */
       if (ret)
 	{
@@ -850,7 +849,8 @@ post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event)
 	  ret = (*cond_dissect->dissect) (ctx,
 					  cond_dissect->mod,
 					  event,
-					  cond_dissect->data);
+					  cond_dissect->data,
+					  dissection_level+1);
 	  /* Free and optionally inject event if sub-dissector fail */
 	  if (ret)
 	    {

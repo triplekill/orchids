@@ -69,7 +69,8 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
 				  event_t *event,
 				  ovm_var_t *delegate,
 				  unsigned char *stream, size_t stream_len,
-				  void *sd_data)
+				  void *sd_data,
+				  int dissector_level)
 {
   ovm_var_t *line;
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -108,14 +109,14 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
   VSTR(line) = (char *)stream;
   VSTRLEN(line) = stream_len; /* keep the final newline, just line mod_textfile */
   GC_UPDATE(gc_ctx, F_BINTOTEXT_LINE, line);
-  REGISTER_EVENTS(ctx, mod, BINTOTEXT_FIELDS);
+  REGISTER_EVENTS(ctx, mod, BINTOTEXT_FIELDS, dissector_level);
   GC_END(gc_ctx);
 }
 
 static int bintotext_dissect (orchids_t *ctx, mod_entry_t *mod,
-			      event_t *event, void *data)
+			      event_t *event, void *data, int dissector_level)
 {
-  return blox_dissect (ctx, mod, event, data);
+  return blox_dissect (ctx, mod, event, data, dissector_level);
 }
 
 static field_t bintotext_fields[] = {

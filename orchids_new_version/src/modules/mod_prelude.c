@@ -156,7 +156,8 @@ void prelude_extern_free (void *p)
 
 static void process_idmef_alert(orchids_t *ctx,
 				mod_entry_t	*mod,
-				idmef_message_t	*message)
+				idmef_message_t	*message,
+				int dissection_level)
 {
   event_t *event;
   int c;
@@ -177,7 +178,7 @@ static void process_idmef_alert(orchids_t *ctx,
   }
   add_fields_to_event(ctx, mod, (event_t **)&GC_LOOKUP(MAX_PRELUDE_FIELDS),
 		      (ovm_var_t **)GC_DATA(), prelude_data->nb_fields);
-  post_event(ctx, mod, (event_t *)GC_LOOKUP(MAX_PRELUDE_FIELDS));
+  post_event(ctx, mod, (event_t *)GC_LOOKUP(MAX_PRELUDE_FIELDS), dissection_level);
   GC_END(gc_ctx);
 }
 
