@@ -86,7 +86,7 @@ extern int display_func(void *data, void *param);
 %left O_TIMES O_DIV O_MOD
 %right PLUSPLUS MINUSMINUS O_NOT BANG
 
-%token RULE STATE IF ELSE EXPECT SPLIT GOTO FOR AND IN RETURN BREAK /* Special keywords */
+%token RULE STATE IF CASE ELSE EXPECT SPLIT GOTO FOR AND IN RETURN BREAK /* Special keywords */
 %token O_BRACE O_OPEN_EVENT C_BRACE O_PARENT C_PARENT O_DB C_DB EQ /* Punctuation */
 %token SEMICOLUMN SYNCHRONIZE
 %token KW_CTIME KW_IPV4 KW_IPV6 KW_TIMEVAL KW_REGEX
@@ -107,14 +107,14 @@ extern int display_func(void *data, void *param);
 %type <node_expr> states statelist
 %type <node_rule> rule
 %type <node_expr> actionlist actions actionblock optional_actionblock
-%type <node_expr> action ifstatement
+%type <node_expr> action ifstatement casestatements
 %type <node_expr> transitionlist transitions
-%type <node_trans> transition
+%type <node_trans> transition gotostatement casestatement
 %type <node_varlist> var_list optional_var_list
 %type <node_syncvarlist> sync_var_list synchro
 
 %type <string> string
-%type <depth> o_split return break o_parent eq ifkw o_brace o_brace_new_scope
+%type <depth> o_split return break o_parent eq ifkw casekw o_brace o_brace_new_scope
 %type <depth> o_open_event o_plus_event o_db for and
 %type <depth> expect goto statekw rulekw o_minus
 
@@ -191,7 +191,12 @@ state:
 
 state_options:
   /* Empty */
-    { $$ = SF_NOFLAGS; }
+    { $$ = 0; }
+| state_options BANG {
+  if ($1 & STATE_COMMIT)
+    issdlerror (compiler_ctx_g, "Warning: no need to say '!' twice");
+  $$ = $1 | STATE_COMMIT;
+    }
 ;
 
 
@@ -212,6 +217,12 @@ statedefs:
   { RESULT($$, build_state(compiler_ctx_g, NULL, $1)); }
 | actions transitions /* actionlist and transitionlist */
   { RESULT($$, build_state(compiler_ctx_g, $1, $2)); }
+| casestatements
+{ RESULT($$, build_state(compiler_ctx_g, NULL, $1));
+  $$->flags |= EPSILON_STATE; }
+| actions casestatements
+{ RESULT($$, build_state(compiler_ctx_g, $1, $2));
+  $$->flags |= EPSILON_STATE; }
 ;
 
 actions:
@@ -498,10 +509,34 @@ ifstatement:
   { RESULT_DROP($$,$1, build_expr_ifstmt(compiler_ctx_g, $3, $5, $7)); }
 
 
-expect : EXPECT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+casekw : CASE { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 goto : GOTO { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
+gotostatement:
+  goto SYMNAME SEMICOLUMN
+  { RESULT_DROP($$,$1,
+		build_direct_transition(compiler_ctx_g,
+					NULL, &($2))); }
+;
+
+casestatement:
+   casekw O_PARENT expr C_PARENT goto SYMNAME SEMICOLUMN
+   { RESULT_DROP($$,$1,
+		 build_direct_transition(compiler_ctx_g,
+					 $3, &($6))); }
+   ;
+
+casestatements:
+    gotostatement
+    { RESULT($$, build_expr_cons(compiler_ctx_g, (node_expr_t *)$1, NULL)); }
+  | casestatement ELSE casestatements
+    { RESULT ($$, build_expr_cons(compiler_ctx_g, (node_expr_t *)$1, $3)); }
+    ;
+
+expect : EXPECT { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
 transition:
@@ -511,10 +546,6 @@ transition:
 | expect O_PARENT expr C_PARENT O_BRACE statedefs C_BRACE
   { RESULT_DROP($$,$1,
 		build_indirect_transition(compiler_ctx_g, $3, $6)); }
-| goto SYMNAME SEMICOLUMN
-  { RESULT_DROP($$,$1,
-		build_direct_transition(compiler_ctx_g,
-					NULL, &($2))); }
 ;
 
 %%

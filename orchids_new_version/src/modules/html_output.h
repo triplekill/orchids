@@ -19,37 +19,6 @@
 
 #include "orchids.h"
 
-#define HTMLSTATE_LNK_DOT         (1 << 0)
-#define HTMLSTATE_LNK_EPS         (1 << 1)
-#define HTMLSTATE_LNK_JPG_THUMB   (1 << 2)
-#define HTMLSTATE_LNK_JPG_FULL    (1 << 3)
-#define HTMLSTATE_LNK_PDF         (1 << 4)
-
-#define HTMLSTATE_NEED_DOT(flag)      \
-  (flag & (  HTMLSTATE_LNK_DOT        \
-           | HTMLSTATE_LNK_EPS        \
-           | HTMLSTATE_LNK_JPG_THUMB  \
-           | HTMLSTATE_LNK_JPG_FULL   \
-           | HTMLSTATE_LNK_PDF))
-
-#define HTMLSTATE_NEED_EPS_FULL(flag) \
-  (flag & (  HTMLSTATE_LNK_EPS        \
-           | HTMLSTATE_LNK_JPG_FULL   \
-           | HTMLSTATE_LNK_PDF))
-
-#define HTMLSTATE_NEED_EPS_THUMB(flag) \
-  (flag & (HTMLSTATE_LNK_JPG_THUMB)
-
-#define HTMLSTATE_NEED_JPG_FULL(flag) \
-  (flag & ( HTMLSTATE_LNK_JPG_FULL ))
-
-#define HTMLSTATE_NEED_JPG_THUMB(flag) \
-  (flag & ( HTMLSTATE_LNK_JPG_THUMB ))
-
-#define HTMLSTATE_NEED_PDF_FULL(flag) \
-  (flag & ( HTMLSTATE_LNK_PDF_FULL ))
-
-#define HTMLSTATE_STATE_LIMIT 50
 
 typedef struct html_output_cfg_s html_output_cfg_t;
 

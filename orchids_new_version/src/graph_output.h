@@ -31,23 +31,6 @@ void
 fprintf_rule_dot(FILE *fp, rule_t *rule);
 
 
-/**
- * Display a rule instance path tree in the GraphViz dot format.
- *
- * @param fp       Output stream.
- * @param rule     Rule instance to display.
- * @param options  Options flags for output.
- * @param tq       Current thread queue.
- * @param limit    Maximum number of printed states.
- * option #DOT_RETRIGLIST: draw threads to be re-triggered (in dotted links).
- **/
-void
-fprintf_rule_instance_dot(FILE *fp,
-                          rule_instance_t *rule,
-                          int options,
-                          wait_thread_t *tq,
-                          int limit);
-
 #endif /* GRAPH_OUTPUT_H */
 
 

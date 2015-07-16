@@ -3,11 +3,12 @@
  ** Analysis engine.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 1.0
+ ** @version 2.0
  ** @ingroup engine
  **
- ** @date  Started on: Fri Feb 21 16:18:12 2003
+ ** @date  Started on: Jeu  2 jul 2015 10:57:40 UTC
  **/
 
 /*
@@ -26,898 +27,59 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <limits.h>
 
 #include "orchids.h"
 #include "lang.h"
 #include "orchids_api.h"
 
 #include "engine.h"
-#include "engine_priv.h"
 
-/* WARNING -- Field list in event_t, and field IDs in int array must
-   be sorted in decreasing order */
-
-
-/* XXX: need to sort threads by rule instance, for fast marking */
-static void mark_dead_rule(orchids_t *ctx, rule_instance_t *rule)
+static void thread_group_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
-  wait_thread_t *t;
+  thread_group_t *pid = (thread_group_t *)p;
 
-  for (t = ctx->cur_retrig_qh; t; t = t->next) {
-    if (t->state_instance->rule_instance == rule) {
-      DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (cur)\n", t);
-      KILL_THREAD(ctx, t);
-    }
-  }
-
-  for (t = ctx->retrig_qh; t; t = t->next) {
-    if ((t->state_instance->rule_instance == rule) && !THREAD_IS_KILLED(t)) {
-      DebugLog(DF_ENG, DS_TRACE, "Marking thread %p as KILLED (retrig)\n", t);
-      KILL_THREAD(ctx, t);
-    }
-  }
-
-  for (t = ctx->current_tail; t; t = t->next) {
-    if (t->state_instance->rule_instance == rule) {
-      DebugLog(DF_ENG, DS_TRACE,
-               "Marking thread %p as KILLED (current_tail)\n", t);
-      KILL_THREAD(ctx, t);
-    }
-  }
-
-  for (t = ctx->new_qh; t; t = t->next) {
-    if ((t->state_instance->rule_instance == rule) && !THREAD_IS_KILLED(t)) {
-      DebugLog(DF_ENG, DS_TRACE, "Forgotten thread ? (in new queue)\n");
-    }
-  }
-
-  rule->flags |= THREAD_KILLED;
+  GC_TOUCH (gc_ctx, pid->rule);
 }
 
-
-
-static void reap_dead_rule(orchids_t *ctx, rule_instance_t *rule)
+static void thread_group_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  rule_instance_t *r;
-  rule_instance_t *next_rule;
-  rule_instance_t *prev_rule;
+  //thread_group_t *pid = (thread_group_t *)p;
 
-  prev_rule = NULL;
-  for (r = ctx->first_rule_instance; r; r = next_rule) {
-    next_rule = r->next;
-    if (r == rule) {
-      DebugLog(DF_ENG, DS_TRACE, "reaping killed rule %p\n", r);
-      if (prev_rule!=NULL)
-        GC_TOUCH (ctx->gc_ctx, prev_rule->next = next_rule);
-      else
-        GC_TOUCH (ctx->gc_ctx, ctx->first_rule_instance = next_rule);
-      cleanup_rule_instance(ctx, r);
-      return ;
-    } else {
-      prev_rule = r;
-    }
-  }
-}
-
-
-static int sync_var_env_is_defined(orchids_t *ctx, state_instance_t *state)
-{
-  int i;
-  int sync_var_sz;
-  int sync_var;
-
-  sync_var_sz = state->rule_instance->rule->sync_vars_sz;
-
-  for (i = 0; i < sync_var_sz; i++)
-    {
-      sync_var = state->rule_instance->rule->sync_vars[i];
-      if (ovm_read_value (state->env, sync_var)==NULL)
-	return 0;
-    }
-  return 1;
-}
-
-
-static void sync_lock_list_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  sync_lock_list_t *sll = (sync_lock_list_t *)p;
-
-  GC_TOUCH (gc_ctx, sll->next);
-  GC_TOUCH (gc_ctx, sll->state);
-}
-
-static void sync_lock_list_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
   return;
 }
 
-static int sync_lock_list_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-				    void *data)
-{
-  sync_lock_list_t *sll = (sync_lock_list_t *)p;
-  int err = 0;
-
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)sll->next, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)sll->state, data);
-  return err;
-}
-
-static gc_class_t sync_lock_list_class = {
-  GC_ID('l','o','k','l'),
-  sync_lock_list_mark_subfields,
-  sync_lock_list_finalize,
-  sync_lock_list_traverse
-};
-
-
-static void wait_thread_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  wait_thread_t *wt = (wait_thread_t *)p;
-
-  GC_TOUCH (gc_ctx, wt->next);
-  GC_TOUCH (gc_ctx, wt->state_instance);
-  GC_TOUCH (gc_ctx, wt->next_in_state_instance);
-}
-
-static void wait_thread_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
-static int wait_thread_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-				 void *data)
-{
-  wait_thread_t *wt = (wait_thread_t *)p;
-  int err = 0;
-
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->next, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->state_instance, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)wt->next_in_state_instance, data);
-  return err;
-}
-
-static gc_class_t wait_thread_class = {
-  GC_ID('t','h','r','d'),
-  wait_thread_mark_subfields,
-  wait_thread_finalize,
-  wait_thread_traverse
-};
-
-
-static int simulate_state_and_create_threads(orchids_t        *ctx,
-					     state_instance_t *state,
-					     active_event_t   *event, /* XXX: NOT USED */
-					     int               only_once)
-{
-  wait_thread_t *thread;
-  state_instance_t *new_state;
-  int t;
-  int trans_nb;
-  int vmret;
-  int created_threads = 0;
-  int simul_ret;
-  state_instance_t *sync_lock;
-  sync_lock_list_t *lock_elmt;
-  gc_t *gc_ctx = ctx->gc_ctx;
-
-  if (state->state->action!=NULL)
-    ovm_exec_stmt(ctx, state, state->state->action);
-
-  trans_nb = state->state->trans_nb;
-  if (trans_nb == 0)
-    {
-      DebugLog(DF_ENG, DS_INFO,
-             "Terminal state reached for rule instance (%p)\n",
-	       state->rule_instance);
-      mark_dead_rule(ctx, state->rule_instance);
-      return -1;
-    }
-
-  /* test sync vars here, if sync, return */
-  if (state->rule_instance->rule->sync_lock!=NULL)
-    {
-      DebugLog(DF_ENG, DS_INFO, "Checking synchronization variables\n");
-      if ( sync_var_env_is_defined(ctx, state) )
-	{
-	  DebugLog(DF_ENG, DS_INFO, "Sync env is fully defined.\n");
-	  sync_lock = objhash_get(state->rule_instance->rule->sync_lock, state);
-	  if (sync_lock!=NULL)
-	    {
-	      DebugLog(DF_ENG, DS_INFO, "LOCK FOUND !\n");
-	      if (sync_lock->rule_instance != state->rule_instance) {
-		DebugLog(DF_ENG, DS_INFO, "Pruning.\n");
-		return -1;
-	      }
-	      DebugLog(DF_ENG, DS_INFO, "In lock owner.\n");
-	    }
-	  else
-	    {
-	      /* create lock */
-	      if ( !only_once ) {
-		DebugLog(DF_ENG, DS_INFO, "No lock found.  Creating...\n");
-		objhash_add(gc_ctx, state->rule_instance->rule->sync_lock,
-			    state, state);
-		lock_elmt = gc_alloc (gc_ctx, sizeof (sync_lock_list_t),
-				      &sync_lock_list_class);
-		lock_elmt->gc.type = T_NULL;
-		GC_TOUCH (gc_ctx, lock_elmt->state = state);
-		GC_TOUCH (gc_ctx, lock_elmt->next =
-			  state->rule_instance->sync_lock_list);
-		GC_TOUCH (gc_ctx, state->rule_instance->sync_lock_list =
-			  lock_elmt);
-        }
-        else {
-          DebugLog(DF_ENG, DS_INFO,
-                   "No lock found.  Don't create in ONLY_ONCE\n");
-        }
-      }
-    }
-    else {
-      DebugLog(DF_ENG, DS_INFO, "Sync env is NOT fully defined.\n");
-    }
-  }
-
-  for (t = 0; t < trans_nb; t++) {
-    /* if we have an e-transition, pass it */
-    if (state->state->trans[t].required_fields_nb == 0) {
-      vmret = 0;
-      if (state->state->trans[t].eval_code!=NULL)
-        vmret = ovm_exec_expr(ctx, state, state->state->trans[t].eval_code);
-      if (vmret == 0) {
-        DPRINTF( ("e-trans passed (to %s)\n",
-                  state->state->trans[t].dest->name) );
-        new_state = create_state_instance(ctx,
-                                          state->state->trans[t].dest,
-                                          state);
-
-        /* link new_state instance in the tree */
-        GC_TOUCH (gc_ctx, new_state->next_sibling = state->first_child);
-        GC_TOUCH (gc_ctx, state->first_child = new_state);
-        GC_TOUCH (gc_ctx, new_state->parent = state);
-
-        /* update state instance list of the current rule instance */
-        GC_TOUCH (gc_ctx, new_state->retrig_next =
-		  state->rule_instance->state_list);
-        GC_TOUCH (gc_ctx, state->rule_instance->state_list = new_state);
-
-        /* and recursively call the simulation function */
-        simul_ret = simulate_state_and_create_threads(ctx,
-                                                      new_state,
-                                                      event,
-                                                      only_once);
-        if (simul_ret < 0)
-          return (-created_threads + simul_ret);
-        created_threads += simul_ret;
-      }
-    } else { /* we have a blocking trans, so create a new thread if needed */
-      thread = gc_alloc (gc_ctx, sizeof (wait_thread_t),
-			 &wait_thread_class);
-      thread->gc.type = T_NULL;
-      thread->next = NULL;
-      thread->trans = &state->state->trans[t];
-      GC_TOUCH (gc_ctx, thread->state_instance = state);
-      thread->next_in_state_instance = NULL;
-      thread->flags = only_once;
-      thread->pass = 0;
-      state->rule_instance->threads++;
-      ctx->threads++;
-      created_threads++;
-
-      DebugLog(DF_ENG, DS_DEBUG,
-               "-- Create thread %p on state %s trans %i\n",
-               thread, state->state->name, t);
-
-      if (only_once == 0) {
-        /* add it to the thread-list of the current state instance */
-        GC_TOUCH (gc_ctx, thread->next_in_state_instance =
-		  state->thread_list);
-        GC_TOUCH (gc_ctx, state->thread_list = thread);
-      }
-
-#ifdef TIMEOUT_OBSOLETE
-      /* compute the timeout date */
-      thread->timeout = time(NULL) + DEFAULT_TIMEOUT;
-#endif
-
-      /* add thread into the 'new thread' queue */
-      if (ctx->new_qt) { /* if queue isn't empty, append to the tail */
-        GC_TOUCH (gc_ctx, ctx->new_qt->next = thread);
-        GC_TOUCH (gc_ctx, ctx->new_qt = thread);
-      } else { /* else create head */
-        GC_TOUCH (gc_ctx, ctx->new_qh = thread);
-        GC_TOUCH (gc_ctx, ctx->new_qt = thread);
-      }
-    }
-  }
-  return created_threads;
-}
-
-
-static void rule_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  rule_instance_t *ri = (rule_instance_t *)p;
-
-  GC_TOUCH (gc_ctx, ri->rule);
-  GC_TOUCH (gc_ctx, ri->first_state);
-  GC_TOUCH (gc_ctx, ri->next);
-  GC_TOUCH (gc_ctx, ri->queue_head);
-  GC_TOUCH (gc_ctx, ri->queue_tail);
-  GC_TOUCH (gc_ctx, ri->state_list);
-  GC_TOUCH (gc_ctx, ri->sync_lock_list);
-}
-
-static void rule_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
-static int rule_instance_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-				   void *data)
-{
-  rule_instance_t *ri = (rule_instance_t *)p;
-  int err = 0;
-
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->rule, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->first_state, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->next, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->queue_head, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->queue_tail, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->state_list, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ri->sync_lock_list, data);
-  return err;
-}
-
-static gc_class_t rule_instance_class = {
-  GC_ID('r','u','l','i'),
-  rule_instance_mark_subfields,
-  rule_instance_finalize,
-  rule_instance_traverse
-};
-
-
-static void create_rule_initial_threads(orchids_t *ctx,
-					active_event_t *event /* XXX: NOT USED */)
-{
-  rule_t *r;
-  state_instance_t *init;
-  rule_instance_t *new_rule;
-  int ret;
-  gc_t *gc_ctx = ctx->gc_ctx;
-
-  GC_START (gc_ctx, 1);
-  for (r = ctx->rule_compiler->first_rule; r; r = r->next) {
-    init = create_init_state_instance(ctx, r);
-    GC_UPDATE (gc_ctx, 0, init);
-
-    new_rule = gc_alloc(gc_ctx, sizeof (rule_instance_t),
-			&rule_instance_class);
-    new_rule->gc.type = T_NULL;
-    GC_TOUCH (gc_ctx, new_rule->rule = r);
-    GC_TOUCH (gc_ctx, new_rule->first_state = init);
-    new_rule->next = NULL;
-    new_rule->state_instances = 1;
-    new_rule->creation_date = 0;
-    new_rule->new_creation_date.tv_sec = 0;
-    new_rule->new_creation_date.tv_usec = 0;
-    new_rule->new_last_act.tv_sec = 0;
-    new_rule->new_last_act.tv_usec = 0;
-    new_rule->queue_head = NULL;
-    new_rule->queue_tail = NULL;
-    new_rule->state_list = NULL;
-    new_rule->max_depth = 0;
-    new_rule->threads = 0;
-    new_rule->flags = 0;
-    new_rule->sync_lock_list = NULL;
-    //GC_UPDATE (gc_ctx, 0, new_rule); /* useless, because of the following line */
-    GC_TOUCH (gc_ctx, init->rule_instance = new_rule); /* move in create_init_inst() ? */
-    /* link rule */
-/*     ctx->state_instances++;
-*/
-
-    ret = simulate_state_and_create_threads(ctx, init, event, THREAD_ONLYONCE);
-
-    if (ret <= 0) {
-      DebugLog(DF_ENG, DS_DEBUG, "No initial threads for rule %s\n",
-               r->name);
-      cleanup_rule_instance(ctx, new_rule);
-    }
-    else {
-      new_rule->threads = ret;
-      GC_TOUCH (gc_ctx, new_rule->next = ctx->first_rule_instance);
-      GC_TOUCH (gc_ctx, ctx->first_rule_instance = new_rule);
-
-      if (ctx->new_qt!=NULL)
-        ctx->new_qt->flags |= THREAD_BUMP;
-    }
-  }
-
-  /* Prepare the current retrig queue by merging new and retrig queues
-     (q_cur = q_new @ q_retrig) */
-  if (ctx->new_qh!=NULL)
-    {
-      GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
-      GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = ctx->new_qh);
-      GC_TOUCH (gc_ctx, ctx->cur_retrig_qt =
-		(ctx->retrig_qt!=NULL) ? ctx->retrig_qt : ctx->new_qt);
-      ctx->new_qh = NULL;
-      ctx->new_qt = NULL;
-    }
-  else
-    {
-      GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = ctx->retrig_qh);
-      GC_TOUCH (gc_ctx, ctx->cur_retrig_qt = ctx->retrig_qt);
-    }
-  ctx->retrig_qh = NULL;
-  ctx->retrig_qt = NULL;
-  GC_END(gc_ctx);
-}
-
-static void unlink_thread_in_state_instance_list(gc_t *gc_ctx,
-						 wait_thread_t *thread)
-{
-  wait_thread_t *t;
-  wait_thread_t *prev_thread;
-  wait_thread_t *next_thread;
-
-  DebugLog(DF_ENG, DS_INFO, "unlink_thread_in_state_instance_list(%p)\n",
-           thread);
-
-  prev_thread = NULL;
-  for (t = thread->state_instance->thread_list; t!=NULL; t = next_thread)
-    {
-      next_thread = t->next_in_state_instance;
-      if (t == thread)
-	{
-	  if (prev_thread!=NULL)
-	    {
-	      GC_TOUCH (gc_ctx, prev_thread->next_in_state_instance =
-			t->next_in_state_instance);
-	    }
-	  else
-	    {
-	      GC_TOUCH (gc_ctx, thread->state_instance->thread_list =
-			t->next_in_state_instance);
-	    }
-	  return;
-	}
-      else
-	{
-	  prev_thread = t;
-	}
-    }
-}
-
-static int backtrack_is_not_needed(orchids_t *ctx, wait_thread_t *thread)
-{
-#if 1
-  /* if destination state is fully blocking AND doesn't bind field value
-   * to a free variable, this is THE shortest run.
-   * Next threads will be redundant. */
-  if (thread->trans->dest->trans_nb > 0 &&
-      !(thread->trans->dest->flags & BYTECODE_HAS_PUSHFIELD))
-    return (TRUE);
-  /* XXX: Destination MUST NOT be a cut-point.
-     Destination cuts should be resolved at compilation-time
-     instead of runtime ? */
-#endif
-
-  return (FALSE);
-}
-
-static void active_event_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  active_event_t *ae = (active_event_t *)p;
-
-  GC_TOUCH (gc_ctx, ae->event);
-  GC_TOUCH (gc_ctx, ae->next);
-  GC_TOUCH (gc_ctx, ae->prev);
-}
-
-static void active_event_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
-static int active_event_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+static int thread_group_traverse (gc_traverse_ctx_t *gtc,
+				  gc_header_t *p,
 				  void *data)
 {
-  active_event_t *ae = (active_event_t *)p;
+  thread_group_t *pid = (thread_group_t *)p;
   int err = 0;
 
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->event, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->next, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)ae->prev, data);
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) pid->rule, data);
   return err;
 }
 
-static gc_class_t active_event_class = {
-  GC_ID('a','e','v','t'),
-  active_event_mark_subfields,
-  active_event_finalize,
-  active_event_traverse
+static gc_class_t thread_group_class = {
+  GC_ID('p','i','d',' '),
+  thread_group_mark_subfields,
+  thread_group_finalize,
+  thread_group_traverse
 };
-
-void inject_event(orchids_t *ctx, event_t *event)
-{
-  event_t *e;
-  wait_thread_t *t, *next_thread;
-  int vmret;
-  active_event_t *active_event;
-  int sret = 0;
-  int ret = 0;
-  int passed_threads = 0;
-#ifdef TIMEOUT_OBSOLETE
-  time_t cur_time;
-#endif
-  gc_t *gc_ctx = ctx->gc_ctx;
-
-#ifdef TIMEOUT_OBSOLETE
-  cur_time = time(NULL);
-#endif
-
-  DebugLog(DF_ENG, DS_INFO, "inject_event() (one-evt)\n");
-
-/*   fprintf_safelib_memstat(stderr); */
-
-  ctx->events++;
-
-  /* prepare an active event record */
-  active_event = gc_alloc(gc_ctx, sizeof (active_event_t),
-			  &active_event_class);
-  active_event->gc.type = T_NULL;
-  GC_TOUCH (gc_ctx, active_event->event = event);
-  active_event->next = NULL;
-  active_event->prev = NULL;
-  active_event->refs = 0;
-  GC_TOUCH (gc_ctx, ctx->active_event_cur = active_event);
-
-  execute_pre_inject_hooks(ctx, active_event->event);
-
-  /* UDP event feedback monitoring */
-  if (ctx->evt_fb_fp!=NULL)
-    {
-      fprintf_event(ctx->evt_fb_fp, ctx, event);
-      fflush(ctx->evt_fb_fp);
-    }
-
-#if ORCHIDS_DEBUG
-  fprintf_event(stderr, ctx, event);
-#endif /* ORCHIDS_DEBUG */
-
-  /* -0- resolve field value XXX: should be done with field checks */
-  DebugLog(DF_ENG, DS_DEBUG, "STEP 0 - resolve field attribute values\n");
-  /* jgl: the following resetting loop is too slow when
-     ctx->global_fields->num_fields
-     becomes large.  Instead, we will maintain the invariant that
-     ctx->global_fields->fields[i].val==NULL between any two calls to inject_event()
-  */
-//  for (i = 0; i < ctx->global_fields->num_fields; i++) /* clean field val refs */
-//    ctx->global_fields->fields[i].val = NULL;
-
-#if ORCHIDS_DEBUG
-  for (i=0; i<ctx->global_fields->num_fields; i++)
-    if (ctx->global_fields->fields[i].val!=NULL)
-      abort();
-#endif
-  for (e = event; e!=NULL; e = e->next)
-    GC_TOUCH (gc_ctx,
-	      ctx->global_fields->fields[ e->field_id ].val = e->value);
-
-#if 0
-    fprintf(stdout, "begin new queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->new_qh);
-
-    fprintf(stdout, "begin next retrig queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->retrig_qh);
-#endif
-
-  /* q-init */
-  DebugLog(DF_ENG, DS_DEBUG, "STEP 1 - create initial threads (q-init)\n");
-  create_rule_initial_threads(ctx, active_event);
-
-#if ORCHIDS_DEBUG
-  fprintf(stderr, "current retrig queue\n");
-  fprintf_thread_queue(stderr, ctx, ctx->cur_retrig_qh);
-#endif /* ORCHIDS_DEBUG */
-
-  /* evt-loop */
-  DebugLog(DF_ENG, DS_DEBUG,
-           "STEP 2 - evaluate all threads in retrig queue (evt-loop)\n");
-  for (t = ctx->cur_retrig_qh; t!=NULL; t = next_thread) {
-    next_thread = t->next;
-    GC_TOUCH (gc_ctx, ctx->current_tail = t);
-
-#ifdef TIMEOUT_OBSOLETE
-    /* Check timeout date */
-    if ( !(t->flags & THREAD_ONLYONCE) && (t->timeout <= cur_time) )
-      {
-	DebugLog(DF_ENG, DS_DEBUG, "thread %p timed out ! (killing)\n", t);
-	t->flags |= THREAD_KILLED;
-      }
-#endif
-
-    /* Killed thread reaper (and rule instance if apply) */
-    if ( THREAD_IS_KILLED(t) )
-      {
-	ctx->last_ruleinst_act = ctx->cur_loop_time;
-	DebugLog(DF_ENG, DS_DEBUG, "Reap and override killed thread (%p)\n", t);
-	t->state_instance->rule_instance->threads--;
-	ctx->threads--;
-	if ( NO_MORE_THREAD(t->state_instance->rule_instance) )
-	  {
-	    /* Update rule instance list links (before removing) */
-	    t->state_instance->rule_instance->flags |= THREAD_KILLED;
-	    reap_dead_rule(ctx, t->state_instance->rule_instance);
-	  }
-	else
-	  {
-	    unlink_thread_in_state_instance_list(gc_ctx, t);
-	  }
-	if (t == ctx->cur_retrig_qh)
-	  {
-	    GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = next_thread);
-	  }
-	if (ctx->cur_retrig_qt!=NULL)
-	  ctx->cur_retrig_qt->next = NULL;
-	ctx->current_tail = NULL;
-	continue;
-      }
-
-    DebugLog(DF_ENG, DS_DEBUG,
-             "  processing thread %p (r=%s s=%s d=%s)\n",
-             (void *)t,
-             t->state_instance->rule_instance->rule->name,
-             t->state_instance->state->name,
-             t->trans->dest->name);
-
-    vmret = ovm_exec_expr(ctx, t->state_instance, t->trans->eval_code);
-    if (vmret == 0)
-      {
-	state_instance_t *new_state;
-
-	DebugLog(DF_ENG, DS_DEBUG,
-		 "TRANSITION MATCH ! (destination '%s')\n",
-		 t->trans->dest->name);
-	t->pass++;
-	passed_threads++;
-
-	ctx->last_ruleinst_act = ctx->cur_loop_time;
-	t->state_instance->rule_instance->new_last_act = ctx->last_ruleinst_act;
-
-	if ( THREAD_IS_ONLYONCE(t) )
-	  {
-	    DebugLog(DF_ENG, DS_DEBUG,
-		     "Initial thread passed. Create rule instance.\n");
-	    t->state_instance->rule_instance->creation_date = time(NULL);
-	    t->state_instance->rule_instance->new_creation_date =
-	      ctx->last_ruleinst_act;
-	    t->state_instance->rule_instance->rule->instances++;
-	    t->state_instance->rule_instance->flags |= RULE_INUSE;
-	    ctx->rule_instances++;
-	  }
-
-	/* Create a new state instance */
-	new_state = create_state_instance(ctx,
-					  t->trans->dest, t->state_instance);
-
-	/* Link the new_state instance into the tree */
-	GC_TOUCH (gc_ctx, new_state->next_sibling =
-		  t->state_instance->first_child);
-	GC_TOUCH (gc_ctx, t->state_instance->first_child = new_state);
-	GC_TOUCH (gc_ctx, new_state->parent = t->state_instance);
-	GC_TOUCH (gc_ctx, new_state->event = active_event);
-	active_event->refs++;
-
-	/* Update state instance list of the current rule instance */
-	GC_TOUCH (gc_ctx, new_state->retrig_next =
-		  t->state_instance->rule_instance->state_list);
-	GC_TOUCH (gc_ctx, t->state_instance->rule_instance->state_list =
-		  new_state);
-
-	/* And recursively call simulation function */
-	sret = simulate_state_and_create_threads(ctx,
-						 new_state, active_event, 0);
-	if (sret < 0)
-	  ret -= sret;
-	else
-	  ret += sret;
-
-	/* Static analysis flags test here (RETRIGGER) */
-	if ( backtrack_is_not_needed(ctx, t) ) {
-	  DebugLog(DF_ENG, DS_DEBUG, "Backtrack not needed\n");
-	  KILL_THREAD(ctx, t);
-	}
-      }
-
-    if ( THREAD_IS_ONLYONCE(t))
-      {
-	KILL_THREAD(ctx, t);
-	/* Initial thread reaper: an initial thread can't be free()d at
-	 * the next loop because initial environment can make references
-	 * to the current event.  In case the event didn't match
-	 * any transition, it will be free()d _before_ the initial
-	 * environment, so we'll lose the reference.  */
-
-	DebugLog(DF_ENG, DS_DEBUG, "Reap INITIAL thread (%p)\n", t);
-
-	if (t->flags & THREAD_BUMP)
-	  {
-	    DebugLog(DF_ENG, DS_DEBUG,
-		     "initial thread bump "
-		     "(commit q'_{new} = q_{new} @ q_{retrig})\n");
-	    if (ctx->retrig_qt)
-	      ctx->retrig_qt->flags |= THREAD_BUMP;
-	    if (ctx->new_qh!=NULL)
-	      {
-		ctx->new_qt->flags |= THREAD_BUMP;
-		GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
-		if (ctx->retrig_qt!=NULL)
-		  GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
-		ctx->retrig_qh = NULL;
-		ctx->retrig_qt = NULL;
-	      }
-	    else
-	      { /* q_new is empty */
-		GC_TOUCH (gc_ctx, ctx->new_qh = ctx->retrig_qh);
-		GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
-		ctx->retrig_qh = NULL;
-		ctx->retrig_qt = NULL;
-	      }
-	  }
-
-	t->state_instance->rule_instance->threads--;
-	ctx->threads--;
-	if ( NO_MORE_THREAD(t->state_instance->rule_instance) )
-	  {
-	    /* Update rule instance list links (before removing) */
-	    t->state_instance->rule_instance->flags |= THREAD_KILLED;
-	    reap_dead_rule(ctx, t->state_instance->rule_instance);
-	  }
-	else
-	  {
-	    unlink_thread_in_state_instance_list(gc_ctx, t);
-	  }
-	if (t == ctx->cur_retrig_qh)
-	  {
-	    GC_TOUCH (gc_ctx, ctx->cur_retrig_qh = next_thread);
-	  }
-	if (ctx->cur_retrig_qt!=NULL)
-	  ctx->cur_retrig_qt->next = NULL;
-	ctx->current_tail = NULL;
-	continue;
-      }
-
-    DebugLog(DF_ENG, DS_DEBUG, "RETRIG q'_{retrig} = q_{retrig} + t\n");
-    if (ctx->retrig_qh!=NULL)
-      {
-	GC_TOUCH (gc_ctx, ctx->retrig_qt->next = t);
-	GC_TOUCH (gc_ctx, ctx->retrig_qt = t);
-      }
-    else
-      {
-	GC_TOUCH (gc_ctx, ctx->retrig_qh = t);
-	GC_TOUCH (gc_ctx, ctx->retrig_qt = t);
-      }
-    t->next = NULL;
-
-#if 0
-    fprintf(stdout, "thread loop new queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->new_qh);
-
-    fprintf(stdout, "thread loop  next retrig queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->retrig_qh);
-#endif
-
-    /* If we need to commit new threads, then merge two queues */
-    if (t->flags & THREAD_BUMP)
-      {
-	DebugLog(DF_ENG, DS_DEBUG,
-		 "thread bump (commit q'_{new} = q_{new} @ q_{retrig})\n");
-	if (ctx->retrig_qt!=NULL)
-	  ctx->retrig_qt->flags |= THREAD_BUMP;
-	if (ctx->new_qh!=NULL)
-	  {
-	    ctx->new_qt->flags |= THREAD_BUMP;
-	    GC_TOUCH (gc_ctx, ctx->new_qt->next = ctx->retrig_qh);
-	    if (ctx->retrig_qt!=NULL)
-	      GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
-	    ctx->retrig_qh = NULL;
-	    ctx->retrig_qt = NULL;
-	  }
-	else
-	  { /* q_new is empty */
-	    GC_TOUCH (gc_ctx, ctx->new_qh = ctx->retrig_qh);
-	    GC_TOUCH (gc_ctx, ctx->new_qt = ctx->retrig_qt);
-	    ctx->retrig_qh = NULL;
-	    ctx->retrig_qt = NULL;
-	  }
-      }
-
-#if 0
-    fprintf(stdout, "end new queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->new_qh);
-
-    fprintf(stdout, "end next retrig queue\n");
-    fprintf_thread_queue(stdout, ctx, ctx->retrig_qh);
-#endif
-
-  }
-
-  execute_post_inject_hooks(ctx, active_event->event);
-
-  for (e = event; e!=NULL; e = e->next)
-    ctx->global_fields->fields[ e->field_id ].val = NULL;
-
-  if (active_event->refs != 0) /* If event still alive: */
-    {
-      ctx->last_evt_act = ctx->cur_loop_time;
-      DebugLog(DF_ENG, DS_DEBUG,
-	       "Keep new event: active_event->refs = %i (linking) %i\n",
-	       active_event->refs, passed_threads);
-      if (ctx->active_event_head == NULL)
-	{
-	  GC_TOUCH (gc_ctx, ctx->active_event_head = active_event);
-	  GC_TOUCH (gc_ctx, ctx->active_event_tail = active_event);
-	}
-      else
-	{
-	  GC_TOUCH (gc_ctx, active_event->prev = ctx->active_event_tail);
-	  GC_TOUCH (gc_ctx, ctx->active_event_tail->next = active_event);
-	  GC_TOUCH (gc_ctx, ctx->active_event_tail = active_event);
-	}
-      ctx->active_events++;
-    }
-
-  DebugLog(DF_ENG, DS_TRACE,
-           "simulate_state_and_create_threads() = %i\n", ret);
-
-#ifdef DMALLOC
-  dmalloc_log_changed(dmalloc_orchids, 1, 1, 1);
-#endif
-}
 
 static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
   state_instance_t *si = (state_instance_t *)p;
 
-  GC_TOUCH (gc_ctx, si->first_child);
-  GC_TOUCH (gc_ctx, si->next_sibling);
-  GC_TOUCH (gc_ctx, si->parent);
-  GC_TOUCH (gc_ctx, si->event);
-  GC_TOUCH (gc_ctx, si->rule_instance);
+  GC_TOUCH (gc_ctx, si->pid);
   GC_TOUCH (gc_ctx, si->env);
-  GC_TOUCH (gc_ctx, si->retrig_next);
-  GC_TOUCH (gc_ctx, si->thread_list);
-  GC_TOUCH (gc_ctx, si->next_report_elmt);
 }
 
 static void state_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  state_instance_t *si = (state_instance_t *)p;
+  //state_instance_t *si = (state_instance_t *)p;
 
-  remove_thread_local_entries (si);
+  /*remove_thread_local_entries (si);*/
 }
 
 static int state_instance_traverse (gc_traverse_ctx_t *gtc,
@@ -927,31 +89,10 @@ static int state_instance_traverse (gc_traverse_ctx_t *gtc,
   state_instance_t *si = (state_instance_t *)p;
   int err = 0;
 
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->first_child, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->next_sibling, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->parent, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->event, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->rule_instance, data);
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->pid, data);
   if (err)
     return err;
   err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->env, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->retrig_next, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->thread_list, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *) si->next_report_elmt, data);
   return err;
 }
 
@@ -962,288 +103,580 @@ static gc_class_t state_instance_class = {
   state_instance_traverse
 };
 
-static state_instance_t *create_state_instance(orchids_t *ctx,
-					       state_t *state,
-					       const state_instance_t *parent)
+static void thread_queue_elt_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
-  state_instance_t *new_state;
+  thread_queue_elt_t *qe = (thread_queue_elt_t *)p;
 
-  /* Allocate and init state instance */
-  new_state = gc_alloc (ctx->gc_ctx, sizeof (state_instance_t),
-			&state_instance_class);
-  new_state->gc.type = T_STATE_INSTANCE;
-  new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
-  GC_TOUCH (ctx->gc_ctx, new_state->rule_instance = parent->rule_instance);
-  new_state->first_child = NULL;
-  new_state->next_sibling = NULL;
-  new_state->parent = NULL;
-  new_state->event_level = 0;
-  new_state->flags = 0;
-  new_state->event = NULL;
-  GC_TOUCH (ctx->gc_ctx, new_state->env = parent->env);
-  new_state->thread_locals = NULL;
-  new_state->retrig_next = NULL;
-  ctx->state_instances++;
-  return new_state;
+  GC_TOUCH (gc_ctx, qe->thread);
+  GC_TOUCH (gc_ctx, qe->next);
 }
 
-
-static state_instance_t *create_init_state_instance(orchids_t *ctx, const rule_t *rule)
+static void thread_queue_elt_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  state_t *state;
-  state_instance_t *new_state;
-
-  state = &rule->state[0];
-  new_state = gc_alloc (ctx->gc_ctx, sizeof (state_instance_t),
-			&state_instance_class);
-  new_state->gc.type = T_STATE_INSTANCE;
-  new_state->state = state; /* no GC_TOUCH() here! state is not gc-able */
-  new_state->rule_instance = NULL;
-  new_state->first_child = NULL;
-  new_state->next_sibling = NULL;
-  new_state->parent = NULL;
-  new_state->event_level = 0;
-  new_state->flags = 0;
-  new_state->event = NULL;
-  new_state->env = NULL;
-  new_state->thread_locals = NULL;
-  new_state->retrig_next = NULL;
-  new_state->thread_list = NULL;
-  new_state->next_report_elmt = NULL;
-  ctx->state_instances++;
-  return new_state;
+  return;
 }
 
-
-static void cleanup_rule_instance(orchids_t *ctx, rule_instance_t *rule_instance)
+static int thread_queue_elt_traverse (gc_traverse_ctx_t *gtc,
+				      gc_header_t *p,
+				      void *data)
 {
+  thread_queue_elt_t *qe = (thread_queue_elt_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) qe->thread, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) qe->next, data);
+  return err;
+}
+
+static gc_class_t thread_queue_elt_class = {
+  GC_ID('t','h','q','e'),
+  thread_queue_elt_mark_subfields,
+  thread_queue_elt_finalize,
+  thread_queue_elt_traverse
+};
+
+static void thread_queue_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  thread_queue_t *tq = (thread_queue_t *)p;
+
+  GC_TOUCH (gc_ctx, tq->first);
+  GC_TOUCH (gc_ctx, tq->last);
+}
+
+static void thread_queue_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int thread_queue_traverse (gc_traverse_ctx_t *gtc,
+				  gc_header_t *p,
+				  void *data)
+{
+  thread_queue_t *tq = (thread_queue_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) tq->first, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *) tq->last, data);
+  return err;
+}
+
+static gc_class_t thread_queue_class = {
+  GC_ID('t','h','q','.'),
+  thread_queue_mark_subfields,
+  thread_queue_finalize,
+  thread_queue_traverse
+};
+
+static thread_queue_t *new_thread_queue (gc_t *gc_ctx)
+{
+  thread_queue_t *tq;
+
+  tq = gc_alloc (gc_ctx, sizeof (thread_queue_t), &thread_queue_class);
+  tq->gc.type = T_NULL;
+  tq->nelts = 0;
+  tq->first = NULL;
+  tq->last = NULL;
+  return tq;
+}
+
+#define THREAD_QUEUE_IS_EMPTY(tq) ((tq)->first==NULL)
+
+static state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq)
+{ /* tq should not be empty here,
+     in the sense that THREAD_QUEUE_IS_EMPTY(tq) should be false */
+  thread_queue_elt_t *qe, *last;
   state_instance_t *si;
-  state_instance_t *next_si;
-  sync_lock_list_t *lock_elmt;
-  sync_lock_list_t *lock_next;
 
-  DebugLog(DF_ENG, DS_DEBUG, "cleanup_rule_instance(%p)\n", rule_instance);
-
-  /* Remove synchronization locks, if any exists */
-  for (lock_elmt = rule_instance->sync_lock_list;
-       lock_elmt!=NULL;
-       lock_elmt = lock_next)
+  qe = tq->first;
+  si = qe->thread;
+  last = tq->last;
+  if (qe==last) /* only one element left: erase queue */
     {
-      lock_next = lock_elmt->next;
-      DebugLog(DF_ENG, DS_DEBUG, "cleanup_rule_instance(%p): removing lock %p\n",
-	       rule_instance, lock_elmt->state);
-      si = objhash_del(rule_instance->rule->sync_lock, lock_elmt->state);
-      if (si == NULL)
+      tq->nelts = 0;
+      tq->first = NULL; /* no need to GC_TOUCH() NULL */
+      tq->last = NULL; /* no need to GC_TOUCH() NULL */
+    }
+  else
+    {
+      GC_TOUCH (gc_ctx, tq->first = qe->next);
+      if (si!=NULL)
 	{
-	  DebugLog(DF_ENG, DS_ERROR,
-		   "cleanup_rule_instance(%p): lock not found\n",
-		   rule_instance);
+	  si->pid->rule->instances--;
+	  tq->nelts--;
 	}
-  }
-  ctx->state_instances--;
+    }
+  return si;
+}
 
-  si = rule_instance->state_list;
-  while (si) {
-    next_si = si->retrig_next;
+static void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *si)
+{ /* add si to the end of queue tq,
+     unless si==NULL (BUMP) and last element of tq is already BUMP */
+  thread_queue_elt_t *qe;
+  thread_queue_elt_t *last;
 
-    /* Update event reference count */
-    if (si->event) {
-      si->event->refs--;
+  last = tq->last;
+  if (si==NULL && last!=NULL && last->thread==NULL)
+    return; /* si==BUMP, there is a last element, and its thread is BUMP */
+  qe = gc_alloc (gc_ctx, sizeof(thread_queue_elt_t), &thread_queue_elt_class);
+  qe->gc.type = T_NULL;
+  qe->next = NULL; /* no need to GC_TOUCH() NULL */
+  GC_TOUCH (gc_ctx, qe->thread = si);
+  if (si!=NULL)
+    {
+      tq->nelts++;
+      si->pid->rule->instances++;
+    }
+  if (THREAD_QUEUE_IS_EMPTY(tq))
+    {
+      GC_TOUCH (gc_ctx, tq->first = qe);
+    }
+  else
+    {
+      GC_TOUCH (gc_ctx, last->next = qe);
+    }
+  GC_TOUCH (gc_ctx, tq->last = qe);
+}
 
-      /* The current active event is freed in inject_event() if unreferenced.
-       * There is the special case of rules that terminate after exactly one
-       * event: the event matches a transition, is referenced, the rule reaches
-       * instantaneously a final state, then terminate.  Here, we have to
-       * only free events other than the current one (i.e. past events). */
-      if (si->event->refs <= 0 && si->event != ctx->active_event_cur) {
-        ctx->last_evt_act = ctx->cur_loop_time;
-        DebugLog(DF_ENG, DS_DEBUG, "event %p ref=0\n", si->event);
-        si->event->event = NULL;
-        ctx->active_events--;
-        /* unlink */
-        if (!si->event->prev) { /* If we are in the first event reference */
-          if (!si->event->next) { /* If it is also the last (it is alone) */
-            ctx->active_event_head = NULL;
-            ctx->active_event_tail = NULL;
-          }
-          else {
-            /* Else it is the first, and there is other references after it */
-            GC_TOUCH (ctx->gc_ctx, ctx->active_event_head = si->event->next);
-            ctx->active_event_head->prev = NULL;
-          }
-          /* si->event->next->prev = si->event->prev; */
-        }
-        else { /* Else the event reference is not the first */
+static void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t *all)
+{ /* concatenate the 'all' queue to the end of tq;
+     'all' is destroyed after that;
+     if last element of tq is BUMP and first element of 'all' is BUMP, remove one of
+     them */
+  thread_queue_elt_t *last;
 
-          if (!si->event->next) { /* If it is exactly the last one */
-            /* Then update the previous element */
-            si->event->prev->next = NULL;
-            GC_TOUCH (ctx->gc_ctx, ctx->active_event_tail = si->event->prev);
-          }
-          else { /* Else the event reference is not the last
-                    we are in the middle of the list */
-            GC_TOUCH (ctx->gc_ctx, si->event->prev->next = si->event->next);
-            GC_TOUCH (ctx->gc_ctx, si->event->next->prev = si->event->prev);
-          }
-          /* ctx->active_event_tail = si->event->prev; */
-        }
+  last = tq->last;
+  if (last!=NULL && last->thread==NULL &&
+      !THREAD_QUEUE_IS_EMPTY(all) && all->first->thread==NULL)
+    (void) thread_dequeue (gc_ctx, all); /* remove first BUMP of 'all' */
+  if (THREAD_QUEUE_IS_EMPTY(all))
+    return; /* nothing to do */
+  if (THREAD_QUEUE_IS_EMPTY(tq))
+    {
+      tq->nelts = all->nelts;
+      GC_TOUCH (gc_ctx, tq->first = all->first);
+    }
+  else
+    {
+      tq->nelts += all->nelts;
+      GC_TOUCH (gc_ctx, tq->last->next = all->first);
+    }
+  GC_TOUCH (gc_ctx, tq->last = all->last);
+  all->nelts = 0;
+  all->first = NULL; /* no need to GC_TOUCH() NULL */
+  all->last = NULL; /* no need to GC_TOUCH() NULL */
+}
+
+static int sync_var_env_is_defined(state_instance_t *state)
+{ /*!!! should be optimized, by maintaining a count of assigned variables, say */
+  size_t i;
+  size_t sync_vars_sz;
+  int32_t sync_var;
+  int32_t *vars;
+
+  sync_vars_sz = state->pid->rule->sync_vars_sz;
+  vars = state->pid->rule->sync_vars;
+
+  for (i = 0; i < sync_vars_sz; i++)
+    {
+      sync_var = vars[i];
+      if (ovm_read_value (state->env, sync_var)==NULL)
+	return 0;
+    }
+  return 1;
+}
+
+static ovm_var_t *copy_high_handles (gc_t *gc_ctx, ovm_var_t *env, uint16_t nhandles)
+{
+  uint16_t k;
+  ovm_var_t *val;
+
+  GC_START (gc_ctx, 1);
+  for (k=MAX_HANDLES; k<nhandles; k++)
+    {
+      val = ovm_read_value (env, HANDLE_FAKE_VAR(k));
+      GC_UPDATE(gc_ctx, 0, val);
+      val = issdl_clone (gc_ctx, val);
+      GC_UPDATE(gc_ctx, 0, val);
+      env = ovm_write_value (gc_ctx, env, HANDLE_FAKE_VAR(k), val);
+      GC_UPDATE(gc_ctx, 0, val);
+    }
+  GC_END(gc_ctx);
+  return env;
+}
+
+static state_instance_t *create_state_instance (orchids_t *ctx,
+						thread_group_t *pid,
+						state_t *state,
+						transition_t *trans,
+						ovm_var_t *env,
+						uint16_t nhandles)
+{
+  state_instance_t *newsi;
+  gc_t *gc_ctx = ctx->gc_ctx;
+
+  /* First, we make fresh copies of all handles >=MAX_HANDLES.
+     This is inefficient, but is not meant to happen: it is
+     expected that we would have very few handles at the same
+     time, and all will have handles<MAX_HANDLES.  The latter
+     will be copied lazily, by handle_get_wr(), not here. */
+  if (nhandles>MAX_HANDLES)
+    env = copy_high_handles (gc_ctx, env, nhandles);
+  /* Allocate and init state instance */
+  newsi = gc_alloc (ctx->gc_ctx, sizeof (state_instance_t),
+			&state_instance_class);
+  newsi->gc.type = T_STATE_INSTANCE;
+  GC_TOUCH (gc_ctx, newsi->pid = pid);
+  pid->nsi++;
+  newsi->q = state; /* no GC_TOUCH() here! state is not gc-able */
+  newsi->t = trans; /* no GC_TOUCH() here! trans is not gc-able */
+  GC_TOUCH (ctx->gc_ctx, newsi->env = env);
+  newsi->nhandles = nhandles;
+  newsi->owned_handles = 0; /* new threads own none of the handles:
+			       if they wish to modify the value of the
+			       handle, they will have to copy it first. */
+  return newsi;
+}
+
+static void cleanup_state_instance (state_instance_t *si)
+/* Cleanup state_instance before we throw it away. */
+{ /* if state_instance was synchronized, then remove its entry from
+     the table of synchronized state_instances. */
+  struct thread_group_s *pid;
+
+  pid = si->pid;
+  --pid->nsi;
+  if (pid->nsi==0 && sync_var_env_is_defined (si))
+    {
+      (void) objhash_del (pid->rule->sync_lock, si);
+    }
+}
+
+static void detach_state_instance (gc_t *gc_ctx, state_instance_t *si)
+{
+  thread_group_t *pid, *newpid;
+
+  pid = si->pid;
+  cleanup_state_instance (si);
+  newpid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
+  newpid->gc.type = T_NULL;
+  GC_TOUCH (gc_ctx, newpid->rule = pid->rule);
+  newpid->nsi = 1;
+  newpid->flags = 0;
+  GC_TOUCH (gc_ctx, si->pid = newpid);
+}
+
+static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
+							state_instance_t *si,
+							state_t *q,
+							thread_queue_t *tq,
+							int only_once)
+{
+  size_t i, trans_nb;
+  state_instance_t *newsi;
+  transition_t *trans;
+  ovm_var_t *oldenv;
+  objhash_t *lock_table;
+  struct thread_group_s *sync_lock;
+  gc_t *gc_ctx = ctx->gc_ctx;
+
+  GC_START (gc_ctx, 1);
+  if (si->q->flags & STATE_COMMIT)
+    {
+      si->pid->flags |= THREAD_KILL;
+      detach_state_instance (gc_ctx, si);
+    }
+  if (q->action!=NULL)
+    {
+      oldenv = si->env;
+      ovm_exec_stmt (ctx, si, q->action);
+      /* This is the unique place where synchronization may take place, when
+	 executing code inside states.  Indeed, synchronization can only
+	 happen when variables change.  The call to ovm_exec_expr() done
+	 when evaluating 'expect' clauses cannot change any variable. */
+      lock_table = si->pid->rule->sync_lock;
+      if (si->env!=oldenv /* Also, we need to check for synchronization
+			     only if the environment actually changed, */
+	  && lock_table!=NULL /* and if the rule is actually synchronized, */
+	  && sync_var_env_is_defined (si) /* and if all the synchronization variables
+					     are defined. */
+	  )
+	{
+	  sync_lock = objhash_get (lock_table, si);
+	  if (sync_lock!=NULL)
+	    { /* some pid sync_lock (with the same rule) already holds the lock;
+		 then we redirect our pid to be sync_lock;
+		 this is rule (7), p.22 in the spec */
+	      /* As an exception, it may be that sync_lock is a group
+		 of threads that have been killed (typically because we
+		 just entered a STATE_COMMIT state), in which case we do
+		 not join that group, instead we declare the synchronization
+		 group to be our own group---with should not be killed. */
+	      if (sync_lock->flags & THREAD_KILL)
+		{ /* declare si->pid to be the new synchronization group */
+		  objhash_del (lock_table, si);
+		  GC_TOUCH (gc_ctx, si->pid);
+		  objhash_add (gc_ctx, lock_table, si, si->pid);
+		}
+	      else
+		{ /* join the synchronization group */
+		  sync_lock->nsi += si->pid->nsi;
+		  GC_TOUCH (gc_ctx, si->pid = sync_lock);
+		  /* there is no 'anchored' rule in Orchids (the boolean represented
+		     by the lightning-shaped down arrow in the spec is always false),
+		     so we never kill a thread directly because of synchronization. */
+		}
+	    }
+	  else
+	    { /* create a lock. */
+	      GC_TOUCH (gc_ctx, si->pid);
+	      objhash_add (gc_ctx, lock_table, si, si->pid);
+	    }
+	}
+    }
+  trans_nb = q->trans_nb;
+  if (q->flags & EPSILON_STATE) /* follow the first epsilon transition that matches */
+    for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
+      {
+	if (trans->eval_code==NULL ||
+	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
+	  {
+	    enter_state_and_follow_epsilon_transitions (ctx, si, trans->dest, tq, only_once);
+	    break;
+	  }
       }
-    }
-    si = next_si;
-    ctx->state_instances--;
-  }
-
-  if (rule_instance->creation_date) {
-    rule_instance->rule->instances--;
-    ctx->rule_instances--;
-  }
+  else if (only_once)
+    for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
+      { /* ordinary transition ('expect (<cond>) goto <state>'),
+	   and flag only_once is set: create temporary fresh state_instance and try to match
+	   transition; then cleanup the fresh state_instance, since it is not enqueued */
+	if (trans->eval_code==NULL ||
+	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
+	  {
+	    newsi = create_state_instance (ctx, si->pid, q, trans, si->env, si->nhandles);
+	    GC_UPDATE (gc_ctx, 0, newsi);
+	    /* now we call ourselves back with only_once false */
+	    enter_state_and_follow_epsilon_transitions (ctx, newsi, trans->dest, tq, 0);
+	    cleanup_state_instance (newsi);
+	  }
+      }
+  else
+    for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
+      { /* ordinary transition ('expect (<cond>) goto <state>')
+	   then we place ourselves on the queue */
+	newsi = create_state_instance (ctx, si->pid, q, trans, si->env, si->nhandles);
+	GC_UPDATE (gc_ctx, 0, newsi);
+	thread_enqueue (gc_ctx, tq, newsi);
+      }
+  GC_END (gc_ctx);
 }
 
-
-void fprintf_rule_instances(FILE *fp, const orchids_t *ctx)
+static void simulate_state_and_create_threads (orchids_t *ctx,
+					       state_instance_t *si,
+					       thread_queue_t *tq)
 {
-  char asc_time[32];
-  rule_instance_t *r;
-  int i;
+  transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
+  int vmret;
 
-  if (ctx->first_rule_instance == NULL) {
-    fprintf(fp, "no rule instance.\n");
-    return;
-  }
-
-  fprintf(fp,
-          "-------------------------------[ "
-          "rule instances"
-          " ]------------------------------\n");
-  fprintf(fp, " rid | rule name   | state |thrds| dpt | creation date\n");
-  fprintf(fp,
-          "-----+-------------+-------+-----+"
-          "-----+---------------------------------------\n");
-  for (r = ctx->first_rule_instance, i = 0; r; r = r->next, ++i) {
-    if (r->creation_date > 0) {
-      strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-               localtime(&r->creation_date));
+  t = si->t;
+  vmret = 0;
+  if (t->eval_code!=NULL)
+    vmret = ovm_exec_expr (ctx, si, t->eval_code);
+  if (vmret==0)
+    { /* OK: pass transition */
+      enter_state_and_follow_epsilon_transitions (ctx, si, t->dest, tq, 0);
     }
-    else {
-      strcpy(asc_time, "initial instance");
-    }
-    fprintf(fp, " %3i |%12.12s |%6lu |%4i | %3i | %li (%.32s)\n",
-            i, r->rule->name, r->state_instances, r->threads,
-            r->max_depth, r->creation_date, asc_time);
-  }
-  fprintf(fp,
-          "-----+-------------+-------+-----+"
-          "-----+---------------------------------------\n");
 }
 
-
-void fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread)
+static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
 {
-  unsigned int i;
-  unsigned int k;
+  rule_t *r;
+  thread_group_t *pid;
+  state_instance_t *init;
+  state_t *q;
+  gc_t *gc_ctx = ctx->gc_ctx;
 
-  fprintf(fp,
-          "----------------------------[ "
-          "thread wait queue"
-          " ]----------------------------\n");
-  fprintf(fp,
-          " thid |"
-          "   rule name  |"
-          "      state names     |"
-          " rid | sid->did |tran| cnt | bmp\n");
-  fprintf(fp,
-          "------+"
-          "--------------+"
-          "----------------------+"
-          "-----+----------+----+-----+----\n");
-
-  k = 0;
-  for (i = 0; thread!=NULL; thread = thread->next, i++)
+  GC_START (gc_ctx, 1);
+  for (r = ctx->rule_compiler->first_rule; r!=NULL; r = r->next)
     {
-      if (!(thread->flags & THREAD_KILLED))
+      pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
+      pid->gc.type = T_NULL;
+      GC_TOUCH (gc_ctx, pid->rule = r);
+      pid->nsi = 0;
+      pid->flags = 0;
+      GC_UPDATE (gc_ctx, 0, pid);
+      q = &r->state[0];
+      init = create_state_instance (ctx, pid, q, NULL, NULL, 0);
+      /* create state instance, in state q, waiting for no transition yet (NULL),
+	 and with empty environment (NULL) */
+      GC_UPDATE (gc_ctx, 0, init);
+      enter_state_and_follow_epsilon_transitions (ctx, init, q, tq, 1);
+      /* since init is meant to be launched only once, we do not enqueue it,
+	 and clean it up. */
+      cleanup_state_instance (init);
+    }
+  GC_END (gc_ctx);
+}
+
+void inject_event(orchids_t *ctx, event_t *event)
+{
+  event_t *e;
+  field_record_t *fields;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  thread_queue_t *new_queue, *unsorted, *next, *old_queue;
+  state_instance_t *si;
+
+  GC_TOUCH (gc_ctx, ctx->current_event = event);
+  ctx->events++;
+  execute_pre_inject_hooks (ctx, event);
+  /* Between two calls to inject_event(),
+     ctx->global_fields->fields[i].val==NULL
+     for every i.
+     We just store each field of the event into the fields[] array
+     and we shall set the latter entries to NULL on exit.
+  */
+  fields = ctx->global_fields->fields;
+  for (e = event; e!=NULL; e = e->next)
+    GC_TOUCH (gc_ctx, fields[e->field_id].val = e->value);
+
+  GC_START (gc_ctx, 4);
+  new_queue = new_thread_queue (gc_ctx);
+  GC_UPDATE (gc_ctx, 0, new_queue);
+  unsorted = new_thread_queue (gc_ctx);
+  GC_UPDATE (gc_ctx, 1, unsorted);
+  next = new_thread_queue (gc_ctx);
+  GC_UPDATE (gc_ctx, 2, next);
+
+#define BUMP() do {						   \
+    thread_enqueue_all (gc_ctx, new_queue, unsorted);		   \
+    thread_enqueue (gc_ctx, new_queue, NULL); /* enqueue 'BUMP' */ \
+    thread_enqueue_all (gc_ctx, new_queue, next);		   \
+    thread_enqueue (gc_ctx, new_queue, NULL); /* enqueue 'BUMP' */ \
+  } while(0)
+
+  old_queue = ctx->thread_queue;
+  if (old_queue!=NULL)
+    {
+      while (!THREAD_QUEUE_IS_EMPTY(old_queue))
 	{
-	  fprintf(fp,
-		  "%5u | "
-		  "%12.12s | "
-		  "%8.8s -> %-8.8s | "
-		  "%3i | "
-		  "%2i -> %-2i | "
-		  "%2i | "
-		  "%3i | "
-		  "%s\n",
-		  i,
-		  thread->state_instance->state->rule->name,
-		  thread->state_instance->state->name,
-		  thread->trans->dest->name,
-		  thread->state_instance->state->rule->id,
-		  thread->state_instance->state->id,
-		  thread->trans->dest->id,
-		  thread->trans->id,
-		  thread->pass,
-		  (thread->flags & THREAD_BUMP) ? "_." : "  ");
-	}
-      else
-	{
-	  k++;
-	  fprintf(fp,
-		  "%5u*| "
-		  "%12.12s | "
-		  "%8.8s -> %-8.8s | "
-		  "%3i | "
-		  "%2i -> %-2i | "
-		  "%2i | "
-		  "%3i |"
-		  "%s\n",
-		  i,
-		  thread->state_instance->state->rule->name,
-		  thread->state_instance->state->name,
-		  thread->trans->dest->name,
-		  thread->state_instance->state->rule->id,
-		  thread->state_instance->state->id,
-		  thread->trans->dest->id,
-		  thread->trans->id,
-		  thread->pass,
-		  (thread->flags & THREAD_BUMP) ? "_." : "  "); 
+	  si = thread_dequeue (gc_ctx, old_queue);
+	  GC_UPDATE (gc_ctx, 3, si);
+	  if (si==NULL) /* This is a BUMP */
+	    BUMP();
+	  else if (si->pid->flags & THREAD_KILL)
+	    { /* kill thread */
+	      cleanup_state_instance (si);
+	    }
+	  else
+	    {
+	      simulate_state_and_create_threads (ctx, si, unsorted);
+	      thread_enqueue (gc_ctx, next, si);
+	    }
 	}
     }
-  fprintf(fp, "(*) %u killed threads\n", k);
-  fprintf(fp,
-          "------+"
-          "--------------+"
-          "----------------------+"
-          "-----+----------+----+-----+----\n");
+  BUMP();
+  create_rule_initial_threads (ctx, new_queue);
+  BUMP();
+
+  GC_TOUCH (gc_ctx, ctx->thread_queue = new_queue);
+  GC_END (gc_ctx);
+
+  execute_post_inject_hooks(ctx, event);
+  /* Set back the entries of the fields[] array to NULL. */
+  for (e = event; e!=NULL; e = e->next)
+    fields[e->field_id].val = NULL;
 }
 
-void fprintf_active_events(FILE *fp, orchids_t *ctx)
+uint16_t create_fresh_handle (gc_t *gc_ctx, state_instance_t *si, ovm_var_t *val)
 {
-  unsigned int i;
-  active_event_t *e;
+  uint16_t k, n;
+  unsigned long kvar;
+  ovm_var_t *storedval;
+  ovm_var_t *env, *newenv;
 
-  if (ctx->active_event_head == NULL)
+  n = si->nhandles;
+  if (n>MAX_HANDLES)
+    n = MAX_HANDLES;
+  env = si->env;
+  for (k=0; k<n; k++)
     {
-      fprintf(fp, "no active event.\n");
-      return;
+      kvar = HANDLE_FAKE_VAR(k);
+      storedval = ovm_read_value (env, kvar);
+      if (storedval==NULL)
+	{ /* found a slot */
+	  si->owned_handles |= (1 << k);
+	  newenv = ovm_write_value (gc_ctx, env, kvar, val);
+	  GC_TOUCH (gc_ctx, si->env = newenv);
+	  return k;
+	}
     }
-
-  fprintf(fp, "--------------[ active events ]-------------\n");
-
-  for (i = 0, e = ctx->active_event_head; e!=NULL; e = e->next, i++)
-    {
-      fprintf(fp,
-	      "\n"
-	      "=============================[ "
-	      "evt %5u (%i refs)"
-	      " ]============================\n\n", i, e->refs);
-      fprintf_event(fp, ctx, e->event);
-    }
+  if (n<MAX_HANDLES)
+    si->owned_handles |= (1 << n);
+  si->nhandles = n+1;
+  kvar = HANDLE_FAKE_VAR(n);
+  newenv = ovm_write_value (gc_ctx, env, kvar, val);
+  GC_TOUCH (gc_ctx, si->env = newenv);
+  return n;
 }
 
+int release_handle (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
+{
+  uint16_t n;
+  ovm_var_t *env;
+
+  if (k<MAX_HANDLES)
+    si->owned_handles ^= ~(1 << k); /* we no longer own the handle */
+  n = si->nhandles;
+  if (k==n-1)
+    si->nhandles--;
+  env = ovm_release_value (gc_ctx, si->env, HANDLE_FAKE_VAR(k));
+  GC_TOUCH (gc_ctx, si->env = env);
+  return 0;
+}
+
+ovm_var_t *handle_get_rd (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
+{
+  return ovm_read_value (si->env, HANDLE_FAKE_VAR(k));
+}
+
+ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
+{
+  uint16_t n;
+  ovm_var_t *val;
+  ovm_var_t *env;
+  void *copy;
+
+  if (k>=MAX_HANDLES) /* value has already been copied, so return it right away */
+    return ovm_read_value (si->env, HANDLE_FAKE_VAR(k));
+  n = si->nhandles;
+  if (k>=n)
+    return NULL;
+  val = ovm_read_value (si->env, HANDLE_FAKE_VAR(k));
+  if (val==NULL)
+    return NULL;
+  if (si->owned_handles & (1 << k)) /* I own it: fine */
+    return val;
+  /* Otherwise, make a copy: */
+  GC_START (gc_ctx, 1);
+  copy = issdl_clone (gc_ctx, val);
+  GC_UPDATE (gc_ctx, 0, val);
+  env = ovm_write_value (gc_ctx, si->env, HANDLE_FAKE_VAR(k), val);
+  GC_TOUCH (gc_ctx, si->env = env);
+  GC_END(gc_ctx);
+  return val;
+}
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

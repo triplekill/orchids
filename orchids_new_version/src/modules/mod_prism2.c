@@ -48,7 +48,8 @@
 
 input_module_t mod_prism2;
 
-static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
+static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data,
+			  int dissection_level)
 {
   u_int8_t *packet;
   size_t packet_len;
@@ -94,7 +95,7 @@ static int prism2_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void
   VBSTRLEN(val) = packet_len - sizeof (prism2_hdr_t);
   GC_UPDATE (gc_ctx, F_FRAME, val);
 
-  REGISTER_EVENTS(ctx, mod, PRISM2_FIELDS, 0);
+  REGISTER_EVENTS(ctx, mod, PRISM2_FIELDS, dissection_level);
   GC_END(gc_ctx);
   return 0;
 }

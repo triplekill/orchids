@@ -44,12 +44,11 @@ rule apachessl
       goto ssl_alert;
   }
 
-  state ssl_alert {
+  state ssl_alert! {
     $response = "ssh root@10.0.0.100 '/sbin/iptables --append orchids --proto TCP --source-port 443 --destination " +
     str_from_ipv4( $attacker ) + " --destination-port " + str_from_int( $port ) + " --jump DROP' &";
 
     system( $response );
-
     report();
   }
 }

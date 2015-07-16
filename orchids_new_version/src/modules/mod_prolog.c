@@ -333,7 +333,7 @@ prolog_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx, issdl_prolog,
                          "prolog",
 			 2, prolog_sigs,
-			 m_random,
+			 m_random_thrash,
 			 "query the prolog engine");
 
   /* if (have_module("htmloutput"))*/

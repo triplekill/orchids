@@ -119,6 +119,7 @@ extern type_t t_int, t_uint, t_float,
 #define      FLOAT(var)    (((ovm_float_t *)(var))->val)
 #define     EXTPTR(var)    (((ovm_extern_t *)(var))->ptr)
 #define    EXTDESC(var)    (((ovm_extern_t *)(var))->desc)
+#define    EXTCOPY(var)    (((ovm_extern_t *)(var))->copy)
 #define    EXTFREE(var)    (((ovm_extern_t *)(var))->free)
 
 #define IS_NULL(var) ((var)==NULL)
@@ -587,6 +588,7 @@ struct ovm_extern_s
   gc_header_t gc;
   void     *ptr;
   char	   *desc;
+  void *(*copy)(gc_t *gc_ctx, void *ptr);
   void (*free)(void *ptr);
 };
 
@@ -789,7 +791,8 @@ void ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
 
 ovm_var_t *ovm_uint_new (gc_t *gc_ctx, unsigned long val);
 
-ovm_var_t *ovm_extern_new(gc_t* gc_ctx, void *ptr, char *desc,
+ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, char *desc,
+			  void *(*copy) (gc_t *gc_ctx, void *ptr),
 			  void (*free) (void *ptr));
 
 void ovm_uint_fprintf (FILE *fp, ovm_uint_t *val);
@@ -799,18 +802,7 @@ void ovm_uint_fprintf (FILE *fp, ovm_uint_t *val);
  ** @param fp  The stream on which the variable will be printed.
  ** @param val The variable to print.
  **/
-void
-fprintf_ovm_var(FILE *fp, ovm_var_t *val);
-
-/**
- ** Print a variable in a buffer with a fixed size.
- ** @param buff	The buffer to fill.
- ** @param size The buffer size.
- ** @param val The variable to print.
- ** @return The number of printed characters in the buffer.
- **/
-int
-snprintf_ovm_var(char *buff, unsigned int size, ovm_var_t *val);
+void fprintf_ovm_var(FILE *fp, ovm_var_t *val);
 
 ovm_var_t *ovm_float_new(gc_t *gc_ctx, double val);
 void ovm_float_fprintf(FILE *fp, ovm_float_t *val);
@@ -827,8 +819,14 @@ ovm_var_t *ovm_snmpoid_new(gc_t *gc_ctx, size_t len);
  **/
 char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str);
 
-ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var);
+ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var); /* returns value, or NULL */
 
+ovm_var_t *ovm_write_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var, ovm_var_t *val);
+/* returns new environment (env is not modified) */
+
+ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var);
+/* removes binding for variable number var,
+   returns new environment (env is not modified) */
 
 #endif /* LANG_H */
 

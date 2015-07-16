@@ -21,34 +21,6 @@
 
 #include "orchids.h"
 
-/**
- * Recursive function for displaying rule instance path tree.
- *
- * @param fp       Output stream.
- * @param state    State instance to display.
- * @param options  Option flag for output.
- * @param limit    Maximum number of printed states.
- **/
-static void
-fprintf_state_instance_dot(FILE *fp,
-                           state_instance_t *state,
-                           int options,
-                           int limit);
-
-/**
- * Recursive function for displaying rule instance path tree.
- *
- * @param fp Output stream.
- * @param state State instance to display.
- * @param options Option flag for output.
- * @param limit A pointer to the maximum number of printed states.
- **/
-static void
-fprintf_state_instance_dot_sub(FILE *fp,
-                               state_instance_t *state,
-                               int options,
-                               int *limit);
-
 #else
 #warning "Private file should not be included multiple times."
 #endif /* GRAPH_OUTPUT_PRIV_H */

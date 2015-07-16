@@ -72,16 +72,7 @@ static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
 static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_current_event()\n");
-  for ( ; state!=NULL && state->event == NULL; state = state->parent)
-    ;
-  if (state!=NULL && state->event!=NULL)
-    {
-      PUSH_VALUE(ctx, state->event);
-    }
-  else
-    {
-      PUSH_VALUE(ctx, NULL);
-    }
+  PUSH_VALUE (ctx, ctx->current_event);
 }
 
 static const type_t *inject_event_sig[] = { &t_int, &t_event };
@@ -105,7 +96,7 @@ static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 issdl_inject_event,
 			 "inject_event",
 			 1, inject_event_sigs,
-			 m_const,
+			 m_const_thrash,
 			 "inject the event into the orchids engine");
   register_lang_function(ctx,
 			 issdl_current_event,

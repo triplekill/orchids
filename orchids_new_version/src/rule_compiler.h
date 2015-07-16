@@ -342,6 +342,8 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e);
    'if ($x) { $y=0; $z=1; } else { $y= 1; }' only $y is sure to be set.
 */
 
+int node_expr_equal (node_expr_t *e1, node_expr_t *e2);
+
 /**
  ** @struct node_trans_s
  **   Transition (if (cond) goto somewhere;)

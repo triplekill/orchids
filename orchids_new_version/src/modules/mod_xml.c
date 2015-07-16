@@ -44,6 +44,46 @@ char *xml_desc(void)
   return xml_description;
 }
 
+static void *xml_copy (gc_t *gc_ctx, void *obj)
+{
+  xmlXPathContextPtr xpath_ctx = obj;
+  xmlDocPtr doc = xpath_ctx->doc;
+
+  doc = xmlCopyDoc (obj, 1);
+  if (doc==NULL)
+    return NULL;
+  return xmlXPathNewContext(doc);
+}
+
+static void xml_free (void *obj)
+{
+  xmlXPathContextPtr xpath_ctx = obj;
+  xmlDocPtr doc;
+
+  if (xpath_ctx!=NULL)
+    {
+      doc = xpath_ctx->doc;
+      if (doc!=NULL)
+	xmlFreeDoc (doc);
+      xmlXPathFreeContext (xpath_ctx);
+    }
+}
+
+uint16_t ovm_xml_new(gc_t *gc_ctx, state_instance_t *si,
+		     xmlXPathContextPtr xpath_ctx,
+		     char *description)
+{
+  uint16_t handle;
+  ovm_var_t *xmldoc;
+
+  GC_START(gc_ctx, 1);
+  xmldoc = ovm_extern_new (gc_ctx, xpath_ctx, description, xml_copy, xml_free);
+  GC_UPDATE(gc_ctx, 0, xmldoc);
+  handle = create_fresh_handle (gc_ctx, si, xmldoc);
+  GC_END(gc_ctx);
+  return handle;
+}
+
 /**
  * Return a node for a XPath request, create nodes automatically
  *
@@ -137,14 +177,14 @@ xmlNode *new_xs_datetime_node(xmlNode *parent,
  *
  * @return return the element if found, else NULL.
  */
-char *xml_get_string(xml_doc_t *xml_doc,
+char *xml_get_string(xmlXPathContextPtr xpath_ctx,
 		     char *path)
 {
   xmlChar	*text;
   xmlXPathObjectPtr	xpathObj = NULL;
   xmlNodePtr		node = NULL;
 
-  xpathObj = xmlXPathEvalExpression(BAD_CAST path, xml_doc->xpath_ctx);
+  xpathObj = xmlXPathEvalExpression(BAD_CAST path, xpath_ctx);
   if ((xpathObj == NULL) || (xpathObj->nodesetval == 0)
       || (xpathObj->nodesetval->nodeNr == 0))
   {
@@ -169,16 +209,17 @@ char *xml_get_string(xml_doc_t *xml_doc,
  */
 static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*var1, *var2, *var3;
+  ovm_var_t	*var1, *var2, *var3, *doc1;
   char *str2, *str3;
+  xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
   xmlNode	*node = NULL;
   xmlChar	*content;
 
   var1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 3);
-  if (var1==NULL || TYPE(var1)!=T_EXTERNAL || EXTDESC(var1)!=xml_description)
+  if (var1==NULL || TYPE(var1)!=T_UINT) /* an uint handle to an xmlXPathContextPtr */
     {
-      DebugLog(DF_MOD, DS_ERROR, "first parameter not an xml document\n");
+      DebugLog(DF_MOD, DS_ERROR, "first parameter not an xml handle\n");
       STACK_DROP(ctx->ovm_stack, 3);
       PUSH_RETURN_FALSE(ctx);
       return;
@@ -200,7 +241,12 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  doc = XMLDOC_RW(ctx->gc_ctx, state, var1);
+  doc1 = handle_get_wr (ctx->gc_ctx, state, UINT(var1));
+  xpath_ctx = EXTPTR(doc1);
+  if (xpath_ctx==NULL)
+    doc = NULL;
+  else
+    doc = xpath_ctx->doc;
   if (doc==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "error : xmldoc is null\n");
@@ -210,8 +256,7 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str2 = ovm_strdup (ctx->gc_ctx, var2);
-  if (!(node = xml_walk_and_create(XMLPATHCTX(var1),
-				   BAD_CAST str2)))
+  if (!(node = xml_walk_and_create(xpath_ctx, BAD_CAST str2)))
     {
       gc_base_free (str2);
       STACK_DROP(ctx->ovm_stack, 3);
@@ -239,15 +284,16 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
  */
 static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*var1, *var2, *var3, *var4;
+  ovm_var_t	*var1, *var2, *var3, *var4, *doc1;
   char *str2, *str3, *str4;
+  xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
   xmlNode	*node = NULL;
   xmlChar	*prop_name;
   xmlChar	*prop_value;
 
   var1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 4);
-  if (var1==NULL || TYPE(var1)!=T_EXTERNAL || EXTDESC(var1)!=xml_description)
+  if (var1==NULL || TYPE(var1)!=T_UINT) /* an uint handle to an xmlXPathContextPtr */
     {
       DebugLog(DF_MOD, DS_ERROR, "first parameter not an xml document\n");
       STACK_DROP(ctx->ovm_stack, 4);
@@ -279,7 +325,12 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  doc = XMLDOC_RW(ctx->gc_ctx, state, var1);
+  doc1 = handle_get_wr (ctx->gc_ctx, state, UINT(var1));
+  xpath_ctx = EXTPTR(doc1);
+  if (xpath_ctx==NULL)
+    doc = NULL;
+  else
+    doc = xpath_ctx->doc;
   if (doc==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "error : xmldoc is null\n");
@@ -289,8 +340,7 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str2 = ovm_strdup (ctx->gc_ctx, var2);
-  if (!(node = xml_walk_and_create(XMLPATHCTX(var1),
-				   BAD_CAST str2)))
+  if (!(node = xml_walk_and_create(xpath_ctx, BAD_CAST str2)))
     {
       gc_base_free (str2);
       STACK_DROP(ctx->ovm_stack, 4);
@@ -325,8 +375,10 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var1;
   ovm_var_t	*var2;
+  ovm_var_t *doc1;
+  xmlXPathContextPtr xpath_ctx;
+  xmlDocPtr doc;
   char *str2;
-  xml_doc_t	*xml_doc;
   xmlXPathObjectPtr	xpathObj = NULL;
   xmlNodePtr		node = NULL;
   ovm_var_t	*res;
@@ -334,9 +386,9 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
   xmlChar	*text;
 
   var1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
-  if (var1==NULL || TYPE(var1)!=T_EXTERNAL || EXTDESC(var1)!=xml_description)
+  if (var1==NULL || TYPE(var1)!=T_UINT) /* an uint handle to an xmlXPathContextPtr */
     {
-      DebugLog(DF_MOD, DS_ERROR, "first parameter not an xml document\n");
+      DebugLog(DF_MOD, DS_ERROR, "first parameter not an xml handle\n");
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_RETURN_FALSE(ctx);
       return;
@@ -350,7 +402,13 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  if ((xml_doc = EXTPTR(var1)) == NULL)
+  doc1 = handle_get_wr (ctx->gc_ctx, state, UINT(var1));
+  xpath_ctx = EXTPTR(doc1);
+  if (xpath_ctx==NULL)
+    doc = NULL;
+  else
+    doc = xpath_ctx->doc;
+  if (doc==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "error : xmldoc is null\n");
       STACK_DROP(ctx->ovm_stack, 2);
@@ -359,7 +417,7 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
     }
 
   str2 = ovm_strdup (ctx->gc_ctx, var2);
-  xpathObj = xmlXPathEvalExpression(BAD_CAST str2, xml_doc->xpath_ctx);
+  xpathObj = xmlXPathEvalExpression(BAD_CAST str2, xpath_ctx);
   if ((xpathObj == NULL) || (xpathObj->nodesetval == 0)
       || (xpathObj->nodesetval->nodeNr == 0))
     {
@@ -387,57 +445,6 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
   gc_base_free (str2);
 }
 
-
-
-/**
- * Free the xml document
- *
- * @param doc XML Document to free
- */
-
-void free_xml_doc(void *ptr)
-{
-  xml_doc_t *doc = ptr;
-
-  if (doc!=NULL)
-    {
-      free_thread_local_obj (doc->tl);
-      xmlXPathFreeContext(doc->xpath_ctx);
-      gc_base_free(doc);
-    }
-}
-
-/**
- * Create a new extern variable for xml documents
- */
-static void xml_free (void *obj)
-{
-  xmlFreeDoc (obj);
-}
-
-static void *xml_copy (void *obj)
-{
-  return xmlCopyDoc (obj, 1);
-}
-
-static thread_local_class_t xml_thread_local_class = {
-  xml_free,
-  xml_copy
-};
-
-ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx,
-		       char *description)
-{
-  ovm_var_t *res;
-  xml_doc_t *xdoc;
-
-  xdoc = gc_base_malloc(gc_ctx, sizeof(xml_doc_t));
-  xdoc->tl = new_thread_local_obj (gc_ctx, &xml_thread_local_class, doc);
-  xdoc->xpath_ctx = xpath_ctx;
-  res = ovm_extern_new (gc_ctx, xdoc, description, free_xml_doc);
-  return res;
-}
-
 #if 0
 /**
  * Dump the xml doc on stderr
@@ -450,13 +457,15 @@ issdl_dump_xml(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*var1;
 
+  /* This code is completely wrong: take this into account if
+     you decide to uncomment. */
   var1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack; 1);
   xmlDocFormatDump(stdout, ((xml_doc_t*)EXTPTR(var1))->doc, 1);
   STACK_DROP(ctx->ovm_stack);
 }
 #endif
 
-static type_t t_xmldoc = { "xmldoc", T_EXTERNAL };
+static type_t t_xmldoc = { "xmldoc", T_UINT };
 
 static const type_t *xml_set_str_sig[] = { &t_int, &t_xmldoc, &t_str, &t_str }; /* returns 0 or 1, in fact */
 static const type_t **xml_set_str_sigs[] = { xml_set_str_sig, NULL };
@@ -472,6 +481,13 @@ static const type_t *xml_dump_sig[] = { &t_int, &t_xmldoc }; /* returns 0 or 1, 
 static const type_t **xml_dump_sigs[] = { xml_dump_sig, NULL };
 #endif
 
+struct node_expr_s;
+monotony m_xml_set (rule_compiler_t *ctx, struct node_expr_s *e, monotony m[])
+{
+  m[0] |= MONO_THRASH; /* thrashes the first argument (xml document) */
+  return MONO_UNKNOWN | MONO_THRASH;
+}
+
 static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() mod_xml@%p\n", (void *) &mod_xml);
@@ -481,7 +497,7 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_dump_xml,
                          "xml_dump",
 			 1, xml_dump_sigs,
-			 m_random,
+			 m_random_thrash,
                          "dump xml doc on stderr");
 #endif
 
@@ -489,21 +505,21 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_xml_get_string,
                          "xml_get_str",
 			 2, xml_get_str_sigs,
-			 m_random,
+			 m_unknown_2,
                          "get a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_string,
                          "xml_set_str",
 			 3, xml_set_str_sigs,
-			 m_random,
+			 m_xml_set,
                          "set a node content following an xpath request");
 
   register_lang_function(ctx,
                          issdl_xml_set_attr_string,
                          "xml_set_prop",
 			 4, xml_set_prop_sigs,
-			 m_random,
+			 m_xml_set,
                          "set a node property following an xpath request");
 
   return NULL;

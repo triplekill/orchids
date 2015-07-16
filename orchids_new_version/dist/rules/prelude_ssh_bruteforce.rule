@@ -2,37 +2,38 @@
 ** test prelude analyzer mode
 */
 
-rule preludeSSHBruteforce synchronize($source)
+rule preludeSSHBruteforce
 {
   state init
   {
     $count = 0;
-    expect ((.prelude.classification_text == "Login") &&
-	    (.prelude.assessment_completion == "failed"))
+    expect (.prelude.classification_text == "Login" &&
+	    .prelude.assessment_completion == "failed")
       goto loop;
   }
 
-  state loop
+  state start! {
+    $count = 0;
+    $source = .prelude.first_source_addr;
+    goto loop;
+  }
+
+  state loop!
   {
-    if ($count == 0)
-      $source = .prelude.first_source_addr;
-
     $count = $count + 1;
-
-    expect (($count >= 10)
-	&& (.prelude.classification_text == "Login")
-	&& (.prelude.assessment_completion == "failed")
-	&& ($source == .prelude.first_source_addr))
-      goto end;
-
-    expect (($count < 10)
-	&& (.prelude.classification_text == "Login")
-	&& (.prelude.assessment_completion == "failed")
-	&& ($source == .prelude.first_source_addr))
-      goto loop;
+    expect (.prelude.classification_text == "Login"
+	&& .prelude.assessment_completion == "failed"
+	&& $source == .prelude.first_source_addr)
+      goto proceed;
   }
 
-  state end
+  state proceed!
+  {
+    case ($count>=10) goto end;
+    else goto loop;
+  }
+
+  state end!
   {
     $idmef = idmef_message_new();
     idmef_message_set($idmef, "alert.assessment.impact.description", "Brute force detected");

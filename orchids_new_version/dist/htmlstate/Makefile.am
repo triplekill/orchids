@@ -21,10 +21,10 @@ nobase_htmlstate_DATA = \
   index-main.html \
   index-menu.html \
   index-title.html \
-  logo-cnrs.gif \
-  logo-ens.gif \
-  logo-inria.gif \
-  logo-lsv.gif \
+  logo-cnrs.jpg \
+  logo-ens.jpg \
+  logo-inria.jpg \
+  logo-lsv.png \
   orchids.gif \
   simplex-bkg.gif \
   style.css \

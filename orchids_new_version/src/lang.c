@@ -104,7 +104,7 @@ static struct issdl_type_s issdl_types_g[] = {
     "Singleton database" },
   { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "General database" },
-  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, extern_clone, NULL, NULL, NULL, NULL,
     "External data (provided by a plugin)" },
   { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
@@ -1858,7 +1858,7 @@ static void extern_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void extern_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  EXTFREE(p) (EXTPTR(p));
+  (*EXTFREE(p)) (EXTPTR(p));
 }
 
 static int extern_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -1874,7 +1874,8 @@ static gc_class_t extern_class = {
   extern_traverse
 };
 
-ovm_var_t *ovm_extern_new(gc_t* gc_ctx, void *ptr, char *desc,
+ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, char *desc,
+			  void *(*copy) (gc_t *gc_ctx, void *ptr),
 			  void (*free) (void *ptr))
 {
   ovm_extern_t *addr;
@@ -1883,6 +1884,7 @@ ovm_var_t *ovm_extern_new(gc_t* gc_ctx, void *ptr, char *desc,
   addr->gc.type = T_EXTERNAL;
   addr->ptr = ptr;
   addr->desc = desc;
+  addr->copy = copy;
   addr->free = free;
   return OVM_VAR(addr);
 }
@@ -1895,6 +1897,16 @@ static void *extern_get_data(ovm_var_t *i)
 static size_t extern_get_data_len(ovm_var_t *i)
 {
   return sizeof (void *);
+}
+
+static ovm_var_t *extern_clone (gc_t *gc_ctx, ovm_var_t *var)
+{
+  void *ptr;
+
+  if (var==NULL || var->gc.type!=T_EXTERNAL)
+    return NULL;
+  ptr = (*EXTCOPY(var)) (gc_ctx, EXTPTR(var));
+  return ovm_extern_new (gc_ctx, ptr, EXTDESC(var), EXTCOPY(var), EXTFREE(var));
 }
 
 
@@ -1996,7 +2008,7 @@ ovm_var_t *issdl_clone(gc_t *gc_ctx, ovm_var_t *var)
 	       "issdl_clone(): cloning doesn't apply for type '%s'\n",
 	       STRTYPE(var));
     }
-  return NULL;
+  return var;
 }
 
 ovm_var_t *issdl_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -2039,107 +2051,12 @@ ovm_var_t *issdl_not(gc_t *gc_ctx, ovm_var_t *var)
   return NULL;
 }
 
-/* Display function */
+/* Display functions */
 
-int snprintf_ovm_var(char *buff, unsigned int buff_length, ovm_var_t *val)
+void fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 {
   int i; /* for STRINGs */
   char asc_time[32]; /* for date conversions */
-  struct hostent *hptr; /* for IPV4ADDR */
-  char **pptr; /* for IPV4ADDR */
-  char dst[INET6_ADDRSTRLEN]; /* for IPV6 */
-  int offset = 0; /* for chars */
-
-  /* display data */
-  if (val==NULL)
-    return snprintf(buff, buff_length, "(null)\n");
-  switch (val->gc.type)
-    {
-    case T_INT:
-      return snprintf(buff, buff_length, "%li", INT(val));
-    case T_BSTR:
-      for (i = 0; i < BSTRLEN(val); i++) {
-	if (isprint(BSTR(val)[i]))
-	  offset += snprintf(buff + offset, buff_length - offset,
-			     "%c", BSTR(val)[i]);
-	else
-	  offset += snprintf(buff + offset, buff_length - offset, ". ");
-      }
-      return offset;
-  case T_STR:
-    for (i = 0; i < STRLEN(val); i++)
-      offset += snprintf(buff + offset, buff_length - offset, "%c", STR(val)[i]);
-    return offset;
-    case T_VSTR:
-      for (i = 0; i < VSTRLEN(val); i++)
-	offset += snprintf(buff + offset, buff_length - offset,
-			   "%c", VSTR(val)[i]);
-      return offset;
-    case T_CTIME:
-      strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-	       localtime(&CTIME(val)));
-      return snprintf(buff, buff_length, "%s (%li)", asc_time, CTIME(val));
-    case T_IPV4:
-      offset += snprintf(buff, buff_length, "%s", inet_ntoa(IPV4(val)));
-      hptr = gethostbyaddr((char *) &IPV4(val),
-			   sizeof (struct in_addr), AF_INET);
-      if (hptr == NULL) {
-	return offset;
-      } else if (hptr->h_name != NULL) {
-	offset += snprintf(buff + offset, buff_length - offset,
-			   " (%s", hptr->h_name);
-      } else {
-	return offset;
-      }
-      for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
-	offset += snprintf(buff + offset, buff_length - offset,
-			   ", %s", *pptr);
-      offset += snprintf(buff + offset, buff_length - offset, ")");
-      return offset;
-    case T_IPV6:
-      inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
-      offset += snprintf(buff, buff_length, "%s", dst);
-      hptr = gethostbyaddr((char *) &IPV6(val),
-			   sizeof (struct in6_addr), AF_INET6);
-      if (hptr == NULL) {
-	return offset;
-      } else if (hptr->h_name != NULL) {
-	offset += snprintf(buff + offset, buff_length - offset,
-			   " (%s", hptr->h_name);
-      } else {
-	return offset;
-      }
-      for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
-	offset += snprintf(buff + offset, buff_length - offset,
-			   ", %s", *pptr);
-      offset += snprintf(buff + offset, buff_length - offset, ")");
-      return offset;
-    case T_TIMEVAL:
-      strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-	       localtime(&TIMEVAL(val).tv_sec));
-      return snprintf(buff, buff_length, "%s +%li us (%li.%06li)",
-		      asc_time, (long)TIMEVAL(val).tv_usec,
-		      TIMEVAL(val).tv_sec, (long)TIMEVAL(val).tv_usec);
-    case T_REGEX:
-      if (REGEXSTR(val)==NULL)
-	{
-	  buff[0] = '\0';
-	  return 0;
-	}
-      return snprintf(buff, buff_length, "%s", REGEXSTR(val));
-    case T_FLOAT:
-      return snprintf(buff, buff_length, "%f", FLOAT(val));
-    default:
-      return snprintf(buff, buff_length,
-		      "type %i doesn't support display\n", val->gc.type);
-    }
-}
-
-void
-fprintf_ovm_var(FILE *fp, ovm_var_t *val)
-{
-  int i; /* for STRINGs */
-  char asc_time[32]; /* for dates conversions */
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
   char dst[INET6_ADDRSTRLEN];
@@ -2152,6 +2069,9 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	 case T_INT:
 	   fprintf(fp, "%li", INT(val));
 	   break;
+	 case T_UINT:
+	   fprintf(fp, "%lu", UINT(val));
+	   break;
 	 case T_BSTR:
 	   for (i = 0; i < BSTRLEN(val); i++) {
 	     if (isprint(BSTR(val)[i]))
@@ -2160,17 +2080,31 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	       fprintf(fp, ". ");
 	   }
 	   break;
+	 case T_VBSTR:
+	   for (i = 0; i < VBSTRLEN(val); i++) {
+	     if (isprint(VBSTR(val)[i]))
+	       fprintf(fp, "%c", VBSTR(val)[i]);
+	     else
+	       fprintf(fp, ". ");
+	   }
+	   break;
 	 case T_STR:
 	   for (i = 0; i < STRLEN(val); i++)
-	     fprintf(fp, "%c", STR(val)[i]);
+	     if (isprint(BSTR(val)[i]))
+	       fprintf(fp, "%c", STR(val)[i]);
+	     else
+	       fprintf(fp, ". ");
 	   break;
 	 case T_VSTR:
 	   for (i = 0; i < VSTRLEN(val); i++)
-	     fprintf(fp, "%c", VSTR(val)[i]);
+	     if (isprint(BSTR(val)[i]))
+	       fprintf(fp, "%c", VSTR(val)[i]);
+	     else
+	       fprintf(fp, ". ");
 	   break;
 	 case T_CTIME:
 	   strftime(asc_time, 32,
-		    "%a %b %d %H:%M:%S %Y", localtime(&CTIME(val)));
+		    "%a %b %d %H:%M:%S %Y", gmtime(&CTIME(val)));
 	   fprintf(fp, "%s (%li)", asc_time, CTIME(val));
 	   break;
 	 case T_IPV4:
@@ -2206,7 +2140,7 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	   break;
 	 case T_TIMEVAL:
 	   strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
-		    localtime(&TIMEVAL(val).tv_sec));
+		    gmtime(&TIMEVAL(val).tv_sec));
 	   fprintf(fp, "%s +%li us (%li.%06li)",
 		   asc_time, (long)TIMEVAL(val).tv_usec,
 		   TIMEVAL(val).tv_sec, (long)TIMEVAL(val).tv_usec);
@@ -2219,9 +2153,27 @@ fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	   fprintf(fp, "%f", FLOAT(val));
 	   break;
 	 default:
-	   fprintf(fp, "type %i doesn't support display\n", val->gc.type);
+	   fprintf(fp, "<type %i> doesn't support display", val->gc.type);
 	   break;
 	 }
+}
+
+void fprintf_env (FILE *fp, const orchids_t *ctx, rule_t *rule, ovm_var_t *env)
+{
+  ovm_var_t *val;
+  int i, n;
+
+  n = rule->dynamic_env_sz;
+  for (i=0; i<n; i++)
+    {
+      val = ovm_read_value (env, i);
+      if (val!=NULL)
+	{
+	  fprintf (fp, "* %s = ", rule->var_name[i]);
+	  fprintf_ovm_var (fp, val);
+	  fprintf (fp, "\n");
+	}
+    }
 }
 
 void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
@@ -2375,6 +2327,7 @@ issdl_print(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+#ifdef OBSOLETE
 static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumpstack()\n");
@@ -2388,7 +2341,7 @@ static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
   // push before state == NULL
   PUSH_RETURN_TRUE(ctx);
 
-  fprintf(stdout, ">>>> rule: %s <<<<<\n", state->rule_instance->rule->name);
+  fprintf(stdout, ">>>> rule: %s <<<<<\n", state->pid->rule->name);
   while (state)
     {
       fprintf(stdout, "***** state: %s *****\n", state->state->name);
@@ -2400,6 +2353,7 @@ static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
       state = state->parent;
     }
 }
+#endif
 
 #if 0
 static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
@@ -2419,10 +2373,11 @@ static void issdl_shutdown(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_shutdown()\n");
   fprintf(stdout, "explicit shutdown on '%s:%s' request\n",
-          state->rule_instance->rule->name, state->state->name);
+          state->pid->rule->name, state->q->name);
   exit(EXIT_SUCCESS);
 }
 
+#ifdef OBSOLETE
 static void issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumppathtree()\n");
@@ -2431,6 +2386,7 @@ static void issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
   /* XXX: hard-coded limit */
   PUSH_RETURN_TRUE(ctx);
 }
+#endif
 
 static void issdl_random(orchids_t *ctx, state_instance_t *state)
 {
@@ -2474,11 +2430,13 @@ static void issdl_system(orchids_t *ctx, state_instance_t *state)
     }
 }
 
+#ifdef OBSOLETE
 static void issdl_stats(orchids_t *ctx, state_instance_t *state)
 {
   fprintf_orchids_stats(stdout, ctx);
   PUSH_RETURN_TRUE(ctx);
 }
+#endif
 
 static void issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
 {
@@ -2685,10 +2643,10 @@ char *orchids_atoui (char *s, size_t len, unsigned long *result)
           }
     }
   else while (s<end && (c = *s, isdigit (c)))
-    {
-      i = 10*i + (((int)c) - '0');
-      s++;
-    }
+	 {
+	   i = 10*i + (((int)c) - '0');
+	   s++;
+	 }
   *result = i;
   return s;
 }
@@ -2779,19 +2737,19 @@ static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state)
 
   ui = POP_VALUE(ctx);
   if (ui != NULL && TYPE(ui) == T_UINT)
-  {
-    if (UINT(ui) <= LONG_MAX)
-      n = UINT(ui);
-    else n = LONG_MAX;
+    {
+      if (UINT(ui) <= LONG_MAX)
+	n = UINT(ui);
+      else n = LONG_MAX;
     
-    i = ovm_int_new(ctx->gc_ctx, n);
-    PUSH_VALUE(ctx, i);  
-  }
+      i = ovm_int_new(ctx->gc_ctx, n);
+      PUSH_VALUE(ctx, i);  
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_uint(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  }
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_uint(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
 }
 
 static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
@@ -2802,19 +2760,19 @@ static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
 
   i = POP_VALUE(ctx);
   if (i != NULL && TYPE(i) == T_INT)
-  {
-    if (INT(i) >= 0)
-      n = INT(i);
-    else n = 0;
+    {
+      if (INT(i) >= 0)
+	n = INT(i);
+      else n = 0;
 
-    ui = ovm_uint_new(ctx->gc_ctx, n);
-    PUSH_VALUE(ctx, ui);   
-  }
+      ui = ovm_uint_new(ctx->gc_ctx, n);
+      PUSH_VALUE(ctx, ui);   
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_int(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  }
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_int(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
 }
 
 static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
@@ -2825,21 +2783,21 @@ static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
 
   x = POP_VALUE(ctx);
   if (x!=NULL && TYPE(x)==T_FLOAT)
-  {
-    if (FLOAT(x) >= (double)LONG_MAX)
-      n = LONG_MAX;
-    else if (FLOAT(x) <= (double)LONG_MIN)
-      n = LONG_MIN;
-    else n = (long)FLOAT(x);
+    {
+      if (FLOAT(x) >= (double)LONG_MAX)
+	n = LONG_MAX;
+      else if (FLOAT(x) <= (double)LONG_MIN)
+	n = LONG_MIN;
+      else n = (long)FLOAT(x);
 
-    i = ovm_int_new(ctx->gc_ctx, n);
-    PUSH_VALUE(ctx, i);
-  }
+      i = ovm_int_new(ctx->gc_ctx, n);
+      PUSH_VALUE(ctx, i);
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_float(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  }
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_int_from_float(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
 }
 
 static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
@@ -2850,21 +2808,21 @@ static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
 
   x = POP_VALUE(ctx);
   if (x!=NULL && TYPE(x)==T_FLOAT)
-  {
-    if (FLOAT(x) >= (double)ULONG_MAX)
-      n = ULONG_MAX;
-    else if (FLOAT(x) <= 0.0)
-      n = 0;
-    else n = (unsigned long)FLOAT(x);
+    {
+      if (FLOAT(x) >= (double)ULONG_MAX)
+	n = ULONG_MAX;
+      else if (FLOAT(x) <= 0.0)
+	n = 0;
+      else n = (unsigned long)FLOAT(x);
 
-    ui = ovm_uint_new(ctx->gc_ctx, n);
-    PUSH_VALUE(ctx, ui);
-  }
+      ui = ovm_uint_new(ctx->gc_ctx, n);
+      PUSH_VALUE(ctx, ui);
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_float(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  }
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_uint_from_float(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
 }
 
 static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state)
@@ -2874,15 +2832,15 @@ static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state)
 
   i = POP_VALUE(ctx);
   if (i!=NULL && TYPE(i)==T_INT)
-  {
-    x = ovm_float_new(ctx->gc_ctx, (double)INT(i));
-    PUSH_VALUE(ctx, x);
-  }
+    {
+      x = ovm_float_new(ctx->gc_ctx, (double)INT(i));
+      PUSH_VALUE(ctx, x);
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_int(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  } 
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_int(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    } 
 }
 
 static void issdl_float_from_uint(orchids_t *ctx, state_instance_t *state)
@@ -2892,21 +2850,21 @@ static void issdl_float_from_uint(orchids_t *ctx, state_instance_t *state)
 
   ui = POP_VALUE(ctx);
   if (ui!=NULL && TYPE(ui)==T_UINT)
-  {
-    x = ovm_float_new(ctx->gc_ctx, (double)UINT(ui));
-    PUSH_VALUE(ctx, x);
-  }
+    {
+      x = ovm_float_new(ctx->gc_ctx, (double)UINT(ui));
+      PUSH_VALUE(ctx, x);
+    }
   else
-  {
-    DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_uint(): param error\n");
-    PUSH_VALUE(ctx, NULL);
-  }
+    {
+      DebugLog(DF_OVM, DS_DEBUG, "issdl_float_from_uint(): param error\n");
+      PUSH_VALUE(ctx, NULL);
+    }
 }
 
 char *time_convert_idmef(char *str, char *end, time_t *res)
 { /* IDMEF time format is %Y-%m-%dT%H:%M:%S%z
      parse it in a fault-tolerant way.
-   */
+  */
   struct tm tm = { 0, };
   unsigned long i;
   int negate = 0;
@@ -2970,7 +2928,7 @@ char *time_convert_idmef(char *str, char *end, time_t *res)
 	  break;
 	if (!isdigit(str[0]) || !isdigit(str[1]) ||
 	    !isdigit(str[2]) || !isdigit(str[3]))
-	    break;
+	  break;
 	i = 60* (
 		 60*(10*(str[0]-'0') + (str[1]-'0')) +
 		 10*(str[2]-'0') + (str[3]-'0')
@@ -3205,7 +3163,7 @@ static void issdl_float_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-
+#ifdef OBSOLETE
 static void issdl_kill_threads(orchids_t *ctx, state_instance_t *state)
 {
   wait_thread_t *t;
@@ -3220,7 +3178,9 @@ static void issdl_kill_threads(orchids_t *ctx, state_instance_t *state)
     }
   PUSH_RETURN_TRUE(ctx);
 }
+#endif
 
+#ifdef OBSOLETE
 static void do_recursive_cut(state_instance_t *state)
 {
   wait_thread_t *t;
@@ -3304,6 +3264,7 @@ static void issdl_cut(orchids_t *ctx, state_instance_t *state)
   STACK_DROP(ctx->ovm_stack, 1);
   PUSH_RETURN_TRUE(ctx);
 }
+#endif
 
 char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str)
 {
@@ -3337,11 +3298,6 @@ static void issdl_report(orchids_t *ctx, state_instance_t *state)
   reportmod_t* r;
 
   DebugLog(DF_ENG, DS_INFO, "Generating report\n");
-  if (state->rule_instance == NULL)
-  {
-    PUSH_RETURN_FALSE(ctx);
-    return;
-  }
   SLIST_FOREACH(r, &ctx->reportmod_list, list) {
     (*r->cb) (ctx, r->mod, r->data, state);
   }
@@ -3495,8 +3451,7 @@ issdl_sendmail(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void
-issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 {
   int pid;
   int tmp_fd;
@@ -3506,7 +3461,6 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *to;
   ovm_var_t *subject;
   ovm_var_t *body;
-  state_instance_t *report_events;
   char *from_str=NULL, *to_str=NULL, *subject_str=NULL, *body_str=NULL;
   size_t body_len;
 
@@ -3605,23 +3559,9 @@ issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 	}
     }
   /* report */
-  for (report_events = NULL; state!=NULL; state = state->parent)
-    {
-      state->next_report_elmt = report_events;
-      report_events = state;
-    }
-  fprintf(ftmp, "Report for rule: %s\n\n",
-	  report_events->rule_instance->rule->name);
-  for ( ; report_events!=NULL ;
-	report_events = report_events->next_report_elmt)
-    {
-      fprintf(ftmp, "State: %s\n", report_events->state->name);
-      if (report_events->event!=NULL)
-        fprintf_event(ftmp, ctx, report_events->event->event);
-      else
-        fprintf(ftmp, "no event.\n");
-      fprintf_state_env(ftmp, ctx, report_events);
-    }
+  fprintf(ftmp, "Report for rule %s, at state %s:\n\n", state->pid->rule->name,
+	  state->q->name);
+  fprintf_env (ftmp, ctx, state->pid->rule, state->env);
   rewind(ftmp);
   /* Now call sendmail */
   pid = fork();
@@ -3678,7 +3618,7 @@ static void issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
     fail:
       PUSH_RETURN_FALSE(ctx);
       return;
-  }
+    }
   if (level==NULL || TYPE(level) != T_INT) {
     DebugLog(DF_ENG, DS_ERROR, "parameter type error\n");
     goto fail;
@@ -3833,7 +3773,7 @@ static void issdl_vstr_from_regex(orchids_t *ctx, state_instance_t *state)
       DebugLog(DF_OVM, DS_ERROR, "issdl_vstr_from_regex(): type error\n");
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_VALUE(ctx, NULL);
-  }
+    }
 }
 
 static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
@@ -3895,10 +3835,10 @@ static void issdl_difftime(orchids_t *ctx, state_instance_t *state)
   t1 = POP_VALUE(ctx);
   t2 = POP_VALUE(ctx);
   if (t1!=NULL && TYPE(t1)==T_CTIME && t2!=NULL && TYPE(t2)==T_CTIME)
-  {
-    res = ovm_int_new (ctx->gc_ctx, difftime(CTIME(t1), CTIME(t2)));
-    PUSH_VALUE (ctx, res);
-  }
+    {
+      res = ovm_int_new (ctx->gc_ctx, difftime(CTIME(t1), CTIME(t2)));
+      PUSH_VALUE (ctx, res);
+    }
   else
     PUSH_VALUE(ctx, NULL);
 }
@@ -3952,9 +3892,72 @@ static void issdl_str_from_timeval(orchids_t *ctx, state_instance_t *state)
 }
 
 
+static void env_bind_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  env_bind_t *bind = (env_bind_t *)p;
+
+  GC_TOUCH (gc_ctx, bind->val);
+}
+
+static void env_bind_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int env_bind_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			      void *data)
+{
+  env_bind_t *bind = (env_bind_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)bind->val, data);
+  return err;
+}
+
+static gc_class_t env_bind_class = {
+  GC_ID('b','i','n','d'),
+  env_bind_mark_subfields,
+  env_bind_finalize,
+  env_bind_traverse
+};
+
+static void env_split_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
+{
+  env_split_t *split = (env_split_t *)p;
+
+  GC_TOUCH (gc_ctx, split->left);
+  GC_TOUCH (gc_ctx, split->right);
+}
+
+static void env_split_finalize (gc_t *gc_ctx, gc_header_t *p)
+{
+  return;
+}
+
+static int env_split_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
+			      void *data)
+{
+  env_split_t *split = (env_split_t *)p;
+  int err = 0;
+
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)split->left, data);
+  if (err)
+    return err;
+  err = (*gtc->do_subfield) (gtc, (gc_header_t *)split->right, data);
+  return err;
+}
+
+static gc_class_t env_split_class = {
+  GC_ID('s','p','l','t'),
+  env_split_mark_subfields,
+  env_split_finalize,
+  env_split_traverse
+};
+
 ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var)
 {
   unsigned long mask;
+
   ovm_var_t *res;
 
   res = NULL;
@@ -3970,6 +3973,136 @@ ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var)
 	env = ((env_split_t *)env)->right;
       else env = ((env_split_t *)env)->left;
   return res;
+}
+
+ovm_var_t *ovm_write_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var, ovm_var_t *val)
+{
+  ovm_var_t *branch[32]; /*depth of environment is at most 32,
+			   since indexed by int32_t's in general
+			   (here by a bytecode_t, but see
+			   dynamic_env_sz in rule_s, orchids.h) */
+  ovm_var_t **branchp;
+  bytecode_t mask, var2;
+  ovm_var_t *env_left, *env_right;
+
+  for (mask = 1L, branchp=branch; env!=NULL; mask <<= 1)
+    if (TYPE(env)==T_BIND)
+      break;
+    else if (var & mask)
+      {
+	*branchp++ = ((env_split_t *)env)->left;
+	env = ((env_split_t *)env)->right;
+      }
+    else
+      {
+	*branchp++ = ((env_split_t *)env)->right;
+	env = ((env_split_t *)env)->left;
+      }
+  if (env!=NULL)
+    {
+      var2 = ((env_bind_t *)env)->var;
+      if (var2!=var)
+	for (;; mask<<=1)
+	  {
+	    if ((var2 & mask)==(var & mask))
+	      *branchp++ = NULL;
+	    else
+	      {
+		*branchp++ = env;
+		mask <<= 1;
+		break;
+	      }
+	  }
+    }
+  GC_START(gc_ctx, 1);
+  env = gc_alloc (gc_ctx, sizeof(env_bind_t), &env_bind_class);
+  env->gc.type = T_BIND;
+  ((env_bind_t *)env)->var = var;
+  GC_TOUCH (gc_ctx, ((env_bind_t *)env)->val = val);
+  GC_UPDATE(gc_ctx, 0, env);
+  for (; branchp > branch; )
+    {
+      mask >>= 1;
+      if (var & mask)
+	{
+	  env_left = *--branchp;
+	  env_right = env;
+	}
+      else
+	{
+	  env_left = env;
+	  env_right = *--branchp;
+	}
+      env = gc_alloc (gc_ctx, sizeof(env_split_t), &env_split_class);
+      env->gc.type = T_SPLIT;
+      GC_TOUCH (gc_ctx, ((env_split_t *)env)->left = env_left);
+      GC_TOUCH (gc_ctx, ((env_split_t *)env)->right = env_right);
+      GC_UPDATE(gc_ctx, 0, env);
+    }
+  GC_END(gc_ctx);
+  return env;
+}
+
+ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var)
+{
+  ovm_var_t *branch[32]; /*depth of environment is at most 32,
+			   since indexed by int32_t's in general
+			   (here by a bytecode_t, but see
+			   dynamic_env_sz in rule_s, orchids.h) */
+  ovm_var_t **branchp;
+  bytecode_t mask;
+  ovm_var_t *env_left, *env_right, *env0, *otherenv;
+
+  env0 = env;
+  for (mask = 1L, branchp=branch; env!=NULL; mask <<= 1)
+    if (TYPE(env)==T_BIND)
+      break;
+    else if (var & mask)
+      {
+	*branchp++ = ((env_split_t *)env)->left;
+	env = ((env_split_t *)env)->right;
+      }
+    else
+      {
+	*branchp++ = ((env_split_t *)env)->right;
+	env = ((env_split_t *)env)->left;
+      }
+  if (env==NULL || ((env_bind_t *)env)->var!=var)
+    return env0;
+  GC_START(gc_ctx, 1);
+  env = NULL;
+  for (; branchp > branch; )
+    {
+      mask >>= 1;
+      otherenv = *--branchp;
+      if (otherenv==NULL)
+	{
+	  if (env==NULL || TYPE(env)==T_BIND)
+	    continue;
+	}
+      else if (env==NULL)
+	{
+	  if (TYPE (otherenv)==T_BIND)
+	    continue;
+	}
+      else if (var & mask)
+	{
+	  env_left = otherenv;
+	  env_right = env;
+	}
+      else
+	{
+	  env_left = env;
+	  env_right = otherenv;
+	}
+      env = gc_alloc (gc_ctx, sizeof(env_split_t), &env_split_class);
+      env->gc.type = T_SPLIT;
+      GC_TOUCH (gc_ctx, ((env_split_t *)env)->left = env_left);
+      GC_TOUCH (gc_ctx, ((env_split_t *)env)->right = env_right);
+      GC_UPDATE(gc_ctx, 0, env);
+    }
+  GC_END(gc_ctx);
+  return env;
 }
 
 /**
@@ -4087,40 +4220,44 @@ static issdl_function_t issdl_function_g[] = {
     "returns null (the undefined object)" },
   { issdl_print, 1, "print",
     1, int_of_any_sigs, /* always returns true, in fact */
-    m_const,
+    m_const_thrash,
     "display a string (TEST FUNCTION)" },
+#ifdef OBSOLETE
   { issdl_dumpstack, 2, "dump_stack",
     0, int_sigs, /* returns 0 or 1, in fact */
-    m_random,
+    m_random_thrash,
     "dump the stack of the current rule" },
+#endif
 #if 0
   { issdl_printevent, 3, "print_event",
     0, int_sigs,  /* always returns true, in fact */
-    m_const,
+    m_const_thrash,
     "print the event associated with state" },
   // OBSOLETE, use print(current_event())
 #endif
+#ifdef OBSOLETE
   { issdl_dumppathtree, 4, "dump_dot_pathtree",
     0, int_sigs, /* always returns true, in fact */
-    m_const,
+    m_const_thrash,
     "dump the rule instance path tree in the GraphViz Dot format"},
+#endif
 #if 0
   { issdl_drop_event, 5, "drop_event",
     0, int_sigs, /* returns 0 or 1, in fact */
-    m_random,
+    m_random_thrash,
     "Drop event" },
   { issdl_set_event_level, 6, "set_event_level",
     1, int_of_int_sigs, /* returns 0 or 1, in fact */
-    m_random,
+    m_random_thrash,
     "Set event level" },
 #endif
   { issdl_report, 7, "report",
     0, int_sigs, /* returns 0 or 1, in fact */
-    m_random,
+    m_random_thrash,
     "generate report" },
   { issdl_shutdown, 8, "shutdown",
     0, int_sigs, /* does not return */
-    m_const,
+    m_const_thrash,
     "shutdown orchids" },
   { issdl_random, 9, "random",
     0, int_sigs,
@@ -4128,12 +4265,14 @@ static issdl_function_t issdl_function_g[] = {
     "return a random number" },
   { issdl_system, 10, "system",
     1, int_of_str_sigs,
-    m_random,
+    m_random_thrash,
     "execute a system command" },
-  { issdl_stats, 11, "show_stats",
+#ifdef OBSOLETE
+  { issdl_statsx, 11, "show_stats",
     0, int_sigs, /* always returns true, in fact */
-    m_const,
+    m_const_thrash,
     "show orchids internal statistics" },
+#endif
   { issdl_str_from_int, 12, "str_from_int",
     1, str_of_int_sigs,
     m_unknown_1,
@@ -4154,23 +4293,27 @@ static issdl_function_t issdl_function_g[] = {
     1, str_of_ipv4_sigs,
     m_unknown_1,
     "convert an ipv4 address to a string" },
+#ifdef OBSOLETE
   { issdl_kill_threads, 17, "kill_threads",
     0, int_sigs, /* always returns true, in fact */
-    m_const,
+    m_const_thrash,
     "kill threads of a rule instance" },
+#endif
+#ifdef OBSOLETE
   { issdl_cut, 18, "cut",
     1, int_of_str_sigs, /* returns 0 or 1, in fact */
-    m_unknown_1,
+    m_unknown_1_thrash,
     "special cut" },
+#endif
   { issdl_sendmail, 19, "sendmail",
     4, sendmail_sigs,
-     /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
-    m_random,
+    /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
+    m_random_thrash,
     "Send an email" },
   { issdl_sendmail_report, 20, "sendmail_report",
     4, sendmail_sigs,
-    m_random,
-     /* sendmail_report (from, to, subject, body), returns 0 or 1, in fact */
+    m_random_thrash,
+    /* sendmail_report (from, to, subject, body), returns 0 or 1, in fact */
     "Send a report by email" },
   { issdl_bindist, 21, "bitdist",
     2, cmp_sigs,

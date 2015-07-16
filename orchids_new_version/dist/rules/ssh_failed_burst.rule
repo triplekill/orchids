@@ -23,16 +23,21 @@
  * XXX ===> Need to check what happens if events are not in the right order
  */
 rule ssh_failed_burst synchronize (AGGR_VARS)
+    // all rule instances with the same AGGR_VARS are merged
 {
   state init
   {
-    $total = 0;
-    $nb_burst = 0;
     expect (CONDITION)
-      goto first;
+      goto start;
   }
 
-  state first
+  state start! {
+    $total = 0;
+    $nb_burst = 0;
+    goto first;
+  }
+
+  state first!
   {
     AGGR_INIT
     $total_begin = TIME_FIELD;
@@ -42,17 +47,11 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
 
     $diff_begin = _CTIME(0);
     $diff_last = _CTIME(0);
-    $mark = mark();
-    // If a rule instance is already running with the same AGGR_VARS, this one is stopped here.
     goto loop;
   }
 
-  state loop
+  state loop!
   {
-    // Delete the waiting threads from the previous state
-    mark_cut($mark);
-    $mark = mark();
-
     $count = $count + 1;
     if ($begin != TIME_FIELD)
     {
@@ -61,43 +60,30 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     }
     $last = TIME_FIELD;
 
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_last < DIFF_TIME)
-	    && ($count >= THRESH))
-      goto alert;
-
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_last < DIFF_TIME)
-	    && ($count < THRESH))
-      goto loop;
-
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_last > DIFF_TIME))
-      goto stop;
-
-    expect (defined(TIME_FIELD)
-	    && TIME_FIELD - $last > DIFF_TIME)
+    expect ((CONDITION) && (AGGR_COND))
+      goto proceed;
+    expect (TIME_FIELD > $last+DIFF_TIME)
       goto stop;
   }
 
+  state proceed! {
+    case ($count>=THRESH) goto alert;
+    else case ($diff_last >= DIFF_TIME) goto stop;
+    else goto loop;
+  }
 
-  state alert
+
+  state alert!
   {
     $m = "Alert : Burst ==> More than " + str_from_uint(THRESH) + ". Source : " + str_from_ipv4($source)  +". Burst started at " + str_from_ctime($begin);
     print ($m);
-
-    // [DEV] we should discard all previous states.
-    mark_cut($mark);
 
     $total = $total + $count;
     $nb_burst = $nb_burst + 1;
     goto first;
   }
 
-  state stop
+  state stop!
   {
     if ($nb_burst > 0)
     {
@@ -106,8 +92,6 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     }
 
     // Here we start a new burst detection by going back to the first state.
-    // [DEV] we should discard all previous states.
-    mark_cut($mark);
     goto first;
   }
 

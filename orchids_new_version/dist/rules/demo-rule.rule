@@ -49,7 +49,7 @@ rule demo {
   state oneamong_5_start {
   /* no  action */
     goto oneamong_5_start_1;
-    goto oneamong_5_start_2;
+    /*goto oneamong_5_start_2;*/
   }
 
   state oneamong_5_start_1 {

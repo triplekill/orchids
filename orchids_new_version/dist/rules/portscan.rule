@@ -10,6 +10,8 @@ rule portscan {
 
   state portscan_begin {
     $sip = .snort.sip;
+    $dip = .snort.dip; /* used in portscan.iodef template, if IODEF is used (hidden
+                          in call to report() */
     $threshold = .snort.threshold;
     $msg = "portscan detected from " + str_from_ipv4($sip);
 
@@ -18,8 +20,7 @@ rule portscan {
   }
 
 #if 0
-  state portscan_status {
-    cut ("portscan_begin");
+  state portscan_status! {
 
     expect (.snort.message == "portscan status" &&
 	.snort.sip == $sip)
@@ -37,8 +38,8 @@ rule portscan {
   }
 #endif
 
-  state portscan_alert {
+  state portscan_alert! {
     print ("portscan completed!");
-    /* report(); */
+    report();
   }
 }

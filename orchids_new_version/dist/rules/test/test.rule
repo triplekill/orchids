@@ -59,7 +59,7 @@ rule demoRule
 
     // Test 6 Regex Split
     $string = "Hello World !";
-    / $string / "([^ ]+) ([^ ]+)" / $hello / $world;
+    split "([^ ]+) ([^ ]+)" / $hello, $world / $string;
     print($string);
     print($hello);
     print($world);
@@ -101,12 +101,12 @@ rule demoRule
       goto txt;
   }
 
-  state udp
+  state udp commit
   {
     print("UDP packet received");
   }
 
-  state txt
+  state txt commit
   {
     print("TXT line read");
   }

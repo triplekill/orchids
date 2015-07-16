@@ -12,7 +12,7 @@
   IPTABLES " --append " BLACKLISTTABLE \
     " --proto TCP --source " + (ip)
 
-rule anti_ssh_scan synchronize($attacker) {
+rule anti_ssh_scan {
 
   state init {
     expect (.sshd.action == "Failed")
@@ -26,19 +26,17 @@ rule anti_ssh_scan synchronize($attacker) {
     goto failed_loop;
   }
 
-  state update_counter {
+  state update_counter! {
     $attempts = $attempts + 1;
     if ($attempts >= MAX_ATTEMPT)
       {
         $cmd = RCMD( FIREWALL, BLOCKIP_CMD( str_from_ipv4( $attacker ) ) );
         report();
-        kill_threads();
       }
     goto failed_loop;
   }
 
-  state failed_loop {
-  /*!!! should really cut() here */
+  state failed_loop! {
    /* Capture other network activities of the suspected attacker. */
    expect (.netfilter.src == $attacker
         && .nfhub.desc != "ssh"

@@ -25,16 +25,11 @@
  **   feature is enabled.  Otherwise, it does nothing.
  **/
 
-#ifdef ENABLE_ACTMON
 /**
  ** An activity monitor for seeing Orchids moving.  This function is
  ** only for demonstration purposes.
  **/
 static void monitor_activity(void);
-# define Monitor_Activity() monitor_activity()
-#else
-# define Monitor_Activity()
-#endif /* ACTMON */
 
 
 /**

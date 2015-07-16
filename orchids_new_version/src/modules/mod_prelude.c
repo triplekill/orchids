@@ -29,10 +29,12 @@ input_module_t mod_prelude;
 #define RETURN_OVM_INT(x) return ovm_int_new(gc_ctx, x)
 #define RETURN_OVM_UINT(x) return ovm_uint_new(gc_ctx, x)
 
-static type_t t_prelude = { "prelude", T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_prelude = { "prelude", T_UINT };
 
 field_t prelude_fields[MAX_PRELUDE_FIELDS] = {
+#ifdef OBSOLETE
 { "prelude.ptr",		   &t_prelude, "prelude alert pointer"           }
+#endif
 };
 
 static ovm_var_t *ovm_var_from_prelude_value(gc_t *gc_ctx,
@@ -146,9 +148,21 @@ static void get_field_from_idmef_value(orchids_t	*ctx,
 
 static prelude_description = "prelude";
 
-void prelude_extern_free (void *p)
+static void *prelude_copy (gc_t *gc_ctx, void *obj)
 {
-  idmef_message_t *msg = (idmef_message_t *)p;
+  idmef_message_t *msg = (idmef_message_t *)obj;
+  idmef_message_t *newmsg = NULL;
+
+  if (msg==NULL)
+    return NULL;
+  if (idmef_message_clone (msg, &newmsg) < 0)
+    return NULL;
+  return newmsg;
+}
+
+static void prelude_free (void *obj)
+{
+  idmef_message_t *msg = (idmef_message_t *)obj;
 
   if (msg!=NULL)
     idmef_message_destroy(msg);
@@ -161,18 +175,22 @@ static void process_idmef_alert(orchids_t *ctx,
 {
   event_t *event;
   int c;
+#ifdef OBSOLETE
   ovm_var_t *val;
+#endif
   gc_t *gc_ctx = ctx->gc_ctx;
   GC_START(gc_ctx, MAX_PRELUDE_FIELDS+1);
 
+#ifdef OBSOLETE
   val = ovm_extern_new (gc_ctx, (void *)message,
 			prelude_description,
-			prelude_extern_free);
+			prelude_copy, prelude_free);
   GC_UPDATE(gc_ctx, F_PTR, val);
+#endif
 
   for (c = 1; c < prelude_data->nb_fields; c++)
   {
-    get_field_from_idmef_value(ctx, attr, message,
+    get_field_from_idmef_value(ctx, (ovm_var_t **)GC_DATA(), message,
 			       prelude_data->field_xpath[c],
 			       c, T_STR);
   }
@@ -220,9 +238,11 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
 
 static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t *message;
+  ovm_var_t *message, *val;
   idmef_message_t	*idmef;
   int		ret;
+  gc_t *gc_ctx = ctx->gc_ctx;
+  uint16_t handle;
 
   ret = idmef_message_new(&idmef);
   if ( ret < 0 )
@@ -233,10 +253,15 @@ static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
       return;
     }
 
-  message = ovm_extern_new(ctx->gc_ctx, (void *)idmef,
+  GC_START (gc_ctx, 1);
+  message = ovm_extern_new(gc_ctx, idmef,
 			   prelude_description,
-			   prelude_extern_free);
-  PUSH_VALUE(ctx, message);
+			   prelude_copy, prelude_free);
+  GC_UPDATE(gc_ctx, 0, message);
+  handle = create_fresh_handle (gc_ctx, state, message);
+  val = ovm_uint_new (gc_ctx, handle);
+  PUSH_VALUE(ctx, val);
+  GC_END (gc_ctx);
 }
 
 static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
@@ -245,14 +270,15 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *path;
   ovm_var_t *value;
   char *str;
+  ovm_var_t *doc1;
+  idmef_message_t *message;
   int ret = 0;
 
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 3);
   path = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   value = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
 
-  if (idmef==NULL || TYPE(idmef)!=T_EXTERNAL ||
-      EXTDESC(idmef)!=prelude_description)
+  if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
     {
       DebugLog(DF_MOD, DS_ERROR, "first parameter not a prelude idmef document");
       STACK_DROP(ctx->ovm_stack, 3);
@@ -274,23 +300,26 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
       return;
     }
 
+  doc1 = handle_get_wr (ctx->gc_ctx, state, UINT(idmef));
+  message = EXTPTR(doc1);
+
   str = ovm_strdup (ctx->gc_ctx, path);
   switch (TYPE(value))
     {
     case T_INT:
-      ret = idmef_message_set_number(EXTPTR(idmef), str, INT(value));
+      ret = idmef_message_set_number(message, str, INT(value));
       break;
     case T_UINT:
-      ret = idmef_message_set_number(EXTPTR(idmef), str, UINT(value));
+      ret = idmef_message_set_number(message, str, UINT(value));
       break;
     case T_DOUBLE:
-      ret = idmef_message_set_number(EXTPTR(idmef), str, DOUBLE(value));
+      ret = idmef_message_set_number(message, str, DOUBLE(value));
       break;
     case T_STR: case T_VSTR:
       {
 	char *val_str = ovm_strdup (ctx->gc_ctx, value);
 
-	ret = idmef_message_set_string(EXTPTR(idmef), str, val_str);
+	ret = idmef_message_set_string(message, str, val_str);
 	gc_base_free (val_str);
       }
       break;
@@ -310,7 +339,7 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
 	    buff[len - 1] = buff[len - 2];
 	    buff[len - 2] = ':';
 	  }
-	ret = idmef_message_set_string(EXTPTR(idmef), str, buff);
+	ret = idmef_message_set_string(message, str, buff);
 	break;
       }
     default:
@@ -327,7 +356,7 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
 	       prelude_strerror(ret, "idmef_message_set_string error\n"));
     }
   STACK_DROP(ctx->ovm_stack, 3);
-  if (res < 0)
+  if (ret < 0)
     PUSH_RETURN_FALSE(ctx);
   else
     PUSH_RETURN_TRUE(ctx);
@@ -336,31 +365,37 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
 static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *idmef;
+  ovm_var_t *doc1;
+  idmef_message_t *message;
   int ret = 0;
 
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (idmef==NULL || TYPE(idmef)!=T_EXTERNAL ||
-      EXTDESC(idmef)!=prelude_description)
+  if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
     {
       DebugLog(DF_MOD, DS_ERROR, "parameter not a prelude idmef document");
       ret = -1;
     }
-  else if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
-    {
-      ret = preludedb_insert_message(prelude_data->db, EXTPTR(idmef));
-      if ( ret < 0 )
-	{
-	  DebugLog(DF_MOD, DS_ERROR,
-		   "could not insert message into database %s\n",
-		   preludedb_strerror(ret));
-	}
-    }
   else
     {
-      prelude_client_send_idmef(prelude_data->client, EXTPTR(idmef));
+      doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(idmef));
+      message = EXTPTR(doc1);
+      if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
+	{
+	  ret = preludedb_insert_message(prelude_data->db, message);
+	  if ( ret < 0 )
+	    {
+	      DebugLog(DF_MOD, DS_ERROR,
+		       "could not insert message into database %s\n",
+		       preludedb_strerror(ret));
+	    }
+	}
+      else
+	{
+	  prelude_client_send_idmef(prelude_data->client, message);
+	}
     }
   STACK_DROP(ctx->ovm_stack, 1);
-  if (res < 0)
+  if (ret < 0)
     PUSH_RETURN_FALSE(ctx);
   else
     PUSH_RETURN_TRUE(ctx);
@@ -369,23 +404,28 @@ static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
 static void issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t *idmef;
+  ovm_var_t *doc1;
+  idmef_message_t *message;
 
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (idmef==NULL || TYPE(idmef)!=T_EXTERNAL ||
-      EXTDESC(idmef)!=prelude_description)
+  if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
     {
       DebugLog(DF_MOD, DS_ERROR, "parameter not a prelude idmef document");
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_RETURN_FALSE(ctx);
       return;
     }
-  idmef_message_print(EXTPTR(idmef), prelude_data->prelude_io);
+  doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(idmef));
+  message = EXTPTR(doc1);
+  idmef_message_print(message, prelude_data->prelude_io);
   PUSH_RETURN_TRUE(ctx);
 }
 
 static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *state)
 {
   ovm_var_t	*idmef;
+  ovm_var_t *doc1;
+  idmef_message_t *message;
   ovm_var_t	*path;
   char *path_str;
   char		*str;
@@ -395,8 +435,7 @@ static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *sta
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   path = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
 
-  if (idmef==NULL || TYPE(idmef)!=T_EXTERNAL ||
-      EXTDESC(idmef)!=prelude_description)
+  if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
     {
       DebugLog(DF_MOD, DS_ERROR, "first parameter not a prelude idmef document");
       STACK_DROP(ctx->ovm_stack, 2);
@@ -412,7 +451,9 @@ static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *sta
     }
   path_str = ovm_strdup (ctx->gc_ctx, path);
 
-  if (idmef_message_get_string(EXTPTR(idmef), path_str, &str) < 0)
+  doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(idmef));
+  message = EXTPTR(doc1);
+  if (idmef_message_get_string(message, path_str, &str) < 0)
     {
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_VALUE(ctx, NULL);
@@ -422,6 +463,7 @@ static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *sta
       str_len = strlen(str);
       res = ovm_str_new(str_len);
       memcpy (STR(res), str, str_len);
+      free (str);
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_VALUE(ctx, res);
     }
@@ -472,6 +514,12 @@ static const type_t **prelude_get_sigs[] = { prelude_get_sig, NULL };
 
 static const type_t *prelude_print_sig[] = { &t_int, &t_prelude };
 static const type_t **prelude_print_sigs[] = { prelude_print_sig, NULL };
+
+monotony m_prelude_set (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  m[0] |= MONO_THRASH; /* thrashes the first argument (prelude document) */
+  return MONO_UNKNOWN | MONO_THRASH;
+}
 
 static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -596,30 +644,35 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_idmef_message_new,
                          "prelude_message_new",
 			 0, prelude_new_sigs,
+			 m_random,
                          "Create a new prelude idmef report");
 
   register_lang_function(ctx,
                          issdl_idmef_message_set,
                          "prelude_message_set",
 			 3, prelude_set_sigs,
+			 m_prelude_set,
                          "set a value in the idmef report");
 
   register_lang_function(ctx,
                          issdl_idmef_message_send,
                          "prelude_message_send",
 			 1, prelude_send_sigs,
+			 m_random_thrash,
                          "send message to the prelude manager");
 
   register_lang_function(ctx,
                          issdl_idmef_message_get_string,
                          "prelude_message_get_string",
 			 2, prelude_get_sigs,
+			 m_random,
                          "get a string from an idmef message using an xpath request");
 
   register_lang_function(ctx,
                          issdl_idmef_message_print,
                          "prelude_message_print",
 			 1, prelude_print_sigs,
+			 m_random_thrash,
                          "Debug function : print the idmef alert on stderr");
 
 }

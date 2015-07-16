@@ -191,19 +191,20 @@ new_orchids_context(void)
   ctx->poll_period.tv_usec = 0;
   ctx->rulefile_list = NULL;
   ctx->last_rulefile = NULL;
+#ifdef OBSOLETE
   ctx->first_rule_instance = NULL;
   ctx->last_rule_instance = NULL;
   ctx->retrig_list = NULL;
-  ctx->active_events = 0;
-  ctx->rule_instances = 0;
-  ctx->state_instances = 0;
-  ctx->threads = 0;
+#endif
   ctx->ovm_stack = NULL; /* for now, will be replaced below */
   ctx->vm_func_tbl = NULL;
   ctx->vm_func_tbl_sz = 0;
   ctx->off_line_mode = 0;
   ctx->off_line_input_file = NULL;
   ctx->daemon = 0;
+  ctx->verbose = 0;
+  ctx->actmon = 0;
+#ifdef OBSOLETE
   ctx->current_tail = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->current_tail);
   ctx->cur_retrig_qh = NULL;
@@ -224,6 +225,11 @@ new_orchids_context(void)
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_tail);
   ctx->active_event_cur = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_cur);
+#endif
+  ctx->thread_queue = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->thread_queue);
+  ctx->current_event = NULL;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->current_event);
   ctx->preconfig_time.tv_sec = 0;
   ctx->preconfig_time.tv_usec = 0;
   ctx->postconfig_time.tv_sec = 0;
@@ -232,7 +238,9 @@ new_orchids_context(void)
   ctx->compil_time.tv_usec = 0;
   ctx->postcompil_time.tv_sec = 0;
   ctx->postcompil_time.tv_usec = 0;
+#ifdef OBSOLETE
   ctx->evt_fb_fp = NULL;
+#endif
   ctx->temporal = NULL; /* for now, will be replaced below */
   ctx->runtime_user = NULL;
   /* ctx->ru not initialized */
@@ -752,12 +760,14 @@ void add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
 				size_t from, size_t to)
 {
   int i, j;
+  ovm_var_t *evt;
   gc_t *gc_ctx = ctx->gc_ctx;
 
   for (i = from; i < to; ++i) {
     /* Handle filled fields */
     j = i - from;
-    if ((tbl_event[j] != NULL) && (tbl_event[j] != F_NOT_NEEDED)) {
+    evt = tbl_event[j];
+    if ((evt != NULL) && (evt != F_NOT_NEEDED)) {
       /* This field is activated, so add it to current event */
       /* XXX: add checks here ??? (if module is well coded
          no need to check) */
@@ -766,7 +776,7 @@ void add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
 	  event_t *new_evt;
 
 	  new_evt = new_event (gc_ctx, mod->first_field_pos + i,
-			       tbl_event[j],
+			       evt,
 			       *event);
 	  GC_TOUCH (gc_ctx, *event = new_evt);
 	}
@@ -774,16 +784,14 @@ void add_fields_to_event_stride(orchids_t *ctx, mod_entry_t *mod,
   }
 }
 
-void
-add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
-                    event_t **event, ovm_var_t **tbl_event, size_t sz)
+void add_fields_to_event(orchids_t *ctx, mod_entry_t *mod,
+			 event_t **event, ovm_var_t **tbl_event, size_t sz)
 {
   add_fields_to_event_stride(ctx,mod,event,tbl_event,0,sz);
 }
 
 
-void
-fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
+void fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
 {
   fprintf(fp, "-------------------------[ event id: %p ]------------------\n",
 	  (void *) event);
@@ -795,7 +803,7 @@ fprintf_event(FILE *fp, const orchids_t *ctx, const event_t *event)
           "-----+"
           "--------------------------+"
           "---------------------------------\n");
-  for ( ; event; event = event->next) {
+  for ( ; event!=NULL; event = event->next) {
     fprintf(fp, "%4i | %-24s | ",
             event->field_id,
 	    ctx->global_fields->fields[ event->field_id ].name);
@@ -872,104 +880,6 @@ void post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event, int dissect
     }
 }
 
-#ifndef ORCHIDS_DEMO
-
-void
-fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
-{
-  struct timeval diff_time;
-  struct timeval curr_time;
-  struct rusage ru;
-  float usage;
-  struct utsname un;
-  char uptime_buf[64];
-#ifdef linux
-  linux_process_info_t pinfo;
-#endif
-
-  gettimeofday(&curr_time, NULL);
-  getrusage(RUSAGE_SELF, &ru);
-
-  fprintf(fp,
-          "-----------------------------[ "
-          "orchids statistics"
-          " ]-------------------------\n");
-  fprintf(fp,
-          "           property |"
-          "  value\n");
-  fprintf(fp,
-          "--------------------+"
-          "-------------------------------------------------------\n");
-  Xuname(&un);
-  fprintf(fp, "             System : %s %s %s %s\n",
-          un.sysname, un.nodename, un.release, un.machine);
-  snprintf_uptime(uptime_buf, sizeof (uptime_buf),
-                  curr_time.tv_sec - ctx->start_time.tv_sec);
-  fprintf(fp, "        Real uptime : %lis (%s)\n",
-          curr_time.tv_sec - ctx->start_time.tv_sec,
-          uptime_buf);
-  fprintf(fp, "          User time : %li.%03li s\n",
-          ru.ru_utime.tv_sec, ru.ru_utime.tv_usec / 1000L);
-  fprintf(fp, "        System time : %li.%03li s\n",
-          ru.ru_stime.tv_sec, ru.ru_stime.tv_usec / 1000L);
-  usage = (float)(ru.ru_stime.tv_sec + ru.ru_utime.tv_sec);
-  usage += (float)((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) / 1000000);
-  usage +=((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) % 1000000) / 1000000.0;
-  fprintf(fp, "     Total CPU time : %5.3f s\n", usage);
-  usage /= (float)(curr_time.tv_sec - ctx->start_time.tv_sec);
-  usage *= 100.0;
-  fprintf(fp, "   Average CPU load : %4.2f %%\n", usage);
-
-  Timer_Sub(&diff_time, &ctx->preconfig_time, &ctx->start_time);
-  fprintf(fp, "   Pre-config. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000L);
-
-  Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
-  fprintf(fp, "  Post-config. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000L);
-
-  Timer_Sub(&diff_time, &ctx->compil_time, &ctx->postconfig_time);
-  fprintf(fp, " Rules compil. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000L);
-
-  Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
-  fprintf(fp, "  Post-compil. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000L);
-
-
-#ifdef linux
-  fprintf(fp,
-          "- - - - - - - - - - + - - - - -[ "
-          "linux specific"
-          " ]- - - - - - - - - - - - - -\n");
-  get_linux_process_info(&pinfo, getpid());
-  fprintf_linux_process_summary(fp, &pinfo);
-  fprintf(fp,
-          "- - - - - - - - - - +"
-          " - - - - - - - - - - - - - - - - - - - - - - - - - - - \n");
-#endif /* linux */
-
-  fprintf(fp, "current config file : '%s'\n", ctx->config_file);
-  fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
-  fprintf(fp, "current poll period : %li\n", ctx->poll_period.tv_sec);
-  fprintf(fp, "  registered fields : %zd\n", ctx->global_fields->num_fields);
-  fprintf(fp, "    injected events : %u\n", ctx->events);
-  fprintf(fp, "      active events : %u\n", ctx->active_events);
-  fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);
-  fprintf(fp, "    state instances : %lu\n", ctx->state_instances);
-  fprintf(fp, "     active threads : %u\n", ctx->threads);
-  fprintf(fp, "     ovm stack size : %d\n", ctx->ovm_stack->n);
-  fprintf(fp, "            reports : %u\n", ctx->reports);
-  fprintf(fp,
-          "--------------------+"
-          "-------------------------------------------------------\n");
-}
-
-#else /* #ifndef ORCHIDS_DEMO */
 
 void
 fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
@@ -1007,9 +917,9 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
           curr_time.tv_sec - ctx->start_time.tv_sec,
           uptime_buf);
   fprintf(fp, "          User time : %li.%03li s\n",
-          ru.ru_utime.tv_sec, ru.ru_utime.tv_usec / 1000);
+          ru.ru_utime.tv_sec, ru.ru_utime.tv_usec / 1000L);
   fprintf(fp, "        System time : %li.%03li s\n",
-          ru.ru_stime.tv_sec, ru.ru_stime.tv_usec / 1000);
+          ru.ru_stime.tv_sec, ru.ru_stime.tv_usec / 1000L);
   usage = (float)(ru.ru_stime.tv_sec + ru.ru_utime.tv_sec);
   usage += (float)((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) / 1000000);
   usage +=((ru.ru_stime.tv_usec + ru.ru_utime.tv_usec) % 1000000) / 1000000.0;
@@ -1020,23 +930,23 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 
   Timer_Sub(&diff_time, &ctx->preconfig_time, &ctx->start_time);
   fprintf(fp, "   Pre-config. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
   fprintf(fp, "  Post-config. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->compil_time, &ctx->postconfig_time);
   fprintf(fp, " Rules compil. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
   fprintf(fp, "  Post-compil. time : %li.%03li ms\n",
-          diff_time.tv_sec * 1000 + diff_time.tv_usec / 1000,
-          diff_time.tv_usec % 1000);
+          diff_time.tv_sec * 1000L + diff_time.tv_usec / 1000L,
+          diff_time.tv_usec % 1000L);
 
 
 #ifdef linux
@@ -1045,25 +955,19 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
           "linux specific"
           " ]- - - - - - - - - - - - - -\n");
   get_linux_process_info(&pinfo, getpid());
-  fprintf_linux_process_summary(fp, &pinfo);
+  fprintf_linux_process_summary(fp, &pinfo, ctx->verbose);
   fprintf(fp, "- - - - - - - - - - + - - - - - - - - - - - - - - - - - - - - - - - - - - - \n");
 #endif /* linux */
 
   fprintf(fp, "current config file : '%s'\n", ctx->config_file);
   fprintf(fp, "     loaded modules : %i\n", ctx->loaded_modules);
-  fprintf(fp, "  registered fields : %i\n", ctx->global_fields->num_fields);
+  fprintf(fp, "  registered fields : %zi\n", ctx->global_fields->num_fields);
   fprintf(fp, "    injected events : %lu\n", ctx->events);
-  fprintf(fp, "      active events : %lu\n", ctx->active_events);
-  fprintf(fp, "     rule instances : %lu\n", ctx->rule_instances);
-  fprintf(fp, "    state instances : %lu\n", ctx->state_instances);
-  fprintf(fp, "     active threads : %lu\n", ctx->threads);
-  fprintf(fp, "            reports : %lu\n", ctx->reports);
+  fprintf(fp, "            reports : %zu\n", ctx->reports);
   fprintf(fp,
           "--------------------+"
           "-------------------------------------------------------\n");
 }
-
-#endif /* ORCHIDS_DEMO */
 
 void
 fprintf_hexdump(FILE *fp, const void *data, size_t n)
@@ -1126,18 +1030,18 @@ void fprintf_state_env(FILE *fp, const orchids_t *ctx,
   int i;
   ovm_var_t *val;
 
-  for (i = 0; i < state->rule_instance->rule->dynamic_env_sz; ++i) {
+  for (i = 0; i < state->pid->rule->dynamic_env_sz; ++i) {
     val = ovm_read_value (state->env, i);
     if (val!=NULL)
       {
 	fprintf(fp, "    env[%i]: ($%s) ",
-		i, state->rule_instance->rule->var_name[i]);
+		i, state->pid->rule->var_name[i]);
 	fprintf_issdl_val(fp, ctx, val);
       }
     else
       {
 	fprintf(fp, "            env[%i]: ($%s) nil\n",
-		i, state->rule_instance->rule->var_name[i]);
+		i, state->pid->rule->var_name[i]);
       }
   }
 }

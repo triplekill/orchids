@@ -48,8 +48,7 @@
  */
 
 
-static int
-ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
+static int ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -63,10 +62,9 @@ ruletrace_hook(orchids_t *ctx, mod_entry_t *mod, void *data, event_t *event)
 }
 
 
-static void
-ruletrace_output_rule_instances(orchids_t *ctx,
-                                ruletrace_ctx_t *ruletracectx,
-                                event_t *event)
+static void ruletrace_output_rule_instances(orchids_t *ctx,
+					    ruletrace_ctx_t *ruletracectx,
+					    event_t *event)
 {
   rule_instance_t *r;
   int rilim;
@@ -94,8 +92,7 @@ ruletrace_output_rule_instances(orchids_t *ctx,
 }
 
 
-static void
-ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
+static void ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
 {
   uint32_t evtid;
   int d1, d2, d3, d4;
@@ -158,10 +155,9 @@ ruletrace_output_create_dirs(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
 }
 
 
-static void
-ruletrace_output_event(orchids_t *ctx,
-                       ruletrace_ctx_t *ruletracectx,
-                       event_t *event)
+static void ruletrace_output_event(orchids_t *ctx,
+				   ruletrace_ctx_t *ruletracectx,
+				   event_t *event)
 {
   FILE *fp;
 
@@ -175,8 +171,7 @@ ruletrace_output_event(orchids_t *ctx,
 }
 
 
-static FILE *
-ruletrace_fopen_event_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
+static FILE * ruletrace_fopen_event_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
 {
   FILE *fp;
   uint32_t evtid;
@@ -212,10 +207,9 @@ ruletrace_fopen_event_file(orchids_t *ctx, ruletrace_ctx_t *ruletracectx)
 }
 
 
-static FILE *
-ruletrace_fopen_dot_file(orchids_t *ctx,
-                         ruletrace_ctx_t *ruletracectx,
-                         rule_instance_t *rule)
+static FILE * ruletrace_fopen_dot_file(orchids_t *ctx,
+				       ruletrace_ctx_t *ruletracectx,
+				       rule_instance_t *rule)
 {
   FILE *fp;
   uint32_t evtid;
@@ -258,8 +252,7 @@ ruletrace_fopen_dot_file(orchids_t *ctx,
 }
 
 
-static void
-ruletrace_output_rule_inst(orchids_t *ctx,
+static void ruletrace_output_rule_inst(orchids_t *ctx,
                            ruletrace_ctx_t *ruletracectx,
                            rule_instance_t *rule)
 {
@@ -294,8 +287,7 @@ static void *ruletrace_preconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static void
-ruletrace_postconfig(orchids_t *ctx, mod_entry_t *mod)
+static void ruletrace_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -312,8 +304,7 @@ ruletrace_postconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static void
-set_output_directory(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_output_directory(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -325,8 +316,7 @@ set_output_directory(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static void
-set_file_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_file_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -338,8 +328,7 @@ set_file_prefix(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static void
-set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   ruletrace_ctx_t *ruletracectx;
 
@@ -351,8 +340,7 @@ set_rule_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 }
 
 
-static void
-set_state_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_state_limit(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   ruletrace_ctx_t *ruletracectx;
 

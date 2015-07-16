@@ -16,9 +16,11 @@
 #define INITIAL_MODPRELUDE_POLL_DELAY  1
 #define DEFAULT_MODPRELUDE_POLL_PERIOD 1
 
-#define MAX_PRELUDE_FIELDS	32
+#define MAX_PRELUDE_FIELDS	128
 
+#ifdef OBSOLETE
 #define F_PTR		0
+#endif
 
 enum prelude_mode_e {
   PRELUDE_MODE_SENSOR,

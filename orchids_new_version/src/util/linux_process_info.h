@@ -71,9 +71,9 @@ struct linux_process_info_s
 */
 
 void fprintf_linux_process_info(FILE *fp, linux_process_info_t *p);
-void fprintf_linux_process_summary(FILE *fp, linux_process_info_t *p);
+void fprintf_linux_process_summary(FILE *fp, linux_process_info_t *p, int verbose);
 void get_linux_process_info(linux_process_info_t *p, pid_t pid);
-void fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p);
+void fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p, int verbose);
 
 #endif /* _LIN_PROC_INFO_H_ */
 

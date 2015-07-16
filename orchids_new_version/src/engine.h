@@ -1,13 +1,14 @@
 /**
  ** @file engine.h
- ** Public definitions for engine.c.
+ ** Public definitions for engine.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 1.0
+ ** @version 2.0
  ** @ingroup engine
  **
- ** @date  Started on: Fri Feb 21 16:18:12 2003
+ ** @date  Started on: Jeu  2 jul 2015 10:57:40 UTC
  **/
 
 /*
@@ -18,7 +19,6 @@
 #define ENGINE_H
 
 #include "orchids.h"
-
 
 /**
  ** Inject an event into the analysis engine.
@@ -31,67 +31,16 @@
  **/
 void inject_event(orchids_t *ctx, event_t *event);
 
-
-/**
- ** Display all active rule instances on a stream.
- ** Displayed informations are :
- ** rule instance identifier (rid), 
- ** rule name, 
- ** number of actives states, 
- ** max depth of the path tree (dpt) 
- ** and the creation date.
- **
- ** @param fp Output stream.
- ** @param ctx Orchids context.
- **/
-void
-fprintf_rule_instances(FILE *fp, const orchids_t *ctx);
-
-
-/**
- ** Display a waiting thread queue.
- ** Displayed information are:
- **   the thread identifier (thid),
- **   the rule name,
- **   the state name,
- **   the rule identifier (rid),
- **   the source state and the destination state identifiers (sid->did),
- **   the transition identifier,
- **   the transition counter value,
- **   the bump flag.
- **
- ** @param fp      The output stream.
- ** @param ctx     Orchids application context.
- ** @param thread  The waiting thread queue to display.
- **/
-void
-fprintf_thread_queue(FILE *fp, orchids_t *ctx, wait_thread_t *thread);
-
-
-/**
- ** Display the list of active events.
- ** An event is active when it has passed a transition, at least.
- ** An active event record (active_event_s) may have passed more than
- ** one transition, so we count the number of references. When a rule instance
- ** is free'd, the reference counter is updated, and if it null, we can
- ** destroy the saved event too.
- **
- ** @param fp   The output stream.
- ** @param ctx  Orchids application context.
- **/
-void
-fprintf_active_events(FILE *fp, orchids_t *ctx);
-
-
-
-
 #endif /* ENGINE_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

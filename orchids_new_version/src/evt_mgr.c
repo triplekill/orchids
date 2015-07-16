@@ -305,9 +305,11 @@ void event_dispatcher_main_loop(orchids_t *ctx)
   DebugLog(DF_CORE, DS_NOTICE,
            "*** Setup done. Entering in event dispatcher main loop ***\n");
 
-#ifdef ENABLE_ACTMON
-  printf("[pid %i] Running...\n ", getpid());
-#endif
+  if (ctx->actmon)
+    {
+      printf("[pid %i] Running...\n ", getpid());
+      fflush (stdout);
+    }
 
 #ifdef DMALLOC
   dmalloc_orchids = dmalloc_mark();
@@ -359,7 +361,8 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 	wait_time_ptr = NULL;
       }
 
-    Monitor_Activity();
+    if (ctx->actmon)
+      monitor_activity();
     memcpy(&rfds, &ctx->fds, sizeof(fd_set));
 
     DebugLog(DF_CORE, DS_DEBUG,
@@ -424,10 +427,7 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 }
 
 
-#ifdef ENABLE_ACTMON
-
-static void
-monitor_activity(void)
+static void monitor_activity(void)
 {
   static int position = 0;
 
@@ -455,8 +455,6 @@ monitor_activity(void)
 
   position = (position + 1) % 4;
 }
-
-#endif /* ENABLE_ACTMON */
 
 
 /*

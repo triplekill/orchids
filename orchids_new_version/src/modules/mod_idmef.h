@@ -25,12 +25,14 @@
 
 #include "orchids_api.h"
 
+#ifdef OBSOLETE
 #define F_PTR	0
+#endif
 
 #define XML_ALLOC_SIZE	1024
 #define XML_PATH_MAX	1024
 
-#define MAX_IDMEF_FIELDS 32
+#define MAX_IDMEF_FIELDS 128
 #define MAX_IDMEF_SIZE 8192
 
 typedef struct	idmef_cfg_t

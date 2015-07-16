@@ -6,7 +6,6 @@ EXTRA_DIST = misc/orchids.spec misc/orchids-sysv
 install-data-hook:
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/reports
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/log
-	mkdir -p $(DESTDIR)$(localstatedir)/orchids/ruletrace
 	mkdir -p $(DESTDIR)$(localstatedir)/run/orchids
 #	-rm $(DESTDIR)$(localstatedir)/run/orchids/void_source
 #	-mknod $(DESTDIR)$(localstatedir)/run/orchids/void_source p

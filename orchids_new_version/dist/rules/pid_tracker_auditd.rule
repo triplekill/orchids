@@ -1,52 +1,33 @@
 /*
-
-pid tracker...
-
+The pid tracker.
 */
 
-#define READ 0
-#define WRITE 1
-#define OPEN 2
-#define CLOSE 3
-#define CLONE 56
-#define FORK 57
-#define VFORK 58
-#define EXECVE 59
-#define EXIT 60
-#define KILL 62
-#define SETUID 105
-#define SETGID 106
-#define SETPGID 109
-#define SETREUID 113
-#define SETREGID 114
-#define SETRESUID 117
-#define SETRESGID 119
+#include "linux64syscall.h"
 
 rule pidtrack
 {
 
   state init
   {
-    expect (.auditd.syscall==FORK)
+    expect (.auditd.syscall==SYS_fork)
       goto newpid;
 
-    expect (.auditd.syscall==VFORK)
+    expect (.auditd.syscall==SYS_vfork)
       goto newpid;
 
-    expect (.auditd.syscall==CLONE)
+    expect (.auditd.syscall==SYS_clone)
       goto newpid;
   }
 
-  state newpid {
+  state newpid! {
     $pid = .auditd.exit;
     $uid = .auditd.euid;
     $gid = .auditd.egid;
-    cut("init");
 
     goto wait;
   }
 
-  state wait
+  state wait!
   {
     expect (.auditd.pid == $pid &&
         .auditd.euid != $uid)
@@ -57,78 +38,71 @@ rule pidtrack
       goto alert;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == EXECVE)
+        .auditd.syscall == SYS_execve)
       goto update_uid_gid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SETRESUID)
+        .auditd.syscall == SYS_setresuid)
       goto update_setuid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SETREUID)
+        .auditd.syscall == SYS_setreuid)
       goto update_setuid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SETGID)
+        .auditd.syscall == SYS_setgid)
       goto update_setgid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == EXIT)
+        .auditd.syscall == SYS_exit)
       goto end;
 
-    expect (.auditd.syscall == KILL &&
+    expect (.auditd.syscall == SYS_kill &&
         .auditd.varzero == $pid &&
         .auditd.varone == 9)
       goto end;
   }
 
-  state update_uid_gid
+  state update_uid_gid!
   {
-    cut("wait");
     $uid = .auditd.euid;
     $gid = .auditd.egid;
 
     goto wait;
   }
 
-  state update_setuid
+  state update_setuid!
   {
-    cut("wait");
     $uid = .auditd.varone; /* a1 field contains new euid (a0=new ruid) */
 
     goto wait;
   }
 
-  state update_setgid
+  state update_setgid!
   {
-    cut("wait");
     $gid = .auditd.varzero;
 
     goto wait;
   }
 
-  state alert
+  state alert!
   {
 
     print("Alert report :");
 
-    /*dump_stack();*/
-    /* dump_dot_pathtree(); */
-    report();
-
     $str = "Attack perpetrated by $uid=" + str_from_int($uid);
     print($str);
+    report();
+
 
     $str = "ssh client 'USER=`cut -d : -f 1,3 /etc/passwd | grep "
     + str_from_int($uid) +
     " | cut -d : -f 1`; echo You have been kicked out by OrchIDS... | write $USER; kill -9 `ps -u $USER -o pid=`; chsh -s /sbin/nologin $USER' >/dev/null 2>/dev/null &";
     system($str);
-    kill_threads();
-
   }
 
-  state end
+  state end!
   {
-    kill_threads();
+    /* all went well */
   }
 }

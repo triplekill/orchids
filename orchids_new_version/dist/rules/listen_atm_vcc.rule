@@ -3,48 +3,51 @@
 *  CVE-2008-5079
 */
 
-#define MAX_CALLS 2
-#define SYSCALL 102
+#include "linux32syscall.h"
+#include "linuxsocket.h"
 
+#define MAX_CALLS 2
 
 rule listen_atm_vcc
 {
   state init
   {
-    expect (.auditd.syscall == SYSCALL &&
-	    .auditd.varzero == "4")
+    expect (.auditd.syscall == SYS_socketcall &&
+	    .auditd.varzero == SYS_LISTEN)
       goto start;
   }
 
-  state start
+  state start!
   {
 
     $counter = 1 ;
     $attack_pid = .auditd.pid;
 
     expect (.auditd.pid == $attack_pid &&
-	    .auditd.syscall == SYSCALL &&
-	    .auditd.varzero == "4")
+	    .auditd.syscall == SYS_socketcall &&
+	    .auditd.varzero == SYS_LISTEN)
       goto listen_loop;
   }
 
-  state listen_loop
+  state listen_loop!
   {
     print($counter);
     $counter = $counter + 1;
 
-    expect ($counter == MAX_CALLS)
-      goto alert;
+    case ($counter == MAX_CALLS) goto alert;
+    else goto listen_loop_body;
+  }
 
+  state listen_loop_body
+  {
     expect ( .auditd.pid == $attack_pid &&
-	     .auditd.syscall == SYSCALL &&
-	     .auditd.varzero == "4" &&
-	     $counter < MAX_CALLS)
+	     .auditd.syscall == SYS_socketcall &&
+	     .auditd.varzero == SYS_LISTEN)
       goto listen_loop;
   }
 
 
-  state alert
+  state alert!
   {
     print(" Linux kernel double-listen Local Denial of Service detected !!!");
 

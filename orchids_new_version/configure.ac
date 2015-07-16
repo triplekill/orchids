@@ -116,31 +116,32 @@ if test "$dmalloc" = "true" ; then
   fi
 fi
 
-AC_ARG_ENABLE(actmon,
-AS_HELP_STRING([--enable-actmon], [enable activity monitor (default is off)]),
-[case "${enableval}" in
-    yes) orchids_actmon=true ;;
-    no)  orchids_actmon=false ;;
-    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-actmon) ;;
-esac],
-[orchids_actmon=false]
-)
-if test "$orchids_actmon" = "true" ; then
-   AC_DEFINE([ENABLE_ACTMON], 1, [Set to 1 if ACTMON is requested])
-fi
+dnl AC_ARG_ENABLE(actmon,
+dnl AS_HELP_STRING([--enable-actmon], [enable activity monitor (default is off)]),
+dnl [case "${enableval}" in
+dnl     yes) orchids_actmon=true ;;
+dnl     no)  orchids_actmon=false ;;
+dnl     *)   AC_MSG_ERROR(bad value ${enableval} for --enable-actmon) ;;
+dnl esac],
+dnl [orchids_actmon=false]
+dnl )
+dnl if test "$orchids_actmon" = "true" ; then
+dnl    AC_DEFINE([ENABLE_ACTMON], 1, [Set to 1 if ACTMON is requested])
+dnl fi
 
-AC_ARG_ENABLE(demo,
-AS_HELP_STRING([--enable-demo], [enable demo mode (default is off)]),
-[case "${enableval}" in
-    yes) orchids_demo=true ;;
-    no)  orchids_demo=false ;;
-    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-demo) ;;
-esac],
-[orchids_demo=false]
-)
-if test "$orchids_demo" = "true" ; then
-   AC_DEFINE([ORCHIDS_DEMO], 1, [Set to 1 if DEMO is requested])
-fi
+dnl Removed: useless
+dnl AC_ARG_ENABLE(demo,
+dnl AS_HELP_STRING([--enable-demo], [enable demo mode (default is off)]),
+dnl [case "${enableval}" in
+dnl     yes) orchids_demo=true ;;
+dnl     no)  orchids_demo=false ;;
+dnl     *)   AC_MSG_ERROR(bad value ${enableval} for --enable-demo) ;;
+dnl esac],
+dnl [orchids_demo=false]
+dnl )
+dnl if test "$orchids_demo" = "true" ; then
+dnl    AC_DEFINE([ORCHIDS_DEMO], 1, [Set to 1 if DEMO is requested])
+dnl fi
 
 dnl Removed because of security reasons
 dnl AC_ARG_ENABLE(preproc,
@@ -301,11 +302,11 @@ dnl Activate Debug log library
 AC_DEFINE([ENABLE_DEBUGLOG], 1, [Set to 1 if DEBUG is requested])
 
 AC_CHECK_LIBPCAP
-AC_CHECK_GNUPLOT
-AC_CHECK_GRAPHVIZ_DOT
-AC_CHECK_EPSTOPDF
-AC_CHECK_CONVERT
-AC_CHECK_DOXYGEN
+dnl AC_CHECK_GNUPLOT
+dnl AC_CHECK_GRAPHVIZ_DOT
+dnl AC_CHECK_EPSTOPDF
+dnl AC_CHECK_CONVERT
+dnl AC_CHECK_DOXYGEN
 
 AC_WITH_RUNTIME_USER
 

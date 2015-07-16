@@ -86,14 +86,22 @@ extern unsigned long dmalloc_orchids;
 #define MODNAME_MAX 32
 #define MAX_MODULES 256
 
-/* this is a trick to allow optimizer enable or disable fields in modules */
+/* this is a trick to allow optimizer enable or disable fields in modules (not used yet) */
 #define F_NOT_NEEDED ((void *)-1)
 
 #define MODE_ONLINE 0
 #define MODE_SYSLOG 1
 #define MODE_SNARE  2
 
+/* in state_t->flags (rule_compiler.h) */
+/* BYTECODE_HASH_PUSHFIELD is set if the state's code contains
+   a pushfield bytecode; this was once used to detect epsilon
+   transitions, but is no longer needed. */
 #define BYTECODE_HAS_PUSHFIELD 0x01
+  /* a state either has the EPSILON_STATE flag set, then all its outgoing transitions
+     are epsilon transitions; else, all its outgoing transitions are 'expect' transitions.
+  */
+#define EPSILON_STATE 0x02
 
 
 /**
@@ -157,33 +165,6 @@ struct event_s
   event_t   *next;
 };
 
-/**
- ** @struct active_event_s
- **   A record of a active event, referenced by a state instance.
- **   Used for the active events list and the reference count.
- **/
-/**   @var active_event_s::event
- **     A pointer to the event data.
- **/
-/**   @var active_event_s::next
- **     A pointer to the next active event.
- **/
-/**   @var active_event_s::prev
- **     A pointer to the previous active event.
- **/
-/**   @var active_event_s::refs
- **     The number of state instance that references this event
- **/
-typedef struct active_event_s active_event_t;
-struct active_event_s
-{
-  gc_header_t    gc;
-  event_t        *event;
-  active_event_t *next;
-  active_event_t *prev;
-  int32_t         refs;
-};
-
 typedef struct orchids_s orchids_t;
 
 
@@ -194,6 +175,7 @@ typedef int monotony;
 #define MONO_MONO     1
 #define MONO_ANTI     2
 #define MONO_CONST    (MONO_MONO|MONO_ANTI)
+#define MONO_THRASH   4
 
 /**
  ** @struct field_record_s
@@ -261,36 +243,12 @@ field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields);
 ** data structure for automata representation **
 *---------------------------------------------*/
 
-#define SF_NOFLAGS  0x00000000
-#define SF_PRUNED   0x00000002
-#define SF_PATHMARK 0xF0000000
-
-#define THREAD_BUMP     0x00000001
-#define THREAD_ONLYONCE 0x00000002
-#define THREAD_KILLED   0x00000004
-
-#define RULE_INUSE     0x00000008
-
-#define THREAD_IS_ONLYONCE(t) ((t)->flags & THREAD_ONLYONCE)
-#define THREAD_IS_KILLED(t) ((t)->flags & THREAD_KILLED)
-
-/** Mark a thread as killed.  It will be deallocated later. */
-#define KILL_THREAD(ctx, t) \
-      (t)->flags |= THREAD_KILLED
-
-
-#define NO_MORE_THREAD(r) ((r)->threads == 0)
-
-#define INIT_STATE_INST 0x00000001
-
 typedef struct transition_s transition_t;
 typedef struct state_s state_t;
 typedef struct rule_s rule_t;
 typedef struct rule_instance_s rule_instance_t;
 typedef struct state_instance_s state_instance_t;
 typedef unsigned long bytecode_t;
-
-typedef struct wait_thread_s wait_thread_t;
 
 typedef struct input_module_s input_module_t;
 typedef struct realtime_input_s realtime_input_t;
@@ -321,7 +279,6 @@ typedef struct rule_compiler_s rule_compiler_t;
 struct transition_s
 {
   state_t *dest;
-  /* int state_id; */ /* XXX: NOT USED */
   int32_t  required_fields_nb;
   int32_t *required_fields;
   bytecode_t *eval_code;
@@ -363,10 +320,12 @@ struct state_s
   char         *name;
   int32_t       line;
   bytecode_t   *action;
-  int32_t       trans_nb;
+  size_t        trans_nb;
   transition_t *trans;
   rule_t       *rule;
   uint32_t      flags;
+#define STATE_COMMIT 0x1
+#define STATE_NO_WAIT 0x2
   int32_t       id;
 };
 
@@ -426,104 +385,33 @@ struct rule_s
   time_t	    file_mtime;
   int32_t           lineno;
   char             *name;
-  int32_t           state_nb;
+  size_t            state_nb;
   state_t          *state;
-  int32_t           trans_nb;
+  size_t            trans_nb;
   ovm_var_t       **static_env;
   int32_t           static_env_sz;
-  int32_t           dynamic_env_sz;
+  int32_t           dynamic_env_sz; /* do not change type to, e.g., size_t:
+				      ovm_write_value(), ovm_release_value() all depend on this
+				      to hold at most 32 bits---that should
+				      be enough anyway */
   char            **var_name;
   int32_t          *start_conds;
   size_t            start_conds_sz;
   rule_t           *next;
-  int32_t           instances;
+  size_t            instances;
   int32_t           id;
 
   state_instance_t *init;
-  wait_thread_t    *ith; /* XXX: UNUSED */
-  wait_thread_t    *itt; /* XXX: UNUSED */
+#ifdef OBSOLETE
   int32_t           nb_init_threads; /* XXX: UNUSED */
+#endif
 
   objhash_t        *sync_lock;
   int32_t          *sync_vars;
-  int32_t           sync_vars_sz;
+  size_t           sync_vars_sz;
 
   /* XXX add rule stats here ??? */
 };
-
-
-/**
- ** @struct sync_lock_list_s
- **   Structure for the list of state instance holding a lock over
- **   synchronized variable(s).
- **/
-/** @var sync_lock_list_s::next
- **   A pointer to the next element in the list.
- **/
-/** @var sync_lock_list_s::state
- **   A pointer to a state instance holding a lock.
- **/
-typedef struct sync_lock_list_s sync_lock_list_t;
-struct sync_lock_list_s {
-  gc_header_t gc;
-  sync_lock_list_t *next;
-  state_instance_t *state;
-};
-
-
-/**
- ** @struct rule_instance_s
- **   Rule instance structure.
- **/
-/**   @var rule_instance_s::rule
- **     A reference to the rule definition.
- **/
-/**   @var rule_instance_s::first_state
- **     A pointer to the first state instance of this rule.
- **     This is an instance of the 'init' state of the reference rule.
- **     It is the root of the paths tree.
- **/
-/**   @var rule_instance_s::next
- **     A pointer to the next rule instance in the global rule_instance list.
- **/
-/**   @var rule_instance_s::state_instances
- **     Number of state instances in this rule instance.
- **/
-/**   @var rule_instance_s::creation_date
- **     Rule instance creation date.
- **/
-/**   @var rule_instance_s::state_list
- **     Re-trigger list for this rule instance (reverse chronological order).
- **/
-/**   @var rule_instance_s::max_depth
- **     Biggest path depth. (for statistics).
- **/
-/**   @var rule_instance_s::threads
- **     XXX
- **/
-/**   @var rule_instance_s::flags
- **     Flags.
- **/
-struct rule_instance_s
-{
-  gc_header_t gc;
-  rule_t *rule;
-  state_instance_t *first_state;
-  rule_instance_t  *next;
-  unsigned long     state_instances;
-  time_t            creation_date;
-  timeval_t         new_creation_date;
-  timeval_t         new_last_act;
-  wait_thread_t    *queue_head;
-  wait_thread_t    *queue_tail;
-  state_instance_t *state_list;
-  int32_t           max_depth;
-  int32_t           threads;
-  uint32_t          flags;
-  /* List of state instance that have synchronisation locks */
-  sync_lock_list_t *sync_lock_list;
-};
-
 
 typedef struct env_bind_s env_bind_t;
 struct env_bind_s {
@@ -563,103 +451,76 @@ struct heap_s {
   heap_t *right;
 };
 
-struct thread_local_list_s; /* private; defined in mod_utils.c */
-
-/**
- ** @struct state_instance_s
- ** State instance structure.
- **/
-/**   @var state_instance_s::first_child
- **     First child (the next state in the exec path.
- **/
-/**   @var state_instance_s::next_sibling
- **     Next sibling. This is another 'thread' fork.
- **/
-/**   @var state_instance_s::parent
- **     Parent state instance (for issdl_dumpstack()).
- **/
-/**   @var state_instance_s::event
- **     Event that permit to reach this state.
- **/
-/**   @var state_instance_s::flags
- **     State flags. (re-trigger, ...).
- **/
-/**   @var state_instance_s::state
- **     Reference to state declaration.
- **/
-/**   @var state_instance_s::rule_instance
- **     Reference to the rule instance that contain this state instance.
- **/
-/**   @var state_instance_s::env
- **     Environment: trie of values allocated by actions in this state instance.
- **/
-/**   @var state_instance_s::thread_locals
- **     List of thread_local objects that have an instance local to this state_instance
- **     (see mod_utils.h)
- **/
-/**   @var state_instance_s::retrig_next
- **     Re-trigger list for THIS rule instance only.
- **/
-struct state_instance_s
-{
+struct thread_group_s {
   gc_header_t gc;
-  state_instance_t *first_child;
-  state_instance_t *next_sibling;
-  state_instance_t *parent;
-  active_event_t   *event;
-  int32_t           event_level;
-  uint32_t          flags;
-  state_t          *state; /* pointer to some state
-			      in rule_instance->rule->state[] array */
-  rule_instance_t  *rule_instance;
-  ovm_var_t        *env;
-  struct thread_local_list_s *thread_locals;
-  state_instance_t *retrig_next;
-  wait_thread_t    *thread_list;
-  state_instance_t *next_report_elmt;
+  rule_t *rule; /* the 'formula F' in the spec */
+  size_t nsi; /* number of state instances that have this pid */
+  uint32_t flags;
+#define THREAD_KILL 0x1
+};
+typedef struct thread_group_s thread_group_t;
+
+/* A state_instance_t is what is called a thread (I know, it's
+   confusing) in the spec.
+*/
+
+#define MAX_HANDLES (32)
+typedef uint32_t handle_bitmask_t;
+#define HANDLE_FAKE_VAR(k) (ULONG_MAX-(k))
+
+struct state_instance_s {
+  gc_header_t gc;
+  struct thread_group_s *pid;
+  state_t *q;  /* pointer to some state
+		  in rule_instance->rule->state[] array */
+  transition_t *t;
+  ovm_var_t *env; /* 'rho' in the spec */
+  handle_bitmask_t owned_handles; /* bitmask of handles I do own;
+				     the value of handle k is obtained by looking
+				     for fake variable HANDLE_FAKE_VAR(k) in env; no value there
+				     means the handle in fact does not exist. */
+  uint16_t nhandles; /* between 0 and MAX_HANDLES-1: copied lazily;
+		      above MAX_HANDLES: copied at each creation of a state_instance_t
+		      (costly, but is not meant to happen) */
+  /* The 'lock' component of the spec will be found in rule->sync_lock,
+     rule->sync_vars, rule->sync_vars_sz
+  */
 };
 
-/* ------------------------------------------------------ */
-
-/**
- ** @struct wait_thread_s
- **   This is a (virtual, not system) thread that waits for
- **   an event to pass a given transition.
- **/
-/**   @var wait_thread_s::next
- **     Next thread in queue.
- **/
-/**   @var wait_thread_s::prev
- **     Previous thread in queue.
- **/
-/**   @var wait_thread_s::rule_instance
- **     A reference to the rule instance.
- **/
-/**   @var wait_thread_s::trans
- **     A pointer to transition to pass.
- **/
-/**   @var wait_thread_s::state_instance
- **     A reference to the state instance.
- **/
-/**   @var wait_thread_s::flags
- **     Flags.
- **/
-/**   @var wait_thread_s::pass
- **     Pass count.
- **/
-struct wait_thread_s
-{
+struct thread_queue_elt_s {
   gc_header_t gc;
-  wait_thread_t    *next;
-  transition_t     *trans; /* pointer to an already allocated transition */
-  state_instance_t *state_instance;
-  wait_thread_t    *next_in_state_instance;
-  unsigned long     flags;
-  unsigned int      pass;
-#ifdef TIMEOUT_OBSOLETE
-  time_t            timeout;
-#endif
+  struct thread_queue_elt_s *next;
+  struct state_instance_s *thread;
+  /* thread can be NULL, in which case it is interpreted as BUMP,
+     the funny curved arrow symbol in the spec (see top of p.18)
+  */
 };
+typedef struct thread_queue_elt_s thread_queue_elt_t;
+
+struct thread_queue_s {
+  gc_header_t gc;
+  size_t nelts; /* number of elements, not counting instances of BUMP (NULL) */
+  struct thread_queue_elt_s *first;
+  struct thread_queue_elt_s *last; /* or NULL if queue is empty */
+};
+typedef struct thread_queue_s thread_queue_t;
+
+/* --- in engine.c: --- */
+
+/* Create a fresh handle to a mutable data val.
+   Return handle number (between 0 and MAX_HANDLES), or TOO_MANY_HANDLES
+   if we ran out of handles.
+*/
+uint16_t create_fresh_handle (gc_t *gc_ctx, state_instance_t *si, ovm_var_t *val);
+
+/* Free a handle for reuse. */
+int release_handle (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
+
+/* Get object referenced by handle --- for reading only */
+ovm_var_t *handle_get_rd (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
+
+/* Get object referenced by handle --- we may write into the object */
+ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
 
 
 /* ------------------------------------------------------ */
@@ -860,21 +721,40 @@ struct issdl_function_s
 /* Possible values for compute_monotony field
    (non-exclusive): */
 monotony m_const (rule_compiler_t *ctx, struct node_expr_s *e,
-		  monotony args[]); /* for maps returning a constant */
+		  monotony args[]); /* for maps returning a constant, no side-effect */
+monotony m_const_thrash (rule_compiler_t *ctx, struct node_expr_s *e,
+			 monotony args[]); /* for maps returning a constant,
+					      but may have side-effects (printing, exiting,
+					      etc.) */
 /* The m_unknown_<n> functions are for maps of <n> arguments,
    returning a value that may increase or decrease, we do not know;
    but at least if you call it twice on the same argument, you get
-   the same result */
+   the same result (no side-effect) */
 monotony m_unknown_1 (rule_compiler_t *ctx, struct node_expr_s *e,
 		      monotony args[]);
 monotony m_unknown_2 (rule_compiler_t *ctx, struct node_expr_s *e,
 		      monotony args[]);
+/* The m_unknown_<n>_thrash functions are for maps of <n> arguments,
+   returning a value that may increase or decrease, we do not know,
+   and with possible side-effects; */
+monotony m_unknown_1_thrash (rule_compiler_t *ctx, struct node_expr_s *e,
+			     monotony args[]);
+monotony m_unknown_2_thrash (rule_compiler_t *ctx, struct node_expr_s *e,
+			     monotony args[]);
 monotony m_random (rule_compiler_t *ctx, struct node_expr_s *e,
 		   monotony args[]); /* for maps returning a value
 					that may increase or decrease,
 					we do not know; additional,
 					calling them twice may return
-					different results */
+					different results; but they do not have
+					side-effects */
+monotony m_random_thrash (rule_compiler_t *ctx, struct node_expr_s *e,
+			  monotony args[]); /* for maps returning a value
+					       that may increase or decrease,
+					       we do not know; additional,
+					       calling them twice may return
+					       different results; and they may
+					       have side-effects */
 
 typedef struct mod_entry_s mod_entry_t;
 
@@ -1118,18 +998,6 @@ struct reportmod_s {
 /**   @var orchids_s::retrig_list
  **     Global retrig list : list of all active state instance.
  **/
-/**   @var orchids_s::active_events
- **     Number of active events.
- **/
-/**   @var orchids_s::rule_instances
- **     Number of extant rule instances.
- **/
-/**   @var orchids_s::state_instances
- **     Number of extant state instances.
- **/
-/**   @var orchids_s::threads
- **     Total number of threads.
- **/
 /**   @var orchids_s::ovm_stack
  **     Orchids virtual machine stack.
  **/
@@ -1255,25 +1123,26 @@ struct orchids_s
   /*int32_t             num_fields; suppressed: now global_fields->num_fields */
   /* field_record_t     *global_fields; replaced by the following: */
   field_record_table_t *global_fields;
-  uint32_t            events;
+  size_t             events;
   rule_compiler_t    *rule_compiler;
   timeval_t           poll_period;
   rulefile_t         *rulefile_list;
   rulefile_t         *last_rulefile;
+#ifdef OBSOLETE
   rule_instance_t    *first_rule_instance;
   rule_instance_t    *last_rule_instance;
   state_instance_t   *retrig_list;
-  uint32_t            active_events;
-  unsigned long       rule_instances;
-  unsigned long       state_instances;
-  uint32_t            threads;
+#endif
   lifostack_t        *ovm_stack;
   issdl_function_t   *vm_func_tbl;
   int32_t             vm_func_tbl_sz;
   int32_t             off_line_mode;
   char               *off_line_input_file;
   bool_t              daemon;
+  bool_t              verbose;
+  bool_t              actmon;
 
+#ifdef OBSOLETE
   wait_thread_t  *current_tail;
   wait_thread_t  *cur_retrig_qh;
   wait_thread_t  *cur_retrig_qt;
@@ -1285,13 +1154,18 @@ struct orchids_s
   active_event_t *active_event_head;
   active_event_t *active_event_tail;
   active_event_t *active_event_cur;
+#endif
+  struct thread_queue_s *thread_queue;
+  event_t *current_event;
 
   timeval_t  preconfig_time;
   timeval_t  postconfig_time;
   timeval_t  compil_time;
   timeval_t  postcompil_time;
 
+#ifdef OBSOLETE
   FILE *evt_fb_fp;
+#endif
 
   /* global temporal information container */
   /* XXX: Move this into mod_period */
@@ -1303,7 +1177,7 @@ struct orchids_s
 
   pid_t pid;
 
-  uint32_t reports;
+  size_t reports;
 
   timeval_t last_evt_act;
   timeval_t last_mod_act; /* XXX: UNUSED: last time when a mod was ins or rem */

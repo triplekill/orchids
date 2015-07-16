@@ -88,6 +88,7 @@ static size_t qstr_sz_g;
 "state"    { return (STATE);    }
 "synchronize" { return (SYNCHRONIZE); }
 "goto"     { return (GOTO);     }
+"case"     { return (CASE);     }
 "if"       { return (IF);       }
 "else"     { return (ELSE);     }
 "expect"   { return (EXPECT);   }

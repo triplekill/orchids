@@ -33,12 +33,8 @@ rule shortestrun
       goto have_b;
   }
 
-  state have_d
+  state have_d commit
   {
     print("ACCEPT");
-    dump_stack();
-    /* dump_dot_pathtree(); */
-    /* show_stats(); */
-    shutdown();
   }
 }

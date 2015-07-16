@@ -14,29 +14,17 @@
 #ifndef MOD_XML_H_
 # define MOD_XML_H_
 
-/* xml_doc_t's are basically a pair of an xmlDocPtr doc, and an
-   xmlXPathContextPtr xpath_ctx.
-   However, there is potentially one per state_instance.
-   This is similar to the notion of buffer-local variable in Emacs.
-*/
-
-struct thread_local_obj_s;
-
-typedef struct xml_doc_s {
-  struct thread_local_obj_s *tl; /* see mod_utils.h; objets stored are of C type xmlDocPtr */
-  xmlXPathContextPtr xpath_ctx;
-} xml_doc_t;
-
 char *xml_desc (void);
 
-ovm_var_t *ovm_xml_new(gc_t *gc_ctx, xmlDocPtr doc, xmlXPathContextPtr xpath_ctx,
-		       char *description);
-#define XMLDOC_RD(gc_ctx,state,var) ((xmlDocPtr)thread_local_obj_rd (gc_ctx, state, ((xml_doc_t *)EXTPTR(var))->tl))
-#define XMLDOC_RW(gc_ctx,state,var) ((xmlDocPtr)thread_local_obj_rw (gc_ctx, state, ((xml_doc_t *)EXTPTR(var))->tl))
+uint16_t ovm_xml_new(gc_t *gc_ctx, state_instance_t *si,
+		     xmlXPathContextPtr xpath_ctx,
+		     char *description);
+/* si may not be NULL; actual xml document is in xpath_ctx->doc;
+ return handle number (see orchids.h, functions create_fresh_handle() and others) */
 
-#define XMLPATHCTX(var) ((xml_doc_t *)EXTPTR(var))->xpath_ctx
+xmlXPathContextPtr xmlGetContextRd(gc_t *gc_ctx, state_instance_t *si, ovm_var_t *var);
 
-char *xml_get_string(xml_doc_t	*xml_doc,
+char *xml_get_string(xmlXPathContextPtr xpath_ctx,
 		     char	*path);
 
 xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
@@ -52,9 +40,6 @@ xmlNode *new_xs_datetime_node(xmlNode *parent,
 xmlNodePtr
 xml_walk_and_create (xmlXPathContextPtr ctx,
 		     xmlChar	*path);
-
-void
-free_xml_doc(void	*ptr);
 
 
 #endif /* !MOD_XML_H_ */

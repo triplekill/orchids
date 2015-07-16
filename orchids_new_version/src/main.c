@@ -57,8 +57,7 @@ sig_chld(int signo)
 }
 
 
-static void
-change_run_id(char *username)
+static void change_run_id(char *username)
 {
   struct passwd *pwent;
   int ret;
@@ -114,14 +113,15 @@ main(int argc, char *argv[])
 
   DebugLog(DF_CORE, DS_NOTICE, "ORCHIDS -- starting\n");
 
-#ifdef ORCHIDS_DEMO
-  printf("%s", ORCHIDS_BANNER);
-#endif
-
   Xsignal(SIGCHLD, sig_chld);
 
   ctx = new_orchids_context();
   parse_cmdline(ctx, argc, argv);
+  if (ctx->verbose)
+    {
+      fputs (ORCHIDS_BANNER,stdout);
+      fflush (stdout);
+    }
 
   if (ctx->daemon)
     daemonize(LOCALSTATEDIR "/orchids/log/orchids.stdout",
@@ -158,7 +158,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 {
   char opt;
 
-  while ((opt = getopt(argc, argv, "hc:o:b:f:r:d:D")) != -1) {
+  while ((opt = getopt(argc, argv, "hc:o:b:f:r:d:Dvm")) != -1) {
     switch (opt) {
 
     case 'h':
@@ -223,6 +223,13 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       break;
 #endif /* ENABLE_DEBUGLOG */
 
+    case 'v':
+      ctx->verbose = 1;
+      break;
+
+    case 'm':
+      ctx->actmon = 1;
+      break;
 
     default:
       orchids_usage(argv[0]);
@@ -242,6 +249,8 @@ orchids_usage(char *prg)
   fprintf(stderr, "  -o <off-line_mode> off-line input file type (default syslog)\n");
   fprintf(stderr, "  -f <input_file>    input file\n");
   fprintf(stderr, "  -r <rule_file>     rule file\n");
+  fprintf(stderr, "  -v                 verbose mode\n");
+  fflush(stderr);
 }
 
 

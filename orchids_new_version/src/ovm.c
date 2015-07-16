@@ -642,7 +642,7 @@ static int ovm_push(isn_param_t *param)
 
   DebugLog(DF_OVM, DS_DEBUG,
            "OP_PUSH [%02lx] ($%s)\n",
-            op, state->state->rule->var_name[op]);
+            op, state->q->rule->var_name[op]);
 
   res = ovm_read_value (state->env, op);
   PUSH_VALUE(param->ctx,res);
@@ -650,143 +650,20 @@ static int ovm_push(isn_param_t *param)
   return 0;
 }
 
-static void env_bind_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  env_bind_t *bind = (env_bind_t *)p;
-
-  GC_TOUCH (gc_ctx, bind->val);
-}
-
-static void env_bind_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
-static int env_bind_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-			      void *data)
-{
-  env_bind_t *bind = (env_bind_t *)p;
-  int err = 0;
-
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)bind->val, data);
-  return err;
-}
-
-static gc_class_t env_bind_class = {
-  GC_ID('b','i','n','d'),
-  env_bind_mark_subfields,
-  env_bind_finalize,
-  env_bind_traverse
-};
-
-static void env_split_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  env_split_t *split = (env_split_t *)p;
-
-  GC_TOUCH (gc_ctx, split->left);
-  GC_TOUCH (gc_ctx, split->right);
-}
-
-static void env_split_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
-static int env_split_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-			      void *data)
-{
-  env_split_t *split = (env_split_t *)p;
-  int err = 0;
-
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)split->left, data);
-  if (err)
-    return err;
-  err = (*gtc->do_subfield) (gtc, (gc_header_t *)split->right, data);
-  return err;
-}
-
-static gc_class_t env_split_class = {
-  GC_ID('s','p','l','t'),
-  env_split_mark_subfields,
-  env_split_finalize,
-  env_split_traverse
-};
-
 static int ovm_pop(isn_param_t *param)
 {
+  ovm_var_t *env;
   ovm_var_t *val;
   state_instance_t *state = param->state;
   bytecode_t op = param->ip[1];
   orchids_t *ctx = param->ctx;
   gc_t *gc_ctx = ctx->gc_ctx;
-  ovm_var_t *env;
-  ovm_var_t *branch[32]; /*depth of environment is at most 32,
-			   since indexed by int32_t's in general
-			   (here by a bytecode_t, but see
-			   static_env_sz in rule_s, orchids.h */
-  ovm_var_t **branchp;
-  bytecode_t mask, op2;
-  ovm_var_t *env_left, *env_right;
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_POP [%02lx] ($%s)\n",
-            op, state->state->rule->var_name[op]);
+            op, state->q->rule->var_name[op]);
   val = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  for (env = state->env, mask = 1L, branchp=branch; env!=NULL; mask <<= 1)
-    if (TYPE(env)==T_BIND)
-      break;
-    else if (op & mask)
-      {
-	*branchp++ = ((env_split_t *)env)->left;
-	env = ((env_split_t *)env)->right;
-      }
-    else
-      {
-	*branchp++ = ((env_split_t *)env)->right;
-	env = ((env_split_t *)env)->left;
-      }
-  if (env!=NULL)
-    {
-      op2 = ((env_bind_t *)env)->var;
-      if (op2!=op)
-	for (;; mask<<=1)
-	  {
-	    if ((op2 & mask)==(op & mask))
-	      *branchp++ = NULL;
-	    else
-	      {
-		*branchp++ = env;
-		mask <<= 1;
-		break;
-	      }
-	  }
-    }
-  GC_START(gc_ctx, 1);
-  env = gc_alloc (gc_ctx, sizeof(env_bind_t), &env_bind_class);
-  env->gc.type = T_BIND;
-  ((env_bind_t *)env)->var = op;
-  GC_TOUCH (gc_ctx, ((env_bind_t *)env)->val = val);
-  GC_UPDATE(gc_ctx, 0, env);
-  for (; branchp > branch; )
-    {
-      mask >>= 1;
-      if (op & mask)
-	{
-	  env_left = *--branchp;
-	  env_right = env;
-	}
-      else
-	{
-	  env_left = env;
-	  env_right = *--branchp;
-	}
-      env = gc_alloc (gc_ctx, sizeof(env_split_t), &env_split_class);
-      env->gc.type = T_SPLIT;
-      GC_TOUCH (gc_ctx, ((env_split_t *)env)->left = env_left);
-      GC_TOUCH (gc_ctx, ((env_split_t *)env)->right = env_right);
-      GC_UPDATE(gc_ctx, 0, env);
-    }
+  env = ovm_write_value (gc_ctx, state->env, op, val);
   GC_TOUCH (gc_ctx, state->env = env);
-  GC_END(gc_ctx);
   STACK_DROP(ctx->ovm_stack, 1);
 
   param->ip += 2;
@@ -828,7 +705,7 @@ static int ovm_pushstatic(isn_param_t *param)
   bytecode_t op = param->ip[1];
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_PUSHSTATIC [%lu]\n", op);
-  PUSH_VALUE (ctx, state->state->rule->static_env[op]);
+  PUSH_VALUE (ctx, state->q->rule->static_env[op]);
   param->ip += 2;
   return 0;
 }

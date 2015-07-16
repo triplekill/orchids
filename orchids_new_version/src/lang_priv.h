@@ -129,6 +129,7 @@ static ovm_var_t *db_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 static void * extern_get_data(ovm_var_t *address);
 static size_t extern_get_data_len(ovm_var_t *address);
+static ovm_var_t *extern_clone(gc_t *gc_ctx, ovm_var_t *var);
 
 #endif /* LANG_PRIV_H */
 

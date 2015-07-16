@@ -31,7 +31,7 @@ rule ssh_failed_long_window
       goto first;
   }
 
-  state first
+  state first!
   {
     AGGR_INIT
 
@@ -51,17 +51,11 @@ rule ssh_failed_long_window
     $last = TIME_FIELD;
     $diff_begin = _CTIME(0);
     $diff_last = _CTIME(0);
-    $mark = mark();
-    expect ($start == 1)
-      goto loop;
+    goto loop;
   }
 
-  state loop
+  state loop!
   {
-    // Delete the waiting threads from the previous state
-    mark_cut($mark);
-    $mark = mark();
-
     $count = $count + 1;
     if ($begin != TIME_FIELD)
     {
@@ -70,31 +64,19 @@ rule ssh_failed_long_window
     }
     $last = TIME_FIELD;
 
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_begin < WINDOW)
-	    && ($count >= THRESH))
-      goto alert;
-
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_begin < WINDOW)
-	    && ($count < THRESH))
-      goto loop;
-
-    expect ((CONDITION)
-	    && (AGGR_COND)
-	    && ($diff_begin > WINDOW))
+    expect ((CONDITION) && (AGGR_COND))
+      goto proceed;
+    expect (TIME_FIELD > $begin+WINDOW)
       goto stop;
-
-    expect (defined(TIME_FIELD)
-	    && TIME_FIELD - $begin > WINDOW)
-      goto stop;
-
   }
 
+  state proceed! {
+    case ($count>=THRESH) goto alert;
+    else case ($diff_begin >= WINDOW) goto stop;
+    else goto loop;
+  }
 
-  state alert
+  state alert!
   {
     $str_source = str_from_ipv4($source);
     $m = "More than " + str_from_uint(THRESH) + " events in less than " + str_from_ctime(WINDOW) + " seconds from " + $str_source ;
@@ -122,11 +104,10 @@ rule ssh_failed_long_window
 
     $m = "Alert : More than " + str_from_uint(THRESH) + " events in less than " + str_from_ctime(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
     print ($m);
-    kill_threads();
   }
 
-  state stop
+  state stop!
   {
-    kill_threads();
+    /* all went well */
   }
 }

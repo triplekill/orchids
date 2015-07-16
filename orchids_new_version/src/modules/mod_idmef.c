@@ -49,10 +49,12 @@
 
 input_module_t mod_idmef;
 
-static type_t t_idmef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_idmef = { "xmldoc", T_UINT }; /* convertible with xmldoc type */
 
 field_t idmef_fields[MAX_IDMEF_FIELDS] = {
+#ifdef OBSOLETE
   { "idmef.ptr", &t_idmef, MONO_UNKNOWN, "idmef xml doc"   }
+#endif
 };
 
 static ovm_var_t* parse_idmef_datetime(gc_t *gc_ctx, char *datetime)
@@ -135,15 +137,17 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
 		     BAD_CAST ("http://iana.org/idmef"));
 
   GC_START(gc_ctx, MAX_IDMEF_FIELDS+1);
+#ifdef OBSOLETE
   val = ovm_xml_new (gc_ctx, doc, xpath_ctx, xml_desc());
   GC_UPDATE (gc_ctx, F_PTR, val);
+#endif
 
   for (c = 1; c < cfg->nb_fields; c++)
   {
     char	*text;
     int		text_len;
 
-    if ((text = xml_get_string((xml_doc_t *)EXTPTR(doc), cfg->field_xpath[c])) != NULL)
+    if ((text = xml_get_string(xpath_ctx, cfg->field_xpath[c])) != NULL)
     {
       switch (idmef_fields[c].type->tag)
       {
@@ -319,12 +323,12 @@ ovm_var_t *idmef_generate_alert(orchids_t	*ctx,
   xmlNode	*cur_node = NULL;
   xmlXPathContext *alert_ctx = NULL;
   char		buff[PATH_MAX];
-
   xmlNs		*ns;
   struct timeval tv;
   unsigned long ntph;
   unsigned long ntpl;
   idmef_cfg_t	*cfg = mod->config;
+  uint16_t handle;
 
 
   gettimeofday(&tv, NULL);
@@ -366,7 +370,8 @@ ovm_var_t *idmef_generate_alert(orchids_t	*ctx,
 	     xmlEncodeEntities(alert_root->doc,
 			       BAD_CAST buff));
 
-  return ovm_xml_new (ctx->gc_ctx, alert_doc, alert_ctx, xml_desc());
+  handle = ovm_xml_new (ctx->gc_ctx, state, alert_ctx, xml_desc());
+  return ovm_uint_new (ctx->gc_ctx, (unsigned long)handle);
 }
 
 
@@ -383,7 +388,8 @@ static void issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state)
 
 static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*var;
+  ovm_var_t	*var, *doc1;
+  xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
   static mod_entry_t	*mod_entry = NULL;
   idmef_cfg_t*	cfg;
@@ -398,7 +404,7 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 
   cfg = (idmef_cfg_t *)mod_entry->config;
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_desc())
+  if (var==NULL || TYPE(var)!=T_UINT) /* an uint handle to an xmlXPathContextPtr */
     {
       DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
       STACK_DROP(ctx->ovm_stack, 1);
@@ -412,28 +418,36 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
     }
   else
     {
-      doc = XMLDOC_RD(ctx->gc_ctx, state, var);
-
-      gettimeofday(&tv, NULL);
-      Timer_to_NTP(&tv, ntph, ntpl);
-
-      // Write the report into the reports dir
-      snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
-	       cfg->report_dir, "report-", ntph, ntpl, ".xml");
-      fp = fopen(buff, "w");
-      if (fp==NULL)
-	{
-	  DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
-		   buff, strerror(errno));
-	  STACK_DROP(ctx->ovm_stack, 1);
-	  PUSH_RETURN_FALSE(ctx);
-	}
+      doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(var));
+      xpath_ctx = EXTPTR(doc1);
+      if (xpath_ctx==NULL)
+	doc = NULL;
       else
+	doc = xpath_ctx->doc;
+
+      if (doc!=NULL)
 	{
-	  xmlDocFormatDump(fp, doc, 1);
-	  (void) fclose(fp);
-	  STACK_DROP(ctx->ovm_stack, 1);
-	  PUSH_RETURN_TRUE(ctx);
+	  gettimeofday(&tv, NULL);
+	  Timer_to_NTP(&tv, ntph, ntpl);
+
+	  // Write the report into the reports dir
+	  snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
+		   cfg->report_dir, "report-", ntph, ntpl, ".xml");
+	  fp = fopen(buff, "w");
+	  if (fp==NULL)
+	    {
+	      DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
+		       buff, strerror(errno));
+	      STACK_DROP(ctx->ovm_stack, 1);
+	      PUSH_RETURN_FALSE(ctx);
+	    }
+	  else
+	    {
+	      xmlDocFormatDump(fp, doc, 1);
+	      (void) fclose(fp);
+	      STACK_DROP(ctx->ovm_stack, 1);
+	      PUSH_RETURN_TRUE(ctx);
+	    }
 	}
     }
 }
@@ -476,7 +490,7 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 issdl_idmef_write_alert,
 			 "idmef_write_alert",
 			 1, idmef_write_alert_sigs,
-			 m_random,
+			 m_random_thrash,
 			 "write idmef alert into the report folder");
 
   return cfg;

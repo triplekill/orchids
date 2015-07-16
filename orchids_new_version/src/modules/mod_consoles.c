@@ -50,6 +50,8 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   int ok;
 
   con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (con==NULL)
+    goto err;
   switch (TYPE(con))
     {
     case T_STR:
@@ -57,17 +59,21 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
       break;
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
+    err:
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_RETURN_FALSE(ctx);
       return;
     }
   str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  if (str==NULL)
+    goto errstr;
   switch (TYPE(str))
     {
     case T_STR: s = STR(str); len = STRLEN(str); break;
     case T_VSTR: s = VSTR(str); len = VSTRLEN(str); break;
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(str));
+    errstr:
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_RETURN_FALSE(ctx);
       return;
@@ -88,8 +94,11 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *con;
   char *c;
   int ok;
+  event_t *evt;
 
-  con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (con==NULL)
+    goto err;
   switch (TYPE(con))
     {
     case T_STR:
@@ -97,14 +106,16 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
       break;
     default:
       DebugLog(DF_ENG, DS_ERROR, "parameter type error (%i)\n", TYPE(con));
-      STACK_DROP(ctx->ovm_stack, 1);
+    err:
+      STACK_DROP(ctx->ovm_stack, 2);
       PUSH_RETURN_FALSE(ctx);
       return;
     }
   c = ovm_strdup(ctx->gc_ctx, con);
-  ok = output_console_evt(ctx, c, state);
+  evt = (event_t *)STACK_ELT(ctx->ovm_stack, 1);
+  ok = output_console_evt(ctx, c, evt);
   gc_base_free (c);
-  STACK_DROP(ctx->ovm_stack, 1);
+  STACK_DROP(ctx->ovm_stack, 2);
   if (ok)
     PUSH_RETURN_TRUE(ctx);
   else PUSH_RETURN_FALSE(ctx);
@@ -113,7 +124,7 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
 static const type_t *console_msg_sig[] = { &t_int, &t_str, &t_str }; /* returns 0 or 1, in fact */
 static const type_t **console_msg_sigs[] = { console_msg_sig, NULL };
 
-static const type_t *console_evt_sig[] = { &t_int, &t_str }; /* returns 0 or 1, in fact */
+static const type_t *console_evt_sig[] = { &t_int, &t_str, &t_event }; /* returns 0 or 1, in fact */
 static const type_t **console_evt_sigs[] = { console_evt_sig, NULL };
 
 static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -124,11 +135,11 @@ static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
            "loading consoles module @ %p\n", (void *) &mod_consoles);
   register_lang_function(ctx, issdl_console_msg, "console_msg",
 			 2, console_msg_sigs,
-			 m_unknown_2,
+			 m_unknown_2_thrash,
 			 "Console message output");
   register_lang_function(ctx, issdl_console_evt, "console_evt",
 			 1, console_evt_sigs,
-			 m_unknown_1,
+			 m_unknown_2_thrash,
 			 "Console event output");
   mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
   mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);
@@ -228,7 +239,7 @@ static int output_console_msg(char *console, char *msg, size_t len)
 
 
 static int output_console_evt(orchids_t *ctx, char *console,
-			       state_instance_t *state)
+			      event_t *evt)
 {
   console_t *con;
 
@@ -241,12 +252,10 @@ static int output_console_evt(orchids_t *ctx, char *console,
       return 0;
     }
 
-  for ( ; state!=NULL && state->event == NULL; state = state->parent)
-    ;
-  if (state!=NULL && state->event!=NULL)
-    fprintf_event(con->fp, ctx, state->event->event);
+  if (evt!=NULL)
+    fprintf_event(con->fp, ctx, evt);
   else
-    fprintf(con->fp, "No event to display.\n");
+    fprintf(con->fp, "No event.\n");
   fflush(con->fp);
   return 1;
 }

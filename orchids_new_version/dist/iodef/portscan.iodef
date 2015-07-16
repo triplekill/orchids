@@ -13,18 +13,18 @@
     </Method>
     <Contact role="creator" type="organization">
       <ContactName>Orchids</ContactName>
-      <Email>Orchids@orchrids.ids</Email>
+      <Email>orchids@lsv.ens-cachan.fr</Email>
     </Contact>
     <EventData>
       <Flow>
         <System category="source">
           <Node>
-            <Address category="ipv4-addr">$.snort.sip</Address>
+            <Address category="ipv4-addr">$sip</Address>
           </Node>
         </System>
         <System category="target">
           <Node>
-            <Address category="ipv4-addr">$.snort.dip</Address>
+            <Address category="ipv4-addr">$dip</Address>
           </Node>
         </System>
       </Flow>

@@ -8,7 +8,7 @@ rule dhcp_lease_check {
       goto discover;
   }
 
-  state discover {
+  state discover! {
     $mac = .dhcpd.mac;
     print ("DHCP discover: a machine is waking up to the network");
 
@@ -20,14 +20,13 @@ rule dhcp_lease_check {
       goto alert_offer;
   }
 
-  state alert_offer {
+  state alert_offer! {
     print ("DHCP expecting offer, did not get any");
     report ();
   }
 
-  state offer {
+  state offer! {
     $ip = .dhcpd.ip;
-    cut ("discover");
 
     expect (.dhcpd.method == "DHCPREQUEST" &&
 	.dhcpd.mac == $mac &&
@@ -42,14 +41,12 @@ rule dhcp_lease_check {
       goto alert_request;
   }
 
-  state alert_request {
+  state alert_request! {
     print ("DHCP offer gotten, should have gotten request");
     report ();
   }
 
-  state request {
-    cut ("offer");
-
+  state request! {
     expect (.dhcpd.method == "DHCPACK" &&
 	.dhcpd.mac == $mac &&
 	.dhcpd.ip == $ip)
@@ -75,22 +72,23 @@ rule dhcp_lease_check {
       goto alert_bad_ip;
   }
 
-  state alert_client_request {
+  state alert_client_request! {
     print ("DHCP client requests a new IP without first releasing");
     report ();
   }
 
-  state alert_ack {
+  state alert_ack! {
     print ("DHCP request, no ack answered");
     report ();
   }
 
-  state alert_bad_ip {
+  state alert_bad_ip! {
     print ("DHCP server tried to change client ip address!");
     report ();
   }
 
-  state release {
+  state release! {
     print ("DHCP release, OK");
+    /* all ends well */
   }
 }

@@ -20,11 +20,9 @@ pkglib_LTLIBRARIES = \
   mod_period.la \
   mod_sharedvars.la \
   mod_timeout.la \
-  mod_ruletrace.la\
   mod_auditd.la \
   mod_htmlstate.la \
   mod_metaevent.la \
-  mod_mark.la \
   mod_openbsm.la
 
 
@@ -127,9 +125,6 @@ mod_sharedvars_la_LDFLAGS = -module -avoid-version
 mod_timeout_la_SOURCES = mod_timeout.c mod_timeout.h
 mod_timeout_la_LDFLAGS = -module -avoid-version
 
-mod_ruletrace_la_SOURCES = mod_ruletrace.c mod_ruletrace.h
-mod_ruletrace_la_LDFLAGS = -module -avoid-version
-
 if USE_PRELUDE
 mod_prelude_la_SOURCES = mod_prelude.c mod_prelude.h
 mod_prelude_la_CFLAGS = $(LIBPRELUDE_CFLAGS) $(LIBPRELUDEDB_CFLAGS)
@@ -159,9 +154,6 @@ endif
 
 mod_metaevent_la_SOURCES = mod_metaevent.c mod_metaevent.h
 mod_metaevent_la_LDFLAGS = -module -avoid-version
-
-mod_mark_la_SOURCES = mod_mark.c mod_mark.h
-mod_mark_la_LDFLAGS = -module -avoid-version
 
 if USE_NETSNMP
 mod_snmptrap_la_SOURCES = mod_snmptrap.c mod_snmptrap.h

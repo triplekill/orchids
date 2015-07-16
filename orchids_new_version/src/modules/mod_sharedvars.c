@@ -198,6 +198,13 @@ static const type_t **shdel_sigs[] = { shdel_sig, NULL };
 static const type_t *shset_sig[] = { &t_int, &t_str, &t_str }; /* returns 0 or 1, in fact */
 static const type_t **shset_sigs[] = { shset_sig, NULL };
 
+struct node_expr_s; /* in rule_compiler.h */
+monotony m_shset (rule_compiler_t *ctx, struct node_expr_s *e, monotony m[])
+{
+  m[0] |= MONO_THRASH; /* thrashes the first argument (shared variable) */
+  return MONO_UNKNOWN | MONO_THRASH;
+}
+
 static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   sharedvars_config_t *cfg;
@@ -217,7 +224,7 @@ static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_set_shared_var,
                          "set_shared_var",
 			 2, shset_sigs,
-			 m_unknown_2,
+			 m_shset,
                          "Set or update a shared variable");
 
   register_lang_function(ctx,
@@ -231,7 +238,7 @@ static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_del_shared_var,
                          "del_shared_var",
 			 1, shdel_sigs,
-			 m_unknown_1,
+			 m_shset,
                          "Delete a shared variable");
 
   /* return config structure, for module manager */

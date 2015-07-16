@@ -26,6 +26,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #ifndef PATH_MAX
 #define PATH_MAX 8192
 /* PATH_MAX is undefined on systems without a limit of filename length,
@@ -55,38 +57,44 @@
 input_module_t mod_iodef;
 static iodef_cfg_t *iodef_cfg;
 
-static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, rule_t *rule)
-{
-  struct stat	s;
-  char		file_path[PATH_MAX];
-  char*		ext = NULL;
-  xmlDocPtr	doc;
+static char *iodef_description = "iodef report";
 
-  if (stat(cfg->iodef_conf_dir, &s)!=0)
+static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, char *fname, size_t len)
+{
+  struct stat st;
+  size_t off;
+  char file_path[PATH_MAX];
+  xmlDocPtr doc;
+  char *s;
+
+  if (stat(cfg->iodef_conf_dir, &st)!=0)
     {
       DebugLog(DF_MOD, DS_ERROR, strerror(errno));
       return NULL;
     }
 
+  for (s=fname+len; --s>=fname;) /* remove slashes, and keep only final file name */
+    if (s[0]=='/')
+      {
+	s++;
+	len = fname+len-s;
+	fname = s;
+	break;
+      }
   // Verify that the path with the new extension will fit in PATH_MAX
-  if (strlen(rule->filename) + cfg->iodef_conf_dir_len + 2 >= PATH_MAX)
+  off = cfg->iodef_conf_dir_len;
+  if (len + off + 8 >= PATH_MAX) /* = one '/', a final ".iodef", and a NUL byte */
   {
     DebugLog(DF_MOD, DS_ERROR, "file path too long\n");
     return NULL;
   }
 
-  snprintf(file_path, PATH_MAX, "%s/%s", cfg->iodef_conf_dir,
-	   strrchr(rule->filename, '/'));
-
-  // Set the new extension
-  ext = strrchr(file_path, '.');
-  if (ext == NULL)
-  {
-    DebugLog(DF_MOD, DS_ERROR, "rule filename format error\n");
-    return NULL;
-  }
-  *ext = 0;
-  strcat(file_path, ".iodef");
+  memcpy (file_path, cfg->iodef_conf_dir, off);
+  file_path[off] = '/';
+  off++;
+  memcpy (file_path+off, fname, len);
+  off += len;
+  strcpy (file_path+off, ".iodef");
 
 
   /* parse the file and get the DOM */
@@ -101,6 +109,203 @@ static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, rule_t *rule)
   return doc;
 }
 
+size_t snprint_xml_s_len (char *buf, size_t buflen, char *s, size_t len)
+{
+  size_t i;
+  int c;
+  char *start, *bufend, *bufnext;
+
+  start = buf;
+  bufend = buf+buflen-1;
+  for (i=0; i<len; i++)
+    {
+      if (buf>=bufend)
+	break;
+      c = s[i];
+      if (isprint (c))
+	switch (c)
+	  {
+	  case '&':
+	    bufnext = buf+5;
+	    if (bufnext>bufend)
+	      i = len; /* to exit the loop */
+	    else
+	      {
+		memcpy (buf, "&amp;", 5);
+		buf = bufnext;
+	      }
+	    break;
+	  case '"':
+	    bufnext = buf+6;
+	    if (bufnext>bufend)
+	      i = len; /* to exit the loop */
+	    else
+	      {
+		memcpy (buf, "&quot;", 6);
+		buf = bufnext;
+	      }
+	    break;
+	  case '\'':
+	    bufnext = buf+6;
+	    if (bufnext>bufend)
+	      i = len; /* to exit the loop */
+	    else
+	      {
+		memcpy (buf, "&apos;", 6);
+		buf = bufnext;
+	      }
+	    break;
+	  case '<':
+	    bufnext = buf+4;
+	    if (bufnext>bufend)
+	      i = len; /* to exit the loop */
+	    else
+	      {
+		memcpy (buf, "&lt;", 4);
+		buf = bufnext;
+	      }
+	    break;
+	  case '>':
+	    bufnext = buf+4;
+	    if (bufnext>bufend)
+	      i = len; /* to exit the loop */
+	    else
+	      {
+		memcpy (buf, "&gt;", 4);
+		buf = bufnext;
+	      }
+	    break;
+	  default:
+	    *buf++ = c;
+	    break;
+	  }
+      else *buf++ = '.';
+    }
+  *buf = '\0';
+  return buf-start;
+}
+
+size_t snprint_xml_s (char *buf, size_t buflen, char *s)
+{
+  return snprint_xml_s_len (buf, buflen, s, strlen(s));
+}
+
+size_t snprintf_ovm_var (char *buff, size_t buff_length, ovm_var_t *val)
+/* imitated from fprintf_html_var() in html_output.c */
+{
+  char asc_time[32]; /* for date conversions; also integers, floats, ipv4 and ipv6,
+			and unknown types */
+  struct hostent *hptr; /* for IPV4ADDR */
+  char **pptr; /* for IPV4ADDR */
+  char dst[INET6_ADDRSTRLEN];
+  size_t offset;
+
+  if (val==NULL)
+    return snprint_xml_s(buff, buff_length, "(null)\n");
+  /* display data */
+  else switch (val->gc.type)
+	 {
+	 case T_INT:
+	   sprintf (asc_time, "%li", INT(val));
+	   return snprint_xml_s (buff, buff_length, asc_time);
+	 case T_UINT:
+	   sprintf (asc_time, "%lu", UINT(val));
+	   return snprint_xml_s (buff, buff_length, asc_time);
+	 case T_BSTR:
+	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
+					 (char *)BSTR(val), BSTRLEN(val));
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   return offset;
+	 case T_VBSTR:
+	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
+					 (char *)VBSTR(val), VBSTRLEN(val));
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   return offset;
+	 case T_STR:
+	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
+					 STR(val), STRLEN(val));
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   return offset;
+	 case T_VSTR:
+	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
+					 VSTR(val), VSTRLEN(val));
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   return offset;
+	 case T_CTIME:
+	   strftime(asc_time, 32,
+		    "%a %b %d %H:%M:%S %Y", gmtime(&CTIME(val)));
+	   return snprint_xml_s(buff, buff_length, asc_time);
+	 case T_IPV4:
+	   sprintf(asc_time, "%s", inet_ntoa(IPV4(val)));
+	   offset = snprint_xml_s (buff, buff_length, asc_time);
+	   hptr = gethostbyaddr((char *) &IPV4(val),
+				sizeof (struct in_addr), AF_INET);
+	   if (hptr == NULL) {
+	     return offset;
+	   } else if (hptr->h_name != NULL) {
+	     offset += snprint_xml_s (buff+offset, buff_length-offset, " (");
+	     offset += snprint_xml_s (buff+offset, buff_length-offset, hptr->h_name);
+	   } else {
+	     return offset;
+	   }
+	   for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+	     {
+	       offset += snprint_xml_s (buff+offset, buff_length-offset, ", ");
+	       offset += snprint_xml_s (buff+offset, buff_length-offset, *pptr);
+	     }
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, ")");
+	   return offset;
+	 case T_IPV6:
+	   inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+	   sprintf(asc_time, "%s", dst);
+	   offset = snprint_xml_s (buff, buff_length, asc_time);
+	   hptr = gethostbyaddr((char *) &IPV6(val),
+				sizeof (struct in6_addr), AF_INET6);
+	   if (hptr == NULL) {
+	     return offset;
+	   } else if (hptr->h_name != NULL) {
+	     offset += snprint_xml_s (buff+offset, buff_length-offset, " (");
+	     offset += snprint_xml_s (buff+offset, buff_length-offset, hptr->h_name);
+	   } else {
+	     return offset;
+	   }
+	   for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
+	     {
+	       offset += snprint_xml_s (buff+offset, buff_length-offset, ", ");
+	       offset += snprint_xml_s (buff+offset, buff_length-offset, *pptr);
+	     }
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, ")");
+	   return offset;
+	 case T_TIMEVAL:
+	   strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
+		    gmtime(&TIMEVAL(val).tv_sec));
+	   offset = snprint_xml_s (buff, buff_length, asc_time);
+	   sprintf(asc_time, " +%li us", (long)TIMEVAL(val).tv_usec);
+	   offset += snprint_xml_s (buff+offset, buff_length-offset, asc_time);
+	   return offset;
+	 case T_REGEX:
+	   if (REGEXSTR(val)!=NULL)
+	     {
+	       offset = snprint_xml_s (buff, buff_length, "\"");
+	       offset += snprint_xml_s (buff+offset, buff_length-offset,
+					REGEXSTR(val));
+	       offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	       return offset;
+	     }	       
+	   return 0;
+	 case T_FLOAT:
+	   sprintf(asc_time, "%f", FLOAT(val));
+	   return snprint_xml_s (buff, buff_length, asc_time);
+	 default:
+	   sprintf(asc_time, "<type %i>", val->gc.type);
+	   return snprint_xml_s (buff, buff_length, asc_time);
+	 }
+}
+
 static char expand_var (orchids_t		*ctx,
 			char		*text,
 			state_instance_t	*state,
@@ -113,57 +318,56 @@ static char expand_var (orchids_t		*ctx,
   unsigned int	text_offset = 0;
   char		c;
 
-  if (!text=='\0' || !strchr(text, '$'))
+  if (!text=='\0' || strchr(text, '$')==NULL)
     return 0;
 
   memset(buff, 0, buff_size);
 
   while (text[text_offset] != 0)
-  {
-   if (buff_offset >= buff_size)
-      return (1);
-    if (text[text_offset] != '$')
-      buff[buff_offset++] = text[text_offset++];
-    else
     {
-
-      // Get the full variable name
-      for (i = 1;
-	   ((text[text_offset] != 0)
-	    && ((text[text_offset + i] == '.')
-		|| (text[text_offset + i] == '_')
-		|| (isalnum(text[text_offset + i]))));
-	   i++)
-	continue ;
-
-      c = text[text_offset + i];
-      text[text_offset + i] = '\0';
-
-      // Retrieve the last variable value and add it to the buffer
-      for (v = 0; v < state->rule_instance->rule->dynamic_env_sz; ++v)
-      {
-	if (!strcmp(text + text_offset + 1,
-		    state->rule_instance->rule->var_name[v]))
-	{
-	  ovm_var_t *val;
-
-	  val = ovm_read_value (state->env, v);
-	  if (val!=NULL)
-	    buff_offset += snprintf_ovm_var(buff + buff_offset,
-					    buff_size - buff_offset,
-					    val);
-	}
-      }
-
       if (buff_offset >= buff_size)
 	return (1);
+      if (text[text_offset] != '$')
+	buff[buff_offset++] = text[text_offset++];
+      else
+	{
+	  // Get the full variable name
+	  for (i = 1;
+	       ((text[text_offset] != 0)
+		&& ((text[text_offset + i] == '.')
+		    || (text[text_offset + i] == '_')
+		    || (isalnum(text[text_offset + i]))));
+	       i++)
+	    continue ;
+	  
+	  c = text[text_offset + i];
+	  text[text_offset + i] = '\0';
+      
+	  // Retrieve the last variable value and add it to the buffer
+	  for (v = 0; v < state->pid->rule->dynamic_env_sz; ++v)
+	    {
+	      if (!strcmp(text + text_offset + 1,
+			  state->pid->rule->var_name[v]))
+		{
+		  ovm_var_t *val;
 
-      text_offset += i;
-      buff[buff_offset++] = c;
-      if (c)
-	text_offset++;
+		  val = ovm_read_value (state->env, v);
+		  if (val!=NULL)
+		    buff_offset += snprintf_ovm_var(buff + buff_offset,
+						    buff_size - buff_offset,
+						    val);
+		}
+	    }
+
+	  if (buff_offset >= buff_size)
+	    return (1);
+
+	  text_offset += i;
+	  buff[buff_offset++] = c;
+	  if (c)
+	    text_offset++;
+	}
     }
-  }
 
   return (1);
 }
@@ -228,7 +432,7 @@ static void insert_template_report(orchids_t	*ctx,
 
     new_node = xmlCopyNode(copy_node, 1);
     rXmlSetNs(new_node, report_node->ns);
-    if (state)
+    if (state!=NULL)
       expand_iodef_template(ctx, new_node, state);
     xmlAddChild(report_node, new_node);
   }
@@ -236,26 +440,26 @@ static void insert_template_report(orchids_t	*ctx,
 
 /**
  * Copy the node from the iodef template to the iodef report.
- * Expand all variables and fields
+ * Expand all variables
  *
  * @param ctx		orchids context
  * @param report_ctx	report xpath context
  * @param template_node idoef template root node
- * @param report_events	first report state instance
  */
 static void process_iodef_template (orchids_t		*ctx,
 				    xmlXPathContext	*report_ctx,
 				    xmlNode		*template_node,
-				    state_instance_t	*report_events)
+				    state_instance_t	*report_events
+				    )
 {
   xmlNode	*insert_node = NULL;
+#ifdef OBSOLETE
   xmlChar	*state_name = NULL;
+#endif
   xmlChar	*xpath = NULL;
-  state_instance_t	*state;
-  state_instance_t	*last_state = report_events;
 
   // For each insert node in the state node
-  for (insert_node = xmlFirstElementChild(template_node); insert_node;
+  for (insert_node = xmlFirstElementChild(template_node); insert_node!=NULL;
        insert_node = xmlNextElementSibling(insert_node))
   {
     if (insert_node->type != XML_ELEMENT_NODE)
@@ -269,15 +473,11 @@ static void process_iodef_template (orchids_t		*ctx,
       continue;
     }
 
-    if ((state_name = xmlGetProp(insert_node, BAD_CAST "state")) != NULL)
-    {
-      for (state = report_events; state ;
-	   state = state->next_report_elmt)
-	if (!strcmp((char*)state_name, state->state->name))
-	  insert_template_report(ctx, report_ctx, insert_node, xpath, state);
-    }
-    else
-      insert_template_report(ctx, report_ctx, insert_node, xpath, last_state);
+#ifdef OBSOLETE
+    state_name = xmlGetProp(insert_node, BAD_CAST "state");
+    if (state_name==NULL || strcmp ((char *)state_name, report_events->q->name)==0)
+#endif
+	insert_template_report(ctx, report_ctx, insert_node, xpath, report_events);
   }
 }
 
@@ -295,7 +495,7 @@ static void generate_and_write_report (orchids_t	*ctx,
 				       void		*data,
 				       state_instance_t *state)
 {
-  ovm_var_t *report;
+  xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
   iodef_cfg_t*	cfg;
   char		buff[PATH_MAX];
@@ -310,15 +510,15 @@ static void generate_and_write_report (orchids_t	*ctx,
     return ;
   }
 
-  report = iodef_generate_report(ctx, mod, state);
-  if (report!=NULL)
+  xpath_ctx = iodef_generate_report(ctx, mod, state, state->pid->rule->name,
+				    strlen(state->pid->rule->name));
+  if (xpath_ctx!=NULL)
     {
-      GC_START(ctx->gc_ctx, 1);
-      GC_UPDATE(ctx->gc_ctx, 0, report);
+      doc = xpath_ctx->doc;
       gettimeofday(&tv, NULL);
       Timer_to_NTP(&tv, ntph, ntpl);
 
-      // Write the report in the reports dir
+      // Write the report into the reports dir
       snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
 	       cfg->report_dir, "report-", ntph, ntpl, ".xml");
       fp = fopen(buff, "w");
@@ -329,19 +529,20 @@ static void generate_and_write_report (orchids_t	*ctx,
 	}
       else
 	{
-	  doc = XMLDOC_RD(ctx->gc_ctx,state,report);
 	  xmlDocFormatDump(fp, doc, 1);
 	  (void) fclose(fp);
 	}
-      // No need to free the xmlDoc, the gc will do it.
-      // free_xml_doc (report); // [jgl] Baptiste did not call this but wrote 'XXX FREE REPORT': why?
-      GC_END(ctx->gc_ctx);
+      if (doc!=NULL)
+	xmlFreeDoc (doc);
+      xmlXPathFreeContext (xpath_ctx);      
     }
 }
 
-ovm_var_t *iodef_generate_report(orchids_t	*ctx,
-				 mod_entry_t	*mod,
-				 state_instance_t *state)
+xmlXPathContextPtr iodef_generate_report(orchids_t	*ctx,
+					 mod_entry_t	*mod,
+					 state_instance_t *state,
+					 char *fname,
+					 size_t len)
 {
   xmlDoc	*report_doc = NULL;
   xmlDoc	*iodef_doc = NULL;
@@ -406,12 +607,12 @@ ovm_var_t *iodef_generate_report(orchids_t	*ctx,
   new_xs_datetime_node(report_cur_node->parent, "StartTime",
   		       localtime(&tv.tv_sec));
 
-  // Create ReportTime node (Must be set at sending time)
+  // Create ReportTime node (must be set at sending time)
   new_xs_datetime_node(report_cur_node->parent, "ReportTime",
   		       localtime(&tv.tv_sec));
 
   // Parse the iodef template and process it
-  if (cfg->iodef_conf_dir && ((iodef_doc = parse_iodef_template (cfg, state->rule_instance->rule))
+  if (cfg->iodef_conf_dir && ((iodef_doc = parse_iodef_template (cfg, fname, len))
 			      != NULL))
   {
     process_iodef_template (ctx, report_ctx,
@@ -420,24 +621,46 @@ ovm_var_t *iodef_generate_report(orchids_t	*ctx,
     xmlFreeDoc(iodef_doc);
   }
 
-  return ovm_xml_new (ctx->gc_ctx, report_doc, report_ctx, xml_desc());
+  return report_ctx;
 }
 
 static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*res;
-  static mod_entry_t	*mod_entry = NULL;
+  xmlXPathContextPtr xpath_ctx;
+  ovm_var_t *res, *arg;
+  uint16_t handle;
+  char *fname;
+  size_t len;
+  static mod_entry_t *mod_entry = NULL;
 
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
-  res = iodef_generate_report (ctx, mod_entry, state);
+  arg = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  switch (TYPE(arg))
+    {
+    case T_STR: fname = STR(arg); len = STRLEN(arg);
+      break;
+    case T_VSTR: fname = VSTR(arg); len = VSTRLEN(arg);
+      break;
+    default:
+      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+      STACK_DROP(ctx->ovm_stack, 1);
+      PUSH_RETURN_FALSE(ctx);
+      return;
+    }
+
+  xpath_ctx = iodef_generate_report (ctx, mod_entry, state, fname, len);
+  handle = ovm_xml_new (ctx->gc_ctx, state, xpath_ctx, iodef_description);
+  res = ovm_uint_new (ctx->gc_ctx, handle);
+  STACK_DROP(ctx->ovm_stack, 1);
   PUSH_VALUE(ctx, res);
 }
 
 
 static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t	*var;
+  ovm_var_t	*var, *doc1;
+  xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
   static mod_entry_t	*mod_entry = NULL;
   iodef_cfg_t*	cfg;
@@ -453,9 +676,9 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
   cfg = (iodef_cfg_t *)mod_entry->config;
 
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (var==NULL || TYPE(var)!=T_EXTERNAL || EXTDESC(var)!=xml_desc())
+  if (var==NULL || TYPE(var)!=T_UINT)  /* an uint handle to an xmlXPathContextPtr */
     {
-      DebugLog(DF_MOD, DS_ERROR, "parameter error\n");
+      DebugLog(DF_MOD, DS_ERROR, "first parameter is not an XML handle\n");
       STACK_DROP(ctx->ovm_stack, 1);
       PUSH_RETURN_FALSE(ctx);
     }
@@ -468,7 +691,9 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
       return ;
     }
 
-  doc = XMLDOC_RD(ctx->gc_ctx,state,var);
+  doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(var));
+  xpath_ctx = EXTPTR(doc1);
+  doc = xpath_ctx->doc;
 
   gettimeofday(&tv, NULL);
   Timer_to_NTP(&tv, ntph, ntpl);
@@ -599,9 +824,9 @@ static void set_csirt_name(orchids_t *ctx, mod_entry_t *mod,
   cfg->CSIRT_name = dir->args;
 }
 
-static type_t t_iodef = { "xmldoc", T_EXTERNAL }; /* convertible with xmldoc type */
+static type_t t_iodef = { "xmldoc", T_UINT }; /* convertible with xmldoc type */
 
-static const type_t *iodef_new_report_sig[] = { &t_iodef };
+static const type_t *iodef_new_report_sig[] = { &t_iodef, &t_str };
 static const type_t **iodef_new_report_sigs[] = { iodef_new_report_sig, NULL };
 
 static const type_t *iodef_write_report_sig[] = { &t_int, &t_iodef };
@@ -622,7 +847,7 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx,
 			issdl_generate_report,
 			"iodef_new_report",
-			 0, iodef_new_report_sigs,
+			 1, iodef_new_report_sigs,
 			 m_random,
 			"generate a report using the iodef template");
 
@@ -630,7 +855,7 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			issdl_iodef_write_report,
 			"iodef_write_report",
 			 1, iodef_write_report_sigs,
-			 m_random,
+			 m_random_thrash,
 			"write iodef report into the report folder");
 
 

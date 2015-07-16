@@ -18,7 +18,7 @@ rule deauth_flood synchronize($addr_src, $addr_dst) {
   } /* end init */
 
 
-  state start {
+  state start! {
 
     $counter = 1 ;
     $start_time = .wifi.time ;
@@ -32,51 +32,36 @@ rule deauth_flood synchronize($addr_src, $addr_dst) {
   } /* end start */
 
 
-  state deauth_loop {
+  state deauth_loop! {
 
     $counter = $counter + 1;
 
-    expect (    .wifi.subtype == "deauth"
+    expect (.wifi.subtype=="deauth"
          && $addr_src == .wifi.sa
-         && $addr_dst == .wifi.da
-         && .wifi.time < $end_time
-         && $counter < MAX_COUNTER )
-      goto deauth_loop;
-
-    expect (    .wifi.subtype == "deauth"
-         && $addr_src == .wifi.sa
-         && $addr_dst == .wifi.da
-         && .wifi.time < $end_time
-         && $counter >= MAX_COUNTER )
-      goto alert;
-
-    expect (    .wifi.subtype == "deauth"
-         && $addr_src == .wifi.sa
-         && $addr_dst == .wifi.da
-         && .wifi.time >= $end_time )
+         && $addr_dst == .wifi.da)
+      goto proceed;
+    expect (.wifi.time >= $end_time)
       goto the_end;
+  }
 
+  state proceed {
+    case ($counter < MAX_COUNTER) goto deauth_loop;
+    else goto alert;
   } /* end deauth_loop */
 
 
-  state alert {
-
-    cut("start");
+  state alert! {
     $end_time = .wifi.time + WAITIME ;
 
     $msg = "deauthentication flood [" + str_from_int( $counter ) + " pkts] src:"
           + .wifi.sa + " dst:" + .wifi.da ;
 
     print ( $msg );
-
-    expect ( .wifi.time >= $end_time )
-      goto the_end;
-
   } /* end alert */
 
 
-  state the_end {
-
+  state the_end! {
+    /* all went well */
   } /* end the_end */
 
 

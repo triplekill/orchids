@@ -6,7 +6,7 @@ orchidsrule_DATA = \
   linux64syscall.h \
   linuxsignal.h \
   linuxptrace.h \
-  pid_tracker.pprule \
+  pid_tracker_auditd.pprule \
   apachessl.pprule \
   portscan.pprule \
   dhcp_lease_check.pprule \

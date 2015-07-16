@@ -128,64 +128,56 @@ fprintf_linux_process_info(FILE *fp, linux_process_info_t *p)
 
 #endif /* 0 */
 
-#ifndef ORCHIDS_DEMO
 
-void
-fprintf_linux_process_summary(FILE *fp, linux_process_info_t *p)
+void fprintf_linux_process_summary(FILE *fp, linux_process_info_t *p, int verbose)
 {
   fprintf(fp, "                pid : %d\n", p->pid);
-  fprintf(fp, "               ppid : %d\n", p->ppid);
-  fprintf(fp, "             tty_nr : %d\n", p->tty_nr);
+  if (verbose)
+    {
+      fprintf(fp, "               ppid : %d\n", p->ppid);
+      fprintf(fp, "             tty_nr : %d\n", p->tty_nr);
+    }
   fprintf(fp, "           priority : %ld\n", p->priority);
-  fprintf(fp, "               nice : %ld\n", p->nice);
+  if (verbose)
+    {
+      fprintf(fp, "               nice : %ld\n", p->nice);
+    }
   fprintf(fp, "              vsize : %lu bytes (%5.3f MB)\n", p->vsize, p->vsize / 1048576.0);
   fprintf(fp, "                rss : %ld pages (%5.3f MB)\n", p->rss, (p->rss * 4) / 1024.0);
-  fprintf(fp, "               rlim : %lu bytes\n", p->rlim);
-  fprintf(fp, "            blocked : 0x%08lx\n", p->blocked);
-  fprintf(fp, "          sigignore : 0x%08lx\n", p->sigignore);
-  fprintf(fp, "           sigcatch : 0x%08lx\n", p->sigcatch);
-  fprintf(fp, "          processor : %d\n", p->processor);
+  if (verbose)
+    {
+      fprintf(fp, "               rlim : %lu bytes\n", p->rlim);
+      fprintf(fp, "            blocked : 0x%08lx\n", p->blocked);
+      fprintf(fp, "          sigignore : 0x%08lx\n", p->sigignore);
+      fprintf(fp, "           sigcatch : 0x%08lx\n", p->sigcatch);
+      fprintf(fp, "          processor : %d\n", p->processor);
+    }
 }
 
-void
-fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p)
+void fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p, int verbose)
 {
   fprintf(fp, "<tr> <td class=\"e0\"> pid </td> <td class=\"v0\"> %d </td> </tr>\n", p->pid);
-  fprintf(fp, "<tr> <td class=\"e1\"> ppid </td> <td class=\"v1\"> %d </td> </tr>\n", p->ppid);
-  fprintf(fp, "<tr> <td class=\"e0\"> tty_nr </td> <td class=\"v0\"> %d </td> </tr>\n", p->tty_nr);
+  if (verbose)
+    {
+      fprintf(fp, "<tr> <td class=\"e1\"> ppid </td> <td class=\"v1\"> %d </td> </tr>\n", p->ppid);
+      fprintf(fp, "<tr> <td class=\"e0\"> tty_nr </td> <td class=\"v0\"> %d </td> </tr>\n", p->tty_nr);
+    }
   fprintf(fp, "<tr> <td class=\"e1\"> priority </td> <td class=\"v1\"> %ld </td> </tr>\n", p->priority);
-  fprintf(fp, "<tr> <td class=\"e0\"> nice </td> <td class=\"v0\"> %ld </td> </tr>\n", p->nice);
-  fprintf(fp, "<tr> <td class=\"e1\"> vsize </td> <td class=\"v1\"> %lu bytes (%5.3f MB) </td> </tr>\n", p->vsize, p->vsize / 1048576.0);
-  fprintf(fp, "<tr> <td class=\"e0\"> rss </td> <td class=\"v0\"> %ld pages (%5.3f MB) </td> </tr>\n", p->rss, (p->rss * 4) / 1024.0);
-  fprintf(fp, "<tr> <td class=\"e1\"> rlim </td> <td class=\"v1\"> %lu bytes </td> </tr>\n", p->rlim);
-  fprintf(fp, "<tr> <td class=\"e0\"> blocked </td> <td class=\"v0\"> 0x%08lx </td> </tr>\n", p->blocked);
-  fprintf(fp, "<tr> <td class=\"e1\"> sigignore </td> <td class=\"v1\"> 0x%08lx </td> </tr>\n", p->sigignore);
-  fprintf(fp, "<tr> <td class=\"e0\"> sigcatch </td> <td class=\"v0\"> 0x%08lx </td> </tr>\n", p->sigcatch);
-  fprintf(fp, "<tr> <td class=\"e1\"> processor </td> <td class=\"v1\"> %d </td> </tr>\n", p->processor);
-}
-
-
-#else /* ORCHIDS_DEMO */
-
-void
-fprintf_linux_process_summary(FILE *fp, linux_process_info_t *p)
-{
-  fprintf(fp, "                pid : %d\n", p->pid);
-  fprintf(fp, "           priority : %ld\n", p->priority);
-  fprintf(fp, "              vsize : %lu bytes (%5.3f MB)\n", p->vsize, p->vsize / 1048576.0);
-  fprintf(fp, "                rss : %ld pages (%5.3f MB)\n", p->rss, (p->rss * 4) / 1024.0);
-}
-
-void
-fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p)
-{
-  fprintf(fp, "<tr> <td class=\"e0\"> pid </td> <td class=\"v0\"> %d </td> </tr>\n", p->pid);
-  fprintf(fp, "<tr> <td class=\"e1\"> priority </td> <td class=\"v1\"> %ld </td> </tr>\n", p->priority);
+  if (verbose)
+    {
+      fprintf(fp, "<tr> <td class=\"e0\"> nice </td> <td class=\"v0\"> %ld </td> </tr>\n", p->nice);
+    }
   fprintf(fp, "<tr> <td class=\"e0\"> vsize </td> <td class=\"v0\"> %lu bytes (%5.3f MB) </td> </tr>\n", p->vsize, p->vsize / 1048576.0);
   fprintf(fp, "<tr> <td class=\"e1\"> rss </td> <td class=\"v1\"> %ld pages (%5.3f MB) </td> </tr>\n", p->rss, (p->rss * 4) / 1024.0);
+  if (verbose)
+    {
+      fprintf(fp, "<tr> <td class=\"e1\"> rlim </td> <td class=\"v1\"> %lu bytes </td> </tr>\n", p->rlim);
+      fprintf(fp, "<tr> <td class=\"e0\"> blocked </td> <td class=\"v0\"> 0x%08lx </td> </tr>\n", p->blocked);
+      fprintf(fp, "<tr> <td class=\"e1\"> sigignore </td> <td class=\"v1\"> 0x%08lx </td> </tr>\n", p->sigignore);
+      fprintf(fp, "<tr> <td class=\"e0\"> sigcatch </td> <td class=\"v0\"> 0x%08lx </td> </tr>\n", p->sigcatch);
+      fprintf(fp, "<tr> <td class=\"e1\"> processor </td> <td class=\"v1\"> %d </td> </tr>\n", p->processor);
+    }
 }
-
-#endif /* ORCHIDS_DEMO */
 
 /* Black cpp magic: */
 #define XSTR(s) XXSTR(s)
@@ -194,8 +186,7 @@ fprintf_linux_process_html_summary(FILE *fp, linux_process_info_t *p)
 /*
 ** WARNING: doesn't work if the process comm name contains ")" or " "
 */
-void
-get_linux_process_info(linux_process_info_t *p, pid_t pid)
+void get_linux_process_info(linux_process_info_t *p, pid_t pid)
 {
   char stat_path[20]; /* max len is '/proc/12345/stat\0' (17) */
   FILE *fp;

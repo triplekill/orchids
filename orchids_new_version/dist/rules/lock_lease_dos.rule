@@ -8,42 +8,43 @@
 *           --> tape : auditctl -a entry,always -S fcntl64
 */
 
+#include "linux32syscall.h"
 
 #define MAX_CALLS 4
-#define SYSCALL 221
 
 rule lock_lease_dos
 {
   state init
   {
-    expect (.auditd.syscall == SYSCALL)
+    expect (.auditd.syscall == SYS_fcntl64)
       goto start;
   }
 
-  state start
+  state start!
   {
     $counter = 1 ;
     $attack_pid = .auditd.pid;
 
     expect (.auditd.pid == $attack_pid &&
-	    .auditd.syscall == SYSCALL)
+	    .auditd.syscall == SYS_fcntl64)
       goto listen_loop;
   }
 
-  state listen_loop
+  state listen_loop!
   {
     $counter = $counter + 1;
-    expect ($counter == MAX_CALLS)
-      goto alert;
+    case ($counter==MAX_CALLS) goto alert;
+    else goto listen_loop_body;
+  }
 
+  state listen_loop_body {
     expect ( .auditd.pid == $attack_pid &&
-	     .auditd.syscall == SYSCALL &&
-	     $counter < MAX_CALLS)
+	     .auditd.syscall == SYS_fcntl64)
       goto listen_loop;
   }
 
 
-  state alert
+  state alert!
   {
     print("Time_Out_Leases PrintK Local Denial of Service attack detected !!");
 
@@ -52,7 +53,6 @@ rule lock_lease_dos
     $msg= " ---> Orchids is reacting : killing attack process !!";
     print($msg);
     print( $reaction );
-
   }
 
 }/* end rule lock_lease_dos*/

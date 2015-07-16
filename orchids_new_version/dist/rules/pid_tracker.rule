@@ -1,7 +1,6 @@
 /*
-
-pid tracker...
-
+The pid tracker --- old version (obsolete), taking events from rawsnare;
+    use pid_tracker_auditd.rule instead
 */
 
 
@@ -17,12 +16,11 @@ rule pidtrack
       goto newpid;
   }
 
-  state newpid
+  state newpid!
   {
     $pid = .rawsnare.retcode;
     $uid = .rawsnare.euid;
     $gid = .rawsnare.egid;
-    cut("init");
 /*
     $query =  "property(Login, user, uid, "
              + str_from_uint($uid) + "), property(Login, user, realname, Name)";
@@ -74,36 +72,32 @@ rule pidtrack
       goto end;
   }
 
-  state update_uid
+  state update_uid!
   {
-    cut("newpid");
     $uid = .rawsnare.euid;
     goto newpid;
   }
 
-  state update_setuid
+  state update_setuid!
   {
-    cut("newpid");
     $uid = .rawsnare.target_id;
     goto newpid;
   }
 
-  state update_gid
+  state update_gid!
   {
-    cut("newpid");
     $gid = .rawsnare.egid;
     goto newpid;
   }
 
-  state alert
+  state alert!
   {
     print("Alert report :");
-    dump_stack();
     report();
   }
 
-  state end
+  state end!
   {
-    kill_threads();
+    /* all went well */
   }
 }

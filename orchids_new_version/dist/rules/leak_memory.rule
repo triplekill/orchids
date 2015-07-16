@@ -4,46 +4,46 @@
 *   http://www.guninski.com/where_do_you_want_billg_to_go_today_2.html
 */
 
+#include "linux32syscall.h"
+#include "linuxsocket.h"
 
 #define MAX_CALLS 5
-#define SYSCALL 102
-
 
 rule leak_memory
 {
   state init
   {
-    expect (.auditd.syscall == SYSCALL &&
-	    .auditd.varzero == "3")
+    expect (.auditd.syscall == SYS_socketcall &&
+	    .auditd.varzero == SYS_CONNECT)
       goto start;
   }
 
-  state start
+  state start!
   {
    $counter = 1 ;
    $attack_pid = .auditd.pid;
 
    expect (.auditd.pid == $attack_pid &&
-       .auditd.syscall == SYSCALL &&
-       .auditd.varzero == "3")
+       .auditd.syscall == SYS_socketcall &&
+       .auditd.varzero == SYS_CONNECT)
        goto listen_loop;
   }
 
-  state listen_loop
+  state listen_loop!
   {
     $counter = $counter + 1;
     expect ($counter == MAX_CALLS)
        goto alert;
 
     expect ( .auditd.pid == $attack_pid &&
-         .auditd.syscall == SYSCALL &&
-         .auditd.varzero == "3" &&
+         .auditd.syscall == SYS_socketcall &&
+         .auditd.varzero == SYS_CONNECT &&
          $counter < MAX_CALLS)
        goto listen_loop;
   }
 
 
-  state alert
+  state alert!
   {
     print("Memory leak DOS attack detected !!");
 

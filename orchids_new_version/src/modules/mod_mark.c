@@ -100,7 +100,7 @@ static void *mark_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          issdl_mark_cut,
                          "mark_cut",
 			 1, mark_cut_sigs,
-			 m_const,
+			 m_const_thrash,
                          "red cut from the mark");
   return NULL;
 }

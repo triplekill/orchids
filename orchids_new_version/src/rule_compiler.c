@@ -1157,6 +1157,74 @@ static void type_check (rule_compiler_t *ctx, node_rule_t *node_rule)
   type_solve (ctx);
 }
 
+int node_expr_equal (node_expr_t *e1, node_expr_t *e2)
+{
+  if (e1==NULL)
+    {
+      if (e2==NULL)
+	return 1;
+      else return 0;
+    }
+  else if (e2==NULL)
+    return 0;
+  if (e1->hash!=e2->hash)
+    return 0;
+  if (e1->type!=e2->type)
+    return 0;
+  switch (e1->type)
+    {
+    case NODE_FIELD:
+    case NODE_VARIABLE:
+      return SYM_RES_ID(e1)==SYM_RES_ID(e2);
+    case NODE_CONST:
+      return issdl_cmp (TERM_DATA(e1), TERM_DATA(e2), CMP_LEQ_MASK | CMP_GEQ_MASK)==
+	(CMP_LEQ_MASK | CMP_GEQ_MASK);
+    case NODE_BINOP:
+    case NODE_COND:
+    case NODE_CONS:
+    case NODE_EVENT: /* compare events literally (not even modulo reordering of fields) */
+    case NODE_DB_PATTERN: /* compare patterns literally (not even modulo alpha-renaming) */
+    case NODE_DB_COLLECT:
+      return node_expr_equal (BIN_LVAL(e1), BIN_LVAL(e2))
+	&& node_expr_equal (BIN_RVAL(e1), BIN_RVAL(e2));
+    case NODE_MONOP:
+    case NODE_DB_SINGLETON:
+      return node_expr_equal (MON_VAL(e1), MON_VAL(e2));
+    case NODE_CALL:
+      return CALL_RES_ID(e1)==CALL_RES_ID(e2)
+	&& node_expr_equal (CALL_PARAMS(e1), CALL_PARAMS(e2));
+    case NODE_IFSTMT:
+      return node_expr_equal (IF_COND(e1), IF_COND(e2))
+	&& node_expr_equal (IF_THEN(e1), IF_THEN(e2))
+	&& node_expr_equal (IF_ELSE(e1), IF_ELSE(e2));
+    case NODE_REGSPLIT: /* should not happen */
+      if (!node_expr_equal (REGSPLIT_STRING(e1), REGSPLIT_STRING(e2)))
+	return 0;
+      if (!node_expr_equal (REGSPLIT_PAT(e1), REGSPLIT_PAT(e2)))
+	return 0;
+      if (REGSPLIT_DEST_VARS(e1)->vars_nb!=REGSPLIT_DEST_VARS(e2)->vars_nb)
+	return 0;
+      {
+	size_t i;
+	
+	for (i=0; i<REGSPLIT_DEST_VARS(e1)->vars_nb; i++)
+	  if (!node_expr_equal (REGSPLIT_DEST_VARS(e1)->vars[i], REGSPLIT_DEST_VARS(e2)->vars[i]))
+	    return 0;
+      }
+      return 1;
+    case NODE_ASSOC: /* should not happen */
+      return node_expr_equal (BIN_LVAL(e1), BIN_LVAL(e2))
+	&& node_expr_equal (BIN_RVAL(e1), BIN_RVAL(e2));
+    case NODE_BREAK: /* should not happen */
+      return 1;
+    case NODE_RETURN: /* should not happen */
+      return node_expr_equal (MON_VAL(e1), MON_VAL(e2));
+    case NODE_UNKNOWN:
+    default:
+      return 0;
+    }
+}
+
 /* Sets of variable numbers are implemented as sorted lists
    of integers.  This is not optimal, but is easy to implement
    and fares OK on small numbers of variables.
@@ -1907,19 +1975,16 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
       return;
     }
   state->an_flags |= AN_EPSILON_REACHABLE;
-  for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
-    {
-      trans = (node_trans_t *)BIN_LVAL(l);
-      if (trans==NULL)
-	continue;
-      if (trans->cond==NULL) /* epsilon transition, i.e.,
-				goto without an expect */
-	{
-	  s = trans_dest_state (ctx, trans);
-	  if (s!=NULL)
-	    mark_epsilon_reachable (ctx, s);
-	}
-    }
+  if (state->flags & EPSILON_STATE)
+    for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+      {
+	trans = (node_trans_t *)BIN_LVAL(l);
+	if (trans==NULL)
+	  continue;
+	s = trans_dest_state (ctx, trans);
+	if (s!=NULL)
+	  mark_epsilon_reachable (ctx, s);
+      }
   state->an_flags &= ~AN_EPSILON_REACHABLE;
   state->an_flags |= AN_EPSILON_DONE;
 }
@@ -2292,7 +2357,10 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 				 args[i] for every i, to give a chance
 				 to compute_monotony() to update vars[]
 				 for the given sequence of arguments. */
-	else res = (*cm) (ctx, e, args);
+	else res = (*cm) (ctx, e, args) & MONOTONY_MASK; /* remove MONO_THRASH bit */
+	for (i=0, l=CALL_PARAMS(e); l!=NULL; i++, l=BIN_RVAL(l))
+	  if (args[i] & MONO_THRASH)
+	    set_monotony_unknown_mayset (ctx, BIN_LVAL(l), vars);
 	gc_base_free(args);
 	return res;
       }
@@ -2502,8 +2570,13 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 }
 
 monotony m_const (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
-{
+{ /* function is constant, no side-effect */
   return MONO_CONST;
+}
+
+monotony m_const_thrash (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{ /* function is constant, but may have side-effects (printing, exiting, etc.) */
+  return MONO_CONST | MONO_THRASH;
 }
 
 monotony m_unknown_1 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
@@ -2513,6 +2586,13 @@ monotony m_unknown_1 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
   return MONO_UNKNOWN;
 }
 
+monotony m_unknown_1_thrash (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  if (m[0]==MONO_CONST)
+    return MONO_CONST | MONO_THRASH;
+  return MONO_UNKNOWN | MONO_THRASH;
+}
+
 monotony m_unknown_2 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
 {
   if (m[0]==MONO_CONST && m[1]==MONO_CONST)
@@ -2520,9 +2600,21 @@ monotony m_unknown_2 (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
   return MONO_UNKNOWN;
 }
 
+monotony m_unknown_2_thrash (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  if (m[0]==MONO_CONST && m[1]==MONO_CONST)
+    return MONO_CONST | MONO_THRASH;
+  return MONO_UNKNOWN | MONO_THRASH;
+}
+
 monotony m_random (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
 {
   return MONO_UNKNOWN;
+}
+
+monotony m_random_thrash (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+{
+  return MONO_UNKNOWN | MONO_THRASH;
 }
 
 /**
@@ -2631,7 +2723,7 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
     }
   state->name = sym->name;
   state->line = sym->line;
-  state->flags = flags;
+  state->flags |= flags;
   /* add state name in current compiler context */
   if (strhash_get(ctx->statenames_hash, sym->name)) {
     if (sym->file!=NULL)
@@ -2729,11 +2821,44 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
       break;
     case NODE_CALL:
       {
+	monotony (*cm) (rule_compiler_t *ctx,
+			node_expr_t *e,
+			monotony args[]);
+	size_t i, n;
+	monotony *args;
+	monotony res;
 	node_expr_t *l;
 
-	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	for (l=CALL_PARAMS(e), n=0; l!=NULL; l=BIN_RVAL(l), n++)
 	  {
 	    check_expect_condition (ctx, BIN_LVAL(l));
+	  }
+	cm = CALL_COMPUTE_MONOTONY(e);
+	if (cm==NULL)
+	  res = MONO_UNKNOWN;
+	else
+	  {
+	    args = gc_base_malloc (ctx->gc_ctx, n*sizeof(monotony));
+	    for (i=0; i<n; i++)
+	      args[i] = MONO_CONST;
+	    res = (*cm) (ctx, e, args);
+	    for (i=0; i<n; i++)
+	      if (args[i] & MONO_THRASH)
+		{
+		  res = MONO_UNKNOWN;
+		  break;
+		}
+	    gc_base_free (args);
+	  }
+	if (res!=MONO_CONST)
+	  {
+	    if (e->file!=NULL)
+	      fprintf (stderr, "%s:", STR(e->file));
+	    /* printing STR(e->file) is legal, since it
+	       was created NUL-terminated, on purpose */
+	  fprintf (stderr, "%u: error: cannot call side-effecting function %s inside 'expect' clause\n",
+		   e->lineno, CALL_SYM(e));
+	  ctx->nerrors++;
 	  }
 	break;
       }
@@ -5505,17 +5630,17 @@ static unsigned long objhash_rule_instance(void *state_inst)
 {
   state_instance_t *si;
   unsigned long h;
-  int i;
-  int sync_var_sz;
-  int sync_var;
+  size_t i;
+  size_t sync_var_sz;
+  int32_t sync_var;
   ovm_var_t *var;
 
   h = 0;
   si = state_inst;
-  sync_var_sz = si->rule_instance->rule->sync_vars_sz;
+  sync_var_sz = si->pid->rule->sync_vars_sz;
 
   for (i = 0; i < sync_var_sz; i++) {
-    sync_var = si->rule_instance->rule->sync_vars[i];
+    sync_var = si->pid->rule->sync_vars[i];
     var = ovm_read_value (si->env, sync_var);
 
     h = datahash_pjw(h, &sync_var, sizeof (sync_var));
@@ -5534,22 +5659,22 @@ static int objhash_rule_instance_cmp(void *state_inst1, void *state_inst2)
 {
   state_instance_t *si1;
   state_instance_t *si2;
-  int sync_var_sz;
-  int sync_var;
+  size_t sync_var_sz;
+  int32_t sync_var;
   ovm_var_t *var1;
   ovm_var_t *var2;
-  int i;
+  size_t i;
   int ret;
 
   si1 = state_inst1;
   si2 = state_inst2;
   /* assert: si1->rule_instance->rule == si2->rule_instance->rule */
 
-  sync_var_sz = si1->rule_instance->rule->sync_vars_sz;
+  sync_var_sz = si1->pid->rule->sync_vars_sz;
 
   /* for each sync vars, compare type and value */
   for (i = 0; i < sync_var_sz; i++) {
-    sync_var = si1->rule_instance->rule->sync_vars[i];
+    sync_var = si1->pid->rule->sync_vars[i];
 
     var1 = ovm_read_value (si1->env, sync_var);
     var2 = ovm_read_value (si2->env, sync_var);
@@ -5664,7 +5789,7 @@ static void rule_finalize (gc_t *gc_ctx, gc_header_t *p)
   rule_t *rule = (rule_t *)p;
   state_t *state;
   transition_t *trans;
-  int32_t i, m, j, n;
+  size_t i, m, j, n;
 
   if (rule->state!=NULL)
     {
@@ -5827,8 +5952,6 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->start_conds = NULL;
   rule->next = NULL;
   rule->init = NULL;
-  rule->ith = NULL;
-  rule->itt = NULL;
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
@@ -7204,7 +7327,7 @@ fprintf_rule_stats(const orchids_t *ctx, FILE *fp)
 
   for (r = ctx->rule_compiler->first_rule, rn = 0; r; r = r->next, rn++)
     {
-      fprintf(fp, " %3i | %12.12s | %3i | %3i | %3i | %3i | %3i | %.24s:%i\n",
+      fprintf(fp, " %3i | %12.12s | %3zi | %3zi | %3i | %3i | %3zi | %.24s:%i\n",
               rn, r->name, r->state_nb, r->trans_nb,
               r->static_env_sz, r->dynamic_env_sz,
               r->instances, r->filename, r->lineno);

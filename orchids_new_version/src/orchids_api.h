@@ -112,13 +112,12 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len);
 
 /**
  ** Create a global application lock file.  This is a protection for
- ** avoiding accidental multiple instance of a orchids daemon.
+ ** avoiding accidental multiple instances of an Orchids daemon.
  ** Nevertheless, the lock file is a parameter to allow well
  ** configured multiple instances of Orchids.
  ** @param lockfile  The path of the lock file name.
  **/
-void
-orchids_lock(const char *lockfile);
+void orchids_lock(const char *lockfile);
 
 
 /**

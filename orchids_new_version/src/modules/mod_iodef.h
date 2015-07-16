@@ -45,10 +45,10 @@ struct iodef_cfg_s {
 #endif
 };
 
-struct ovm_var_s;
-struct ovm_var_s *iodef_generate_report(orchids_t	*ctx,
-					mod_entry_t	*mod,
-					state_instance_t *state);
+xmlXPathContextPtr iodef_generate_report(orchids_t	*ctx,
+					 mod_entry_t	*mod,
+					 state_instance_t *state,
+					 char *fname, size_t len);
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification

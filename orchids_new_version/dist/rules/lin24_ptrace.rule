@@ -84,7 +84,7 @@ rule ptrace
       goto ptrace_detach;
   }
 
-  state ptrace_detach
+  state ptrace_detach!
   {
     print("Preliminary report :");
 
@@ -92,19 +92,15 @@ rule ptrace
            str_from_uint($attacker_uid) +
            " -o pid= | xargs) ; chsh -s /sbin/nologin user ' >/dev/null 2>/dev/null &";
     /* system($str); */
-    dump_dot_pathtree();
-    /* kill_threads(); */
-    cut("ptrace_attach");
-    dump_stack();
 
-    /* continue audit while we are trying to kill attacker */
+    /* continue auditing while we are trying to kill attacker */
 
     /* audit all events made by the target program */
     expect (.rawsnare.pid == $target_pid)
       goto audit_loop;
   }
 
-  state audit_loop
+  state audit_loop!
   {
     expect (.rawsnare.pid == $target_pid)
       goto audit_loop;
@@ -126,13 +122,9 @@ rule ptrace
       goto make_report;
   }
 
-  state make_report
+  state make_report!
   {
     print("Final report :");
-    dump_stack();
     report();
-/*    dump_dot_pathtree(); */
-/*    show_stats(); */
-/*    shutdown(); */
   }
 }
