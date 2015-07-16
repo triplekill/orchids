@@ -647,7 +647,6 @@ ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
   uint16_t n;
   ovm_var_t *val;
   ovm_var_t *env;
-  void *copy;
 
   if (k>=MAX_HANDLES) /* value has already been copied, so return it right away */
     return ovm_read_value (si->env, HANDLE_FAKE_VAR(k));
@@ -661,7 +660,7 @@ ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
     return val;
   /* Otherwise, make a copy: */
   GC_START (gc_ctx, 1);
-  copy = issdl_clone (gc_ctx, val);
+  val = issdl_clone (gc_ctx, val);
   GC_UPDATE (gc_ctx, 0, val);
   env = ovm_write_value (gc_ctx, si->env, HANDLE_FAKE_VAR(k), val);
   GC_TOUCH (gc_ctx, si->env = env);

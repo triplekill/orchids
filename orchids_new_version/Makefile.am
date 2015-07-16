@@ -2,6 +2,8 @@ SUBDIRS    = src dist
 
 EXTRA_DIST = misc/orchids.spec misc/orchids-sysv
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 # orchidsstatedir must be owned by orchids
 install-data-hook:
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/reports

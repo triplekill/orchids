@@ -136,7 +136,7 @@ main(int argc, char *argv[])
   proceed_post_compil(ctx);
   if (ctx->rule_compiler->nerrors)
     {
-      fprintf (stderr, "That makes %d error%ss: stop.\n",
+      fprintf (stderr, "That makes %d error%s: stop.\n",
 	       ctx->rule_compiler->nerrors,
 	       (ctx->rule_compiler->nerrors==1)?"":"s");
       fflush (stderr);

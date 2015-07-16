@@ -668,7 +668,7 @@ static int generate_html_orchids_stats(orchids_t *ctx,
           "<th colspan=\"2\"> Linux specific statistics </th> "
           "</tr>\n");
   get_linux_process_info(&pinfo, ctx->pid);
-  fprintf_linux_process_html_summary(fp, &pinfo);
+  fprintf_linux_process_html_summary(fp, &pinfo, ctx->verbose);
   fprintf(fp,
           "  <tr class=\"hh\"> "
           "<th colspan=\"2\"> End of linux specific statistics </th> "

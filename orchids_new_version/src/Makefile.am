@@ -40,6 +40,8 @@ AM_CFLAGS= -I$(srcdir)/util
 
 EXTRA_DIST = issdl.l issdl.y
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 BUILT_SOURCES = \
 	issdl.yy.c issdl.tab.c issdl.tab.h
 

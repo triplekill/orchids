@@ -4053,6 +4053,7 @@ ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var)
   bytecode_t mask;
   ovm_var_t *env_left, *env_right, *env0, *otherenv;
 
+  GC_START(gc_ctx, 1);
   env0 = env;
   for (mask = 1L, branchp=branch; env!=NULL; mask <<= 1)
     if (TYPE(env)==T_BIND)
@@ -4068,8 +4069,9 @@ ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var)
 	env = ((env_split_t *)env)->left;
       }
   if (env==NULL || ((env_bind_t *)env)->var!=var)
-    return env0;
-  GC_START(gc_ctx, 1);
+    env = env0;
+  else 
+    {
   env = NULL;
   for (; branchp > branch; )
     {
@@ -4085,7 +4087,7 @@ ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var)
 	  if (TYPE (otherenv)==T_BIND)
 	    continue;
 	}
-      else if (var & mask)
+      if (var & mask)
 	{
 	  env_left = otherenv;
 	  env_right = env;
@@ -4101,6 +4103,7 @@ ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var)
       GC_TOUCH (gc_ctx, ((env_split_t *)env)->right = env_right);
       GC_UPDATE(gc_ctx, 0, env);
     }
+  } 
   GC_END(gc_ctx);
   return env;
 }

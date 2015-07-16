@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)/src -I$(top_srcdir)/src/util
+AM_CPPFLAGS = -I$(top_srcdir)/src -I$(top_srcdir)/src/util
 
 BUILT_SOURCES = snare.tab.c snare.tab.h snare.yy.c
 
