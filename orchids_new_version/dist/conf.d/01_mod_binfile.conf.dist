@@ -1,0 +1,17 @@
+#
+# Configuration file for binfile input module
+
+<module binfile>
+
+#  # Set the polling period, for checking for new data.
+#  SetPollPeriod 15
+#
+#  # Binary files to read data from.  Do not use: prefer the INPUT directive in orchids-inputs.conf
+#  AddInputFile /var/log/messages
+#
+#  # The default behavior is to process all data in files, at startup.
+  ProcessAll 1
+#  # Stop orchids after processing all files. Usefull for benchmarks
+# ExitAfterProcessAll 1
+#
+</module>
