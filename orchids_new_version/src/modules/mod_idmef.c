@@ -142,7 +142,7 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
   GC_UPDATE (gc_ctx, F_PTR, val);
 #endif
 
-  for (c = 1; c < cfg->nb_fields; c++)
+  for (c = 0 /* OBSOLETE: 1 */; c < cfg->nb_fields; c++)
   {
     char	*text;
     int		text_len;
@@ -466,7 +466,7 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   DebugLog(DF_MOD, DS_INFO, "load() idmef@%p\n", (void *) &mod_idmef);
 
   cfg = gc_base_malloc(ctx->gc_ctx, sizeof (idmef_cfg_t));
-  cfg->nb_fields = 1;
+  cfg->nb_fields = 0; /* OBSOLETE: 1; */
   for (i=0; i<MAX_IDMEF_FIELDS; i++)
     cfg->field_xpath[i] = NULL;
   cfg->buff[0] =  '\0';

@@ -188,7 +188,7 @@ static void process_idmef_alert(orchids_t *ctx,
   GC_UPDATE(gc_ctx, F_PTR, val);
 #endif
 
-  for (c = 1; c < prelude_data->nb_fields; c++)
+  for (c = 0 /* OBSOLETE: 1*/; c < prelude_data->nb_fields; c++)
   {
     get_field_from_idmef_value(ctx, (ovm_var_t **)GC_DATA(), message,
 			       prelude_data->field_xpath[c],
@@ -484,7 +484,7 @@ static void *mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
   prelude_data->profile = "orchids";
   prelude_data->prelude_db_settings = NULL;
   prelude_data->poll_period = 0;
-  prelude_data->nb_fields = 1;
+  prelude_data->nb_fields = 0; /* OBSOLETE: 1; */
   for (i=0; i<MAX_PRELUDE_FIELDS; i++)
     prelude_data->field_xpath[i] = NULL;
 
