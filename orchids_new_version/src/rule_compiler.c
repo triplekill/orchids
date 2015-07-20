@@ -2690,7 +2690,7 @@ node_state_t *build_state(rule_compiler_t *ctx,
   s = gc_alloc (ctx->gc_ctx, sizeof(node_state_t),
 		&node_state_class);
   s->gc.type = T_NULL;
-  s->state_id = 0; /* not set */
+  s->state_id = 0; /* not set: will be set by compile_and_add_rule_ast() */
   s->file = NULL; /* not set: will be set by set_state_label() */
   s->line = 0; /* not set: will be set by set_state_label() */
   s->name = NULL; /* not set: will be set by set_state_label() */
@@ -6014,10 +6014,9 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   }
   /* XXX - clean here */
 
-  if (node_rule->statelist!=NULL)
-    rule->state_nb = list_len (node_rule->statelist) + 1;
-  else
-    rule->state_nb = 1;
+  for (s=1, l=node_rule->statelist; l!=NULL; l=BIN_RVAL(l), s++)
+    ((node_state_t *)BIN_LVAL(l))->state_id = s;
+  rule->state_nb = s;
   rule->state = gc_base_malloc (ctx->gc_ctx,
 				rule->state_nb * sizeof (state_t));
   for (s=0, m=rule->state_nb; s<m; s++)

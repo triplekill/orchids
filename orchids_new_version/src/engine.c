@@ -349,7 +349,7 @@ static void cleanup_state_instance (state_instance_t *si)
 
   pid = si->pid;
   --pid->nsi;
-  if (pid->nsi==0 && sync_var_env_is_defined (si))
+  if (pid->nsi==0 && pid->rule->sync_lock!=NULL && sync_var_env_is_defined (si))
     {
       (void) objhash_del (pid->rule->sync_lock, si);
     }
@@ -371,7 +371,6 @@ static void detach_state_instance (gc_t *gc_ctx, state_instance_t *si)
 
 static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 							state_instance_t *si,
-							state_t *q,
 							thread_queue_t *tq,
 							int only_once)
 {
@@ -381,10 +380,12 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   ovm_var_t *oldenv;
   objhash_t *lock_table;
   struct thread_group_s *sync_lock;
+  state_t *q;
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START (gc_ctx, 1);
-  if (si->q->flags & STATE_COMMIT)
+  q = si->q;
+  if (q->flags & STATE_COMMIT)
     {
       si->pid->flags |= THREAD_KILL;
       detach_state_instance (gc_ctx, si);
@@ -444,7 +445,8 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	if (trans->eval_code==NULL ||
 	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
 	  {
-	    enter_state_and_follow_epsilon_transitions (ctx, si, trans->dest, tq, only_once);
+	    si->q = trans->dest;
+	    enter_state_and_follow_epsilon_transitions (ctx, si, tq, only_once);
 	    break;
 	  }
       }
@@ -456,10 +458,10 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	if (trans->eval_code==NULL ||
 	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
 	  {
-	    newsi = create_state_instance (ctx, si->pid, q, trans, si->env, si->nhandles);
+	    newsi = create_state_instance (ctx, si->pid, trans->dest, trans, si->env, si->nhandles);
 	    GC_UPDATE (gc_ctx, 0, newsi);
 	    /* now we call ourselves back with only_once false */
-	    enter_state_and_follow_epsilon_transitions (ctx, newsi, trans->dest, tq, 0);
+	    enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
 	    cleanup_state_instance (newsi);
 	  }
       }
@@ -487,7 +489,8 @@ static void simulate_state_and_create_threads (orchids_t *ctx,
     vmret = ovm_exec_expr (ctx, si, t->eval_code);
   if (vmret==0)
     { /* OK: pass transition */
-      enter_state_and_follow_epsilon_transitions (ctx, si, t->dest, tq, 0);
+      si->q = t->dest;
+      enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
     }
 }
 
@@ -513,7 +516,7 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
       /* create state instance, in state q, waiting for no transition yet (NULL),
 	 and with empty environment (NULL) */
       GC_UPDATE (gc_ctx, 0, init);
-      enter_state_and_follow_epsilon_transitions (ctx, init, q, tq, 1);
+      enter_state_and_follow_epsilon_transitions (ctx, init, tq, 1);
       /* since init is meant to be launched only once, we do not enqueue it,
 	 and clean it up. */
       cleanup_state_instance (init);

@@ -90,13 +90,13 @@ rule pidtrack
 
     print("Alert report :");
 
-    $str = "Attack perpetrated by $uid=" + str_from_int($uid);
+    $str = "Attack perpetrated by $uid=" + str_from_uint($uid);
     print($str);
     report();
 
 
     $str = "ssh client 'USER=`cut -d : -f 1,3 /etc/passwd | grep "
-    + str_from_int($uid) +
+    + str_from_uint($uid) +
     " | cut -d : -f 1`; echo You have been kicked out by OrchIDS... | write $USER; kill -9 `ps -u $USER -o pid=`; chsh -s /sbin/nologin $USER' >/dev/null 2>/dev/null &";
     system($str);
   }
