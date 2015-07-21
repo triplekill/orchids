@@ -75,8 +75,12 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
 
   state alert!
   {
-    $m = "Alert : Burst ==> More than " + str_from_uint(THRESH) + ". Source : " + str_from_ipv4($source)  +". Burst started at " + str_from_ctime($begin);
-    print ($m);
+    print_string ("Alert: Burst ==> More than ");
+    print_string (str_from_uint (THRESH));
+    print_string (". Source : ");
+    print_string (str_from_ipv4($source));
+    print_string (". Burst started at ");
+    print_string (str_from_ctime($begin));
 
     $total = $total + $count;
     $nb_burst = $nb_burst + 1;
@@ -87,8 +91,14 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   {
     if ($nb_burst > 0)
     {
-      $m = "Alert : Multiple burst : " + str_from_uint($nb_burst) + " consecutive bursts. Total : " + str_from_uint($count)  +". Bursts started at " + str_from_ctime($total_begin) + " Source : " + str_from_ipv4($source);
-      print ($m);
+      print_string ("Alert : Multiple burst : ");
+      print_string (str_from_uint($nb_burst));
+      print_string (" consecutive bursts. Total : ");
+      print_string (str_from_uint($count));
+      print_string (". Bursts started at ");
+      print_string (str_from_ctime($total_begin));
+      print_string (" Source : ");
+      print_string (str_from_ipv4($source));
     }
 
     // Here we start a new burst detection by going back to the first state.

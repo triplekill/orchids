@@ -2327,6 +2327,35 @@ issdl_print(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
+static void issdl_print_string (orchids_t *ctx, state_instance_t *state)
+{
+  ovm_var_t *param;
+  char *s;
+  size_t len, i;
+
+  DebugLog(DF_OVM, DS_DEBUG, "issdl_print_string()\n");
+  param = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  s = NULL;
+  len = 0;
+  if (param!=NULL)
+    switch (TYPE(param))
+      {
+      case T_STR:
+	s = STR(param); len = STRLEN(param); break;
+      case T_VSTR:
+	s = VSTR(param); len = VSTRLEN(param); break;
+      default:
+	DebugLog(DF_OVM, DS_DEBUG, "parameter error\n");
+	break;
+      }
+  for (i = 0; i < len; i++)
+    fputc(s[i], stdout);
+  fflush (stdout);
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_RETURN_TRUE(ctx);
+}
+
+
 #ifdef OBSOLETE
 static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
 {
@@ -4231,13 +4260,10 @@ static issdl_function_t issdl_function_g[] = {
     m_random_thrash,
     "dump the stack of the current rule" },
 #endif
-#if 0
-  { issdl_printevent, 3, "print_event",
-    0, int_sigs,  /* always returns true, in fact */
+  { issdl_print_string, 3, "print_string",
+    1, int_of_str_sigs,  /* always returns true, in fact */
     m_const_thrash,
-    "print the event associated with state" },
-  // OBSOLETE, use print(current_event())
-#endif
+    "print a string verbatim" },
 #ifdef OBSOLETE
   { issdl_dumppathtree, 4, "dump_dot_pathtree",
     0, int_sigs, /* always returns true, in fact */

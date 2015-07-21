@@ -86,7 +86,7 @@ rule ptrace
 
   state ptrace_detach!
   {
-    print("Preliminary report :");
+    print_string ("Preliminary report :\n");
 
     $str = "ssh root@10.0.0.100 'echo You have been kicked by OrchIDS... | write user ; kill -9 $(ps -u " +
            str_from_uint($attacker_uid) +
@@ -124,7 +124,7 @@ rule ptrace
 
   state make_report!
   {
-    print("Final report :");
+    print_string ("Final report :\n");
     report();
   }
 }

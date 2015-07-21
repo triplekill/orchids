@@ -26,7 +26,8 @@ rule pidtrack
              + str_from_uint($uid) + "), property(Login, user, realname, Name)";
     $user = prolog($query, "Name");
     $str = str_from_int($pid) + " started by " + $user;
-    print($str); */
+    print_string ($str);
+    print_string ("\n"); */
 
     expect (.rawsnare.pid == $pid &&
         .rawsnare.syscall == "(11) SYS_execve" &&
@@ -92,7 +93,7 @@ rule pidtrack
 
   state alert!
   {
-    print("Alert report :");
+    print_string ("Alert report :\n");
     report();
   }
 

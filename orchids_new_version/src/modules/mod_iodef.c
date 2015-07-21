@@ -113,7 +113,7 @@ size_t snprint_xml_s_len (char *buf, size_t buflen, char *s, size_t len)
 {
   size_t i;
   int c;
-  char *start, *bufend, *bufnext;
+  char *start, *bufend;
 
   start = buf;
   bufend = buf+buflen-1;
@@ -123,62 +123,7 @@ size_t snprint_xml_s_len (char *buf, size_t buflen, char *s, size_t len)
 	break;
       c = s[i];
       if (isprint (c))
-	switch (c)
-	  {
-	  case '&':
-	    bufnext = buf+5;
-	    if (bufnext>bufend)
-	      i = len; /* to exit the loop */
-	    else
-	      {
-		memcpy (buf, "&amp;", 5);
-		buf = bufnext;
-	      }
-	    break;
-	  case '"':
-	    bufnext = buf+6;
-	    if (bufnext>bufend)
-	      i = len; /* to exit the loop */
-	    else
-	      {
-		memcpy (buf, "&quot;", 6);
-		buf = bufnext;
-	      }
-	    break;
-	  case '\'':
-	    bufnext = buf+6;
-	    if (bufnext>bufend)
-	      i = len; /* to exit the loop */
-	    else
-	      {
-		memcpy (buf, "&apos;", 6);
-		buf = bufnext;
-	      }
-	    break;
-	  case '<':
-	    bufnext = buf+4;
-	    if (bufnext>bufend)
-	      i = len; /* to exit the loop */
-	    else
-	      {
-		memcpy (buf, "&lt;", 4);
-		buf = bufnext;
-	      }
-	    break;
-	  case '>':
-	    bufnext = buf+4;
-	    if (bufnext>bufend)
-	      i = len; /* to exit the loop */
-	    else
-	      {
-		memcpy (buf, "&gt;", 4);
-		buf = bufnext;
-	      }
-	    break;
-	  default:
-	    *buf++ = c;
-	    break;
-	  }
+	*buf++ = c;
       else *buf++ = '.';
     }
   *buf = '\0';
@@ -212,28 +157,28 @@ size_t snprintf_ovm_var (char *buff, size_t buff_length, ovm_var_t *val)
 	   sprintf (asc_time, "%lu", UINT(val));
 	   return snprint_xml_s (buff, buff_length, asc_time);
 	 case T_BSTR:
-	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
 	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
 					 (char *)BSTR(val), BSTRLEN(val));
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
 	   return offset;
 	 case T_VBSTR:
-	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
 	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
 					 (char *)VBSTR(val), VBSTRLEN(val));
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
 	   return offset;
 	 case T_STR:
-	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
 	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
 					 STR(val), STRLEN(val));
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
 	   return offset;
 	 case T_VSTR:
-	   offset = snprint_xml_s (buff, buff_length, "\"");
+	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
 	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
 					 VSTR(val), VSTRLEN(val));
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
+	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
 	   return offset;
 	 case T_CTIME:
 	   strftime(asc_time, 32,
@@ -318,7 +263,7 @@ static char expand_var (orchids_t		*ctx,
   unsigned int	text_offset = 0;
   char		c;
 
-  if (!text=='\0' || strchr(text, '$')==NULL)
+  if (text=='\0' || strchr(text, '$')==NULL)
     return 0;
 
   memset(buff, 0, buff_size);
@@ -346,7 +291,7 @@ static char expand_var (orchids_t		*ctx,
 	  // Retrieve the last variable value and add it to the buffer
 	  for (v = 0; v < state->pid->rule->dynamic_env_sz; ++v)
 	    {
-	      if (!strcmp(text + text_offset + 1,
+	      if (!strcmp(text + text_offset,
 			  state->pid->rule->var_name[v]))
 		{
 		  ovm_var_t *val;

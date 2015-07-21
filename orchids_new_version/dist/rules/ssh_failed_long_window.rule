@@ -102,8 +102,13 @@ rule ssh_failed_long_window
 	"Brute force detected");
     idmef_write_alert($idmef);
 
-    $m = "Alert : More than " + str_from_uint(THRESH) + " events in less than " + str_from_ctime(WINDOW) + " seconds (" + str_from_ipv4($source)  +")"; \
-    print ($m);
+    print_string ("Alert : More than ");
+    print_string (str_from_uint(THRESH));
+    print_string (" events in less than ");
+    print_string (str_from_ctime(WINDOW));
+    print_string (" seconds (");
+    print_string (str_from_ipv4($source));
+    print_string (")\n");
   }
 
   state stop!

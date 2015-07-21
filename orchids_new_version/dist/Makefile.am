@@ -3,7 +3,7 @@ orchidsconfdir = $(sysconfdir)/orchids
 EXTRA_DIST = orchids.conf.dist orchids-rules.conf.dist orchids-modules.conf.dist \
 		orchids-inputs.conf.dist
 
-SUBDIRS = conf.d htmlstate rules
+SUBDIRS = conf.d htmlstate iodef rules
 
 orchidsconf_DATA = orchids.conf orchids-rules.conf orchids-modules.conf \
 			orchids-inputs.conf

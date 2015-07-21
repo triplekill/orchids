@@ -88,10 +88,11 @@ rule pidtrack
   state alert!
   {
 
-    print("Alert report :");
+    print_string ("Alert report :\n");
 
     $str = "Attack perpetrated by $uid=" + str_from_uint($uid);
-    print($str);
+    print_string ($str);
+    print_string ("\n");
     report();
 
 

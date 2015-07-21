@@ -3,7 +3,7 @@
 #
 
 AddRuleFile @@ETCDIR@@/orchids/rules/lin24_ptrace.pprule
-AddRuleFile @@ETCDIR@@/orchids/rules/pid_tracker.pprule
+AddRuleFile @@ETCDIR@@/orchids/rules/pid_tracker_auditd.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/apachessl.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/portscan.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/dhcp_lease_check.pprule

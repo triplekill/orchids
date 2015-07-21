@@ -53,10 +53,13 @@ rule deauth_flood synchronize($addr_src, $addr_dst) {
   state alert! {
     $end_time = .wifi.time + WAITIME ;
 
-    $msg = "deauthentication flood [" + str_from_int( $counter ) + " pkts] src:"
-          + .wifi.sa + " dst:" + .wifi.da ;
-
-    print ( $msg );
+    print_string ("deauthentication flood [");
+    print_string (str_from_int( $counter ));
+    print_string (" pkts] src:");
+    print_string (.wifi.sa);
+    print_string (" dst:");
+    print_string (.wifi.da);
+    print_string ("\n");
   } /* end alert */
 
 

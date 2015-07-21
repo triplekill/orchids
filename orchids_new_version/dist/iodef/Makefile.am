@@ -3,7 +3,7 @@ orchidsconfdir = $(sysconfdir)/orchids
 orchidsiodefconfdir = $(orchidsconfdir)/iodef
 orchidsiodefconf_DATA =		\
   lin24_ptrace_audit.iodef	\
-  pid_tracker.iodef		\
+  pidtrack.iodef		\
   portscan.iodef		\
   anti_ssh_scan.iodef		\
   test_idmef.iodef

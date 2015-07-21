@@ -387,8 +387,13 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   q = si->q;
   if (q->flags & STATE_COMMIT)
     {
-      si->pid->flags |= THREAD_KILL;
-      detach_state_instance (gc_ctx, si);
+      if (si->pid->nsi!=1)
+	{ /* optimization: if only one state instance has this pid (namely, ourselves: si),
+	     then no need to kill the other state instances with the same pid
+	     and to detach. */
+	  si->pid->flags |= THREAD_KILL;
+	  detach_state_instance (gc_ctx, si);
+	}
     }
   if (q->action!=NULL)
     {

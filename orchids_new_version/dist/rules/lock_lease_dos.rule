@@ -46,13 +46,13 @@ rule lock_lease_dos
 
   state alert!
   {
-    print("Time_Out_Leases PrintK Local Denial of Service attack detected !!");
+    print_string ("Time_Out_Leases PrintK Local Denial of Service attack detected !!\n");
 
     $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
     system( $reaction );
-    $msg= " ---> Orchids is reacting : killing attack process !!";
-    print($msg);
-    print( $reaction );
+    print_string (" ---> Orchids is reacting : killing attack process !!\n");
+    print_string ( $reaction );
+    print_string ("\n");
   }
 
 }/* end rule lock_lease_dos*/

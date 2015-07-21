@@ -13,9 +13,10 @@ rule portscan {
     $dip = .snort.dip; /* used in portscan.iodef template, if IODEF is used (hidden
                           in call to report() */
     $threshold = .snort.threshold;
-    $msg = "portscan detected from " + str_from_ipv4($sip);
 
-    print ($msg);
+    print_string ("portscan detected from ");
+    print_string (str_from_ipv4 ($sip));
+    print_string ("\n");
     goto portscan_alert;
   }
 
@@ -39,7 +40,7 @@ rule portscan {
 #endif
 
   state portscan_alert! {
-    print ("portscan completed!");
+    print_string ("portscan completed!\n");
     report();
   }
 }

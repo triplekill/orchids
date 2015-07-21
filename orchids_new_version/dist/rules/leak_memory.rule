@@ -45,13 +45,13 @@ rule leak_memory
 
   state alert!
   {
-    print("Memory leak DOS attack detected !!");
+    print_string ("Memory leak DOS attack detected !!\n");
 
     $reaction = "kill -9 " + str_from_int( $attack_pid ) ;
     system( $reaction );
-    $msg= " --> Orchids is reacting : killing attack process !!";
-    print($msg);
-    print( $reaction );
+    print_string (" --> Orchids is reacting : killing attack process !!\n");
+    print_string ( $reaction );
+    print_string ("\n");
 
     report();
   }
