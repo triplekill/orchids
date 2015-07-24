@@ -30,6 +30,7 @@
 #endif
 
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -2223,13 +2224,28 @@ static only_depends_on (gc_t *gc_ctx, node_expr_t *e, varset_t *vars)
 */
 
 static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
-				  monotony vars[]);
+				  monotony vars[], int const_fields);
+/* Imagine we evaluate e in two different variable environments env1 and env2.
+   vars[i] says how variable #i evolves from env1 to env2:
+   - value increases (>=) if MONO_MONO
+   - value decreases (<=) if MONO_ANTI
+   - value stays the same (==) if MONO_CONST
+   - don't know if MONO_UNKNOWN.
+   Then compute_monotony() computes how the value of expression e evolves:
+   returns MONO_MONO if values increases, etc.
+   This also updates vars[i] in case of side-effects on variables, and
+   instructs us about the direction of variation of the values of variables
+   *after* the execution of e.
+   Finally, const_fields is true if the fields are assumed constant.
+   If const_fields is false, we take them to vary according to their
+   SYM_MONO field. */
 
 static monotony compute_monotony_cond (rule_compiler_t *ctx,
 				       int op,
 				       node_expr_t *left,
 				       node_expr_t *right,
-				       monotony vars[])
+				       monotony vars[],
+				       int const_fields)
 {
   monotony ma, mb, res;
   monotony *alt;
@@ -2240,12 +2256,12 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
     {
     case ANDAND:
     case OROR:
-      ma = compute_monotony (ctx, left, vars);
+      ma = compute_monotony (ctx, left, vars, const_fields);
       nvars = ctx->rule_env->elmts;
       varsz = nvars*sizeof(monotony);
       alt = gc_base_malloc (ctx->gc_ctx, varsz);
       memcpy (alt, vars, varsz);
-      mb = compute_monotony (ctx, right, alt);
+      mb = compute_monotony (ctx, right, alt, const_fields);
       /* The effect on vars[] is a bit complicated, and
 	 is as in the NODE_IFSTMT case in compute_monotony() */
       if (ma==MONO_CONST)
@@ -2269,7 +2285,7 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
 	res |= MONO_ANTI;
       return res;
     case BANG:
-      ma = compute_monotony (ctx, left, vars);
+      ma = compute_monotony (ctx, left, vars, const_fields);
       /* BANG is antitonic: */
       res = MONO_UNKNOWN;
       if (ma & MONO_MONO)
@@ -2281,15 +2297,15 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
     case OP_CNEQ:
     case OP_CRM:
     case OP_CNRM:
-      ma = compute_monotony (ctx, left, vars);
-      mb = compute_monotony (ctx, right, vars);
+      ma = compute_monotony (ctx, left, vars, const_fields);
+      mb = compute_monotony (ctx, right, vars, const_fields);
       if (ma==MONO_CONST && mb==MONO_CONST)
 	return MONO_CONST;
       return MONO_UNKNOWN;
     case OP_CGT:
     case OP_CGE:
-      ma = compute_monotony (ctx, left, vars);
-      mb = compute_monotony (ctx, right, vars);
+      ma = compute_monotony (ctx, left, vars, const_fields);
+      mb = compute_monotony (ctx, right, vars, const_fields);
       /* >, >= are monotonic in its first argument, antitonic
 	 in its second argument, just like OP_SUB */
       res = MONO_UNKNOWN;
@@ -2300,8 +2316,8 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
       return res;
     case OP_CLT:
     case OP_CLE:
-      ma = compute_monotony (ctx, left, vars);
-      mb = compute_monotony (ctx, right, vars);
+      ma = compute_monotony (ctx, left, vars, const_fields);
+      mb = compute_monotony (ctx, right, vars, const_fields);
       /* <, <= are antitonic in its first argument, monotonic
 	 in its second argument, just like OP_SUB */
       res = MONO_UNKNOWN;
@@ -2325,14 +2341,17 @@ static int do_set_mono_const (int var, void *data)
 }
 
 static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
-				  monotony vars[])
+				  monotony vars[], int const_fields)
 {
   if (e==NULL)
     return MONO_CONST; /* null is constant */
   switch (e->type)
     {
     case NODE_FIELD:
-      return SYM_MONO(e);
+      if (const_fields)
+	return MONO_CONST;
+      else
+	return SYM_MONO(e);
     case NODE_CONST:
       return MONO_CONST;
     case NODE_VARIABLE:
@@ -2351,7 +2370,7 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	n = list_len (CALL_PARAMS(e));
 	args = gc_base_malloc (ctx->gc_ctx, n*sizeof(monotony));
 	for (i=0, l=CALL_PARAMS(e); l!=NULL; i++, l=BIN_RVAL(l))
-	  args[i] = compute_monotony (ctx, BIN_LVAL(l), vars);
+	  args[i] = compute_monotony (ctx, BIN_LVAL(l), vars, const_fields);
 	if (cm==NULL)
 	  res = MONO_UNKNOWN; /* we do this after we have computed
 				 args[i] for every i, to give a chance
@@ -2383,29 +2402,29 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
       {
 	monotony ma, mb;
 
-	ma = compute_monotony (ctx, BIN_LVAL(e), vars);
-	mb = compute_monotony (ctx, BIN_RVAL(e), vars);
+	ma = compute_monotony (ctx, BIN_LVAL(e), vars, const_fields);
+	mb = compute_monotony (ctx, BIN_RVAL(e), vars, const_fields);
 	return compute_monotony_bin (ctx, BIN_OP(e), ma, mb);
       }
     case NODE_MONOP:
       {
 	monotony ma;
 
-	ma = compute_monotony (ctx, MON_VAL(e), vars);
+	ma = compute_monotony (ctx, MON_VAL(e), vars, const_fields);
 	return compute_monotony_mon (ctx, MON_OP(e),
 				     ma, MON_VAL(e)->stype);
       }
     case NODE_COND:
       return compute_monotony_cond (ctx, BIN_OP(e),
 				    BIN_LVAL(e), BIN_RVAL(e),
-				    vars);
+				    vars, const_fields);
     case NODE_EVENT:
     case NODE_CONS:
       {
 	monotony ma, mb;
 
-	ma = compute_monotony (ctx, BIN_LVAL(e), vars);
-	mb = compute_monotony (ctx, BIN_RVAL(e), vars);
+	ma = compute_monotony (ctx, BIN_LVAL(e), vars, const_fields);
+	mb = compute_monotony (ctx, BIN_RVAL(e), vars, const_fields);
 	if (ma==MONO_CONST && mb==MONO_CONST)
 	  return MONO_CONST;
 	return MONO_UNKNOWN;
@@ -2424,12 +2443,12 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	   Additionally, we set each pati that is a logical variable
 	   to MONO_UNKNOWN.
 	 */
-	m = compute_monotony (ctx, BIN_LVAL(e), vars);
+	m = compute_monotony (ctx, BIN_LVAL(e), vars, const_fields);
 	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
 	  {
 	    if (is_logical_variable (BIN_LVAL(l)))
 	      vars[SYM_RES_ID(BIN_LVAL(l))] = MONO_UNKNOWN;
-	    else if (compute_monotony (ctx, BIN_LVAL(l), vars)!=MONO_CONST)
+	    else if (compute_monotony (ctx, BIN_LVAL(l), vars, const_fields)!=MONO_CONST)
 	      m = MONO_UNKNOWN;
 	  }
 	return m;
@@ -2460,7 +2479,7 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	m = MONO_CONST;
 	for (l=BIN_RVAL(BIN_RVAL(e)); l!=NULL; l=BIN_RVAL(l))
 	  {
-	    m &= compute_monotony (ctx, BIN_LVAL(l), vars);
+	    m &= compute_monotony (ctx, BIN_LVAL(l), vars, const_fields);
 	  }
 	if (m!=MONO_UNKNOWN)
 	  { /* decide whether the tuple BIN_LVAL(e) is constant under the
@@ -2474,8 +2493,8 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	    memcpy (alt, vars, varsz);
 	    bound = vs_bound_vars_db_pattern (ctx->gc_ctx, BIN_RVAL(BIN_RVAL(e)));
 	    (void) vs_sweep (bound, do_set_mono_const, alt);
-	    (void) compute_monotony (ctx, BIN_LVAL(BIN_LVAL(BIN_RVAL(e))), alt);
-	    if (compute_monotony (ctx, BIN_RVAL(BIN_LVAL(BIN_RVAL(e))), alt)!=MONO_CONST)
+	    (void) compute_monotony (ctx, BIN_LVAL(BIN_LVAL(BIN_RVAL(e))), alt, const_fields);
+	    if (compute_monotony (ctx, BIN_RVAL(BIN_LVAL(BIN_RVAL(e))), alt, const_fields)!=MONO_CONST)
 	      m = MONO_UNKNOWN;
 	    gc_base_free (alt);
 	  }
@@ -2497,7 +2516,7 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 
 	m = MONO_CONST;
 	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
-	  if (compute_monotony (ctx, BIN_LVAL(l), vars)!=MONO_CONST)
+	  if (compute_monotony (ctx, BIN_LVAL(l), vars, const_fields)!=MONO_CONST)
 	    {
 	      m = MONO_UNKNOWN;
 	      break;
@@ -2511,7 +2530,7 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	if (REGSPLIT_DEST_VARS(e)!=NULL)
 	  n = REGSPLIT_DEST_VARS(e)->vars_nb;
 	else n = 0;
-	if (compute_monotony (ctx, REGSPLIT_STRING(e), vars)==MONO_CONST)
+	if (compute_monotony (ctx, REGSPLIT_STRING(e), vars, const_fields)==MONO_CONST)
 	  {
 	    for (i=0; i<n; i++)
 	      vars[SYM_RES_ID(REGSPLIT_DEST_VARS(e)->vars[i])] = MONO_CONST;
@@ -2532,15 +2551,15 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
 	size_t varsz;
 	monotony res;
 
-	mif = compute_monotony (ctx, IF_COND(e), vars);
+	mif = compute_monotony (ctx, IF_COND(e), vars, const_fields);
 	nvars = ctx->rule_env->elmts;
 	varsz = nvars*sizeof(monotony);
 	vars_then = gc_base_malloc (ctx->gc_ctx, varsz);
 	vars_else = gc_base_malloc (ctx->gc_ctx, varsz);
 	memcpy (vars_then, vars, varsz);
-	mthen = compute_monotony (ctx, IF_THEN(e), vars_then);
+	mthen = compute_monotony (ctx, IF_THEN(e), vars_then, const_fields);
 	memcpy (vars_else, vars, varsz);
-	melse = compute_monotony (ctx, IF_ELSE(e), vars_else);
+	melse = compute_monotony (ctx, IF_ELSE(e), vars_else, const_fields);
 	if (mif==MONO_CONST)
 	  {
 	    for (i=0; i<nvars; i++)
@@ -2560,13 +2579,145 @@ static monotony compute_monotony (rule_compiler_t *ctx, node_expr_t *e,
       }
     case NODE_ASSOC:
       return vars[SYM_RES_ID(BIN_LVAL(e))] =
-	compute_monotony (ctx, BIN_RVAL(e), vars);
+	compute_monotony (ctx, BIN_RVAL(e), vars, const_fields);
     default:
       DebugLog(DF_OLC, DS_FATAL,
 	       "unrecognized node type %d\n", e->type);
       exit(EXIT_FAILURE);
       break;
     }
+}
+
+static monotony compute_monotony_simple (rule_compiler_t *ctx, node_expr_t *e)
+{
+  monotony *vars, m;
+  size_t i, n;
+
+  n = ctx->dyn_var_name_nb;
+  vars = gc_base_malloc (ctx->gc_ctx, n*sizeof(monotony));
+  for (i=0; i<n; i++)
+    vars[i] = MONO_CONST;
+  m = compute_monotony (ctx, e, vars, 0);
+  gc_base_free (vars);
+  return m;
+}
+
+typedef struct sesf_s sesf_t;
+struct sesf_s {
+  node_state_t *state;
+  size_t nvars;
+  monotony vars[];
+};
+
+static hcode_t sesf_hash (hkey_t *key, size_t keylen)
+{
+  sesf_t *sesf = (sesf_t *)key;
+  hcode_t hash;
+  size_t i, n;
+
+  hash = (unsigned long)sesf->state;
+  n = sesf->nvars;
+  hash += n;
+  for (i=0; i<n; i++)
+    hash += sesf->vars[i];
+  return hash;
+}
+
+static int same_event_sequence_fits (rule_compiler_t *ctx, node_state_t *state,
+				     monotony vars[], hash_t *memo)
+{
+  sesf_t *sesf;
+  size_t i, n, sz;
+  void *p;
+  monotony *newvars, *condvars;
+  size_t varsz;
+  node_expr_t *l;
+  monotony m;
+  node_trans_t *t;
+  node_state_t *next;
+  int res;
+
+  n = ctx->dyn_var_name_nb;
+  sz = offsetof(sesf_t, vars[n]);
+  sesf = gc_base_malloc (ctx->gc_ctx, sz);
+  sesf->state = state;
+  sesf->nvars = n;
+  for (i=0; i<n; i++)
+    sesf->vars[i] = vars[i];
+  p = hash_get (memo, sesf, sz);
+  if (p!=NULL) /* cycle found */
+    res = 1;
+  else
+    {
+      hash_add (ctx->gc_ctx, memo, (void *)1, sesf, sz);
+      varsz = n*sizeof(monotony);
+      newvars = gc_base_malloc (ctx->gc_ctx, 2*varsz);
+      memcpy (newvars, vars, varsz);
+      condvars = newvars + ctx->dyn_var_name_nb;
+      for (l=state->actionlist; l!=NULL; l=BIN_RVAL(l))
+	(void) compute_monotony (ctx, BIN_LVAL(l), newvars, 1);
+      for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+	{
+	  t = (node_trans_t *)BIN_LVAL(l);
+	  if (t->cond!=NULL)
+	    {
+	      memcpy (condvars, newvars, varsz);
+	      m = compute_monotony (ctx, t->cond, condvars, 1);
+	      /* we wish that if the condition holds (==1) in the future
+		 then it holds in the past, namely that the condition
+		 be antitone (or constant). */
+	      if (!(m & MONO_ANTI))
+		{
+		  res = 0; /* no way */
+		  break;
+		}
+	      next = trans_dest_state (ctx, t);
+	      res = same_event_sequence_fits (ctx, next, condvars, memo);
+	      if (res==0)
+		break;
+	    }
+	}
+      gc_base_free (newvars);
+      hash_del (memo, sesf, sz);
+    }
+  return res;
+}
+
+static int trans_no_wait_needed (rule_compiler_t *ctx, node_trans_t *trans)
+/* Imagine we are able to take transition 'trans' at some event #m.
+   By default, the Orchids engine will also created a thread T that waits
+   for 'trans' to match at some later event #n.
+   Imagine the latter will eventually succeed with a run n=n0 < n1 < n2 < ...
+   We would like to know whether the run m < n1 < n2 < ... (i.e., with n
+   replaced by m) would have succeeded too.  In that case, it is useless
+   to create the thread T.
+   The purpose of trans_no_wait_needed() is to detect that case.
+   If so, we return true.
+*/
+{
+  monotony *vars;
+  size_t varsz, i, n;
+  node_state_t *next;
+  hash_t *memo;
+  int res;
+
+  res = 1;
+  n = ctx->dyn_var_name_nb;
+  varsz = n*sizeof(monotony);
+  vars = gc_base_malloc (ctx->gc_ctx, varsz);
+  for (i=0; i<n; i++)
+    vars[i] = MONO_CONST; /* We start assuming that the engine is started
+			     with the same values of the variables at #m and
+			     at #n. */
+  next = trans_dest_state (ctx, trans);
+  memo = new_hash (ctx->gc_ctx, 1023); /* XXX hardcoded */
+  memo->hash = sesf_hash;
+  /* Then we check that the same sequence of events n1 < n2 < ...
+     will fit the next state */
+  res = same_event_sequence_fits (ctx, next, vars, memo);
+  free_hash (memo, NULL);
+  gc_base_free (vars);
+  return res;
 }
 
 monotony m_const (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
@@ -6945,6 +7096,12 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	  node_trans = (node_trans_t *)BIN_LVAL(l);
 	  rule->trans_nb++; /* update rule stats */
 	  state->trans[i].id = i; /* set trans id */
+	  trans->flags = 0;
+	  if ((state->flags & EPSILON_STATE) || trans_no_wait_needed (ctx, node_trans))
+	    trans->flags |= TRANS_NO_WAIT;
+	  if (!(state->flags & EPSILON_STATE) && node_trans->cond!=NULL
+	      && compute_monotony_simple (ctx, node_trans->cond) & MONO_ANTI)
+	    trans->flags |= TRANS_ALWAYS_FAILS_IF_EVER;
 
 	  DebugLog(DF_OLC, DS_DEBUG, "transition %i: \n", i);
 	  if (node_trans->cond!=NULL)

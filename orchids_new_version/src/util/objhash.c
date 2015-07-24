@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "safelib.h"
 #include "gc.h"
 #include "objhash.h"
 

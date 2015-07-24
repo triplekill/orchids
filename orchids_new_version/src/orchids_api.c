@@ -495,17 +495,17 @@ void register_conditional_dissector(orchids_t *ctx,
       }
       break;
     case T_UINT:
-      cond_param = Xmalloc (sizeof (unsigned long));
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (unsigned long));
       *(unsigned long *)cond_param = strtoul(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (unsigned long);
       break;
     case T_INT:
-      cond_param = Xmalloc (sizeof (long));
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (long));
       *(long *)cond_param = strtol(cond_param_str, (char **)NULL, 10);
       cond_param_size = sizeof (long);
       break;
     case T_IPV4:
-      cond_param = Xmalloc (sizeof (in_addr_t));
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (in_addr_t));
       if (inet_pton (AF_INET, cond_param_str, cond_param) != 1)
 	{
 	  fprintf (stderr,
@@ -518,7 +518,7 @@ void register_conditional_dissector(orchids_t *ctx,
       cond_param_size = sizeof (in_addr_t);
       break;
     case T_IPV6:
-      cond_param = Xmalloc (sizeof (struct in6_addr));
+      cond_param = gc_base_malloc (ctx->gc_ctx, sizeof (struct in6_addr));
       /* inet_addr is not IPv6 aware. Use inet_pton instead */
       if (inet_pton (AF_INET6, cond_param_str, cond_param) != 1)
 	{
@@ -543,7 +543,7 @@ void register_conditional_dissector(orchids_t *ctx,
   if (m_source->sub_dissectors==NULL)
     {
       /* XXX Hard-coded hash size... */
-      m_source->sub_dissectors = new_hash(31);
+      m_source->sub_dissectors = new_hash(ctx->gc_ctx, 31);
     }
   else if (hash_get(m_source->sub_dissectors, cond_param, cond_param_size))
     {
@@ -552,12 +552,12 @@ void register_conditional_dissector(orchids_t *ctx,
       exit(EXIT_FAILURE);
     }
 
-  cond_dissect = Xmalloc(sizeof (conditional_dissector_record_t));
+  cond_dissect = gc_base_malloc(ctx->gc_ctx, sizeof (conditional_dissector_record_t));
   cond_dissect->dissect = dissect_func;
   cond_dissect->data = data;
   cond_dissect->mod = m_dissect;
 
-  hash_add(m_source->sub_dissectors, cond_dissect, cond_param, cond_param_size);
+  hash_add(ctx->gc_ctx, m_source->sub_dissectors, cond_dissect, cond_param, cond_param_size);
 }
 
 

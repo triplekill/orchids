@@ -359,12 +359,12 @@ static void *syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   DebugLog(DF_MOD, DS_INFO, "load() syslog@%p\n", (void *) &mod_syslog);
  
-  data = Xmalloc (sizeof(syslog_data_t));
+  data = gc_base_malloc (ctx->gc_ctx, sizeof(syslog_data_t));
   now = time (NULL);
   t = gmtime (&now);
   data->default_year.year = t->tm_year;
   data->default_year.flags = SYSLOG_TT_FIRST;
-  data->year_table = new_hash (101); /* XXX hard-coded hash table size */
+  data->year_table = new_hash (ctx->gc_ctx, 101); /* XXX hard-coded hash table size */
   GC_TOUCH (ctx->gc_ctx, val = ovm_vstr_new (ctx->gc_ctx, NULL));
   VSTR(val) = "syslog";
   VSTRLEN(val) = strlen(VSTR(val));
@@ -494,10 +494,10 @@ static void syslog_set_year (orchids_t *ctx, mod_entry_t * mod, config_directive
 	goto err;
       break;
     }
-  tt = Xmalloc (sizeof(syslog_time_tracker_t));
+  tt = gc_base_malloc (ctx->gc_ctx, sizeof(syslog_time_tracker_t));
   tt->year = year;
   tt->flags = SYSLOG_TT_FIRST;
-  hash_add (data->year_table, tt, tag, len);
+  hash_add (ctx->gc_ctx, data->year_table, tt, tag, len);
 }
 
 static mod_cfg_cmd_t syslog_dir[] =

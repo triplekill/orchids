@@ -22,173 +22,172 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "safelib.h"
-
+#include "gc.h"
 #include "hash.h"
 
 
-hash_t *
-new_hash(size_t hsize)
+hash_t *new_hash(gc_t *gc_ctx, size_t hsize)
 {
   hash_t *h;
+  hash_elmt_t **he;
+  size_t i;
 
-  h = Xmalloc(sizeof (hash_t));
+  h = gc_base_malloc(gc_ctx, sizeof (hash_t));
   h->size = hsize;
   h->elmts = 0;
   h->hash = DEFAULT_HASH_FUNCTION;
-  h->htable = Xzmalloc(hsize * sizeof (hash_elmt_t *));
-
+  h->htable = he = gc_base_malloc(gc_ctx, hsize * sizeof (hash_elmt_t *));
+  for (i=0; i<hsize; i++)
+    he[i] = NULL;
   return (h);
 }
 
 
-void
-clear_hash(hash_t *hash, void (*elmt_free)(void *e))
+void clear_hash(hash_t *hash, void (*elmt_free)(void *e))
 {
-  int i;
-  hash_elmt_t *tmp;
+  size_t i, sz;
+  hash_elmt_t **he, *tmp;
   hash_elmt_t *tmp_next;
 
-  for (i = 0; i < hash->size; i++) {
-    tmp = hash->htable[i];
+  sz = hash->size;
+  he = hash->htable;
+  for (i = 0; i < sz; i++) {
+    tmp = he[i];
     while (tmp) {
       tmp_next = tmp->next;
       if (elmt_free)
-        elmt_free(tmp->data);
-      Xfree(tmp);
+        (*elmt_free) (tmp->data);
+      gc_base_free (tmp);
       tmp = tmp_next;
     }
   }
   hash->elmts = 0;
-  memset(hash->htable, 0, hash->size * sizeof (void *));
+  for (i=0; i<sz; i++)
+    he[i] = NULL;
 }
 
 
-void *
-hash_to_array(hash_t *hash)
+void *hash_to_array(gc_t *gc_ctx, hash_t *hash)
 {
   void **array;
   hash_elmt_t *helmt;
   int elmts;
-  int i;
-  int hsize;
-  int j;
+  size_t i;
+  size_t hsize;
+  size_t j;
 
   hsize = hash->size;
   elmts = hash->elmts;
-  array = Xmalloc(elmts * sizeof (void *));
+  array = gc_base_malloc(gc_ctx, elmts * sizeof (void *));
   j = 0;
   for (i = 0; i < hsize; i++) {
-    for (helmt = hash->htable[i]; helmt; helmt = helmt->next) {
+    for (helmt = hash->htable[i]; helmt!=NULL; helmt = helmt->next) {
       array[j] = helmt->data;
       j++;
     }
   }
-
   return (array);
 }
 
 
-void
-free_hash(hash_t *hash, void (*elmt_free)(void *e))
+void free_hash(hash_t *hash, void (*elmt_free)(void *e))
 {
-  int i;
-  hash_elmt_t *tmp;
+  size_t i, sz;
+  hash_elmt_t **he, *tmp;
   hash_elmt_t *tmp_next;
 
-  for (i = 0; i < hash->size; i++) {
-    tmp = hash->htable[i];
+  sz = hash->size;
+  he = hash->htable;
+  for (i = 0; i < sz; i++) {
+    tmp = he[i];
     while (tmp) {
       tmp_next = tmp->next;
-      if (elmt_free)
+      if (elmt_free!=NULL)
         elmt_free(tmp->data);
-      Xfree(tmp);
+      gc_base_free (tmp);
       tmp = tmp_next;
     }
   }
-
-  Xfree(hash->htable);
-  Xfree(hash);
+  gc_base_free(he);
+  gc_base_free(hash);
 }
 
 
-void
-hash_resize(hash_t *hash, size_t newsize)
+void hash_resize(gc_t *gc_ctx, hash_t *hash, size_t newsize)
 {
-  hash_elmt_t **old_htable;
-  int i;
+  hash_elmt_t **old_htable, **he;
+  size_t i, sz;
 
   old_htable = hash->htable;
-  hash->htable = Xzmalloc(newsize * sizeof (hash_elmt_t *));
+  hash->htable = he = gc_base_malloc (gc_ctx, newsize * sizeof (hash_elmt_t *));
+  for (i=0; i<newsize; i++)
+    he[i] = NULL;
 
-  for (i = 0; i < hash->size; ++i) {
-    hash_elmt_t *tmp;
+  sz = hash->size;
+  for (i = 0; i<sz; ++i)
+    {
+      hash_elmt_t *tmp;
 
-    for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
-      hcode_t hcode;
+      for (tmp = old_htable[i]; tmp!=NULL; tmp = tmp->next)
+	{
+	  hcode_t hcode;
 
-      hcode = hash->hash(tmp->key, tmp->keylen) % newsize;
-      tmp->next = hash->htable[hcode];
-      hash->htable[hcode] = tmp;
+	  hcode = (*hash->hash) (tmp->key, tmp->keylen) % newsize;
+	  tmp->next = he[hcode];
+	  he[hcode] = tmp;
+	}
     }
-  }
-
-  Xfree(old_htable);
+  gc_base_free(old_htable);
   hash->size = newsize;
 }
 
 
-void
-hash_add(hash_t *hash, void *data, void *key, size_t keylen)
+void hash_add(gc_t *gc_ctx, hash_t *hash, void *data, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
   hcode_t hcode;
 
-  elmt = Xmalloc(sizeof (hash_elmt_t));
+  elmt = gc_base_malloc(gc_ctx, sizeof (hash_elmt_t));
   elmt->key = (hkey_t *) key;
   elmt->keylen = keylen;
   elmt->data = data;
 
-  hcode = hash->hash((hkey_t *) key, keylen) % hash->size;
+  hcode = (*hash->hash) ((hkey_t *) key, keylen) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
 }
 
 
-void *
-hash_check_and_add(hash_t *hash, void *data, void *key, size_t keylen)
+void *hash_check_and_add(gc_t *gc_ctx, hash_t *hash, void *data, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
   hcode_t hcode;
 
-  elmt = hash->htable[hash->hash((hkey_t *)key, keylen) % hash->size];
-  for (; elmt; elmt = elmt->next) {
-    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
-      return (elmt->data);
+  elmt = hash->htable[(*hash->hash) ((hkey_t *)key, keylen) % hash->size];
+  for (; elmt!=NULL; elmt = elmt->next) {
+    if (keylen==elmt->keylen && !memcmp(key, elmt->key, keylen))
+      return elmt->data;
   }
-
-  elmt = Xmalloc(sizeof (hash_elmt_t));
+  elmt = gc_base_malloc(gc_ctx, sizeof (hash_elmt_t));
   elmt->key = (hkey_t *) key;
   elmt->keylen = keylen;
   elmt->data = data;
 
-  hcode = hash->hash((hkey_t *) key, keylen) % hash->size;
+  hcode = (*hash->hash) ((hkey_t *) key, keylen) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
-
-  return (NULL);
+  return NULL;
 }
 
 
-void *
-hash_update(hash_t *hash, void *new_data, void *key, size_t keylen)
+void *hash_update(hash_t *hash, void *new_data, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
   void *old_data;
 
-  elmt = hash->htable[hash->hash(key, keylen) % hash->size];
+  elmt = hash->htable[(*hash->hash) (key, keylen) % hash->size];
   for (; elmt; elmt = elmt->next) {
     if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
       old_data = elmt->data;
@@ -202,14 +201,14 @@ hash_update(hash_t *hash, void *new_data, void *key, size_t keylen)
 }
 
 
-void *
-hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen)
+void *hash_update_or_add(gc_t *gc_ctx, hash_t *hash, void *new_data, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
   void *old_data;
   hcode_t hcode;
 
-  elmt = hash->htable[hash->hash(key, keylen) % hash->size];
+  hcode = (*hash->hash) (key, keylen) % hash->size;
+  elmt = hash->htable[hcode];
   for (; elmt; elmt = elmt->next) {
     if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
       old_data = elmt->data;
@@ -219,12 +218,11 @@ hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen)
     }
   }
 
-  elmt = Xmalloc(sizeof (hash_elmt_t));
+  elmt = gc_base_malloc(gc_ctx, sizeof (hash_elmt_t));
   elmt->key = key;
   elmt->keylen = keylen;
   elmt->data = new_data;
 
-  hcode = hash->hash(key, keylen) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -233,8 +231,7 @@ hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen)
 }
 
 
-void *
-hash_del(hash_t *hash, void *key, size_t keylen)
+void *hash_del(hash_t *hash, void *key, size_t keylen)
 {
   hash_elmt_t **head;
   hash_elmt_t  *elmt;
@@ -242,7 +239,7 @@ hash_del(hash_t *hash, void *key, size_t keylen)
   void         *data;
 
   prev = NULL;
-  head = &hash->htable[hash->hash(key, keylen) % hash->size];
+  head = &hash->htable[(*hash->hash) (key, keylen) % hash->size];
   for (elmt = *head; elmt; elmt = elmt->next) {
     if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
       data = elmt->data;
@@ -250,7 +247,7 @@ hash_del(hash_t *hash, void *key, size_t keylen)
         prev->next = elmt->next;
       else
         *head = elmt->next;
-      Xfree(elmt);
+      gc_base_free(elmt);
 
       return (data);
     }
@@ -261,13 +258,12 @@ hash_del(hash_t *hash, void *key, size_t keylen)
 }
 
 
-void *
-hash_get(hash_t *hash, void *key, size_t keylen)
+void *hash_get(hash_t *hash, void *key, size_t keylen)
 {
   hash_elmt_t *elmt;
 
-  elmt = hash->htable[hash->hash((hkey_t *)key, keylen) % hash->size];
-  for (; elmt; elmt = elmt->next) {
+  elmt = hash->htable[(*hash->hash)((hkey_t *)key, keylen) % hash->size];
+  for (; elmt!=NULL; elmt = elmt->next) {
     if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
       return (elmt->data);
   }
@@ -276,8 +272,7 @@ hash_get(hash_t *hash, void *key, size_t keylen)
 }
 
 
-hash_t *
-hash_clone(hash_t *hash, void *(clone)(void *elmt))
+hash_t *hash_clone(gc_t *gc_ctx, hash_t *hash, void *(*clone)(gc_t *gc_ctx, void *elmt))
 {
   hash_t *h;
   hash_elmt_t *tmp;
@@ -289,11 +284,11 @@ hash_clone(hash_t *hash, void *(clone)(void *elmt))
     return (NULL);
 
   hsize = hash->size;
-  h = new_hash(hsize);
+  h = new_hash(gc_ctx, hsize);
   for (i = 0; i < hsize; i++) {
-    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
-      data = clone(tmp->data);
-      hash_add(h, data, tmp->key, tmp->keylen);
+    for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next) {
+      data = (*clone) (gc_ctx, tmp->data);
+      hash_add(gc_ctx, h, data, tmp->key, tmp->keylen);
     }
   }
 
@@ -301,19 +296,19 @@ hash_clone(hash_t *hash, void *(clone)(void *elmt))
 }
 
 
-int
-hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
+int hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
 {
-  int   i;
+  size_t i;
 
-  for (i = 0; i < hash->size; i++) {
+  for (i = 0; i<hash->size; i++) {
     hash_elmt_t *tmp;
     int status;
 
-    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
-      if ((status = func(tmp->data, data)) != 0)
-        return (status);
-    }
+    for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next)
+      {
+	if ((status = (*func)(tmp->data, data)) != 0)
+	  return (status);
+      }
   }
 
   return (0);

@@ -481,9 +481,9 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   GC_END (gc_ctx);
 }
 
-static void simulate_state_and_create_threads (orchids_t *ctx,
-					       state_instance_t *si,
-					       thread_queue_t *tq)
+static int simulate_state_and_create_threads (orchids_t *ctx,
+					      state_instance_t *si,
+					      thread_queue_t *tq)
 {
   transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
   int vmret;
@@ -497,6 +497,7 @@ static void simulate_state_and_create_threads (orchids_t *ctx,
       si->q = t->dest;
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
     }
+  return vmret;
 }
 
 static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
@@ -536,6 +537,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   gc_t *gc_ctx = ctx->gc_ctx;
   thread_queue_t *new_queue, *unsorted, *next, *old_queue;
   state_instance_t *si;
+  int failed;
 
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
@@ -580,8 +582,30 @@ void inject_event(orchids_t *ctx, event_t *event)
 	    }
 	  else
 	    {
-	      simulate_state_and_create_threads (ctx, si, unsorted);
-	      thread_enqueue (gc_ctx, next, si);
+	      failed = simulate_state_and_create_threads (ctx, si, unsorted);
+	      switch (si->t->flags & (TRANS_NO_WAIT | TRANS_ALWAYS_FAILS_IF_EVER))
+		{
+		case 0: /* normal case */
+		  thread_enqueue (gc_ctx, next, si);
+		  break;
+		case TRANS_NO_WAIT:
+		  if (failed) /* We failed: wait for another time */
+		    thread_enqueue (gc_ctx, next, si);
+		  else cleanup_state_instance (si); /* We succeeded: no need to wait. */
+		  break;
+		case TRANS_ALWAYS_FAILS_IF_EVER:
+		  if (failed) /* We failed, and will always fail in the future:
+				 no need to wait. */
+		    cleanup_state_instance (si);
+		  else thread_enqueue (gc_ctx, next, si); /* We succeeded:
+							     do as in the normal case */
+		  break;
+		default: //case TRANS_NO_WAIT | TRANS_ALWAYS_FAILS_IF_EVER:
+		  /* We must not wait if we succeeded, and it is useless to wait
+		     if we failed.  So don't wait at all.  This case is not meant to happen. */
+		  cleanup_state_instance (si);
+		  break;
+		}
 	    }
 	}
     }

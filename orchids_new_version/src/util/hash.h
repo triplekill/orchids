@@ -46,17 +46,17 @@ struct hash_s
 
 typedef int (*hash_walk_func_t)(void *elmt, void *data);
 
-hash_t *new_hash(size_t hsize);
-void hash_resize(hash_t *hash, size_t newsize);
+hash_t *new_hash(gc_t *gc_ctx, size_t hsize);
+void hash_resize(gc_t *gc_ctx, hash_t *hash, size_t newsize);
 void clear_hash(hash_t *hash, void (*elmt_free)(void *e));
 void free_hash(hash_t *hash, void (*elmt_free)(void *e));
-void hash_add(hash_t *hash, void *data, void *key, size_t keylen);
-void *hash_check_and_add(hash_t *hash, void *data, void *key, size_t keylen);
+void hash_add(gc_t *gc_ctx, hash_t *hash, void *data, void *key, size_t keylen);
+void *hash_check_and_add(gc_t *gc_ctx, hash_t *hash, void *data, void *key, size_t keylen);
 void *hash_del(hash_t *hash, void *key, size_t keylen);
 void *hash_get(hash_t *hash, void *key, size_t keylen);
 void *hash_update(hash_t *hash, void *new_data, void *key, size_t keylen);
-void *hash_update_or_add(hash_t *hash, void *new_data, void *key, size_t keylen);
-hash_t *hash_clone(hash_t *hash, void *(clone)(void *elmt));
+void *hash_update_or_add(gc_t *gc_ctx, hash_t *hash, void *new_data, void *key, size_t keylen);
+hash_t *hash_clone(gc_t *gc_ctx, hash_t *hash, void *(*clone)(gc_t *gc_ctx, void *elmt));
 int hash_walk(hash_t *hash, hash_walk_func_t func, void *data);
 int hash_collide_count(hash_t *hash);
 

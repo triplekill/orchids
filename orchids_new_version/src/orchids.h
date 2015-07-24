@@ -284,6 +284,9 @@ struct transition_s
   bytecode_t *eval_code;
   int32_t id;
   int32_t global_id;
+  uint32_t flags;
+#define TRANS_NO_WAIT 0x1
+#define TRANS_ALWAYS_FAILS_IF_EVER 0x2
 };
 
 
@@ -325,7 +328,6 @@ struct state_s
   rule_t       *rule;
   uint32_t      flags;
 #define STATE_COMMIT 0x1
-#define STATE_NO_WAIT 0x2
   int32_t       id;
 };
 
