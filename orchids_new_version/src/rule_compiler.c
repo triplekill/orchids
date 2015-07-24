@@ -2645,8 +2645,9 @@ static int same_event_sequence_fits (rule_compiler_t *ctx, node_state_t *state,
   for (i=0; i<n; i++)
     sesf->vars[i] = vars[i];
   p = hash_get (memo, sesf, sz);
+  res = 1;
   if (p!=NULL) /* cycle found */
-    res = 1;
+    ;
   else
     {
       hash_add (ctx->gc_ctx, memo, (void *)1, sesf, sz);
