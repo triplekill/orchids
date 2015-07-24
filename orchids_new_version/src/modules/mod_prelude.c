@@ -20,7 +20,7 @@
 #endif
 
 #include <string.h>
-
+#include "ovm.h"
 #include "mod_prelude.h"
 
 modprelude_t	*prelude_data;
@@ -146,7 +146,7 @@ static void get_field_from_idmef_value(orchids_t	*ctx,
     }
 }
 
-static prelude_description = "prelude";
+static char *prelude_description = "prelude";
 
 static void *prelude_copy (gc_t *gc_ctx, void *obj)
 {
@@ -173,7 +173,6 @@ static void process_idmef_alert(orchids_t *ctx,
 				idmef_message_t	*message,
 				int dissection_level)
 {
-  event_t *event;
   int c;
 #ifdef OBSOLETE
   ovm_var_t *val;
@@ -211,7 +210,7 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
   ret = prelude_client_recv_idmef(prelude_data->client, 0, &idmef_message);
   if ( ret < 0 )
     {
-      DebugLog (DF_MOD, DS_ERROR, prelude_strerror(ret, "no recv_idmef"));
+      DebugLog (DF_MOD, DS_ERROR, prelude_strerror(ret));
       gc_base_free(he);
       return ret;
     }
@@ -222,7 +221,7 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
 	{
 	case IDMEF_MESSAGE_TYPE_ALERT:
 	  //idmef_message_print(idmef_message, prelude_data->prelude_io);
-	  process_idmef_alert(ctx, he->data, idmef_message);
+	  process_idmef_alert(ctx, he->data, idmef_message, he->pri);
 	  break;
 	case IDMEF_MESSAGE_TYPE_ERROR :
 	case IDMEF_MESSAGE_TYPE_HEARTBEAT :
@@ -247,8 +246,7 @@ static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
   ret = idmef_message_new(&idmef);
   if ( ret < 0 )
     {
-      DebugLog (DF_MOD, DS_ERROR,
-		prelude_strerror(ret, "Unable to create the IDMEF message"));
+      DebugLog (DF_MOD, DS_ERROR, prelude_strerror(ret));
       PUSH_VALUE(ctx, NULL);
       return;
     }
@@ -312,8 +310,8 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
     case T_UINT:
       ret = idmef_message_set_number(message, str, UINT(value));
       break;
-    case T_DOUBLE:
-      ret = idmef_message_set_number(message, str, DOUBLE(value));
+    case T_FLOAT:
+      ret = idmef_message_set_number(message, str, FLOAT(value));
       break;
     case T_STR: case T_VSTR:
       {
@@ -352,8 +350,7 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
   gc_base_free(str);
   if (ret < 0)
     {
-      DebugLog(DF_MOD, DS_ERROR,
-	       prelude_strerror(ret, "idmef_message_set_string error\n"));
+      DebugLog(DF_MOD, DS_ERROR, prelude_strerror(ret));
     }
   STACK_DROP(ctx->ovm_stack, 3);
   if (ret < 0)
@@ -461,7 +458,7 @@ static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *sta
   else
     {
       str_len = strlen(str);
-      res = ovm_str_new(str_len);
+      res = ovm_str_new(ctx->gc_ctx, str_len);
       memcpy (STR(res), str, str_len);
       free (str);
       STACK_DROP(ctx->ovm_stack, 2);
@@ -515,7 +512,8 @@ static const type_t **prelude_get_sigs[] = { prelude_get_sig, NULL };
 static const type_t *prelude_print_sig[] = { &t_int, &t_prelude };
 static const type_t **prelude_print_sigs[] = { prelude_print_sig, NULL };
 
-monotony m_prelude_set (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
+struct node_expr_s;
+monotony m_prelude_set (rule_compiler_t *ctx, struct node_expr_s *e, monotony m[])
 {
   m[0] |= MONO_THRASH; /* thrashes the first argument (prelude document) */
   return MONO_UNKNOWN | MONO_THRASH;
@@ -637,7 +635,8 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 			  rtaction_recv_idmef,
 			  NULL,
 			  mod,
-			  INITIAL_MODPRELUDE_POLL_DELAY);
+			  INITIAL_MODPRELUDE_POLL_DELAY,
+			  0);
     }
 
   register_lang_function(ctx,
@@ -739,7 +738,7 @@ static void add_field(orchids_t *ctx, char* field_name, char* xpath)
     memcpy (s, "prelude.", 8);
     strcpy (s+8, field_name);
   }
-  prelude_fields[prelude_data->nb_fields].type = T_STR;
+  prelude_fields[prelude_data->nb_fields].type = &t_str;
   prelude_fields[prelude_data->nb_fields].desc = xpath;
 
   DebugLog(DF_MOD, DS_INFO, "add new field %s : %s\n",

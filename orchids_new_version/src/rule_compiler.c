@@ -6861,7 +6861,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	    return;
 	  }
 	default:
-	  DPRINTF( ("Rule compiler cond : unknown op (%i)\n", BINOP(expr)) );
+	  DPRINTF( ("Rule compiler cond : unknown op (%i)\n", BIN_OP(expr)) );
 	  return;
 	}
     case NODE_ASSOC:
