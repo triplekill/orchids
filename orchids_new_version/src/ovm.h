@@ -29,6 +29,10 @@
   STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
 	     (gc_header_t *)ctx->zero)
 
+#define PUSH_RETURN_MINUS_ONE(ctx)				\
+  STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
+	     (gc_header_t *)ctx->minusone)
+
 #define PUSH_RETURN_EMPTY(ctx)					\
   STACK_PUSH((ctx)->gc_ctx, (ctx)->ovm_stack,			\
 	     (gc_header_t *)ctx->empty_string)
@@ -351,9 +355,32 @@
 #define OP_PUSHNULL 43
 
 /**
+ * Push minus one
+ **/
+#define OP_PUSHMINUSONE 44
+
+#define OP_CEQJMP 45
+#define OP_CEQJMP_OPPOSITE 46
+#define OP_CNEQJMP 47
+#define OP_CNEQJMP_OPPOSITE 48
+#define OP_CRMJMP 49
+#define OP_CRMJMP_OPPOSITE 50
+#define OP_CNRMJMP 51
+#define OP_CNRMJMP_OPPOSITE 52
+#define OP_CGTJMP 53
+#define OP_CGTJMP_OPPOSITE 54
+#define OP_CLTJMP 55
+#define OP_CLTJMP_OPPOSITE 56
+#define OP_CGEJMP 57
+#define OP_CGEJMP_OPPOSITE 58
+#define OP_CLEJMP 59
+#define OP_CLEJMP_OPPOSITE 60
+#define OP_TRASH2 61
+
+/**
  ** Number of total opcodes.
  **/
-#define OPCODE_NUM 44
+#define OPCODE_NUM 62
 
 #endif /* OVM_H */
 

@@ -172,6 +172,8 @@ new_orchids_context(void)
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->one);
   GC_TOUCH(ctx->gc_ctx, ctx->zero = ovm_int_new(ctx->gc_ctx, 0));
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->zero);
+  GC_TOUCH(ctx->gc_ctx, ctx->minusone = ovm_int_new(ctx->gc_ctx, -1));
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->minusone);
   GC_TOUCH(ctx->gc_ctx, ctx->empty_string = ovm_str_new(ctx->gc_ctx, 0));
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->empty_string);
 

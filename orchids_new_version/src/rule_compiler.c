@@ -101,10 +101,22 @@ static void compile_bytecode_stmt(node_expr_t *expr,
 static void compile_bytecode_expr(node_expr_t *expr,
 				  bytecode_buffer_t *code);
 
+/* flags passed to compile_bytecode_cond():
+   COND_THEN_IMMEDIATE says that we plan label_then to be the label
+   right after the compiled bytecode for 'code';
+   COND_ELSE_IMMEDIATE is similar, for label_else.
+   It is always safe to pass a zero value of flags.
+   If you pass one of these flags, you should see
+   a SET_LABEL (..., label_then) (resp., label_end)
+   after the call to compile_bytecode_cond().
+*/
+#define COND_THEN_IMMEDIATE 0x1
+#define COND_ELSE_IMMEDIATE 0x2
 static void compile_bytecode_cond(node_expr_t *expr,
 				  bytecode_buffer_t *code,
 				  int	label_then,
-				  int	label_else);
+				  int	label_else,
+				  int flags);
 
 
 static void statics_add(rule_compiler_t *ctx, ovm_var_t *data);
@@ -6345,6 +6357,175 @@ static void compile_actions_bytecode(node_expr_t *actionlist,
   }
 }
 
+static size_t count_conjuncts (node_expr_t *e, int neg)
+{
+  if (e==NULL)
+    return 0;
+  switch (e->type)
+    {
+    case NODE_COND:
+      switch (BIN_OP (e))
+	{
+	case ANDAND:
+	  if (neg)
+	    return 1;
+	  return count_conjuncts (BIN_LVAL(e), neg)+count_conjuncts (BIN_RVAL(e), neg);
+	case OROR:
+	  if (neg)
+	    return count_conjuncts (BIN_LVAL(e), neg)+count_conjuncts (BIN_RVAL(e), neg);
+	  return 1;
+	case BANG:
+	  return count_conjuncts (BIN_RVAL(e), !neg);
+	default:
+	  return 1;
+	}
+      break;
+    default:
+      return 1;
+    }
+}
+
+typedef struct normalized_trans_s normalized_trans_t;
+struct normalized_trans_s {
+  size_t npersistent;
+  node_expr_t **persistent;
+  char *persneg;
+  size_t nother;
+  node_expr_t **other;
+  char *otherneg;
+};
+
+static void normalize_trans_cond_rec (rule_compiler_t *ctx, node_expr_t *e,
+				      normalized_trans_t *nt,
+				      char neg);
+
+static void normalize_trans_cond_rec (rule_compiler_t *ctx, node_expr_t *e,
+				      normalized_trans_t *nt,
+				      char neg)
+{
+  size_t n;
+  monotony m;
+  
+  if (e==NULL)
+    return;
+  switch (e->type)
+    {
+    case NODE_COND:
+      switch (BIN_OP(e))
+	{
+	case ANDAND:
+	  if (neg)
+	    goto basecase;
+	  normalize_trans_cond_rec (ctx, BIN_LVAL(e), nt, neg);
+	  normalize_trans_cond_rec (ctx, BIN_RVAL(e), nt, neg);
+	  break;
+	case OROR:
+	  if (!neg)
+	    goto basecase;
+	  normalize_trans_cond_rec (ctx, BIN_LVAL(e), nt, neg);
+	  normalize_trans_cond_rec (ctx, BIN_RVAL(e), nt, neg);
+	  break;
+	case BANG:
+	  normalize_trans_cond_rec (ctx, BIN_RVAL(e), nt, !neg);
+	  break;
+	default: goto basecase;
+	}
+      break;
+    default:
+    basecase:
+      m = compute_monotony_simple (ctx, e);
+      /* put e into persistent[] list if and only if
+	 neg==false and e is antitonic (if it fails now, it will fail forever),
+	 or neg==true and e is monotonic */
+      if (neg?(m & MONO_MONO):(m & MONO_ANTI))
+	{
+	  n = nt->npersistent++;
+	  nt->persistent[n] = e;
+	  nt->persneg[n] = neg;
+	}
+      else
+	{
+	  n = nt->nother++;
+	  nt->other[n] = e;
+	  nt->otherneg[n] = neg;
+	}
+      break;
+    }
+}
+
+static normalized_trans_t normalize_trans_cond (rule_compiler_t *ctx, node_expr_t *e)
+{
+  size_t nconjuncts;
+  normalized_trans_t nt;
+
+  nconjuncts = count_conjuncts (e, 0);
+  nt.npersistent = 0;
+  nt.persistent = gc_base_malloc (ctx->gc_ctx, nconjuncts*sizeof(node_expr_t *));
+  nt.persneg = gc_base_malloc (ctx->gc_ctx, nconjuncts*sizeof(char));
+  nt.nother = 0;
+  nt.other = gc_base_malloc (ctx->gc_ctx, nconjuncts*sizeof(node_expr_t *));
+  nt.otherneg = gc_base_malloc (ctx->gc_ctx, nconjuncts*sizeof(char));
+  normalize_trans_cond_rec (ctx, e, &nt, 0);
+  return nt;
+}
+
+static void compile_bytecode_trans_cond (node_expr_t *e,
+					 bytecode_buffer_t *code)
+{
+  normalized_trans_t nt;
+  unsigned int label_ok, label_fail, label_will_always_fail, label_end;
+  size_t i;
+
+  label_ok = NEW_LABEL(code->labels)
+  nt = normalize_trans_cond (code->ctx, e);
+  if (nt.nother!=0)
+    label_fail = NEW_LABEL(code->labels)
+  else label_fail = 0;
+  if (nt.npersistent!=0)
+    label_will_always_fail = NEW_LABEL(code->labels)
+  else label_will_always_fail = 0;
+  label_end = NEW_LABEL(code->labels);
+  for (i=0; i<nt.npersistent; i++)
+    {
+      if (nt.persneg[i])
+	compile_bytecode_cond (nt.persistent[i], code, label_will_always_fail, label_ok,
+			       COND_ELSE_IMMEDIATE);
+      else
+	compile_bytecode_cond (nt.persistent[i], code, label_ok, label_will_always_fail,
+			       COND_THEN_IMMEDIATE);
+      SET_LABEL (code->ctx, code->labels, code->pos, label_ok);
+      label_ok = NEW_LABEL(code->labels)
+    }
+  for (i=0; i<nt.nother; i++)
+    {
+      if (nt.otherneg[i])
+	compile_bytecode_cond (nt.other[i], code, label_fail, label_ok, COND_ELSE_IMMEDIATE);
+      else
+	compile_bytecode_cond (nt.other[i], code, label_ok, label_fail, COND_THEN_IMMEDIATE);
+      SET_LABEL (code->ctx, code->labels, code->pos, label_ok);
+      label_ok = NEW_LABEL(code->labels)
+    }
+  EXIT_IF_BYTECODE_BUFF_FULL(6);
+  SET_LABEL (code->ctx, code->labels, code->pos, label_ok);
+  code->bytecode[code->pos++] = OP_PUSHONE;
+  code->bytecode[code->pos++] = OP_END;
+  if (nt.nother!=0)
+    {
+      SET_LABEL (code->ctx, code->labels, code->pos, label_fail);
+      code->bytecode[code->pos++] = OP_PUSHZERO;
+      code->bytecode[code->pos++] = OP_END;
+    }
+  if (nt.npersistent!=0)
+    {
+      SET_LABEL (code->ctx, code->labels, code->pos, label_will_always_fail);
+      code->bytecode[code->pos++] = OP_PUSHMINUSONE;
+      code->bytecode[code->pos++] = OP_END;
+    }
+  gc_base_free (nt.persistent);
+  gc_base_free (nt.persneg);
+  gc_base_free (nt.other);
+  gc_base_free (nt.otherneg);
+}
 
 /**
  * Compile an evaluation expression into bytecode.
@@ -6371,15 +6552,8 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
   code.logicals = NULL;
 
   INIT_LABELS(ctx, code.labels);
-
-  compile_bytecode_expr(expr, &code);
+  compile_bytecode_trans_cond(expr, &code);
   compile_set_labels(&code);
-
-  if (code.pos >= BYTECODE_BUF_SZ - 1) {
-    DebugLog(DF_OLC, DS_FATAL, "Bytecode buffer full\n");
-    exit(EXIT_FAILURE);
-  }
-  code.bytecode[code.pos++] = OP_END;
 
   DebugLog(DF_OLC, DS_TRACE, "bytecode size: %i\n", code.pos);
   DebugLog(DF_OLC, DS_TRACE, "used fields: %i\n", code.used_fields_sz);
@@ -6460,7 +6634,8 @@ static void compile_bytecode_stmt(node_expr_t *expr,
     {
       unsigned int label_end = NEW_LABEL(code->labels);
 
-      compile_bytecode_cond(expr, code, label_end, label_end);
+      compile_bytecode_cond(expr, code, label_end, label_end,
+			    COND_THEN_IMMEDIATE | COND_ELSE_IMMEDIATE);
       SET_LABEL (code->ctx, code->labels, code->pos, label_end);
       break;
     }
@@ -6505,7 +6680,7 @@ static void compile_bytecode_stmt(node_expr_t *expr,
 
       save_stack_level = code->stack_level;
       compile_bytecode_cond(IF_COND(expr), code,
-			    label_then, label_else);
+			    label_then, label_else, COND_THEN_IMMEDIATE);
       /* now compile then branch;
 	 first set label_then to here */
       SET_LABEL (code->ctx, code->labels,  code->pos, label_then);
@@ -6851,23 +7026,43 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       break;
 
     case NODE_COND:
-    {
-      unsigned int	label_then = NEW_LABEL(code->labels);
-      unsigned int	label_else = NEW_LABEL(code->labels);
-      unsigned int	label_end = NEW_LABEL(code->labels);
+      switch (BIN_OP(expr))
+	{
+	case OP_CEQ:
+	case OP_CNEQ:
+	case OP_CRM:
+	case OP_CNRM:
+	case OP_CGT:
+	case OP_CLT:
+	case OP_CGE:
+	case OP_CLE:
+	  compile_bytecode_expr(BIN_LVAL(expr), code);
+	  compile_bytecode_expr(BIN_RVAL(expr), code);
+	  EXIT_IF_BYTECODE_BUFF_FULL(1);
+	  code->bytecode[ code->pos++ ] = BIN_OP(expr);
+	  code->stack_level--;
+	  break;
+	default:
+	  {
+	    unsigned int label_then = NEW_LABEL(code->labels)
+	    unsigned int label_else = NEW_LABEL(code->labels)
+	    unsigned int label_end = NEW_LABEL(code->labels)
 
-      compile_bytecode_cond(expr, code, label_then, label_else);
-      SET_LABEL (code->ctx, code->labels, code->pos, label_then);
-      EXIT_IF_BYTECODE_BUFF_FULL(4);
-      code->bytecode[ code->pos++ ] = OP_PUSHONE;
-      code->bytecode[ code->pos++ ] = OP_JMP;
-      PUT_LABEL (code->ctx, code->labels, code, label_end);
-      SET_LABEL (code->ctx, code->labels, code->pos, label_else);
-      code->bytecode[ code->pos++ ] = OP_PUSHZERO;
-      SET_LABEL (code->ctx, code->labels, code->pos, label_end);
-      code->stack_level++;
+	    compile_bytecode_cond(expr, code, label_then, label_else, COND_THEN_IMMEDIATE);
+	    SET_LABEL (code->ctx, code->labels, code->pos, label_then);
+	    EXIT_IF_BYTECODE_BUFF_FULL(4);
+	    code->bytecode[ code->pos++ ] = OP_PUSHONE;
+	    code->bytecode[ code->pos++ ] = OP_JMP;
+	    PUT_LABEL (code->ctx, code->labels, code, label_end);
+	    SET_LABEL (code->ctx, code->labels, code->pos, label_else);
+	    code->bytecode[ code->pos++ ] = OP_PUSHZERO;
+	    SET_LABEL (code->ctx, code->labels, code->pos, label_end);
+	    code->stack_level++;
+	    break;
+	  }
+	  break;
+	}
       break;
-    }
 
     case NODE_FIELD:
       EXIT_IF_BYTECODE_BUFF_FULL(2);
@@ -6953,6 +7148,37 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
   }
 }
 
+bytecode_t jmp_bytecode (unsigned long op)
+{
+  switch (op)
+    {
+    case OP_CEQ: return OP_CEQJMP;
+    case OP_CNEQ: return OP_CNEQJMP;
+    case OP_CRM: return OP_CRMJMP;
+    case OP_CNRM: return OP_CNRMJMP;
+    case OP_CGT: return OP_CGTJMP;
+    case OP_CLT: return OP_CLTJMP;
+    case OP_CGE: return OP_CGEJMP;
+    case OP_CLE: return OP_CLEJMP;
+    default: DebugLog(DF_OLC, DS_FATAL, "unrecognized opcode\n"); return 0;
+    }
+}
+
+bytecode_t jmp_bytecode_opposite (unsigned long op)
+{
+  switch (op)
+    {
+    case OP_CEQ: return OP_CEQJMP_OPPOSITE;
+    case OP_CNEQ: return OP_CNEQJMP_OPPOSITE;
+    case OP_CRM: return OP_CRMJMP_OPPOSITE;
+    case OP_CNRM: return OP_CNRMJMP_OPPOSITE;
+    case OP_CGT: return OP_CGTJMP_OPPOSITE;
+    case OP_CLT: return OP_CLTJMP_OPPOSITE;
+    case OP_CGE: return OP_CGEJMP_OPPOSITE;
+    case OP_CLE: return OP_CLEJMP_OPPOSITE;
+    default: DebugLog(DF_OLC, DS_FATAL, "unrecognized opcode\n"); return 0;
+    }
+}
 
 /**
  * Byte code compiler recursive sub-routine.
@@ -6962,7 +7188,8 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 static void compile_bytecode_cond(node_expr_t *expr,
 				  bytecode_buffer_t *code,
 				  int label_then,
-				  int label_else)
+				  int label_else,
+				  int flags)
 {
   switch (expr->type)
     {
@@ -6977,39 +7204,66 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	case OP_CLT:
 	case OP_CGE:
 	case OP_CLE:
-	  // XXX Optimization : Create Op code CEQJMP, CNEQJMP ...
-	  // remove a push + pop
-	  compile_bytecode_expr(BIN_LVAL(expr), code);
-	  compile_bytecode_expr(BIN_RVAL(expr), code);
-	  EXIT_IF_BYTECODE_BUFF_FULL(5);
-	  code->bytecode[ code->pos++ ] = BIN_OP(expr);
-	  code->bytecode[ code->pos++ ] = OP_POPCJMP;
-	  PUT_LABEL (code->ctx, code->labels, code, label_then);
-	  code->bytecode[ code->pos++ ] = OP_JMP;
-	  PUT_LABEL (code->ctx, code->labels, code, label_else);
-	  code->stack_level -= 2;
-	  return;
+	  {
+	    bytecode_t op;
+	    
+	    compile_bytecode_expr(BIN_LVAL(expr), code);
+	    compile_bytecode_expr(BIN_RVAL(expr), code);
+	    switch (flags)
+	      {
+	      case COND_THEN_IMMEDIATE:
+		op = jmp_bytecode_opposite (BIN_OP(expr));
+		EXIT_IF_BYTECODE_BUFF_FULL(2);
+		code->bytecode[ code->pos++ ] = op;
+		PUT_LABEL (code->ctx, code->labels, code, label_else);
+		break;
+	      case COND_ELSE_IMMEDIATE:
+		op = jmp_bytecode (BIN_OP(expr));
+		EXIT_IF_BYTECODE_BUFF_FULL(2);
+		code->bytecode[ code->pos++ ] = op;
+		PUT_LABEL (code->ctx, code->labels, code, label_then);
+		break;
+	      case COND_THEN_IMMEDIATE | COND_ELSE_IMMEDIATE:
+		EXIT_IF_BYTECODE_BUFF_FULL(1);
+		code->bytecode[ code->pos++ ] = OP_TRASH2;
+		break;
+	      default: /* unoptimized, vanilla case (which should not happen that often) */
+		op = jmp_bytecode (BIN_OP(expr));
+		EXIT_IF_BYTECODE_BUFF_FULL(4);
+		code->bytecode[ code->pos++ ] = op;
+		PUT_LABEL (code->ctx, code->labels, code, label_then);
+		code->bytecode[ code->pos++ ] = OP_JMP;
+		PUT_LABEL (code->ctx, code->labels, code, label_else);
+		break;
+	      }
+	    code->stack_level -= 2;
+	    return;
+	  }
 	case ANDAND:
 	  {
 	    unsigned int label_i = NEW_LABEL(code->labels);
 
-	    compile_bytecode_cond(BIN_LVAL(expr), code, label_i, label_else);
+	    compile_bytecode_cond(BIN_LVAL(expr), code, label_i, label_else,
+				  COND_THEN_IMMEDIATE);
 	    SET_LABEL (code->ctx, code->labels, code->pos, label_i);
-	    compile_bytecode_cond(BIN_RVAL(expr), code, label_then, label_else);
+	    compile_bytecode_cond(BIN_RVAL(expr), code, label_then, label_else, flags);
 	    return;
 	  }
 	case OROR:
 	  {
 	    unsigned int label_i = NEW_LABEL(code->labels);
 
-	    compile_bytecode_cond(BIN_LVAL(expr), code, label_then, label_i);
+	    compile_bytecode_cond(BIN_LVAL(expr), code, label_then, label_i,
+				  COND_ELSE_IMMEDIATE);
 	    SET_LABEL (code->ctx, code->labels, code->pos, label_i);
-	    compile_bytecode_cond(BIN_RVAL(expr), code, label_then, label_else);
+	    compile_bytecode_cond(BIN_RVAL(expr), code, label_then, label_else, flags);
 	    return;
 	  }
 	case BANG:
 	  {
-	    compile_bytecode_cond(BIN_LVAL(expr), code, label_else, label_then); 
+	    compile_bytecode_cond(BIN_LVAL(expr), code, label_else, label_then,
+				  ((flags & COND_THEN_IMMEDIATE)?COND_ELSE_IMMEDIATE:0)
+				  | ((flags & COND_ELSE_IMMEDIATE)?COND_THEN_IMMEDIATE:0));
 	    return;
 	  }
 	default:
@@ -7100,9 +7354,6 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	  trans->flags = 0;
 	  if ((state->flags & EPSILON_STATE) || trans_no_wait_needed (ctx, node_trans))
 	    trans->flags |= TRANS_NO_WAIT;
-	  if (!(state->flags & EPSILON_STATE) && node_trans->cond!=NULL
-	      && compute_monotony_simple (ctx, node_trans->cond) & MONO_ANTI)
-	    trans->flags |= TRANS_ALWAYS_FAILS_IF_EVER;
 
 	  DebugLog(DF_OLC, DS_DEBUG, "transition %i: \n", i);
 	  if (node_trans->cond!=NULL)

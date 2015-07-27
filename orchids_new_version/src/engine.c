@@ -489,10 +489,10 @@ static int simulate_state_and_create_threads (orchids_t *ctx,
   int vmret;
 
   t = si->t;
-  vmret = 0;
+  vmret = 1;
   if (t->eval_code!=NULL)
-    vmret = ovm_exec_expr (ctx, si, t->eval_code);
-  if (vmret==0)
+    vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);
+  if (vmret > 0)
     { /* OK: pass transition */
       si->q = t->dest;
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
@@ -537,7 +537,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   gc_t *gc_ctx = ctx->gc_ctx;
   thread_queue_t *new_queue, *unsorted, *next, *old_queue;
   state_instance_t *si;
-  int failed;
+  int vmret;
 
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
@@ -582,30 +582,23 @@ void inject_event(orchids_t *ctx, event_t *event)
 	    }
 	  else
 	    {
-	      failed = simulate_state_and_create_threads (ctx, si, unsorted);
-	      switch (si->t->flags & (TRANS_NO_WAIT | TRANS_ALWAYS_FAILS_IF_EVER))
-		{
-		case 0: /* normal case */
-		  thread_enqueue (gc_ctx, next, si);
-		  break;
-		case TRANS_NO_WAIT:
-		  if (failed) /* We failed: wait for another time */
-		    thread_enqueue (gc_ctx, next, si);
-		  else cleanup_state_instance (si); /* We succeeded: no need to wait. */
-		  break;
-		case TRANS_ALWAYS_FAILS_IF_EVER:
-		  if (failed) /* We failed, and will always fail in the future:
-				 no need to wait. */
-		    cleanup_state_instance (si);
-		  else thread_enqueue (gc_ctx, next, si); /* We succeeded:
-							     do as in the normal case */
-		  break;
-		default: //case TRANS_NO_WAIT | TRANS_ALWAYS_FAILS_IF_EVER:
-		  /* We must not wait if we succeeded, and it is useless to wait
-		     if we failed.  So don't wait at all.  This case is not meant to happen. */
-		  cleanup_state_instance (si);
-		  break;
-		}
+	      vmret = simulate_state_and_create_threads (ctx, si, unsorted);
+	      /* If si->t->flags does not have the TRANS_NO_WAIT flag set (normal case):
+		 - if vmret=1, we succeeded, and we must wait (i.e., reenqueue si)
+		 - if vmret=0, we failed, and we must wait (reenqueue si)
+		 - if vmret=-1, we failed and will fail forever (don't reenqueue; hence cleanup si)
+		 If si->t->flags has the TRANS_NO_WAIT flag set:
+		 - if vmret=1, we succeeded, hence we don't have to wait (cleanup si)
+		 - if vmret=0, we failed, and we must wait (reenqueue si)
+		 - if vmret=-1, we failed and will fail forever (cleanup si).
+		 In other words, we reenqueue if vmret=0, or if vmret=1 and the TRANS_NO_WAIT
+		 flag is not set.  Equivalently, if:
+		 - the TRANS_NO_WAIT flags is set and vmret==0
+		 - or it is not set and vmret>=0
+	      */
+	      if ((si->t->flags & TRANS_NO_WAIT)?(vmret==0):(vmret>=0))
+		thread_enqueue (gc_ctx, next, si);
+	      else cleanup_state_instance (si); /* We succeeded: no need to wait. */
 	    }
 	}
     }

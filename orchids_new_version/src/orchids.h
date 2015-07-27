@@ -286,7 +286,6 @@ struct transition_s
   int32_t global_id;
   uint32_t flags;
 #define TRANS_NO_WAIT 0x1
-#define TRANS_ALWAYS_FAILS_IF_EVER 0x2
 };
 
 
@@ -1112,6 +1111,7 @@ struct orchids_s
   gc_t *gc_ctx;
   ovm_var_t *one;
   ovm_var_t *zero;
+  ovm_var_t *minusone;
   ovm_var_t *empty_string;
   timeval_t    start_time;
   char        *config_file;
@@ -1542,9 +1542,9 @@ int issdlparse(void *__compiler_ctx_g); /* really of type rule_compiler_t * */
  **
  ** @return  0 if expr is true (= non-zero T_INT), error code otherwise
  **/
-int
-ovm_exec_expr(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
+int ovm_exec_expr (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
 
+int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
 /**
  ** Orchids virtual machine entry point.
  **

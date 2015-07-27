@@ -78,6 +78,16 @@ int ovm_exec_expr(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
     return 1;
 }
 
+int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
+{
+  ovm_var_t *res;
+
+  ovm_exec_base(ctx, s, bytecode);
+  res = POP_VALUE(ctx); /* res is guaranteed to be a T_INT */
+  ovm_flush(ctx);
+  return INT(res);
+}
+
 void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 {
   bytecode_t *code;
@@ -111,6 +121,11 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 		  offset, OP_PUSHZERO);
 	  offset += 1;
 	  break;
+	case OP_PUSHMINUSONE:
+	  fprintf(fp, "0x%04x: %08x             | pushminusone\n",
+		  offset, OP_PUSHMINUSONE);
+	  offset += 1;
+	  break;
 	case OP_PUSHONE:
 	  fprintf(fp, "0x%04x: %08x             | pushone\n",
 		  offset, OP_PUSHONE);
@@ -133,6 +148,10 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 	  break ;
 	case OP_TRASH:
 	  fprintf(fp, "0x%04x: %08x             | trash\n", offset, OP_TRASH);
+	  offset += 1;
+	  break ;
+	case OP_TRASH2:
+	  fprintf(fp, "0x%04x: %08x             | trash2\n", offset, OP_TRASH2);
 	  offset += 1;
 	  break ;
 	case OP_CALL:
@@ -192,6 +211,86 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 	  break ;
 	case OP_POPCJMP:
 	  fprintf(fp, "0x%04x: %08lx             | popcjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CEQJMP:
+	  fprintf(fp, "0x%04x: %08lx             | ceqjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CEQJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | ceqjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNEQJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cneqjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNEQJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cneqjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CRMJMP:
+	  fprintf(fp, "0x%04x: %08lx             | crmjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CRMJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | crmjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNRMJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNRMJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGTJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cgtjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGTJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cgtjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLTJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cltjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLTJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cltjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGEJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cgejmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGEJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cgejmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLEJMP:
+	  fprintf(fp, "0x%04x: %08lx             | clejmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLEJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | clejmp_opp [%lu] \n", offset,
 		  *code, code[1]);
 	  offset += 2;
 	  break ;
@@ -381,6 +480,11 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 		  offset, OP_PUSHZERO);
 	  offset += 1;
 	  break;
+	case OP_PUSHMINUSONE:
+	  fprintf(fp, "0x%04x: %02x       | pushminusone\n",
+		  offset, OP_PUSHMINUSONE);
+	  offset += 1;
+	  break;
 	case OP_PUSHONE:
 	  fprintf(fp, "0x%04x: %02x       | pushone\n",
 		  offset, OP_PUSHONE);
@@ -403,6 +507,10 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 	  break ;
 	case OP_TRASH:
 	  fprintf(fp, "0x%04x: %08x        | trash\n", offset, OP_TRASH);
+	  offset += 1;
+	  break ;
+	case OP_TRASH2:
+	  fprintf(fp, "0x%04x: %08x        | trash2\n", offset, OP_TRASH2);
 	  offset += 1;
 	  break ;
 	case OP_CALL:
@@ -462,6 +570,86 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 	  break ;
 	case OP_POPCJMP:
 	  fprintf(fp, "0x%04x: %08lx             | popcjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CEQJMP:
+	  fprintf(fp, "0x%04x: %08lx             | ceqjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CEQJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | ceqjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNEQJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cneqjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNEQJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cneqjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CRMJMP:
+	  fprintf(fp, "0x%04x: %08lx             | crmjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CRMJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | crmjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNRMJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CNRMJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGTJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cgtjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGTJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cgtjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLTJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cltjmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLTJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cltjmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGEJMP:
+	  fprintf(fp, "0x%04x: %08lx             | cgejmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CGEJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | cgejmp_opp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLEJMP:
+	  fprintf(fp, "0x%04x: %08lx             | clejmp [%lu] \n", offset,
+		  *code, code[1]);
+	  offset += 2;
+	  break ;
+	case OP_CLEJMP_OPPOSITE:
+	  fprintf(fp, "0x%04x: %08lx             | clejmp_opp [%lu] \n", offset,
 		  *code, code[1]);
 	  offset += 2;
 	  break ;
@@ -694,6 +882,16 @@ static int ovm_push_one(isn_param_t *param)
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_PUSHONE\n");
   PUSH_RETURN_TRUE(ctx);
+  param->ip += 1;
+  return 0;
+}
+
+static int ovm_push_minus_one(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_PUSHMINUSONE\n");
+  PUSH_RETURN_MINUS_ONE(ctx);
   param->ip += 1;
   return 0;
 }
@@ -1009,6 +1207,52 @@ static int ovm_ceq(isn_param_t *param)
   return 0;
 }
 
+static int ovm_ceqjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CEQJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_EQUAL(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else
+    param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_ceqjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CEQJMP_OPPOSITE\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_EQUAL(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else
+    param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
 static int ovm_cneq(isn_param_t *param)
 {
   orchids_t *ctx = param->ctx;
@@ -1035,6 +1279,52 @@ static int ovm_cneq(isn_param_t *param)
     res = NULL;
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_cneqjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CNEQJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_EQUAL(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else
+    param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_cneqjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CNEQJMP_OPPOSITE\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_EQUAL(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else
+    param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
   return 0;
 }
 
@@ -1117,6 +1407,74 @@ static int ovm_crm(isn_param_t *param)
   return 0;
 }
 
+static int ovm_crmjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *string;
+  ovm_var_t *regex;
+  int ret = 1; // False by default
+  regmatch_t match[1];
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CRMJMP\n");
+  regex = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  string = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(regex) && !IS_NULL(string) && TYPE(regex)==T_REGEX &&
+      (TYPE(string)==T_STR || TYPE(string)==T_VSTR))
+    {
+      ret = my_regvexec(ctx->gc_ctx, &REGEX(regex), string, 0, match, 0);
+      if (ret == REG_NOMATCH)
+	param->ip += 2;
+      else if (ret != 0) /* regexec error */
+	{
+	  char err_buf[64];
+
+	  regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+	  DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
+	  param->ip += 2;
+	}
+      else
+	param->ip += param->ip[1]+2;
+    }
+  else
+    param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_crmjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *string;
+  ovm_var_t *regex;
+  int ret = 1; // False by default
+  regmatch_t match[1];
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CRMJMP_OPPOSITE\n");
+  regex = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  string = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(regex) && !IS_NULL(string) && TYPE(regex)==T_REGEX &&
+      (TYPE(string)==T_STR || TYPE(string)==T_VSTR))
+    {
+      ret = my_regvexec(ctx->gc_ctx, &REGEX(regex), string, 0, match, 0);
+      if (ret == REG_NOMATCH)
+	param->ip += param->ip[1]+2;
+      else if (ret != 0) /* regexec error */
+	{
+	  char err_buf[64];
+
+	  regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+	  DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
+	  param->ip += param->ip[1]+2;
+	}
+      else
+	param->ip += 2;
+    }
+  else
+    param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
 static int ovm_cnrm(isn_param_t *param)
 {
   orchids_t *ctx = param->ctx;
@@ -1151,7 +1509,7 @@ static int ovm_cnrm(isn_param_t *param)
 
 	  regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
 	  DebugLog(DF_OVM, DS_ERROR, "regexec eror (%s)\n", err_buf);
-	  res = NULL; /* REGEX_ERROR_VAR; */
+	  res = NULL;
 	}
       else
 	{
@@ -1161,6 +1519,74 @@ static int ovm_cnrm(isn_param_t *param)
     }
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_cnrmjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *string;
+  ovm_var_t *regex;
+  int ret = 1; // False by default
+  regmatch_t match[1];
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CNRMJMP\n");
+  regex = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  string = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(regex) && !IS_NULL(string) && TYPE(regex)==T_REGEX &&
+      (TYPE(string)==T_STR || TYPE(string)==T_VSTR))
+    {
+      ret = my_regvexec(ctx->gc_ctx, &REGEX(regex), string, 0, match, 0);
+      if (ret == REG_NOMATCH)
+	param->ip += param->ip[1]+2;
+      else if (ret != 0) /* regexec error */
+	{
+	  char err_buf[64];
+
+	  regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+	  DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
+	  param->ip += 2;
+	}
+      else
+	param->ip += 2;
+    }
+  else
+    param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_cnrmjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *string;
+  ovm_var_t *regex;
+  int ret = 1; // False by default
+  regmatch_t match[1];
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CNRMJMP\n");
+  regex = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  string = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(regex) && !IS_NULL(string) && TYPE(regex)==T_REGEX &&
+      (TYPE(string)==T_STR || TYPE(string)==T_VSTR))
+    {
+      ret = my_regvexec(ctx->gc_ctx, &REGEX(regex), string, 0, match, 0);
+      if (ret == REG_NOMATCH)
+	param->ip += 2;
+      else if (ret != 0) /* regexec error */
+	{
+	  char err_buf[64];
+
+	  regerror(ret, &(REGEX(regex)), err_buf, sizeof (err_buf));
+	  DebugLog(DF_OVM, DS_ERROR, "regexec error (%s)\n", err_buf);
+	  param->ip += param->ip[1]+2;
+	}
+      else
+	param->ip += param->ip[1]+2;
+    }
+  else
+    param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
   return 0;
 }
 
@@ -1197,13 +1623,59 @@ static int ovm_clt(isn_param_t *param)
   return 0;
 }
 
+static int ovm_cltjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 0; //False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CLTJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_LESS(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else
+    param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_cltjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 0; //False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CLTJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_LESS(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else
+    param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
 static int ovm_cgt(isn_param_t *param)
 {
   orchids_t *ctx = param->ctx;
   ovm_var_t *op1;
   ovm_var_t *op2;
   ovm_var_t *res;
-  int ret = 0; // False by default
+  int ret = 0; //False by default
 
   DebugLog(DF_OVM, DS_DEBUG, "OP_CGT\n");
   op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
@@ -1227,6 +1699,50 @@ static int ovm_cgt(isn_param_t *param)
     res = NULL;
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx,res);
+  return 0;
+}
+
+static int ovm_cgtjmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 0; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CGTJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_GREATER(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_cgtjmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 0; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CGTJMP_OPPOSITE\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK | CMP_GEQ_MASK);
+      if (CMP_GREATER(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
   return 0;
 }
 
@@ -1270,6 +1786,64 @@ static int ovm_cle(isn_param_t *param)
   return 0;
 }
 
+static int ovm_clejmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CLEJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK);
+      /* Don't need CMP_GEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op1 in op2 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op2 is included in op1, wasting time for nothing
+      */
+      if (CMP_LEQ(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_clejmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = 1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CLEJMP_OPPOSITE\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_LEQ_MASK);
+      /* Don't need CMP_GEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op1 in op2 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op2 is included in op1, wasting time for nothing
+      */
+      if (CMP_LEQ(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
 static int ovm_cge(isn_param_t *param)
 {
   orchids_t *ctx = param->ctx;
@@ -1308,6 +1882,72 @@ static int ovm_cge(isn_param_t *param)
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_VALUE(ctx,res);
   return 0;
+}
+
+static int ovm_cgejmp(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = -1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CGEJMP\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_GEQ_MASK);
+      /* Don't need CMP_LEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op2 in op1 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op1 is included in op2, wasting time for nothing
+      */
+      if (CMP_GEQ(ret))
+	param->ip += param->ip[1]+2;
+      else param->ip += 2;
+    }
+  else param->ip += 2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_cgejmp_opposite(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op1;
+  ovm_var_t *op2;
+  int ret = -1; // False by default
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_CGEJMP_OPPOSITE\n");
+  op2 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  op1 = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
+  if (!IS_NULL(op1) && !IS_NULL(op2))
+    {
+      ret = issdl_cmp(op1, op2, CMP_GEQ_MASK);
+      /* Don't need CMP_LEQ_MASK here, since anyway
+	 whether this flag will be set or unset will be irrelevant.
+	 This is important for databases, where just the inclusion
+	 of op2 in op1 will be tested, using this mask;
+	 using the CMP_LEQ_MASK | CMP_GEQ_MASK would also
+	 test whether op1 is included in op2, wasting time for nothing
+      */
+      if (CMP_GEQ(ret))
+	param->ip += 2;
+      else param->ip += param->ip[1]+2;
+    }
+  else param->ip += param->ip[1]+2;
+  STACK_DROP(ctx->ovm_stack, 2);
+  return 0;
+}
+
+static int ovm_trash2(isn_param_t *param)
+{
+  DebugLog(DF_OVM, DS_DEBUG, "OP_TRASH2\n");
+  STACK_DROP(param->ctx->ovm_stack, 2);
+  param->ip += 1;
+  return (0);
 }
 
 static int ovm_regsplit(isn_param_t *param)
@@ -1632,6 +2272,24 @@ static ovm_insn_rec_t ops_g[] = {
   { ovm_db_single, 0, "db_single" },
   { ovm_dup, 0, "dup" },
   { ovm_push_null, 0, "pushnull" },
+  { ovm_push_minus_one, 0, "pushminusone" },
+  { ovm_ceqjmp, 0, "ceqjmp" },
+  { ovm_ceqjmp_opposite, 0, "ceqjmp_opp" },
+  { ovm_cneqjmp, 0, "cneqjmp" },
+  { ovm_cneqjmp_opposite, 0, "cneqjmp_opp" },
+  { ovm_crmjmp, 0, "crmjmp" },
+  { ovm_crmjmp_opposite, 0, "crmjmp_opp" },
+  { ovm_cnrmjmp, 0, "cnrmjmp" },
+  { ovm_cnrmjmp_opposite, 0, "cnrmjmp_opp" },
+  { ovm_cgtjmp, 0, "cgtjmp" },
+  { ovm_cgtjmp_opposite, 0, "cgtjmp_opp" },
+  { ovm_cltjmp, 0, "cltjmp" },
+  { ovm_cltjmp_opposite, 0, "cltjmp_opp" },
+  { ovm_cgejmp, 0, "cgejmp" },
+  { ovm_cgejmp_opposite, 0, "cgejmp_opp" },
+  { ovm_clejmp, 0, "clejmp" },
+  { ovm_clejmp_opposite, 0, "clejmp_opp" },
+  { ovm_trash2, 0, "trash2" },
   { NULL,           0, NULL         }
 };
 
@@ -1688,6 +2346,24 @@ static char *op_name[] = {
   "db_single",
   "dup",
   "pushnull",
+  "pushminusone",
+  "ceqjmp",
+  "ceqjmp_opp",
+  "cneqjmp",
+  "cneqjmp_opp",
+  "crmjmp",
+  "crmjmp_opp",
+  "cnrmjmp",
+  "cnrmjmp_opp",
+  "cgtjmp",
+  "cgtjmp_opp",
+  "cltjmp",
+  "cltjmp_opp",
+  "cgejmp",
+  "cgejmp_opp",
+  "clejmp",
+  "clejmp_opp",
+  "trash2",
   NULL
 };
 
