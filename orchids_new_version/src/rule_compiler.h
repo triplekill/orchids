@@ -189,13 +189,16 @@ struct node_expr_symbol_s
 {
   NODE_EXPR_S
   int   res_id;
-  monotony mono; /* for field names */
   char *name;
+  node_expr_t *def; /* for variables, gives the assignment that determined
+		       the variable's type, if any. */
+  monotony mono; /* for field names */
 };
 
 #define SYM_RES_ID(e) ((node_expr_symbol_t *)e)->res_id
 #define SYM_MONO(e) ((node_expr_symbol_t *)e)->mono
 #define SYM_NAME(e) ((node_expr_symbol_t *)e)->name
+#define SYM_DEF(e) ((node_expr_symbol_t *)e)->def
 
 
 /**

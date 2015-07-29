@@ -361,7 +361,7 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 	wait_time_ptr = NULL;
       }
 
-    if (ctx->actmon)
+    if (ctx->actmon && ctx->verbose<2)
       monitor_activity();
     memcpy(&rfds, &ctx->fds, sizeof(fd_set));
 

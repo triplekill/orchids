@@ -158,7 +158,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 {
   char opt;
 
-  while ((opt = getopt(argc, argv, "hc:o:b:f:r:d:Dvm")) != -1) {
+  while ((opt = getopt(argc, argv, "hc:o:b:f:r:d:Dv:m")) != -1) {
     switch (opt) {
 
     case 'h':
@@ -171,7 +171,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       break;
 
     case 'o':
-      DebugLog(DF_CORE, DS_NOTICE, "Requesting off-line mode.\n");
+      DebugLog(DF_CORE, DS_NOTICE, "requesting off-line mode\n");
       if (!strcmp("syslog", optarg))
         ctx->off_line_mode = MODE_SYSLOG;
       else if (!strcmp("snare", optarg))
@@ -183,7 +183,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       break;
 
     case 'r':
-      DebugLog(DF_CORE, DS_NOTICE, "adding the rule file '%s'\n", optarg);
+      DebugLog(DF_CORE, DS_NOTICE, "adding rule file '%s'\n", optarg);
       ctx->rulefile_list = gc_base_malloc(ctx->gc_ctx, sizeof (rulefile_t));
       ctx->last_rulefile = ctx->rulefile_list;
       ctx->rulefile_list->next = NULL;
@@ -198,7 +198,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 
         if (ctx->off_line_input_file) {
           DebugLog(DF_CORE, DS_FATAL,
-                   "Offline input file already defined to [%s]\n",
+                   "offline input file already defined to '%s'\n",
                    ctx->off_line_input_file);
           exit(EXIT_FAILURE);
         }
@@ -224,7 +224,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
 #endif /* ENABLE_DEBUGLOG */
 
     case 'v':
-      ctx->verbose = 1;
+      sscanf (optarg, "%i", &ctx->verbose);
       break;
 
     case 'm':
@@ -249,7 +249,7 @@ orchids_usage(char *prg)
   fprintf(stderr, "  -o <off-line_mode> off-line input file type (default syslog)\n");
   fprintf(stderr, "  -f <input_file>    input file\n");
   fprintf(stderr, "  -r <rule_file>     rule file\n");
-  fprintf(stderr, "  -v                 verbose mode\n");
+  fprintf(stderr, "  -v <level>         verbose mode\n");
   fflush(stderr);
 }
 

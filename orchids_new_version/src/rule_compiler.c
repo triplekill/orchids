@@ -406,6 +406,7 @@ rule_compiler_t *new_rule_compiler_ctx(gc_t *gc_ctx)
   ctx->returns = NULL;
   ctx->type_stack = NULL;
   ctx->nerrors = 0;
+  ctx->verbose = 0;
   GC_UPDATE(gc_ctx, 0, ctx);
 
   issdllex_init (&ctx->scanner);
@@ -642,7 +643,10 @@ static gc_class_t node_expr_term_class = {
 
 static void node_expr_sym_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
+  node_expr_symbol_t *sym = (node_expr_symbol_t *)p;
+  
   node_expr_mark_subfields (gc_ctx, p);
+  GC_TOUCH (gc_ctx, SYM_DEF(sym));
   return;
 }
 
@@ -655,12 +659,13 @@ static void node_expr_sym_finalize (gc_t *gc_ctx, gc_header_t *p)
 static int node_expr_sym_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 				   void *data)
 {
+  node_expr_symbol_t *sym = (node_expr_symbol_t *)p;
   int err;
 
   err = node_expr_traverse (gtc, p, data);
   if (err)
     return err;
-  return 0;
+  return (*gtc->do_subfield) (gtc, (gc_header_t *)SYM_DEF(sym), data);
 }
 
 static gc_class_t node_expr_sym_class = {
@@ -907,6 +912,7 @@ void compile_rules(orchids_t *ctx)
 
   DebugLog(DF_OLC, DS_NOTICE, "*** beginning rule compilation ***\n");
 
+  ctx->rule_compiler->verbose = ctx->verbose;
   build_fields_hash(ctx);
   /* XXX functions hash construction moved to register_lang_function() */
   build_functions_hash(ctx);
@@ -2636,7 +2642,7 @@ static hcode_t sesf_hash (hkey_t *key, size_t keylen)
 }
 
 static int same_event_sequence_fits (rule_compiler_t *ctx, node_state_t *state,
-				     monotony vars[], hash_t *memo)
+				     monotony vars[], hash_t *memo, int notfirst)
 {
   sesf_t *sesf;
   size_t i, n, sz;
@@ -2649,26 +2655,34 @@ static int same_event_sequence_fits (rule_compiler_t *ctx, node_state_t *state,
   node_state_t *next;
   int res;
 
+  if (state->flags & STATE_COMMIT)
+    return 1; /* acceptance (even though the sequence may go on) */
   n = ctx->dyn_var_name_nb;
   sz = offsetof(sesf_t, vars[n]);
-  sesf = gc_base_malloc (ctx->gc_ctx, sz);
-  sesf->state = state;
-  sesf->nvars = n;
-  for (i=0; i<n; i++)
-    sesf->vars[i] = vars[i];
-  p = hash_get (memo, sesf, sz);
+  p = NULL;
+  sesf = NULL;
+  if (notfirst)
+    {
+      sesf = gc_base_malloc (ctx->gc_ctx, sz);
+      sesf->state = state;
+      sesf->nvars = n;
+      for (i=0; i<n; i++)
+	sesf->vars[i] = vars[i];
+      p = hash_get (memo, sesf, sz);
+    }
   res = 1;
   if (p!=NULL) /* cycle found */
     ;
   else
     {
-      hash_add (ctx->gc_ctx, memo, (void *)1, sesf, sz);
+      if (notfirst)
+	hash_add (ctx->gc_ctx, memo, (void *)1, sesf, sz);
       varsz = n*sizeof(monotony);
       newvars = gc_base_malloc (ctx->gc_ctx, 2*varsz);
       memcpy (newvars, vars, varsz);
-      condvars = newvars + ctx->dyn_var_name_nb;
+      condvars = newvars + n;
       for (l=state->actionlist; l!=NULL; l=BIN_RVAL(l))
-	(void) compute_monotony (ctx, BIN_LVAL(l), newvars, 1);
+	(void) compute_monotony (ctx, BIN_LVAL(l), newvars, notfirst);
       for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
 	{
 	  t = (node_trans_t *)BIN_LVAL(l);
@@ -2685,14 +2699,17 @@ static int same_event_sequence_fits (rule_compiler_t *ctx, node_state_t *state,
 		  break;
 		}
 	      next = trans_dest_state (ctx, t);
-	      res = same_event_sequence_fits (ctx, next, condvars, memo);
+	      res = same_event_sequence_fits (ctx, next, condvars, memo, 1);
 	      if (res==0)
 		break;
 	    }
 	}
       gc_base_free (newvars);
-      hash_del (memo, sesf, sz);
+      if (notfirst)
+	(void) hash_del (memo, sesf, sz);
     }
+  if (notfirst)
+    gc_base_free (sesf);
   return res;
 }
 
@@ -2727,7 +2744,7 @@ static int trans_no_wait_needed (rule_compiler_t *ctx, node_trans_t *trans)
   memo->hash = sesf_hash;
   /* Then we check that the same sequence of events n1 < n2 < ...
      will fit the next state */
-  res = same_event_sequence_fits (ctx, next, vars, memo);
+  res = same_event_sequence_fits (ctx, next, vars, memo, 0);
   free_hash (memo, NULL);
   gc_base_free (vars);
   return res;
@@ -4305,10 +4322,20 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 	fprintf (stderr, "%s:", STR(n->file));
       /* printing STR(n->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s.\n",
+      fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s",
 	       n->lineno,
 	       type->name, ((node_expr_symbol_t *)n->lval)->name,
 	       vartype->name);
+      if (SYM_DEF(n->lval)!=NULL)
+	{
+	  fprintf (stderr, ", see assignment at ");
+	  if (STR(SYM_DEF(n->lval)->file)!=NULL)
+	    fprintf (stderr, "%s:", STR(SYM_DEF(n->lval)->file));
+	  /* printing STR(SYM_DEF(n->lval)->file) is legal, since it
+	     was created NUL-terminated, on purpose */
+	  fprintf (stderr, "line %u", SYM_DEF(n->lval)->lineno);
+	}
+      fprintf (stderr, ".\n");
       ctx->nerrors++;
     }
   set_type (ctx, (node_expr_t *)n->lval, newtype);
@@ -4629,6 +4656,7 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   n->name = fieldname;
   n->res_id = f->id;
   n->mono = f->mono;
+  n->def = NULL;
   GC_UPDATE(ctx->gc_ctx, 0, n);
   GC_END(ctx->gc_ctx);
   return (node_expr_t *)n;
@@ -4663,6 +4691,8 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
   n->parents = NULL;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
+  n->mono = 0;
+  n->def = NULL;
   n->hash = h_pair (NODE_VARIABLE, h_pair (n->res_id, H_NULL));
   /* hash = '(NODE_VARIABLE n)' mod bigprime */
   GC_START(ctx->gc_ctx, 1);
@@ -7316,7 +7346,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 				    state_t          *state,
 				    node_expr_t      *translist)
 {
-  int i;
+  size_t i;
 
   DebugLog(DF_OLC, DS_INFO,
            "compiling transitions in state \"%s\" in rule \"%s\"\n",
@@ -7353,7 +7383,17 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	  state->trans[i].id = i; /* set trans id */
 	  trans->flags = 0;
 	  if ((state->flags & EPSILON_STATE) || trans_no_wait_needed (ctx, node_trans))
-	    trans->flags |= TRANS_NO_WAIT;
+	    {
+	      if (ctx->verbose>=1 && !(state->flags & EPSILON_STATE))
+		{
+		  if (node_trans->file!=NULL)
+		    fprintf (stderr, "%s:", node_trans->file);
+		  fprintf (stderr, "%u: info: transition #%zi of state '%s', if triggered, will not wait, good!\n",
+			   node_trans->lineno, i+1,
+			   state->name?state->name:"(null)");
+		}
+	      trans->flags |= TRANS_NO_WAIT;
+	    }
 
 	  DebugLog(DF_OLC, DS_DEBUG, "transition %i: \n", i);
 	  if (node_trans->cond!=NULL)

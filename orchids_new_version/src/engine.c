@@ -530,6 +530,23 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
   GC_END (gc_ctx);
 }
 
+static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si)
+{
+  thread_group_t *pid;
+  unsigned long code;
+
+  if (si==NULL)
+    fputc ('|', stderr);
+  else
+    {
+      pid = si->pid;
+      code = (unsigned long)pid;
+      code >>= 4;
+      code %= 26;
+      fputc ('A'+code, stderr);
+    }
+}
+
 void inject_event(orchids_t *ctx, event_t *event)
 {
   event_t *e;
@@ -574,6 +591,8 @@ void inject_event(orchids_t *ctx, event_t *event)
 	{
 	  si = thread_dequeue (gc_ctx, old_queue);
 	  GC_UPDATE (gc_ctx, 3, si);
+	  if (ctx->verbose>=2)
+	    engine_activity_monitor (ctx, si);
 	  if (si==NULL) /* This is a BUMP */
 	    BUMP();
 	  else if (si->pid->flags & THREAD_KILL)
@@ -613,6 +632,8 @@ void inject_event(orchids_t *ctx, event_t *event)
   /* Set back the entries of the fields[] array to NULL. */
   for (e = event; e!=NULL; e = e->next)
     fields[e->field_id].val = NULL;
+  if (ctx->verbose>=2)
+    fputc ('\n', stderr);
 }
 
 uint16_t create_fresh_handle (gc_t *gc_ctx, state_instance_t *si, ovm_var_t *val)

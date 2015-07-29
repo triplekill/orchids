@@ -659,6 +659,7 @@ struct rule_compiler_s
   /* Type-checking: */
   struct type_heap_s *type_stack;
   int nerrors;
+  int verbose;
 };
 
 
@@ -1140,8 +1141,8 @@ struct orchids_s
   int32_t             vm_func_tbl_sz;
   int32_t             off_line_mode;
   char               *off_line_input_file;
+  int                 verbose;
   bool_t              daemon;
-  bool_t              verbose;
   bool_t              actmon;
 
 #ifdef OBSOLETE
