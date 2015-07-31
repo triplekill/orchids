@@ -6157,6 +6157,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->static_env_sz = ctx->statics_nb;
   rule->dynamic_env_sz = ctx->rule_env->elmts;
   rule->id = ctx->rules;
+  rule->flags = 0;
 
   /* Allocate static env */
   rule->static_env = gc_base_malloc (ctx->gc_ctx,

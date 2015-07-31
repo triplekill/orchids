@@ -511,6 +511,10 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
   GC_START (gc_ctx, 1);
   for (r = ctx->rule_compiler->first_rule; r!=NULL; r = r->next)
     {
+      if (r->flags & RULE_INITIAL_ALREADY_LAUNCHED)
+	continue; /* The 'anchored' rules of the spec, that is, the rules
+		     that should start to be monitored at the very beginning,
+		     but should never be relaunched later on. */
       pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
       pid->gc.type = T_NULL;
       GC_TOUCH (gc_ctx, pid->rule = r);
@@ -518,6 +522,8 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
       pid->flags = 0;
       GC_UPDATE (gc_ctx, 0, pid);
       q = &r->state[0];
+      if (q->flags & STATE_COMMIT) /* 'anchored' rule */
+	r->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
       init = create_state_instance (ctx, pid, q, NULL, NULL, 0);
       /* create state instance, in state q, waiting for no transition yet (NULL),
 	 and with empty environment (NULL) */

@@ -401,7 +401,8 @@ struct rule_s
   rule_t           *next;
   size_t            instances;
   int32_t           id;
-
+  int               flags;
+#define RULE_INITIAL_ALREADY_LAUNCHED 0x1
   state_instance_t *init;
 #ifdef OBSOLETE
   int32_t           nb_init_threads; /* XXX: UNUSED */
