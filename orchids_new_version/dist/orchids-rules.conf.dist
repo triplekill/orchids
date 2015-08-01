@@ -11,3 +11,4 @@ AddRuleFile @@ETCDIR@@/orchids/rules/password_sniff.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/anti_ssh_scan.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/ssh_failed_burst.pprule
 AddRuleFile @@ETCDIR@@/orchids/rules/ssh_failed_long_window.pprule
+AddRuleFile @@ETCDIR@@/orchids/rules/taint_auditd.pprule

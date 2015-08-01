@@ -1813,7 +1813,7 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
     {
       if (file!=NULL)
 	fprintf (stderr, "%s:", file);
-      fprintf (stderr, "%u: error: variable %s may be used initialized in action list of state '%s'.\n",
+      fprintf (stderr, "%u: error: variable %s may be used uninitialized in action list of state '%s'.\n",
 	       line, ctx->dyn_var_name[vs->n], state->name);
       ctx->nerrors++;
     }
@@ -1835,7 +1835,7 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
 	{
 	  if (file!=NULL)
 	    fprintf (stderr, "%s:", file);
-	  fprintf (stderr, "%u: error: variable %s may be used initialized in expect clause.\n",
+	  fprintf (stderr, "%u: error: variable %s may be used uninitialized in expect clause.\n",
 		   line, ctx->dyn_var_name[vs->n]);
 	  ctx->nerrors++;
 	}
@@ -2084,22 +2084,15 @@ static monotony compute_monotony_mon (rule_compiler_t *ctx,
   switch (op)
     {
     case OP_OPP:
-      if (strcmp (ta->name, "uint")==0)
-	{ /* special case: the opposite of a uint is a int,
-	     and monotonicity is not preserved; only constancy is.
-	     By the way, we need this operation to be interpret -1
-	     as an int (this is parsed as the opposite of the uint 1).
-	  */
-	  if (ma==MONO_CONST)
-	    res = MONO_CONST;
-	  break;
-	}
-      /*FALLTHROUGH*/
     case OP_NOT:
       if (ma & MONO_MONO)
 	res |= MONO_ANTI;
       if (ma & MONO_ANTI)
 	res |= MONO_MONO;
+      break;
+    case OP_PLUS:
+    case OP_NOP:
+      res = ma;
       break;
     default:
       DebugLog(DF_OLC, DS_FATAL,
@@ -2303,7 +2296,7 @@ static monotony compute_monotony_cond (rule_compiler_t *ctx,
 	res |= MONO_ANTI;
       return res;
     case BANG:
-      ma = compute_monotony (ctx, left, vars, const_fields);
+      ma = compute_monotony (ctx, right, vars, const_fields);
       /* BANG is antitonic: */
       res = MONO_UNKNOWN;
       if (ma & MONO_MONO)
@@ -3925,6 +3918,7 @@ static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself)
   switch (MON_OP(n))
     {
     case OP_OPP:
+    case OP_PLUS:
       if (strcmp(atype->name, "int")==0 ||
 	  strcmp(atype->name, "uint")==0)
 	{
@@ -3937,6 +3931,9 @@ static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself)
 	  return;
 	}
       break;
+    case OP_NOP:
+      set_type (ctx, myself, atype);
+      return;
     case OP_NOT:
       if (strcmp(atype->name, "int")==0 ||
 	  strcmp(atype->name, "uint")==0 ||
@@ -3960,6 +3957,7 @@ static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself)
   switch (MON_OP(n))
     {
     case OP_OPP: op_name = "-"; break;
+    case OP_PLUS: op_name = "+"; break;
     case OP_NOT: op_name = "~"; break;
     default: op_name = ""; break;
     }
@@ -4159,9 +4157,18 @@ static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself)
   char *op_name;
 
   set_type (ctx, myself, &t_int); /* return type is boolean, whatever happens */
-  ltype = BIN_LVAL(n)->stype;
+  if (BIN_LVAL(n)==NULL) /* unary operators, such as BANG */
+    {
+      ltype = NULL;
+    }
+  else
+    {
+      ltype = BIN_LVAL(n)->stype;
+      if (ltype==NULL)
+	return;
+    }
   rtype = BIN_RVAL(n)->stype;
-  if (ltype==NULL || rtype==NULL)
+  if (rtype==NULL)
     return;
   if (ltype==&t_any || rtype==&t_any)
     return;
@@ -4333,26 +4340,33 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 	    fprintf (stderr, "%s:", STR(SYM_DEF(n->lval)->file));
 	  /* printing STR(SYM_DEF(n->lval)->file) is legal, since it
 	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "line %u", SYM_DEF(n->lval)->lineno);
+	  fprintf (stderr, "%u", SYM_DEF(n->lval)->lineno);
 	}
       fprintf (stderr, ".\n");
       ctx->nerrors++;
     }
+  else
+    {
+      GC_TOUCH (ctx->gc_ctx, SYM_DEF(n->lval) = myself);
+    }
   set_type (ctx, (node_expr_t *)n->lval, newtype);
 }
 
-node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
+node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *nop_var,
 			 node_expr_t *expr)
 {
   node_expr_bin_t *n;
+  node_expr_t *var;
 
+  //gc_check(ctx->gc_ctx);
+  var = MON_VAL(nop_var);
   GC_START(ctx->gc_ctx, 1);
   n = (node_expr_bin_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 				   &node_expr_bin_class);
   n->gc.type = T_NULL;
   n->type = NODE_ASSOC;
-  GC_TOUCH (ctx->gc_ctx, n->file = var->file);
-  n->lineno = var->lineno;
+  GC_TOUCH (ctx->gc_ctx, n->file = nop_var->file);
+  n->lineno = nop_var->lineno;
   n->hash = h_pair (NODE_ASSOC,
 		    h_cons (var,
 			    h_cons (expr, H_NULL)));
@@ -4363,6 +4377,7 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *var,
   n->op = EQ;
   GC_TOUCH (ctx->gc_ctx, n->lval = var);
   GC_TOUCH (ctx->gc_ctx, n->rval = expr);
+  //gc_check(ctx->gc_ctx);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   add_parent (ctx, expr, (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
@@ -4532,7 +4547,7 @@ static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself)
   /*type_t *restype, *thentype, *elsetype;*/
 
   condtype = IF_COND(ifn)->stype;
-  if (!stype_below(condtype, &t_int))
+  if (!stype_below(condtype, &t_int) && condtype!=&t_any)
     {
       if (myself->file!=NULL)
 	fprintf (stderr, "%s:", STR(myself->file));
@@ -5156,6 +5171,7 @@ static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *mysel
     return;
   bufsize = 128;
   len = 0;
+  buf = gc_base_malloc (ctx->gc_ctx, bufsize);
   buf_puts (ctx->gc_ctx, "db[", &buf, &len, &bufsize);
   delim = "";
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
@@ -7010,9 +7026,12 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
       /* unary operator */
     case NODE_MONOP:
       compile_bytecode_expr(MON_VAL(expr), code);
-      EXIT_IF_BYTECODE_BUFF_FULL(1);
-      code->bytecode[ code->pos++ ] = MON_OP(expr);
-      /*code->stack_level += 0; */
+      if (MON_OP(expr)!=OP_NOP)
+	{
+	  EXIT_IF_BYTECODE_BUFF_FULL(1);
+	  code->bytecode[ code->pos++ ] = MON_OP(expr);
+	  /*code->stack_level += 0; */
+	}
       break;
 
       /* meta-event */
@@ -7292,7 +7311,7 @@ static void compile_bytecode_cond(node_expr_t *expr,
 	  }
 	case BANG:
 	  {
-	    compile_bytecode_cond(BIN_LVAL(expr), code, label_else, label_then,
+	    compile_bytecode_cond(BIN_RVAL(expr), code, label_else, label_then,
 				  ((flags & COND_THEN_IMMEDIATE)?COND_ELSE_IMMEDIATE:0)
 				  | ((flags & COND_ELSE_IMMEDIATE)?COND_THEN_IMMEDIATE:0));
 	    return;

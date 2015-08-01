@@ -60,53 +60,53 @@
  ** Table of data types natively recognized in the Orchids language.
  **/
 static struct issdl_type_s issdl_types_g[] = {
-  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "null",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Null type for error/exception management" },
-  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "func",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Function reference" },
-  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_opp, int_mul, int_div, int_mod, int_clone, int_and, int_or, int_xor, int_not,
+  { "int",     0, int_get_data, int_get_data_len, int_cmp, int_add, int_sub, int_opp, int_mul, int_div, int_mod, int_clone, int_and, int_or, int_xor, int_not, int_plus,
     "Integer numbers (32-bits signed int)" },
-  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, NULL, NULL, NULL, NULL,
+  { "bstr",    0, bytestr_get_data, bytestr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, bstr_clone, NULL, NULL, NULL, NULL, NULL,
     "Binary string, allocated, (unsigned char *)" },
-  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, NULL, NULL, NULL, NULL,
+  { "vbstr",   0, vbstr_get_data, vbstr_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, vbstr_clone, NULL, NULL, NULL, NULL, NULL,
     "Virtual binary string, not allocated, only pointer/offset reference" },
-  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, string_clone, NULL, NULL, NULL, NULL,
+  { "str",     0, string_get_data, string_get_data_len, str_cmp, str_add, NULL, NULL, NULL, NULL, NULL, string_clone, NULL, NULL, NULL, NULL, NULL,
     "Character string, allocated, (char *)" },
-  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, vstr_clone, NULL, NULL, NULL, NULL,
+  { "vstr",    0, vstring_get_data, vstring_get_data_len, vstr_cmp, vstr_add, NULL, NULL, NULL, NULL, NULL, vstr_clone, NULL, NULL, NULL, NULL, NULL,
     "Virtual string, not allocated, only pointer/offset reference" },
-  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "array",   0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Array" },
-  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "hash",    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Hash table" },
-  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, NULL, NULL, NULL, NULL, ctime_clone, NULL, NULL, NULL, NULL,
+  { "ctime",   0, ctime_get_data, ctime_get_data_len, ctime_cmp, ctime_add, ctime_sub, NULL, NULL, NULL, NULL, ctime_clone, NULL, NULL, NULL, NULL, NULL,
     "C Time, seconds since Epoch (Jan. 1, 1970, 00:00 GMT), (time_t)" },
-  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, NULL, ipv4_clone, ipv4_and, ipv4_or, ipv4_xor, ipv4_not,
+  { "ipv4",    0, ipv4_get_data, ipv4_get_data_len, ipv4_cmp, NULL, NULL, NULL, NULL, NULL, NULL, ipv4_clone, ipv4_and, ipv4_or, ipv4_xor, ipv4_not, NULL,
     "IPv4 address (struct in_addr)" },
-  { "ipv6",    0, ipv6_get_data, ipv6_get_data_len, ipv6_cmp, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ipv6_and, ipv6_or, ipv6_xor, ipv6_not,
+  { "ipv6",    0, ipv6_get_data, ipv6_get_data_len, ipv6_cmp, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ipv6_and, ipv6_or, ipv6_xor, ipv6_not, NULL,
     "IPv6 address (struct in6_addr)" },
-  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, NULL, NULL, NULL, NULL, timeval_clone, NULL, NULL, NULL, NULL,
+  { "timeval", 0, timeval_get_data, timeval_get_data_len, timeval_cmp, timeval_add, timeval_sub, NULL, NULL, NULL, NULL, timeval_clone, NULL, NULL, NULL, NULL, NULL,
     "Seconds and microseconds since Epoch, (struct timeval)" },
-  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "regex",   0, regex_get_data, regex_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Posix Extended Regular Expression, with substring addressing" },
-  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_opp, uint_mul, uint_div, uint_mod, uint_clone, uint_and, uint_or, uint_xor, uint_not,
+  { "uint",    0, uint_get_data, uint_get_data_len, uint_cmp, uint_add, uint_sub, uint_opp, uint_mul, uint_div, uint_mod, uint_clone, uint_and, uint_or, uint_xor, uint_not, uint_plus,
     "Non negative integer (32-bits unsigned int)" },
-  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "snmpoid", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "SNMP Object Identifier" },
-  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_opp, float_mul, float_div, NULL, float_clone, NULL, NULL, NULL, NULL,
-    "IEEE 32-bit floating point number (float)" },
-  { "event", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "float",   0, float_get_data, float_get_data_len, float_cmp, float_add, float_sub, float_opp, float_mul, float_div, NULL, float_clone, NULL, NULL, NULL, NULL, float_plus,
+    "IEEE 64-bit floating point number (float)" },
+  { "event", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Meta event" },
-  { "state_instance", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "state_instance", 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "State instance/cut mark" },
-  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Empty database" },
-  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "Singleton database" },
-  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  { "db", 0, NULL, NULL, db_cmp, db_add, db_sub, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "General database" },
-  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, extern_clone, NULL, NULL, NULL, NULL,
+  { "extern",  0, extern_get_data, extern_get_data_len, NULL, NULL, NULL, NULL, NULL, NULL, NULL, extern_clone, NULL, NULL, NULL, NULL, NULL,
     "External data (provided by a plugin)" },
-  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
+  { NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "" }
 };
 
 type_t t_int = { "int", T_INT };
@@ -339,6 +339,11 @@ static ovm_var_t *int_not(gc_t *gc_ctx, ovm_var_t *var)
   return ovm_int_new (gc_ctx, ~INT(var));
 }
 
+static ovm_var_t *int_plus(gc_t *gc_ctx, ovm_var_t *var)
+{
+  return var;
+}
+
 /*
 ** Unsigned integer type
 ** store an 'uint32_t' value.
@@ -419,7 +424,15 @@ static ovm_var_t *uint_sub (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *uint_opp (gc_t *gc_ctx, ovm_var_t *var)
 {
-  return ovm_int_new (gc_ctx, -(long)UINT(var));
+  unsigned long n;
+  long res;
+
+  n = UINT(var);
+  if (n+LONG_MIN<n) /* overflow, i.e., when n+LONG_MIN<0, mathematically;
+		       equivalently, n<-LONG_MIN: we truncate to LONG_MIN */
+    res = LONG_MIN;
+  else res = -(long)n;
+  return ovm_int_new (gc_ctx, res);
 }
 
 static ovm_var_t *uint_mul (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
@@ -500,9 +513,19 @@ static ovm_var_t *uint_xor (gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 
 static ovm_var_t *uint_not(gc_t *gc_ctx, ovm_var_t *var)
 {
-  if (var==NULL || TYPE(var) != T_UINT)
-    return NULL;
   return ovm_uint_new (gc_ctx, ~UINT(var));
+}
+
+static ovm_var_t *uint_plus(gc_t *gc_ctx, ovm_var_t *var)
+{
+  unsigned long n;
+  long res;
+  
+  n = UINT(var);
+  if (n>LONG_MAX)
+    res = LONG_MAX;
+  else res = (long)n;
+  return ovm_int_new (gc_ctx, res);
 }
 
 /*
@@ -1742,6 +1765,11 @@ static ovm_var_t *float_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 static ovm_var_t *float_opp(gc_t *gc_ctx, ovm_var_t *var)
 {
   return ovm_float_new (gc_ctx, -FLOAT(var));
+}
+
+static ovm_var_t *float_plus(gc_t *gc_ctx, ovm_var_t *var)
+{
+  return var;
 }
 
 static ovm_var_t *float_mul(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)

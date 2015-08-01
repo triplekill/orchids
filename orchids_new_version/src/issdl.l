@@ -264,9 +264,21 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
   return (FPDOUBLE);
 }
 
- /* Integer numbers */
-[0-9]+ {
+ /* Integers */
+[1-9][0-9]* {
   issdllval.integer = strtoul(issdltext, (char **)NULL, 10);
+  /* printf("NUMBER %lu\n", issdllval.integer); */
+  return (NUMBER);
+}
+
+0x[0-0a-fA-F]+ {
+  issdllval.integer = strtoul(issdltext+2, (char **)NULL, 16);
+  /* printf("NUMBER %lu\n", issdllval.integer); */
+  return (NUMBER);
+}
+
+0[0-7]* {
+  issdllval.integer = strtoul(issdltext+1, (char **)NULL, 8);
   /* printf("NUMBER %lu\n", issdllval.integer); */
   return (NUMBER);
 }

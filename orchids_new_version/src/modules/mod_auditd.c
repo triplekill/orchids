@@ -198,7 +198,7 @@ static field_t auditd_fields[] = {
   {"auditd.subj",     &t_str, MONO_UNKNOWN,     "lspp subject's context string"       },
   {"auditd.key",      &t_str, MONO_UNKNOWN,     "tty interface"                       },
   {"auditd.item",     &t_uint, MONO_UNKNOWN,      "file path: item"                     },
-  {"auditd.name",     &t_uint, MONO_UNKNOWN,      "file path: name"                     },
+  {"auditd.name",     &t_str, MONO_UNKNOWN,      "file path: name"                     },
   {"auditd.inode",    &t_uint, MONO_UNKNOWN,      "file path: inode"                    },
   {"auditd.mode",     &t_uint, MONO_UNKNOWN,      "file path: mode"                     },
   {"auditd.dev",      &t_uint, MONO_UNKNOWN,      "file path: device (major and minor)" },

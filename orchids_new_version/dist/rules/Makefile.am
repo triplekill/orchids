@@ -17,7 +17,8 @@ orchidsrule_DATA = \
   lock_lease_dos.pprule\
   leak_memory.pprule\
   ssh_failed_burst.pprule\
-  ssh_failed_long_window.pprule
+  ssh_failed_long_window.pprule \
+  taint_auditd.pprule
 
 EXTRA_DIST = $(orchidsrule_DATA) test/*.rule
 

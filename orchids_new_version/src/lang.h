@@ -165,6 +165,7 @@ typedef ovm_var_t *(*var_and_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_or_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_xor_t)(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 typedef ovm_var_t *(*var_not_t)(gc_t *gc_ctx, ovm_var_t *var);
+typedef ovm_var_t *(*var_plus_t)(gc_t *gc_ctx, ovm_var_t *var);
 
 /**
  ** @struct issdl_type_s
@@ -240,6 +241,7 @@ struct issdl_type_s
   var_or_t             or;
   var_xor_t            xor;
   var_not_t            not;
+  var_plus_t	       plus;
   /* XXX add extension here */
   char                *desc;
 };

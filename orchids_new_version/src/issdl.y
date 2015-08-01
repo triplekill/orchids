@@ -100,13 +100,13 @@ extern int display_func(void *data, void *param);
 %type <flags> state_options
 
 %type <node_expr> params paramlist
-%type <node_expr> var regsplit
+%type <node_expr> var nop_var regsplit
 %type <node_expr> expr db_tuple db_non_empty_tuple db_patterns db_pattern
 %type <node_expr> event_record event_recordlist event_records
 %type <node_state> state statedefs
 %type <node_expr> states statelist
 %type <node_rule> rule
-%type <node_expr> actionlist actions actionblock optional_actionblock
+%type <node_expr> actionlist actions actionblock brace_actionblock
 %type <node_expr> action ifstatement casestatements
 %type <node_expr> transitionlist transitions
 %type <node_trans> transition gotostatement casestatement
@@ -116,7 +116,7 @@ extern int display_func(void *data, void *param);
 %type <string> string
 %type <depth> o_split return break o_parent eq ifkw casekw o_brace o_brace_new_scope
 %type <depth> o_open_event o_plus_event o_db for and
-%type <depth> expect goto statekw rulekw o_minus
+%type <depth> expect goto statekw rulekw o_minus o_plus
 
 %%
 
@@ -243,6 +243,14 @@ var:
   { RESULT($$,build_varname(compiler_ctx_g, $1)); }
 ;
 
+nop_var: VARIABLE
+  { RESULT($$,build_varname(compiler_ctx_g, $1));
+    RESULT($$, build_expr_monop(compiler_ctx_g, OP_NOP, $$));
+    /* insert a NOP so as to keep current file and line number (hack). */
+    GC_TOUCH (compiler_ctx_g->gc_ctx, $$->file = compiler_ctx_g->currfile);
+    $$->lineno = compiler_ctx_g->issdllineno;
+  }
+;
 
 regsplit:
   string
@@ -291,6 +299,9 @@ eq : EQ { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 o_minus : O_MINUS { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
+o_plus : O_PLUS { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
+;
+
 for : FOR { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 ;
 
@@ -300,7 +311,7 @@ and : AND { $$ = COMPILE_GC_DEPTH(compiler_ctx_g); }
 expr:
   o_parent expr C_PARENT
   { RESULT_DROP($$,$1, $2); }
-| var eq expr %prec EQ
+| nop_var eq expr %prec EQ
   { RESULT_DROP($$,$2, build_assoc(compiler_ctx_g, $1, $3)); }
 | expr O_PLUS expr
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_ADD, $1, $3)); }
@@ -308,6 +319,8 @@ expr:
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_SUB, $1, $3)); }
 | o_minus expr %prec O_MINUS
   { RESULT($$, build_expr_monop(compiler_ctx_g, OP_OPP, $2)); }
+| o_plus expr %prec O_PLUS
+  { RESULT($$, build_expr_monop(compiler_ctx_g, OP_PLUS, $2)); }
 | expr O_TIMES expr
   { RESULT($$, build_expr_binop(compiler_ctx_g, OP_MUL, $1, $3)); }
 | expr O_DIV expr
@@ -350,8 +363,7 @@ expr:
   { RESULT($$,build_integer(compiler_ctx_g, $1)); }
 | FPDOUBLE /* Constant floating point (double precision) value */
   { RESULT($$,build_double(compiler_ctx_g, $1)); }
-| VARIABLE /* Variable */
-  { RESULT($$,build_varname(compiler_ctx_g, $1)); }
+| nop_var
 | LOGICAL /* Logical variable */
   { RESULT($$,build_varname(compiler_ctx_g, $1)); }
 | FIELD
@@ -381,8 +393,22 @@ expr:
 | NOTHING { RESULT($$, build_db_nothing(compiler_ctx_g)); }
 | o_db db_tuple C_DB
   { RESULT_DROP($$,$1,build_db_singleton(compiler_ctx_g,$2)); }
-| db_patterns optional_actionblock COLLECT expr
+| db_patterns brace_actionblock COLLECT expr
   { RESULT($$, build_db_collect(compiler_ctx_g,$2,$4,
+				BIN_LVAL(compiler_ctx_g->returns),$1));
+    GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns = BIN_RVAL(compiler_ctx_g->returns));
+  }
+| db_patterns COLLECT expr
+  { GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns =
+	    build_expr_cons (compiler_ctx_g, NULL,
+			     compiler_ctx_g->returns));
+    RESULT($$, build_db_collect(compiler_ctx_g,NULL,$3,
+				BIN_LVAL(compiler_ctx_g->returns),$1));
+    GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns = BIN_RVAL(compiler_ctx_g->returns));
+  }
+| db_patterns brace_actionblock
+  { RESULT($$, build_db_nothing(compiler_ctx_g));
+    RESULT($$, build_db_collect(compiler_ctx_g,$2,$$,
 				BIN_LVAL(compiler_ctx_g->returns),$1));
     GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns = BIN_RVAL(compiler_ctx_g->returns));
   }
@@ -486,14 +512,8 @@ actionblock:
 | action
   {  RESULT($$, build_expr_action(compiler_ctx_g, $1, NULL)); }
 
-optional_actionblock:
-{
-  GC_TOUCH (compiler_ctx_g->gc_ctx, compiler_ctx_g->returns =
-	    build_expr_cons (compiler_ctx_g, NULL,
-			     compiler_ctx_g->returns));
-  $$ = NULL;
-}
-| o_brace_new_scope C_BRACE
+brace_actionblock:
+  o_brace_new_scope C_BRACE
   { $$ = NULL; }
 | o_brace_new_scope actions C_BRACE
   { RESULT_DROP($$,$1, $2); }

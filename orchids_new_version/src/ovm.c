@@ -171,6 +171,10 @@ void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
 	  fprintf(fp, "0x%04x: %08lx             | opp\n", offset, *code);
 	  offset += 1;
 	  break;
+	case OP_PLUS:
+	  fprintf(fp, "0x%04x: %08lx             | plus\n", offset, *code);
+	  offset += 1;
+	  break;
 	case OP_MUL:
 	  fprintf(fp, "0x%04x: %08lx             | mul\n", offset, *code);
 	  offset += 1;
@@ -528,6 +532,10 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 	  break ;
 	case OP_OPP:
 	  fprintf(fp, "%04x: %02lx       | opp\n", offset, *code);
+	  offset += 1;
+	  break ;
+	case OP_PLUS:
+	  fprintf(fp, "%04x: %02lx       | plus\n", offset, *code);
 	  offset += 1;
 	  break ;
 	case OP_MUL:

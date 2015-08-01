@@ -377,10 +377,12 @@
 #define OP_CLEJMP_OPPOSITE 60
 #define OP_TRASH2 61
 
+#define OP_PLUS 62
+
 /**
  ** Number of total opcodes.
  **/
-#define OPCODE_NUM 62
+#define OPCODE_NUM 63
 
 #endif /* OVM_H */
 

@@ -61,7 +61,7 @@ static ovm_var_t *int_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *int_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *int_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *int_not(gc_t *gc_ctx, ovm_var_t *var);
-
+static ovm_var_t *int_plus(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *uint_get_data(ovm_var_t *i);
 static size_t uint_get_data_len(ovm_var_t *i);
@@ -77,7 +77,7 @@ static ovm_var_t *uint_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *uint_not(gc_t *gc_ctx, ovm_var_t *var);
-
+static ovm_var_t *uint_plus(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *ipv4_get_data(ovm_var_t *addr);
 static size_t ipv4_get_data_len(ovm_var_t *addr);
@@ -114,7 +114,7 @@ static ovm_var_t *float_opp(gc_t *gc_ctx, ovm_var_t *var);
 static ovm_var_t *float_mul(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *float_div(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 static ovm_var_t *float_clone(gc_t *gc_ctx, ovm_var_t *var);
-
+static ovm_var_t *float_plus(gc_t *gc_ctx, ovm_var_t *var);
 
 static void *ctime_get_data(ovm_var_t *t);
 static size_t ctime_get_data_len(ovm_var_t *i);
