@@ -1958,6 +1958,22 @@ static int ovm_trash2(isn_param_t *param)
   return (0);
 }
 
+static int ovm_plus(isn_param_t *param)
+{
+  orchids_t *ctx = param->ctx;
+  ovm_var_t *op;
+  ovm_var_t *res = NULL;
+
+  DebugLog(DF_OVM, DS_DEBUG, "OP_PLUS\n");
+  op = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  param->ip += 1;
+  if (!IS_NULL(op))
+    res = issdl_plus(ctx->gc_ctx, op);
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_VALUE(ctx, res);
+  return 0;
+}
+
 static int ovm_regsplit(isn_param_t *param)
 {
   orchids_t *ctx = param->ctx;
@@ -2298,6 +2314,7 @@ static ovm_insn_rec_t ops_g[] = {
   { ovm_clejmp, 0, "clejmp" },
   { ovm_clejmp_opposite, 0, "clejmp_opp" },
   { ovm_trash2, 0, "trash2" },
+  { ovm_plus, 0, "plus" },
   { NULL,           0, NULL         }
 };
 
@@ -2372,6 +2389,7 @@ static char *op_name[] = {
   "clejmp",
   "clejmp_opp",
   "trash2",
+  "plus",
   NULL
 };
 

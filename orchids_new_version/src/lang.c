@@ -1991,7 +1991,17 @@ ovm_var_t *issdl_opp(gc_t *gc_ctx, ovm_var_t *var)
   if (var!=NULL && issdl_types_g[var->gc.type].opp!=NULL)
     return (*issdl_types_g[var->gc.type].opp) (gc_ctx, var);
   DebugLog(DF_OVM, DS_WARN,
-	   "issdl_opp(): substraction doesn't apply for type '%s'\n",
+	   "issdl_opp(): opposite doesn't apply for type '%s'\n",
+	   STRTYPE(var));
+  return NULL;
+}
+
+ovm_var_t *issdl_plus(gc_t *gc_ctx, ovm_var_t *var)
+{
+  if (var!=NULL && issdl_types_g[var->gc.type].plus!=NULL)
+    return (*issdl_types_g[var->gc.type].plus) (gc_ctx, var);
+  DebugLog(DF_OVM, DS_WARN,
+	   "issdl_plus(): same sign conversion doesn't apply for type '%s'\n",
 	   STRTYPE(var));
   return NULL;
 }

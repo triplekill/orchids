@@ -674,11 +674,18 @@ ovm_var_t *issdl_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 ovm_var_t *issdl_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2);
 
 /**
- ** Opposite function of the Orchids language.
+ ** Opposite function of the Orchids language (- operator).
  ** @param var   The operand.
  ** @return      A new allocated variable containing the result.
  **/
 ovm_var_t *issdl_opp(gc_t *gc_ctx, ovm_var_t *var1);
+
+/**
+ ** Same sign conversion (+ operator)
+ ** @param var   The operand.
+ ** @return      A new allocated variable containing the result.
+ **/
+ovm_var_t *issdl_plus(gc_t *gc_ctx, ovm_var_t *var1);
 
 
 /**
