@@ -1,0 +1,110 @@
+
+#include "linux64syscall.h"
+#include "fcntl.h"
+
+rule taint
+{
+  state init! /* rule will be launched once, at the beginning */
+  {
+    $sensitive_files_regexp = _REGEX("/etc/*");
+    $public_regexp = _REGEX("/tmp/*|/home/*");
+    $tainted_inodes = nothing;
+    $tainted_pids = nothing;
+    goto track;
+  }
+
+  state track!
+  {
+    expect (.auditd.syscall==SYS_open)
+      goto open;
+    expect (.auditd.syscall==SYS_fork || .auditd.syscall==SYS_vfork || .auditd.syscall==SYS_clone)
+      goto fork;
+    expect (.auditd.syscall==SYS_exit)
+      goto exit;
+  }
+
+  state open!
+  {
+    $serial = .auditd.serial;
+    $pid = .auditd.pid;
+    expect (.auditd.serial!=$serial)
+      goto track; /* missed the .auditd.type="PATH" message */
+    expect ((.auditd.mode & O_ACCMODE)==O_RDWR)
+      goto rdwr;
+    expect ((.auditd.mode & O_ACCMODE)==O_RDONLY)
+      goto read;
+    expect ((.auditd.mode & O_ACCMODE)==O_WRONLY)
+      goto write;
+  }
+
+  state read!
+  {
+    $found_file = (.auditd.name =~ $sensitive_files_regexp);
+    if (!$found_file)
+      for .auditd.inode, Name in $tainted_inodes { $found_file = +1; };
+    case ($found_file) goto taint_pid;
+    else goto track;
+  }
+
+  state taint_pid!
+  {
+    $tainted_pids = $tainted_pids + {{$pid}};
+    goto track;
+  }
+
+  state write!
+  {
+    $found_pid = +0;
+    for $pid in $tainted_pids { $found_pid = +1; };
+    case ($found_pid) goto taint_file;
+    else goto track;
+  }
+
+  state taint_file!
+  {
+    $inode = .auditd.inode;
+    $filename = .auditd.name;
+    $tainted_inodes = $tainted_inodes + {{$inode, $filename}};
+    goto check_leakage;
+  }
+
+  state rdwr!
+  {
+    $found_file = (.auditd.name =~ $sensitive_files_regexp);
+    if (!$found_file)
+      for .auditd.inode, Name in $tainted_inodes { $found_file = +1; };
+    $found_pid = +0;
+    for $pid in $tainted_pids { $found_pid = +1; };
+    case ($found_file) goto taint_pid;
+    else case ($found_pid) goto taint_file;
+    else goto track;
+  }
+
+  state fork!
+  {
+    $oldpid = .auditd.pid;
+    $pid = .auditd.exit;
+    $found_pid = +0;
+    for $oldpid in $tainted_pids { $found_pid = +1; };
+    case ($found_pid) goto taint_pid;
+    else goto track;
+  }
+
+  state check_leakage!
+  {
+    case ($filename =~ $public_regexp) goto alert;
+    else goto track;
+  }
+
+  state alert!
+  {
+    report();
+    goto track;
+  }
+
+  state exit!
+  {
+    $tainted_pids = $tainted_pids - {{.auditd.pid}};
+    goto track;
+  }
+}
