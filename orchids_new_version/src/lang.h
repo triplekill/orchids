@@ -33,7 +33,7 @@
 /* Minimal native types */
 #define T_NULL            0 /* Type of things not handled by the ovm, or
 			       for which we don't care about the type    */
-#define T_FNCT            1
+#define T_FNCT            1 /* Unused */
 #define T_INT             2
 #define T_BSTR            3
 #define T_VBSTR           4
@@ -67,6 +67,10 @@
 #define T_IPV6PEER 0
 
 /* Extra types, not used for constant values */
+#define T_NOTHING 128
+/* T_NOTHING is not used; only as a tag in functions save_gc_struct()
+   and related */
+
 #define T_BIND 255
 /* T_BIND is for environments; see env_bind_t in orchids.h */
 #define T_SPLIT 254
@@ -75,6 +79,83 @@
 /* T_HEAP is for skew heaps, as used in register_rtaction() and others in evt_mgr.c */
 #define T_DB_SMALL_TABLE 252
 /* T_DB_SMALL_TABLE is for collision lists (db_small_table) in databases, see db.c */
+#define T_THREAD_QUEUE 251
+/* T_THREAD_QUEUE is for thread queues (thread_queue_t) in engine.c */
+#define T_THREAD_QUEUE_ELT 250
+/* T_THREAD_QUEUE_ELT is for thread queue elements (thread_queue_elt_t)
+   in engine.c */
+#define T_THREAD_GROUP 249
+/* T_THREAD_GROUP is for thread groups (thread_group_t) in engine.c */
+#define T_FIELD_RECORD_TABLE 248
+/* T_FIELD_RECORD_TABLE is for the unique table of field records
+   (field_record_table_t) in orchids_api.c */
+#define T_FIELD_TABLE 247
+/* T_FIELD_TABLE is for field tables (field_table_t) in orchids_api.c */
+#define T_RULE_COMPILER 246
+/* T_RULE_COMPILER is for the unique rule compiler context (rule_compiler_t)
+   in rule_compiler.c */
+#define T_VARSET 245
+/* T_VARSET is for sets of variables (varset_t) in rule_compiler.c */
+#define T_NODE_STATE 244
+/* T_NODE_STATE is for state nodes (node_state_t) in rule_compiler.c */
+#define T_NODE_IFSTMT 243
+/* T_NODE_IFSTMT is for if statement nodes (node_expr_if_t) in rule_compiler.c */
+#define T_NODE_TRANS 242
+/* T_NODE_TRANS is for transition nodes (node_trans_t) in rule_compiler.c */
+#define T_NODE_RULE 241
+/* T_NODE_RULE is for rule nodes (node_rule_t) in rule_compiler.c */
+#define T_TYPE_HEAP 240
+/* T_TYPE_HEAP is for heaps of type equations (type_heap_t) in rule_compiler.c */
+#define T_NODE_REGSPLIT 239
+/* T_NODE_REGSPLIT is for regexp split expression nodes (node_expr_regsplit_t,
+   of class node_expr_regsplit_class) in rule_compiler.c */
+#define T_NODE_BINOP 238
+/* T_NODE_BINOP is for binary operator expression nodes (node_expr_bin_t,
+   of class node_expr_bin_class) in rule_compiler.c */
+#define T_NODE_MONOP 237
+/* T_NODE_MONOP is for unary operator expression nodes (node_expr_mon_t,
+   of class node_expr_mon_class) in rule_compiler.c */
+#define T_NODE_RETURN 236
+/* T_NODE_RETURN is for return expression nodes (node_expr_mon_t,
+   of class node_expr_mon_class --- as for T_NODE_MONOP) in rule_compiler.c */
+#define T_NODE_BREAK 235
+/* T_NODE_BREAK is for break expression nodes (node_expr_mon_t,
+   of class node_expr_mon_class --- as for T_NODE_MONOP) in rule_compiler.c */
+#define T_NODE_CONS 234
+/* T_NODE_CONS is for cons nodes (node_expr_bin_t, of class node_expr_bin_class
+   --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_COND 233
+/* T_NODE_COND is for logical operator nodes (node_expr_bin_t,
+   of class node_expr_bin_class --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_ASSOC 232
+/* T_NODE_ASSOC is for assignment nodes (node_expr_bin_t,
+   of class node_expr_bin_class --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_EVENT 231
+/* T_NODE_EVENT is for event enrichment nodes (node_expr_bin_t,
+   of class node_expr_bin_class --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_DB_PATTERN 230
+/* T_NODE_DB_PATTERN is for database pattern nodes (node_expr_bin_t,
+   of class node_expr_bin_class --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_DB_COLLECT 229
+/* T_NODE_DB_COLLECT is for database 'collect' nodes (node_expr_bin_t,
+   of class node_expr_bin_class --- as for T_NODE_BINOP) in rule_compiler.c */
+#define T_NODE_DB_SINGLETON 228
+/* T_NODE_DB_SINGLETON is for database singleton nodes (node_expr_mon_t,
+   of class node_expr_mon_class --- as for T_NODE_MONOP) in rule_compiler.c */
+#define T_NODE_CALL 227
+/* T_NODE_CALL is for primitive call nodes (node_expr_call_t)
+   in rule_compiler.c */
+#define T_NODE_FIELD 226
+/* T_NODE_FIELD is for field name nodes (node_expr_symbol_t)
+   in rule_compiler.c */
+#define T_NODE_VARIABLE 225
+/* T_NODE_VARIABLE is for variable nodes (node_expr_symbol_t
+   --- as for T_NODE_FIELD) in rule_compiler.c */
+#define T_NODE_CONST 224
+/* T_NODE_CONST is for constant value nodes (node_expr_term_t)
+   in rule_compiler.c */
+#define T_RULE 223
+/* T_RULE is for OrchIDS rules (rule_t) in rule_compiler.c */
 
 /* Types, for the type checker.
    Not to be confused with the run-time type tags T_*
@@ -118,9 +199,12 @@ extern type_t t_int, t_uint, t_float,
 #define    SNMPOID(var)  (((ovm_snmpoid_t *)(var))->objoid)
 #define      FLOAT(var)    (((ovm_float_t *)(var))->val)
 #define     EXTPTR(var)    (((ovm_extern_t *)(var))->ptr)
-#define    EXTDESC(var)    (((ovm_extern_t *)(var))->desc)
-#define    EXTCOPY(var)    (((ovm_extern_t *)(var))->copy)
-#define    EXTFREE(var)    (((ovm_extern_t *)(var))->free)
+#define   EXTCLASS(var)   (((ovm_extern_t *)(var))->class)
+#define    EXTDESC(var)    (((ovm_extern_t *)(var))->class->desc)
+#define    EXTCOPY(var)    (((ovm_extern_t *)(var))->class->copy)
+#define    EXTFREE(var)    (((ovm_extern_t *)(var))->class->free)
+#define    EXTSAVE(var)    (((ovm_extern_t *)(var))->class->save)
+#define EXTRESTORE(var) (((ovm_extern_t *)(var))->class->restore)
 
 #define IS_NULL(var) ((var)==NULL)
 
@@ -583,15 +667,21 @@ struct ovm_float_s
 /**   @var ovm_extern_s::addr
  **     Address value.
  **/
-typedef void (*freefct)(void *ptr);
+typedef struct ovm_extern_class_s ovm_extern_class_t;
+struct ovm_extern_class_s {
+  char	   *desc;
+  void *(*copy)(gc_t *gc_ctx, void *ptr);
+  void (*free)(void *ptr);
+  int (*save)(save_ctx_t *sctx, void *ptr);
+  void *(*restore)(restore_ctx_t *rctx);
+};
+
 typedef struct ovm_extern_s ovm_extern_t;
 struct ovm_extern_s
 {
   gc_header_t gc;
   void     *ptr;
-  char	   *desc;
-  void *(*copy)(gc_t *gc_ctx, void *ptr);
-  void (*free)(void *ptr);
+  struct ovm_extern_class_s *class;
 };
 
 
@@ -800,9 +890,7 @@ void ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str);
 
 ovm_var_t *ovm_uint_new (gc_t *gc_ctx, unsigned long val);
 
-ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, char *desc,
-			  void *(*copy) (gc_t *gc_ctx, void *ptr),
-			  void (*free) (void *ptr));
+ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, ovm_extern_class_t *xclass);
 
 void ovm_uint_fprintf (FILE *fp, ovm_uint_t *val);
 
@@ -836,6 +924,9 @@ ovm_var_t *ovm_write_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var, ovm
 ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var);
 /* removes binding for variable number var,
    returns new environment (env is not modified) */
+
+int save_gc_struct (save_ctx_t *sctx, gc_header_t *p);
+gc_header_t *restore_gc_struct (restore_ctx_t *rctx);
 
 #endif /* LANG_H */
 
