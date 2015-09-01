@@ -2,7 +2,6 @@
  ** @file engine.c
  ** Analysis engine.
  **
- ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 2.0
@@ -28,6 +27,7 @@
 #include <time.h>
 #include <string.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "orchids.h"
 #include "lang.h"
@@ -42,13 +42,6 @@ static void thread_group_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, pid->rule);
 }
 
-static void thread_group_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  //thread_group_t *pid = (thread_group_t *)p;
-
-  return;
-}
-
 static int thread_group_traverse (gc_traverse_ctx_t *gtc,
 				  gc_header_t *p,
 				  void *data)
@@ -60,11 +53,57 @@ static int thread_group_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t thread_group_class = {
+static int thread_group_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  thread_group_t *pid = (thread_group_t *)p;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)pid->rule);
+  if (err) return err;
+  err = save_size_t (sctx, pid->nsi);
+  if (err) return err;
+  err = save_uint32 (sctx, pid->flags);
+  return err;
+}
+
+gc_class_t thread_group_class;
+
+static gc_header_t *thread_group_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  rule_t *rule;
+  thread_group_t *pid;
+  size_t nsi;
+  uint32_t flags;
+  int err;
+
+  GC_START (gc_ctx, 1);
+  pid = NULL;
+  rule = (rule_t *)restore_gc_struct (rctx);
+  if (rule==NULL && errno!=0)
+    goto end;
+  GC_UPDATE (gc_ctx, 0, rule);
+  err = restore_size_t (rctx, &nsi);
+  if (err) { errno = err; goto end; }
+  err = restore_uint32 (rctx, &flags);
+  if (err) { errno = err; goto end; }
+  pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
+  pid->gc.type = T_THREAD_GROUP;
+  GC_TOUCH (gc_ctx, pid->rule = rule);
+  pid->nsi = nsi;
+  pid->flags = flags;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)pid;
+}
+
+gc_class_t thread_group_class = {
   GC_ID('p','i','d',' '),
   thread_group_mark_subfields,
-  thread_group_finalize,
-  thread_group_traverse
+  NULL,
+  thread_group_traverse,
+  thread_group_save,
+  thread_group_restore
 };
 
 static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -73,13 +112,6 @@ static void state_instance_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, si->pid);
   GC_TOUCH (gc_ctx, si->env);
-}
-
-static void state_instance_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  //state_instance_t *si = (state_instance_t *)p;
-
-  /*remove_thread_local_entries (si);*/
 }
 
 static int state_instance_traverse (gc_traverse_ctx_t *gtc,
@@ -96,11 +128,97 @@ static int state_instance_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t state_instance_class = {
+static int state_instance_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  state_instance_t *si = (state_instance_t *)p;
+  long stateno, transno;
+  uint32_t nhandles;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)si->pid);
+  if (err) return err;
+  stateno = si->q - si->pid->rule->state;
+  err = save_long (sctx, stateno);
+  if (err) return err;
+  if (si->t==NULL)
+    transno = -1;
+  else
+    transno = si->t - si->q->trans;
+  err = save_long (sctx, transno);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)si->env);
+  if (err) return err;
+  err = save_uint32 (sctx, si->owned_handles); /* requires handle_bitmask_t==uint32_t */
+  if (err) return err;
+  nhandles = si->nhandles; /* convert from uint16_t to uint32_t,
+			      to avoid creating a save_uint16_t() function */
+  err = save_uint32 (sctx, nhandles);
+  return err;
+}
+
+gc_class_t state_instance_class;
+
+gc_header_t *state_instance_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  thread_group_t *pid;
+  state_instance_t *si;
+  long stateno, transno;
+  state_t *q;
+  transition_t *t;
+  ovm_var_t *env;
+  uint32_t owned_handles, nhandles;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  si = NULL;
+  pid = (thread_group_t *)restore_gc_struct (rctx);
+  if (pid==NULL && errno!=0)
+    goto end;
+  if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
+    { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 0, pid);
+  err = restore_long (rctx, &stateno);
+  if (err) { errno = err; goto end; }
+  if (stateno<0 || stateno>=pid->rule->state_nb)
+    { errno = -3; goto end; }
+  q = &pid->rule->state[stateno];
+  err = restore_long (rctx, &transno);
+  if (err) { errno = err; goto end; }
+  if (transno==-1)
+    t = NULL;
+  else if (transno<0 || transno>=q->trans_nb)
+    { errno = -3; goto end; }
+  else t = &q->trans[transno];
+  env = (ovm_var_t *)restore_gc_struct (rctx);
+  if (errno) goto end;
+  if (env!=NULL && TYPE(env)!=T_BIND && TYPE(env)!=T_SPLIT)
+    { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 1, env);
+  err = restore_uint32 (rctx, &owned_handles);
+  if (err) { errno = err; goto end; }
+  err = restore_uint32 (rctx, &nhandles);
+  if (err) { errno = err; goto end; }
+  si = gc_alloc (gc_ctx, sizeof(state_instance_t), &state_instance_class);
+  si->gc.type = T_STATE_INSTANCE;
+  GC_TOUCH (gc_ctx, si->pid = pid);
+  si->q = q;
+  si->t = t;
+  GC_TOUCH (gc_ctx, si->env = env);
+  si->owned_handles = owned_handles;
+  si->nhandles = nhandles;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)si;
+}
+
+gc_class_t state_instance_class = {
   GC_ID('s','t','t','i'),
   state_instance_mark_subfields,
-  state_instance_finalize,
-  state_instance_traverse
+  NULL,
+  state_instance_traverse,
+  state_instance_save,
+  state_instance_restore
 };
 
 static void thread_queue_elt_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -109,11 +227,6 @@ static void thread_queue_elt_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, qe->thread);
   GC_TOUCH (gc_ctx, qe->next);
-}
-
-static void thread_queue_elt_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int thread_queue_elt_traverse (gc_traverse_ctx_t *gtc,
@@ -130,11 +243,53 @@ static int thread_queue_elt_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t thread_queue_elt_class = {
+static int thread_queue_elt_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  thread_queue_elt_t *qe = (thread_queue_elt_t *)p;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)qe->thread);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)qe->next);
+  return err;
+}
+
+gc_class_t thread_queue_elt_class;
+
+static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  thread_queue_elt_t *qe, *next;
+  state_instance_t *si;
+
+  GC_START (gc_ctx, 2);
+  qe = NULL;
+  si = (state_instance_t *)restore_gc_struct (rctx);
+  if (si==NULL && errno!=0)
+    goto end;
+  if (si!=NULL && TYPE(si)!=T_STATE_INSTANCE)
+    { errno = -2; goto end; }
+  next = (thread_queue_elt_t *)restore_gc_struct (rctx);
+  if (next==NULL && errno!=0)
+    goto end;
+  if (next!=NULL && TYPE(next)!=T_THREAD_QUEUE_ELT)
+    { errno = -2; goto end; }
+  qe = gc_alloc (gc_ctx, sizeof(thread_queue_elt_t), &thread_queue_elt_class);
+  qe->gc.type = T_THREAD_QUEUE_ELT;
+  GC_TOUCH (gc_ctx, qe->next = next);
+  GC_TOUCH (gc_ctx, qe->thread = si);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)qe;
+}
+
+gc_class_t thread_queue_elt_class = {
   GC_ID('t','h','q','e'),
   thread_queue_elt_mark_subfields,
-  thread_queue_elt_finalize,
-  thread_queue_elt_traverse
+  NULL,
+  thread_queue_elt_traverse,
+  thread_queue_elt_save,
+  thread_queue_elt_restore
 };
 
 static void thread_queue_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -143,11 +298,6 @@ static void thread_queue_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, tq->first);
   GC_TOUCH (gc_ctx, tq->last);
-}
-
-static void thread_queue_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int thread_queue_traverse (gc_traverse_ctx_t *gtc,
@@ -164,11 +314,57 @@ static int thread_queue_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t thread_queue_class = {
+static int thread_queue_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  thread_queue_t *tq = (thread_queue_t *)p;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)tq->first);
+  /* don't save nelts or last, which will be recomputed
+     at restoration time */
+  return err;
+}
+
+gc_class_t thread_queue_class;
+
+static gc_header_t *thread_queue_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  thread_queue_t *tq;
+  thread_queue_elt_t *qe, *last, *next;
+  size_t n;
+
+  GC_START (gc_ctx, 1);
+  tq = NULL;
+  qe = (thread_queue_elt_t *)restore_gc_struct (rctx);
+  if (qe==NULL && errno!=0)
+    goto end;
+  if (qe!=NULL && TYPE(qe)!=T_THREAD_QUEUE_ELT)
+    { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 0, qe);
+  if (qe==NULL)
+    {
+      last = NULL;
+      n = 0;
+    }
+  else for (n=1, last=qe; (next = last->next)!=NULL; last=next);
+  tq = gc_alloc (gc_ctx, sizeof(thread_queue_t), &thread_queue_class);
+  tq->gc.type = T_THREAD_QUEUE;
+  GC_TOUCH (gc_ctx, tq->first = qe);
+  GC_TOUCH (gc_ctx, tq->last = last);
+  tq->nelts = n;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)tq;
+}
+
+gc_class_t thread_queue_class = {
   GC_ID('t','h','q','.'),
   thread_queue_mark_subfields,
-  thread_queue_finalize,
-  thread_queue_traverse
+  NULL,
+  thread_queue_traverse,
+  thread_queue_save,
+  thread_queue_restore
 };
 
 static thread_queue_t *new_thread_queue (gc_t *gc_ctx)
@@ -176,7 +372,7 @@ static thread_queue_t *new_thread_queue (gc_t *gc_ctx)
   thread_queue_t *tq;
 
   tq = gc_alloc (gc_ctx, sizeof (thread_queue_t), &thread_queue_class);
-  tq->gc.type = T_NULL;
+  tq->gc.type = T_THREAD_QUEUE;
   tq->nelts = 0;
   tq->first = NULL;
   tq->last = NULL;
@@ -222,7 +418,7 @@ static void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *
   if (si==NULL && last!=NULL && last->thread==NULL)
     return; /* si==BUMP, there is a last element, and its thread is BUMP */
   qe = gc_alloc (gc_ctx, sizeof(thread_queue_elt_t), &thread_queue_elt_class);
-  qe->gc.type = T_NULL;
+  qe->gc.type = T_THREAD_QUEUE_ELT;
   qe->next = NULL; /* no need to GC_TOUCH() NULL */
   GC_TOUCH (gc_ctx, qe->thread = si);
   if (si!=NULL)
@@ -362,7 +558,7 @@ static void detach_state_instance (gc_t *gc_ctx, state_instance_t *si)
   pid = si->pid;
   cleanup_state_instance (si);
   newpid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
-  newpid->gc.type = T_NULL;
+  newpid->gc.type = T_THREAD_GROUP;
   GC_TOUCH (gc_ctx, newpid->rule = pid->rule);
   newpid->nsi = 1;
   newpid->flags = 0;
@@ -516,7 +712,7 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
 		     that should start to be monitored at the very beginning,
 		     but should never be relaunched later on. */
       pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
-      pid->gc.type = T_NULL;
+      pid->gc.type = T_THREAD_GROUP;
       GC_TOUCH (gc_ctx, pid->rule = r);
       pid->nsi = 0;
       pid->flags = 0;
@@ -726,7 +922,6 @@ ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k)
 ** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions

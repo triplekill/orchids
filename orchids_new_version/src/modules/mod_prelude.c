@@ -168,6 +168,55 @@ static void prelude_free (void *obj)
     idmef_message_destroy(msg);
 }
 
+static int prelude_save (save_ctx_t *sctx, void *ptr)
+{
+  prelude_io_t *pio;
+  int err;
+  
+  err = prelude_io_new (&pio);
+  if (err) return err;
+  prelude_io_set_file_io (pio, sctx->f);
+  errno = 0;
+  idmef_message_print (ptr, pio);
+  if (errno) { err = errno; goto end; }
+ end:
+  prelude_io_destroy (pio);
+  return err;
+}
+
+static void *prelude_restore (restore_ctx_t *rctx)
+{
+  prelude_msg_t *msg;
+  prelude_io_t *pio;
+  idmef_message_t *idmef = NULL;
+  int err;
+
+  err = prelude_io_new (&pio);
+  if (err) return err;
+  prelude_io_set_file_io (pio, rctx->f);
+  msg = NULL;
+  err = prelude_msg_read (&msg, pio);
+  if (err) goto end;
+  err = idmef_message_new (&idmef);
+  if (err) goto end_msg;
+  err = idmef_message_read (idmef, msg);
+  if (err) { idmef_message_destroy (idmef); idmef = NULL; }
+ end_msg:
+  prelude_msg_destroy (msg);
+ end:
+  prelude_io_destroy (pio);
+  errno = err;
+  return idmef;
+}
+
+static ovm_extern_class_t prelude_xclass = {
+  "prelude",
+  prelude_copy,
+  prelude_free,
+  prelude_save,
+  prelude_restore
+};
+
 static void process_idmef_alert(orchids_t *ctx,
 				mod_entry_t	*mod,
 				idmef_message_t	*message,
@@ -181,9 +230,7 @@ static void process_idmef_alert(orchids_t *ctx,
   GC_START(gc_ctx, MAX_PRELUDE_FIELDS+1);
 
 #ifdef OBSOLETE
-  val = ovm_extern_new (gc_ctx, (void *)message,
-			prelude_description,
-			prelude_copy, prelude_free);
+  val = ovm_extern_new (gc_ctx, (void *)message, &prelude_xclass);
   GC_UPDATE(gc_ctx, F_PTR, val);
 #endif
 
@@ -252,9 +299,7 @@ static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
     }
 
   GC_START (gc_ctx, 1);
-  message = ovm_extern_new(gc_ctx, idmef,
-			   prelude_description,
-			   prelude_copy, prelude_free);
+  message = ovm_extern_new(gc_ctx, idmef, &prelude_xclass);
   GC_UPDATE(gc_ctx, 0, message);
   handle = create_fresh_handle (gc_ctx, state, message);
   val = ovm_uint_new (gc_ctx, handle);
@@ -484,7 +529,7 @@ static void *mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
   prelude_data->nb_fields = 0; /* OBSOLETE: 1; */
   for (i=0; i<MAX_PRELUDE_FIELDS; i++)
     prelude_data->field_xpath[i] = NULL;
-
+  register_extern_class (ctx, &prelude_xclass);
   return prelude_data;
 }
 

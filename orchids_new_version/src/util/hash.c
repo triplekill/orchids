@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <time.h>
 #include "gc.h"
 #include "hash.h"
 
@@ -71,7 +71,7 @@ void *hash_to_array(gc_t *gc_ctx, hash_t *hash)
 {
   void **array;
   hash_elmt_t *helmt;
-  int elmts;
+  size_t elmts;
   size_t i;
   size_t hsize;
   size_t j;
@@ -103,7 +103,7 @@ void free_hash(hash_t *hash, void (*elmt_free)(void *e))
     while (tmp) {
       tmp_next = tmp->next;
       if (elmt_free!=NULL)
-        elmt_free(tmp->data);
+        (*elmt_free) (tmp->data);
       gc_base_free (tmp);
       tmp = tmp_next;
     }
@@ -944,7 +944,7 @@ fprintf_hash_info(FILE *fp, hash_t *h)
 {
   fprintf(fp, "htable = %p\n", h->htable);
   fprintf(fp, "size = %i\n", h->size);
-  fprintf(fp, "elmts = %i\n", h->elmts);
+  fprintf(fp, "elmts = %zu\n", h->elmts);
   fprintf(fp, "hfunc = %p\n", h->hash);
 }
 

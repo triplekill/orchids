@@ -74,7 +74,7 @@ typedef struct node_expr_if_s node_expr_if_t;
   unsigned long hash;							\
   type_t *stype; /* static type, used in static type checking (&t_int,	\
 		    &t_str, etc.) */					\
-  void (*compute_stype) (rule_compiler_t *ctx, node_expr_t *myself);	\
+  int compute_stype; /* index into an array of functions */		\
   node_expr_t *parents; /* list of nodes of which this node is an	\
 			   argument, for type checking */
 
@@ -644,7 +644,7 @@ struct bytecode_buffer_s
   size_t pos;
   bytecode_t bytecode[BYTECODE_BUF_SZ];
   size_t used_fields_sz;
-  int used_fields[MAX_FIELD_SZ];
+  int32_t used_fields[MAX_FIELD_SZ];
   unsigned long flags;
   labels_t	labels;
   int stack_level;
@@ -1003,25 +1003,20 @@ build_ipv6(rule_compiler_t *ctx, char *hostname);
  * @param hostname The hostname string.
  * @return A new allocated ipv4addr or ipv6addr expression node.
  **/
-node_expr_t *
-build_ip(rule_compiler_t *ctx, char *hostname);
+node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname);
 
-node_expr_t *
-build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec);
+node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec);
 
 
-node_expr_t *
-build_timeval_from_string(rule_compiler_t *ctx, char *date, long tv_usec);
+node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long tv_usec);
 
 
 #ifdef COUNTER_OBSOLETE
-node_expr_t *
-build_counter(rule_compiler_t *ctx, long value);
+node_expr_t *build_counter(rule_compiler_t *ctx, long value);
 #endif
 
 
-node_expr_t *
-build_regex(rule_compiler_t *ctx, char *regex_str);
+node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str);
 
 
 node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str);

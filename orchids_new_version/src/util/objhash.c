@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <time.h>
 #include "gc.h"
 #include "objhash.h"
 
@@ -251,7 +251,7 @@ fprintf_objhash_info(FILE *fp, objhash_t *h)
 {
   fprintf(fp, "htable = %p\n", h->htable);
   fprintf(fp, "size = %i\n", h->size);
-  fprintf(fp, "elmts = %i\n", h->elmts);
+  fprintf(fp, "elmts = %zu\n", h->elmts);
   fprintf(fp, "hfunc = %p\n", h->hash);
 }
 

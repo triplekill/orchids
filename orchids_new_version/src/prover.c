@@ -46,11 +46,6 @@ static void formula_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
     }
 }
 
-static void formula_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int formula_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 				    void *data)
 {
@@ -85,7 +80,7 @@ static int formula_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 static gc_class_t formula_class = {
   GC_ID('f','o','r','m'),
   formula_mark_subfields,
-  formula_finalize,
+  NULL,
   formula_traverse
 };
 
@@ -95,11 +90,6 @@ static void branch_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, b->next);
   GC_TOUCH (gc_ctx, b->f);
-}
-
-static void branch_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int branch_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -118,7 +108,7 @@ static int branch_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 static gc_class_t branch_class = {
   GC_ID('b','r','c','h'),
   branch_mark_subfields,
-  branch_finalize,
+  NULL,
   branch_traverse
 };
 

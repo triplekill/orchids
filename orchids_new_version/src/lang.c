@@ -27,6 +27,7 @@
 #include <string.h>
 #include <errno.h>
 #include <math.h>
+#include <regex.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -146,11 +147,41 @@ issdl_type_t *issdlgettypes(void)
 ** store a 'signed int' value.
 */
 
+static int int_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  return save_long (sctx, INT(p));
+}
+
+static gc_class_t int_class;
+
+static gc_header_t *int_restore (restore_ctx_t *rctx)
+{
+  long n;
+  ovm_int_t *p;
+  int err;
+
+  err = restore_long (rctx, &n);
+  if (err) { errno = err; return NULL; }
+  p = gc_alloc (rctx->gc_ctx, sizeof (ovm_int_t), &int_class);
+  p->gc.type = T_INT;
+  p->val = n;
+  return (gc_header_t *)p;
+}
+
+static gc_class_t int_class = {
+  GC_ID('i','n','t',' '),
+  NULL,
+  NULL,
+  NULL,
+  int_save,
+  int_restore
+};
+
 ovm_var_t *ovm_int_new(gc_t *gc_ctx, long val)
 {
   ovm_int_t *n;
 
-  n = gc_alloc (gc_ctx, sizeof (ovm_int_t), NULL);
+  n = gc_alloc (gc_ctx, sizeof (ovm_int_t), &int_class);
   n->gc.type = T_INT;
   n->val = val;
   return OVM_VAR(n);
@@ -349,11 +380,41 @@ static ovm_var_t *int_plus(gc_t *gc_ctx, ovm_var_t *var)
 ** store an 'uint32_t' value.
 */
 
+static int uint_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  return save_ulong (sctx, UINT(p));
+}
+
+static gc_class_t uint_class;
+
+static gc_header_t *uint_restore (restore_ctx_t *rctx)
+{
+  unsigned long n;
+  ovm_uint_t *p;
+  int err;
+
+  err = restore_ulong (rctx, &n);
+  if (err) { errno = err; return NULL; }
+  p = gc_alloc (rctx->gc_ctx, sizeof (ovm_uint_t), &uint_class);
+  p->gc.type = T_UINT;
+  p->val = n;
+  return (gc_header_t *)p;
+}
+
+static gc_class_t uint_class = {
+  GC_ID('u','i','n','t'),
+  NULL,
+  NULL,
+  NULL,
+  uint_save,
+  uint_restore
+};
+
 ovm_var_t *ovm_uint_new(gc_t *gc_ctx, unsigned long val)
 {
   ovm_uint_t *n;
 
-  n = gc_alloc (gc_ctx, sizeof (ovm_uint_t), NULL);
+  n = gc_alloc (gc_ctx, sizeof (ovm_uint_t), &uint_class);
   n->gc.type = T_UINT;
   n->val = val;
   return OVM_VAR(n);
@@ -533,11 +594,72 @@ static ovm_var_t *uint_plus(gc_t *gc_ctx, ovm_var_t *var)
 ** used to store binary objects.
 */
 
+static int bstr_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  FILE *f = sctx->f;
+  ovm_bstr_t *str = (ovm_bstr_t *)p;
+  uint8_t *s;
+  size_t i, n;
+  int c, err;
+
+  err = save_size_t (sctx, BSTRLEN(str));
+  if (err) return err;
+  for (i=0, n=BSTRLEN(str), s=BSTR(str); i<n; i++)
+    {
+      c = s[i];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t bstr_class;
+
+static gc_header_t *bstr_restore (restore_ctx_t *rctx)
+{
+  FILE *f = rctx->f;
+  ovm_bstr_t *bstr;
+  uint8_t *s;
+  int err=0;
+  int c;
+  size_t i, sz;
+
+  /* We have already read the first byte, and it was T_BSTR. */
+  err = restore_size_t (rctx, &sz);
+  if (err) goto errlab;
+  bstr = gc_alloc (rctx->gc_ctx, offsetof(ovm_bstr_t,str[sz]), &bstr_class);
+  bstr->gc.type = T_BSTR;
+  bstr->len = sz;
+  for (i=0, s=bstr->str; i<sz; i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	{ err = c; goto errlab; }
+      s[i] = c;
+    }
+  goto normal;
+ errlab:
+  bstr = NULL;
+  errno = err;
+ normal:
+  return (gc_header_t *)bstr;
+}
+
+static gc_class_t bstr_class = {
+  GC_ID('b','s','t','r'),
+  NULL,
+  NULL,
+  NULL,
+  bstr_save,
+  bstr_restore
+};
+
+
 ovm_var_t *ovm_bstr_new (gc_t *gc_ctx, size_t size)
 {
   ovm_bstr_t *bstr;
 
-  bstr = gc_alloc (gc_ctx, offsetof(ovm_bstr_t,str[size]), NULL);
+  bstr = gc_alloc (gc_ctx, offsetof(ovm_bstr_t,str[size]), &bstr_class);
   bstr->gc.type = T_BSTR;
   bstr->len = size;
   return OVM_VAR(bstr);
@@ -597,11 +719,6 @@ static void vbstr_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
     GC_TOUCH (gc_ctx, str->delegate);
 }
 
-static void vbstr_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int vbstr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			   void *data)
 {
@@ -615,11 +732,81 @@ static int vbstr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int vbstr_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  FILE *f = sctx->f;
+  ovm_vbstr_t *str = (ovm_vbstr_t *)p;
+  uint8_t *s;
+  size_t i, n;
+  int c, err;
+
+  /*  err = putc (TYPE(p), f);
+      if (err) return err;
+      // TYPE(p) will already have been saved.
+      */
+  err = save_size_t (sctx, VBSTRLEN(str));
+  if (err) return err;
+  for (i=0, n=VBSTRLEN(str), s=VBSTR(str); i<n; i++)
+    {
+      c = s[i];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t vbstr_class;
+static gc_class_t bstr_class;
+
+static gc_header_t *vbstr_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  FILE *f = rctx->f;
+  ovm_vbstr_t *vbstr;
+  ovm_bstr_t *bstr;
+  uint8_t *s;
+  int err=0;
+  int c;
+  size_t i, sz;
+
+  GC_START (gc_ctx, 1);
+  vbstr = gc_alloc (gc_ctx, sizeof (ovm_vbstr_t), &vbstr_class);
+  vbstr->gc.type = T_VBSTR;
+  vbstr->delegate = NULL;
+  GC_UPDATE (gc_ctx, 0, vbstr);
+  /* We have already read the first byte, and it was T_VBSTR. */
+  err = restore_size_t (rctx, &sz);
+  if (err) goto errlab;
+  VBSTRLEN(vbstr) = sz+1;
+  bstr = gc_alloc (gc_ctx, offsetof(ovm_bstr_t,str[sz+1]), &bstr_class);
+  bstr->gc.type = T_BSTR;
+  bstr->len = sz;
+  for (i=0, s=bstr->str; i<sz; i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	{ err = c; goto errlab; }
+      s[i] = c;
+    }
+  s[sz] = '\0'; /* some functions (e.g., error reporting in rule_compiler.c)
+		   assume a final NUL character */
+  GC_TOUCH (gc_ctx, vbstr->delegate = (ovm_var_t *)bstr);
+  goto normal;
+ errlab:
+  vbstr = NULL;
+  errno = err;
+ normal:
+  GC_END (gc_ctx);
+  return (gc_header_t *)vbstr;
+}
+
 static gc_class_t vbstr_class = {
   GC_ID('v','b','s','t'),
   vbstr_mark_subfields,
-  vbstr_finalize,
-  vbstr_traverse
+  NULL,
+  vbstr_traverse,
+  vbstr_save,
+  vbstr_restore
 };
 
 ovm_var_t *ovm_vbstr_new(gc_t *gc_ctx, ovm_var_t *bstr)
@@ -680,11 +867,71 @@ void ovm_vbstr_fprintf(FILE *fp, ovm_vbstr_t *str)
 ** store text string
 */
 
+static int str_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  FILE *f = sctx->f;
+  ovm_str_t *str = (ovm_str_t *)p;
+  char *s;
+  size_t i, n;
+  int c, err;
+
+  err = save_size_t (sctx, STRLEN(str));
+  if (err) return err;
+  for (i=0, n=STRLEN(str), s=STR(str); i<n; i++)
+    {
+      c = s[i];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t str_class;
+
+static gc_header_t *str_restore (restore_ctx_t *rctx)
+{
+  FILE *f = rctx->f;
+  ovm_str_t *str;
+  char *s;
+  int err=0;
+  int c;
+  size_t i, sz;
+
+  /* We have already read the first byte, and it was T_STR. */
+  err = restore_size_t (rctx, &sz);
+  if (err) goto errlab;
+  str = gc_alloc (rctx->gc_ctx, offsetof(ovm_str_t,str[sz]), &str_class);
+  str->gc.type = T_STR;
+  str->len = sz;
+  for (i=0, s=str->str; i<sz; i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	{ err = c; goto errlab; }
+      s[i] = c;
+    }
+  goto normal;
+ errlab:
+  str = NULL;
+  errno = err;
+ normal:
+  return (gc_header_t *)str;
+}
+
+static gc_class_t str_class = {
+  GC_ID('s','t','r',' '),
+  NULL,
+  NULL,
+  NULL,
+  str_save,
+  str_restore
+};
+
 ovm_var_t *ovm_str_new(gc_t *gc_ctx, size_t size)
 {
   ovm_str_t *str;
 
-  str = gc_alloc (gc_ctx, offsetof(ovm_str_t,str[size]), NULL);
+  str = gc_alloc (gc_ctx, offsetof(ovm_str_t,str[size]), &str_class);
   str->gc.type = T_STR;
   str->len = size;
   return OVM_VAR(str);
@@ -792,11 +1039,6 @@ static void vstr_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
     GC_TOUCH (gc_ctx, str->delegate);
 }
 
-static void vstr_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int vstr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			  void *data)
 {
@@ -810,11 +1052,80 @@ static int vstr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int vstr_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  FILE *f = sctx->f;
+  ovm_vstr_t *str = (ovm_vstr_t *)p;
+  char *s;
+  size_t i, n;
+  int c, err;
+
+  /*  err = putc (TYPE(p), f);
+      if (err) return err;
+      // TYPE(p) will already have been saved.
+      */
+  err = save_size_t (sctx, VSTRLEN(str));
+  if (err) return err;
+  for (i=0, n=VSTRLEN(str), s=VSTR(str); i<n; i++)
+    {
+      c = s[i];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t vstr_class;
+
+static gc_header_t *vstr_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  FILE *f = rctx->f;
+  ovm_vstr_t *vstr;
+  ovm_str_t *str;
+  char *s;
+  int err=0;
+  int c;
+  size_t i, sz;
+
+  GC_START (gc_ctx, 1);
+  vstr = gc_alloc (gc_ctx, sizeof (ovm_vstr_t), &vstr_class);
+  vstr->gc.type = T_VSTR;
+  vstr->delegate = NULL;
+  GC_UPDATE (gc_ctx, 0, vstr);
+  /* We have already read the first byte, and it was T_VSTR. */
+  err = restore_size_t (rctx, &sz);
+  if (err) goto errlab;
+  VSTRLEN(vstr) = sz+1;
+  str = gc_alloc (gc_ctx, offsetof(ovm_str_t,str[sz+1]), &str_class);
+  str->gc.type = T_STR;
+  str->len = sz;
+  for (i=0, s=str->str; i<sz; i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	{ err = c; goto errlab; }
+      s[i] = c;
+    }
+  s[sz] = '\0'; /* some functions (e.g., error reporting in rule_compiler.c)
+		   assume a final NUL character */
+  GC_TOUCH (gc_ctx, vstr->delegate = (ovm_var_t *)str);
+  goto normal;
+ errlab:
+  vstr = NULL;
+  errno = err;
+ normal:
+  GC_END (gc_ctx);
+  return (gc_header_t *)vstr;
+}
+
 static gc_class_t vstr_class = {
   GC_ID('v','s','t', 'r'),
   vstr_mark_subfields,
-  vstr_finalize,
-  vstr_traverse
+  NULL,
+  vstr_traverse,
+  vstr_save,
+  vstr_restore
 };
 
 ovm_var_t *ovm_vstr_new(gc_t *gc_ctx, ovm_var_t *str)
@@ -939,11 +1250,41 @@ void ovm_vstr_fprintf(FILE *fp, ovm_vstr_t *vstr)
 ** store a time_t value
 */
 
+static int ctime_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  return save_ctime (sctx, CTIME(p));
+}
+
+static gc_class_t ctime_class;
+
+static gc_header_t *ctime_restore (restore_ctx_t *rctx)
+{
+  time_t tm;
+  ovm_ctime_t *p;
+  int err;
+
+  err = restore_ctime (rctx, &tm);
+  if (err) { errno = err; return NULL; }
+  p = gc_alloc (rctx->gc_ctx, sizeof (ovm_ctime_t), &ctime_class);
+  p->gc.type = T_CTIME;
+  p->time = tm;
+  return (gc_header_t *)p;
+}
+
+static gc_class_t ctime_class = {
+  GC_ID('t','i','m','e'),
+  NULL,
+  NULL,
+  NULL,
+  ctime_save,
+  ctime_restore
+};
+
 ovm_var_t *ovm_ctime_new(gc_t *gc_ctx, time_t tm)
 {
   ovm_ctime_t *time;
 
-  time = gc_alloc (gc_ctx, sizeof (ovm_ctime_t), NULL);
+  time = gc_alloc (gc_ctx, sizeof (ovm_ctime_t), &ctime_class);
   time->gc.type = T_CTIME;
   time->time = tm;
   return OVM_VAR(time);
@@ -1113,11 +1454,44 @@ void ovm_ctime_fprintf(FILE *fp, ovm_ctime_t *time)
 ** store a sockaddr_in structure
 */
 
+static int ipv4_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  ovm_ipv4_t *addr = (ovm_ipv4_t *)p;
+  in_addr_t a = IPV4(addr).s_addr;
+
+  return save_uint32 (sctx, (uint32_t)a);
+}
+
+static gc_class_t ipv4_class;
+
+static gc_header_t *ipv4_restore (restore_ctx_t *rctx)
+{
+  uint32_t a;
+  ovm_ipv4_t *addr;
+  int err;
+
+  err = restore_uint32 (rctx, &a);
+  if (err) { errno = err; return NULL; }
+  addr = gc_alloc (rctx->gc_ctx, sizeof (ovm_ipv4_t), &ipv4_class);
+  addr->gc.type = T_IPV4;
+  IPV4(addr).s_addr = (in_addr_t)a;
+  return (gc_header_t *)addr;
+}
+
+static gc_class_t ipv4_class = {
+  GC_ID('i','p','v','4'),
+  NULL,
+  NULL,
+  NULL,
+  ipv4_save,
+  ipv4_restore
+};
+
 ovm_var_t *ovm_ipv4_new(gc_t* gc_ctx)
 {
   ovm_ipv4_t *addr;
 
-  addr = gc_alloc (gc_ctx, sizeof (ovm_ipv4_t), NULL);
+  addr = gc_alloc (gc_ctx, sizeof (ovm_ipv4_t), &ipv4_class);
   addr->gc.type = T_IPV4;
   return OVM_VAR(addr);
 }
@@ -1265,11 +1639,62 @@ void ovm_ipv4_fprintf(FILE *fp, ovm_ipv4_t *addr)
 ** store a sockaddr_in6 structure
 */
 
+static int ipv6_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  ovm_ipv6_t *addr = (ovm_ipv6_t *)p;
+  FILE *f = sctx->f;
+  int i, c, err;
+
+  for (i = 0 ; i < 16 ; i++)
+    {
+      c = (char)IPV6(addr).s6_addr[i];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t ipv6_class;
+
+static gc_header_t *ipv6_restore (restore_ctx_t *rctx)
+{
+  FILE *f = rctx->f;
+  ovm_ipv6_t *addr;
+  int err=0;
+  int c;
+  int i;
+
+  addr = gc_alloc (rctx->gc_ctx, sizeof(ovm_ipv6_t), &ipv6_class);
+  addr->gc.type = T_IPV6;
+  for (i=0; i<16; i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	{ err = c; goto errlab; }
+      IPV6(addr).s6_addr[i] = (unsigned char)c;
+    }
+  goto normal;
+ errlab:
+  addr = NULL;
+  errno = err;
+ normal:
+  return (gc_header_t *)addr;
+}
+
+static gc_class_t ipv6_class = {
+  GC_ID('i','p','v','6'),
+  NULL,
+  NULL,
+  NULL,
+  ipv6_save,
+  ipv6_restore
+};
+
 ovm_var_t *ovm_ipv6_new(gc_t* gc_ctx)
 {
   ovm_ipv6_t *addr;
 
-  addr = gc_alloc (gc_ctx, sizeof (ovm_ipv6_t), NULL);
+  addr = gc_alloc (gc_ctx, sizeof (ovm_ipv6_t), &ipv6_class);
   addr->gc.type = T_IPV6;
   return OVM_VAR(addr);
 }
@@ -1407,11 +1832,50 @@ void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr)
 ** store a timeval struct
 */
 
+static int timeval_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  ovm_timeval_t *time = (ovm_timeval_t *)p;
+  int err;
+
+  err = save_long (sctx, time->time.tv_sec);
+  if (err) return err;
+  err = save_long (sctx, time->time.tv_usec);
+  return err;
+}
+
+static gc_class_t timeval_class;
+
+static gc_header_t *timeval_restore (restore_ctx_t *rctx)
+{
+  ovm_timeval_t *time;
+  long sec, usec;
+  int err;
+
+  err = restore_long (rctx, &sec);
+  if (err) { errno = err; return NULL; }
+  err = restore_long (rctx, &usec);
+  if (err) { errno = err; return NULL; }
+  time = gc_alloc (rctx->gc_ctx, sizeof (ovm_timeval_t), &timeval_class);
+  time->gc.type = T_TIMEVAL;
+  time->time.tv_sec = sec;
+  time->time.tv_usec = usec;
+  return (gc_header_t *)time;
+}
+
+static gc_class_t timeval_class = {
+  GC_ID('t','v','a','l'),
+  NULL,
+  NULL,
+  NULL,
+  timeval_save,
+  timeval_restore
+};
+
 ovm_var_t *ovm_timeval_new(gc_t *gc_ctx)
 {
   ovm_timeval_t *time;
 
-  time = gc_alloc (gc_ctx, sizeof (ovm_timeval_t), NULL);
+  time = gc_alloc (gc_ctx, sizeof (ovm_timeval_t), &timeval_class);
   time->gc.type = T_TIMEVAL;
   time->time.tv_sec = 0;
   time->time.tv_usec = 0;
@@ -1628,31 +2092,60 @@ void ovm_timeval_fprintf(FILE *fp, ovm_timeval_t *time)
 ** Regex
 */
 
-static void regex_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static void regex_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
   ovm_regex_t *regex = (ovm_regex_t *)p;
 
-  regfree(&(REGEX(regex)));
-  if (regex->regex_str!=NULL)
-    gc_base_free(regex->regex_str);
+  if (REGEX(regex).re_magic!=0)
+    regfree(&(REGEX(regex)));
+  if (REGEXSTR(regex)!=NULL)
+    gc_base_free(REGEXSTR(regex));
 }
 
-static int regex_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-			   void *data)
+static int regex_save (save_ctx_t *sctx, gc_header_t *p)
 {
-  return 0;
+  ovm_regex_t *regex = (ovm_regex_t *)p;
+
+  return save_string (sctx, REGEXSTR(regex));
+}
+
+static gc_class_t regex_class;
+
+static gc_header_t *regex_restore (restore_ctx_t *rctx)
+{
+  ovm_regex_t *regex;
+  char *str;
+  int err;
+
+  /* We have already read the first byte, and it was T_REGEX. */
+  err = restore_string (rctx, &str);
+  if (err) goto errlab;
+  regex = gc_alloc (rctx->gc_ctx, sizeof(ovm_regex_t), &regex_class);
+  regex->gc.type = T_REGEX;
+  regex->regex_str = str;
+  regex->regex.re_magic = 0;
+  regex->splits = 0;
+  if (str!=NULL)
+    {
+      err = regcomp(&REGEX(regex), str, REG_EXTENDED);
+      if (err) goto errlab;
+      REGEXNUM(regex) = REGEX(regex).re_nsub;
+    }
+  goto normal;
+ errlab:
+  regex = NULL;
+  errno = err;
+ normal:
+  return (gc_header_t *)regex;
 }
 
 static gc_class_t regex_class = {
   GC_ID('r','e','g','x'),
-  regex_mark_subfields,
+  NULL,
   regex_finalize,
-  regex_traverse
+  NULL,
+  regex_save,
+  regex_restore
 };
 
 ovm_var_t *ovm_regex_new(gc_t *gc_ctx)
@@ -1662,6 +2155,7 @@ ovm_var_t *ovm_regex_new(gc_t *gc_ctx)
   regex = gc_alloc (gc_ctx, sizeof (ovm_regex_t), &regex_class);
   regex->gc.type = T_REGEX;
   regex->regex_str = NULL;
+  regex->regex.re_magic = 0;
   regex->splits = 0;
   return OVM_VAR(regex);
 }
@@ -1694,11 +2188,41 @@ void ovm_regex_fprintf(FILE *fp, ovm_regex_t *regex)
 ** store a 'float' value.
 */
 
+static int float_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  return save_double (sctx, FLOAT(p));
+}
+
+static gc_class_t float_class;
+
+static gc_header_t *float_restore (restore_ctx_t *rctx)
+{
+  double x;
+  ovm_float_t *p;
+  int err;
+
+  err = restore_double (rctx, &x);
+  if (err) { errno = err; return NULL; }
+  p = gc_alloc (rctx->gc_ctx, sizeof (ovm_float_t), &float_class);
+  p->gc.type = T_FLOAT;
+  p->val = x;
+  return (gc_header_t *)p;
+}
+
+static gc_class_t float_class = {
+  GC_ID('f','l','t',' '),
+  NULL,
+  NULL,
+  NULL,
+  float_save,
+  float_restore
+};
+
 ovm_var_t *ovm_float_new(gc_t *gc_ctx, double val)
 {
   ovm_float_t *n;
 
-  n = gc_alloc (gc_ctx, sizeof (ovm_float_t), NULL);
+  n = gc_alloc (gc_ctx, sizeof (ovm_float_t), &float_class);
   n->gc.type = T_FLOAT;
   n->val = val;
   return OVM_VAR(n);
@@ -1801,11 +2325,58 @@ static ovm_var_t *float_clone(gc_t *gc_ctx, ovm_var_t *var)
 ** snmp oid
 */
 
+static int snmpoid_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  ovm_snmpoid_t *oid = (ovm_snmpoid_t *)p;
+  int err;
+  size_t i, n;
+
+  n = SNMPOIDLEN(oid);
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = save_ulong (sctx, SNMPOID(oid)[i]);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static gc_class_t snmpoid_class;
+
+static gc_header_t *snmpoid_restore (restore_ctx_t *rctx)
+{
+  ovm_snmpoid_t *oid;
+  int err;
+  size_t i, n;
+
+  err = restore_size_t (rctx, &n);
+  if (err) { errno = err; return NULL; }
+  oid = gc_alloc (rctx->gc_ctx, offsetof(ovm_snmpoid_t,objoid[n]), &snmpoid_class);
+  oid->gc.type = T_SNMPOID;
+  oid->len = n;
+  for (i=0; i<n; i++)
+    {
+      err = restore_size_t (rctx, &oid->objoid[i]);
+      if (err) { errno = err; return NULL; }
+    }
+  return (gc_header_t *)oid;
+}
+
+static gc_class_t snmpoid_class = {
+  GC_ID('s','n','m','p'),
+  NULL,
+  NULL,
+  NULL,
+  snmpoid_save,
+  snmpoid_restore
+};
+
 ovm_var_t *ovm_snmpoid_new(gc_t *gc_ctx, size_t len)
 {
   ovm_snmpoid_t *o;
 
-  o = gc_alloc (gc_ctx, offsetof(ovm_snmpoid_t,objoid[len]), NULL);
+  o = gc_alloc (gc_ctx, offsetof(ovm_snmpoid_t,objoid[len]), &snmpoid_class);
   o->gc.type = T_SNMPOID;
   o->len = len;
   return OVM_VAR(o);
@@ -1879,41 +2450,71 @@ static ovm_var_t *db_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
 ** store an 'void *' pointer.
 */
 
-static void extern_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static void extern_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
   (*EXTFREE(p)) (EXTPTR(p));
 }
 
-static int extern_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
-			   void *data)
+static int extern_save (save_ctx_t *sctx, gc_header_t *p)
 {
-  return 0;
+  ovm_extern_t *a = (ovm_extern_t *)p;
+  char *desc;
+  int err;
+
+  desc = EXTDESC(a);
+  err = save_string (sctx, desc);
+  if (err) return err;
+  return (*EXTSAVE(a)) (sctx, EXTPTR(a));
+}
+
+static gc_class_t extern_class;
+
+static gc_header_t *extern_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  int err;
+  ovm_extern_t *a;
+  char *desc;
+  struct ovm_extern_class_s *class;
+  void *ptr;
+
+  a = NULL;
+  err = restore_string (rctx, &desc);
+  if (err) { errno = err; goto end; }
+  if (desc==NULL) { errno = -2; goto end; }
+  class = strhash_get (rctx->externs, desc);
+  if (class==NULL)
+    { errno = -2; goto end; }
+  ptr = (*class->restore) (rctx);
+  if (ptr==NULL && errno!=0)
+    goto end;
+  a = gc_alloc (gc_ctx, sizeof (ovm_extern_t), &extern_class);
+  a->gc.type = T_EXTERNAL;
+  a->ptr = ptr;
+  a->class = class;
+ end:
+  if (desc!=NULL)
+    gc_base_free (desc);
+  return (gc_header_t *)a;
 }
 
 static gc_class_t extern_class = {
   GC_ID('x','t','r','n'),
-  extern_mark_subfields,
+  NULL,
   extern_finalize,
-  extern_traverse
+  NULL,
+  extern_save,
+  extern_restore
 };
 
-ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, char *desc,
-			  void *(*copy) (gc_t *gc_ctx, void *ptr),
-			  void (*free) (void *ptr))
+ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, ovm_extern_class_t *xclass)
 {
   ovm_extern_t *addr;
 
   addr = gc_alloc (gc_ctx, sizeof (ovm_extern_t), &extern_class);
   addr->gc.type = T_EXTERNAL;
   addr->ptr = ptr;
-  addr->desc = desc;
-  addr->copy = copy;
-  addr->free = free;
+  addr->class = xclass;
   return OVM_VAR(addr);
 }
 
@@ -1934,9 +2535,13 @@ static ovm_var_t *extern_clone (gc_t *gc_ctx, ovm_var_t *var)
   if (var==NULL || var->gc.type!=T_EXTERNAL)
     return NULL;
   ptr = (*EXTCOPY(var)) (gc_ctx, EXTPTR(var));
-  return ovm_extern_new (gc_ctx, ptr, EXTDESC(var), EXTCOPY(var), EXTFREE(var));
+  return ovm_extern_new (gc_ctx, ptr, EXTCLASS(var));
 }
 
+void register_extern_class (orchids_t *ctx, ovm_extern_class_t *xclass)
+{
+  strhash_add(ctx->gc_ctx, ctx->xclasses, xclass, xclass->desc);
+}
 
 /* type specific actions */
 
@@ -3966,11 +4571,6 @@ static void env_bind_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, bind->val);
 }
 
-static void env_bind_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int env_bind_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			      void *data)
 {
@@ -3981,11 +4581,53 @@ static int env_bind_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int env_bind_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  env_bind_t *bind = (env_bind_t *)p;
+  int err;
+
+  err = save_int32 (sctx, bind->var);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)bind->val);
+  return err;
+}
+
+static gc_class_t env_bind_class;
+
+static gc_header_t *env_bind_restore (restore_ctx_t *rctx)
+{
+  int err;
+  int32_t var;
+  ovm_var_t *val;
+  env_bind_t *bind;
+
+  GC_START(rctx->gc_ctx, 1);
+  err = restore_int32 (rctx, &var);
+  if (err) goto errlab;
+  val = (ovm_var_t *)restore_gc_struct (rctx);
+  if (val==NULL && errno!=0)
+    goto errlab;
+  GC_UPDATE(rctx->gc_ctx, 0, val);
+  bind = gc_alloc (rctx->gc_ctx, sizeof(env_bind_t), &env_bind_class);
+  bind->gc.type = T_BIND;
+  bind->var = var;
+  GC_TOUCH (rctx->gc_ctx, bind->val = val);
+  goto normal;
+ errlab:
+  errno = err;
+  bind = NULL;
+ normal:
+  GC_END(rctx->gc_ctx);
+  return (gc_header_t *)bind;
+}
+
 static gc_class_t env_bind_class = {
   GC_ID('b','i','n','d'),
   env_bind_mark_subfields,
-  env_bind_finalize,
-  env_bind_traverse
+  NULL,
+  env_bind_traverse,
+  env_bind_save,
+  env_bind_restore
 };
 
 static void env_split_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -3994,11 +4636,6 @@ static void env_split_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, split->left);
   GC_TOUCH (gc_ctx, split->right);
-}
-
-static void env_split_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int env_split_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -4014,11 +4651,53 @@ static int env_split_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int env_split_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  env_split_t *split = (env_split_t *)p;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)split->left);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)split->right);
+  return err;
+}
+
+static gc_class_t env_split_class;
+
+static gc_header_t *env_split_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  ovm_var_t *left, *right;
+  env_split_t *split;
+
+  GC_START (gc_ctx, 2);
+  left = (ovm_var_t *)restore_gc_struct (rctx);
+  if (left==NULL && errno!=0)
+    goto errlab;
+  GC_UPDATE (gc_ctx, 0, left);
+  right = (ovm_var_t *)restore_gc_struct (rctx);
+  if (right==NULL && errno!=0)
+    goto errlab;
+  GC_UPDATE (gc_ctx, 1, right);
+  split = gc_alloc (gc_ctx, sizeof(env_split_t), &env_split_class);
+  split->gc.type = T_SPLIT;
+  GC_TOUCH (gc_ctx, split->left = left);
+  GC_TOUCH (gc_ctx, split->right = right);
+  goto normal;
+ errlab:
+  split = NULL;
+ normal:
+  GC_END (gc_ctx);
+  return (gc_header_t *)split;
+}
+
 static gc_class_t env_split_class = {
   GC_ID('s','p','l','t'),
   env_split_mark_subfields,
-  env_split_finalize,
-  env_split_traverse
+  NULL,
+  env_split_traverse,
+  env_split_save,
+  env_split_restore
 };
 
 ovm_var_t *ovm_read_value (ovm_var_t *env, unsigned long var)
@@ -4533,12 +5212,164 @@ void set_ip_resolution(int value)
   resolve_ipv6_g = resolve_ipv4_g = value ? TRUE : FALSE;
 }
 
+/*********
+	  Saving and restoring
+ *********/
+
+/* In db.c: */
+extern gc_class_t empty_db_class;
+extern gc_class_t db_small_table_class;
+extern gc_class_t db_tuples_class;
+extern gc_class_t db_branch_class;
+/* In engine.c: */
+extern gc_class_t thread_group_class;
+extern gc_class_t state_instance_class;
+extern gc_class_t thread_queue_elt_class;
+extern gc_class_t thread_queue_class;
+/* In orchids_api.c: */
+extern gc_class_t field_record_table_class;
+extern gc_class_t event_class;
+extern gc_class_t field_table_class;
+/* In rule_compiler.c: */
+extern gc_class_t node_state_class;
+extern gc_class_t varset_class;
+extern gc_class_t node_trans_class;
+extern gc_class_t node_rule_class;
+extern gc_class_t node_expr_term_class;
+extern gc_class_t node_expr_var_class;
+extern gc_class_t node_expr_field_class;
+extern gc_class_t node_expr_bin_class;
+extern gc_class_t node_expr_mon_class;
+extern gc_class_t node_expr_call_class;
+extern gc_class_t node_expr_ifstmt_class;
+extern gc_class_t node_expr_regsplit_class;
+extern gc_class_t type_heap_class;
+
+static gc_header_t *nothing_restore (restore_ctx_t *rctx)
+{
+  return NULL;
+}
+
+static gc_class_t nothing_class = {
+  GC_ID(' ',' ',' ',' '),
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  nothing_restore
+};
+
+static gc_class_t *gc_classes[256] = {
+  /* 00 */ NULL, NULL, &int_class, &bstr_class,
+  /* 04 */ &vbstr_class, &str_class, &vstr_class, NULL,
+  /* 08 */ NULL, &ctime_class, &ipv4_class, &ipv6_class,
+  /* 0c */ &timeval_class, &regex_class, &uint_class, &snmpoid_class,
+  /* 10 */ &float_class, &event_class, &state_instance_class, &empty_db_class, 
+  /* 14 */ &db_branch_class, &db_tuples_class, &extern_class, NULL,
+  /* 18 */ NULL, NULL, NULL, NULL,
+  /* 1c */ NULL, NULL, NULL, NULL,
+  /* 20 */ NULL, NULL, NULL, NULL,
+  /* 24 */ NULL, NULL, NULL, NULL,
+  /* 28 */ NULL, NULL, NULL, NULL,
+  /* 2c */ NULL, NULL, NULL, NULL,
+  /* 30 */ NULL, NULL, NULL, NULL,
+  /* 34 */ NULL, NULL, NULL, NULL,
+  /* 38 */ NULL, NULL, NULL, NULL,
+  /* 3c */ NULL, NULL, NULL, NULL,
+  /* 40 */ NULL, NULL, NULL, NULL,
+  /* 44 */ NULL, NULL, NULL, NULL,
+  /* 48 */ NULL, NULL, NULL, NULL,
+  /* 4c */ NULL, NULL, NULL, NULL,
+  /* 50 */ NULL, NULL, NULL, NULL,
+  /* 54 */ NULL, NULL, NULL, NULL,
+  /* 58 */ NULL, NULL, NULL, NULL,
+  /* 5c */ NULL, NULL, NULL, NULL,
+  /* 60 */ NULL, NULL, NULL, NULL,
+  /* 64 */ NULL, NULL, NULL, NULL,
+  /* 68 */ NULL, NULL, NULL, NULL,
+  /* 6c */ NULL, NULL, NULL, NULL,
+  /* 70 */ NULL, NULL, NULL, NULL,
+  /* 74 */ NULL, NULL, NULL, NULL,
+  /* 78 */ NULL, NULL, NULL, NULL,
+  /* 7c */ NULL, NULL, NULL, NULL,
+  /* 80 */ &nothing_class, NULL, NULL, NULL,
+  /* 84 */ NULL, NULL, NULL, NULL,
+  /* 88 */ NULL, NULL, NULL, NULL,
+  /* 8c */ NULL, NULL, NULL, NULL,
+  /* 90 */ NULL, NULL, NULL, NULL,
+  /* 94 */ NULL, NULL, NULL, NULL,
+  /* 98 */ NULL, NULL, NULL, NULL,
+  /* 9c */ NULL, NULL, NULL, NULL,
+  /* a0 */ NULL, NULL, NULL, NULL,
+  /* a4 */ NULL, NULL, NULL, NULL,
+  /* a8 */ NULL, NULL, NULL, NULL,
+  /* ac */ NULL, NULL, NULL, NULL,
+  /* b0 */ NULL, NULL, NULL, NULL,
+  /* b4 */ NULL, NULL, NULL, NULL,
+  /* b8 */ NULL, NULL, NULL, NULL,
+  /* bc */ NULL, NULL, NULL, NULL,
+  /* c0 */ NULL, NULL, NULL, NULL,
+  /* c4 */ NULL, NULL, NULL, NULL,
+  /* c8 */ NULL, NULL, NULL, NULL,
+  /* cc */ NULL, NULL, NULL, NULL,
+  /* d0 */ NULL, NULL, NULL, NULL,
+  /* d4 */ NULL, NULL, NULL, NULL,
+  /* d8 */ NULL, NULL, NULL, NULL,
+  /* dc */ NULL, NULL, NULL, NULL,
+  /* e0 */ &node_expr_term_class, &node_expr_var_class, &node_expr_field_class, &node_expr_call_class,
+  /* e4 */ NULL, NULL, NULL, NULL,
+  /* e8 */ NULL, NULL, NULL, NULL,
+  /* ec */ NULL, &node_expr_mon_class, &node_expr_bin_class, &node_expr_regsplit_class,
+  /* f0 */ &type_heap_class, &node_rule_class, &node_trans_class, &node_expr_ifstmt_class,
+  /* f4 */ &node_state_class, &varset_class, NULL, &field_table_class,
+  /* f8 */ &field_record_table_class, &thread_group_class, &thread_queue_elt_class, &thread_queue_class,
+  /* fc */ &db_small_table_class, NULL, &env_split_class, &env_bind_class
+};
+
+/*!!! deal with sharing */
+
+int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
+{
+  int c, err;
+  gc_class_t *gccl;
+
+  if (p==NULL)
+    err = putc (T_NOTHING, sctx->f);
+  else
+    {
+      c = TYPE(p);
+      err = putc (c, sctx->f);
+      if (err) goto end;
+      gccl = gc_classes[c];
+      if (gccl==NULL) { err = -2; goto end; }
+      err = (*gccl->save) (sctx, p);
+    }
+ end:
+  return err;
+}
+
+/* Before calling restore_gc_struct(), set errno=0,
+   get back ctx->xclasses and put it into rctx.
+*/
+gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
+{
+  int c;
+  gc_class_t *gccl;
+
+  c = getc (rctx->f);
+  if (c==EOF) { errno = c; return NULL; }
+  if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL) { errno = -2; return NULL; }
+  return (*gccl->restore) (rctx);
+}
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

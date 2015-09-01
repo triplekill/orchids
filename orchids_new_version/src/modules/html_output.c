@@ -799,7 +799,7 @@ static int generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 	      "<td class=\"v%i\"> <a href=\"rules/%s.html\"> %s </a> </td> "
 	      "<td class=\"v%i\"> %zu </td> "
 	      "<td class=\"v%i\"> %zu </td> "
-	      "<td class=\"v%i\"> %i </td> "
+	      "<td class=\"v%i\"> %zu </td> "
 	      "<td class=\"v%i\"> %i </td> "
 	      "<td class=\"v%i\"> %zu </td> "
 	      "<td class=\"v%i\"> %s:%i </td> "
@@ -840,6 +840,7 @@ static void fprintf_file(FILE *fp, const char *filename)
 static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
+  size_t j;
   int i;
   int p;
   int e;
@@ -915,7 +916,7 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 	fprintf(fp,
 		"  <tr> "
 		"<td class=\"e0\"> Static env size </td> "
-		"<td class=\"v0\"> %i </td> "
+		"<td class=\"v0\"> %zu </td> "
 		"</tr>\n",
 		r->static_env_sz);
 	fprintf(fp,
@@ -1017,15 +1018,15 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 		"  <tr class=\"hh\"> "
 		"<th> ID </th> <th> Type </th> <th> Value </th> "
 		"</tr>\n\n");
-	for (e = 0 ; e < r->static_env_sz; e++)
+	for (j = 0 ; j < r->static_env_sz; j++)
 	  {
-	    p = e % 2;
+	    p = j % 2;
 	    fprintf(fp,
-		    "<tr> <td class=\"e%i\"> %i </td> <td class=\"v%i\"> %s </td>",
-		    p, e,
-		    p, str_issdltype(TYPE(r->static_env[e])));
+		    "<tr> <td class=\"e%i\"> %zu </td> <td class=\"v%i\"> %s </td>",
+		    p, j,
+		    p, str_issdltype(TYPE(r->static_env[j])));
 	    fprintf(fp, "<td class=\"v%i\"> ", p);
-	    fprintf_ovm_var(fp, r->static_env[e]);
+	    fprintf_ovm_var(fp, r->static_env[j]);
 	    fprintf(fp, "</td> </tr>\n");
 	  }
 	fprintf(fp, "</table><br/><br/>\n");

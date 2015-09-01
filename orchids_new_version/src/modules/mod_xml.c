@@ -26,7 +26,9 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 #include <libxml/xmlschemas.h>
+#include <libxml/hash.h>
 #include <time.h>
+#include <errno.h>
 
 #include "orchids.h"
 #include "lang.h"
@@ -69,6 +71,116 @@ static void xml_free (void *obj)
     }
 }
 
+static void xml_hash_count_scanner (void *payload, void *data, xmlChar *name)
+{
+  size_t *np = data;
+
+  ++*np;
+}
+
+static void xml_hash_save_scanner (void *payload, void *data, xmlChar *name)
+{
+  save_ctx_t *sctx = data;
+  int err;
+
+  err = save_string (sctx, (char *)name);
+  if (err) { errno = err; return; }
+  err = save_string (sctx, (char *)payload);
+  if (err) { errno = err; return; }
+}
+
+static int xml_save (save_ctx_t *sctx, void *ptr)
+{
+  xmlXPathContextPtr xpath_ctx = ptr;
+  xmlDocPtr doc;
+  size_t n;
+  int err;
+
+  if (xpath_ctx==NULL)
+    return -2; /* !!! should we need to save empty xml docs as well? */
+  doc = xpath_ctx->doc;
+  if (doc==NULL)
+    return -2;
+  err = save_string (sctx, doc->name);
+  if (err) return err;
+  err = xmlDocDump (sctx->f, doc);
+  if (err) return err;
+  xmlHashScan (xpath_ctx->nsHash, xml_hash_count_scanner, &n);
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  errno = 0;
+  xmlHashScan (xpath_ctx->nsHash, xml_hash_save_scanner, sctx);
+  return errno;
+}
+
+static int xml_restore_input_callback (void *context, char *buffer, int len)
+{
+  int i, c;
+  FILE *f = context;
+
+  for (i=0; i<len; i++)
+    {
+      c = getc (f);
+      if (c==EOF) return c;
+      buffer[i] = (char)c;
+    }
+  return 0;
+}
+
+static int xml_restore_close_callback (void *context)
+{
+  return 0;
+}
+
+static void *xml_restore (restore_ctx_t *rctx)
+{
+  xmlDocPtr doc;
+  xmlXPathContextPtr xpath_ctx;
+  size_t i, ns_n;
+  char *name, *url, *baseurl;
+  int err;
+
+  err = restore_string (rctx, &baseurl);
+  if (err) { errno = err; return NULL; }
+  doc = xmlReadIO (xml_restore_input_callback,
+		   xml_restore_close_callback,
+		   rctx->f,
+		   baseurl, /* not too sure about this (see xml_save()) */
+		   NULL, XML_PARSE_NOWARNING);
+  gc_base_free (baseurl);
+  if (doc==NULL)
+    { errno = -1; return NULL; }
+  xpath_ctx = xmlXPathNewContext(doc);
+  if (xpath_ctx==NULL)
+    {
+      xmlFreeDoc(doc);
+      errno = -1; return NULL;
+    }
+  err = restore_size_t (rctx, &ns_n); /* get number of registered namespaces */
+  if (err) { err_freexpath:
+    errno = err; xmlXPathFreeContext (xpath_ctx); xmlFreeDoc (doc); return NULL; }
+  for (i=0; i<ns_n; i++)
+    {
+      err = restore_string (rctx, &name);
+      if (err) goto err_freexpath;
+      if (name==NULL) { err = -2; goto err_freexpath; }
+      err = restore_string (rctx, &url);
+      if (err) { gc_base_free (name); goto err_freexpath; }
+      if (url==NULL) { err = -2; goto err_freexpath; }
+      xmlXPathRegisterNs (xpath_ctx, BAD_CAST(name), BAD_CAST(url));
+      gc_base_free (name);
+    }
+  return xpath_ctx;
+}
+
+static ovm_extern_class_t xml_xclass = {
+  "xmldoc",
+  xml_copy,
+  xml_free,
+  xml_save,
+  xml_restore
+};
+
 uint16_t ovm_xml_new(gc_t *gc_ctx, state_instance_t *si,
 		     xmlXPathContextPtr xpath_ctx,
 		     char *description)
@@ -77,7 +189,7 @@ uint16_t ovm_xml_new(gc_t *gc_ctx, state_instance_t *si,
   ovm_var_t *xmldoc;
 
   GC_START(gc_ctx, 1);
-  xmldoc = ovm_extern_new (gc_ctx, xpath_ctx, description, xml_copy, xml_free);
+  xmldoc = ovm_extern_new (gc_ctx, xpath_ctx, &xml_xclass);
   GC_UPDATE(gc_ctx, 0, xmldoc);
   handle = create_fresh_handle (gc_ctx, si, xmldoc);
   GC_END(gc_ctx);
@@ -492,6 +604,7 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_INFO, "load() mod_xml@%p\n", (void *) &mod_xml);
 
+  register_extern_class (ctx, &xml_xclass);
 #if 0
   register_lang_function(ctx,
                          issdl_dump_xml,

@@ -36,7 +36,7 @@ struct objhash_s
 {
   objhash_elmt_t **htable;
   size_t size;
-  int elmts;
+  size_t elmts;
   objhashfunc_t hash;
   objhashcmp_t cmp;
 };

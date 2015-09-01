@@ -40,7 +40,7 @@ struct hash_s
 {
   hash_elmt_t **htable;
   size_t size;
-  int elmts;
+  size_t elmts;
   hashfunc_t hash;
 };
 

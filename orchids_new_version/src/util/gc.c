@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
+#include <time.h>
 #include "gc.h"
 
 #include "safelib.h"
@@ -84,7 +85,7 @@ void gc_touch (gc_t *gc_ctx, gc_header_t *p)
     return;
   if (GC_GREY_OR_BLACK_NEWp(gc_ctx,p))
     return;
-  if (p->class!=NULL)
+  if (p->class->mark_subfields!=NULL)
     {
       p->flags |= GC_FLAGS_GREY; /* set grey flag, */
       p->nextgrey = gc_ctx->grey; /* and insert into grey list */
@@ -150,10 +151,11 @@ int gc_mark (gc_t *gc_ctx)
 	      gc_ctx->grey = p->nextgrey;
 	      GC_SET_BLACK_NEW(gc_ctx,p);
 	      p->flags &= ~GC_FLAGS_GREY_MASK;
-	      if (p->class!=NULL) /* This test is in principle useless:
-				     only objects p with non-null class
-				     can ever be put into the grey list,
-				     if you obey the API. */
+	      if (p->class->mark_subfields!=NULL)
+		/* This test is in principle useless:
+		   only objects p with non-null class
+		   can ever be put into the grey list,
+		   if you obey the API. */
 		(*p->class->mark_subfields) (gc_ctx, p);
 	      nmarked++;
 	    }
@@ -194,7 +196,7 @@ int gc_sweep (gc_t *gc_ctx)
 	   old generation): free the object */
 	{
 	  *pp = p->next;
-	  if (p->class!=NULL)
+	  if (p->class->finalize!=NULL)
 	    (*p->class->finalize) (gc_ctx, p);
 	  p->magic[0] = MAGIC_FREE0;
 	  p->magic[1] = MAGIC_FREE1;
@@ -397,7 +399,7 @@ static int gc_check_grey (gc_traverse_ctx_t *gtc, gc_header_t *p,
       fprintf (stderr, "gc_check: black object pointing to white, directly.\n");
       abort (); /* so as to fall into debugger */
     }
-  if (p->class==NULL) /* no subfield: stop */
+  if (p->class->traverse==NULL) /* no subfield: stop */
     return 0;
   if (p->flags & GC_FLAGS_CHECKED) /* already marked p's subfields */
     return 0;
@@ -503,8 +505,358 @@ void gc_check (gc_t *gc_ctx)
     }
 }
 
+int save_size_t (save_ctx_t *sctx, size_t sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(size_t); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_size_t (restore_ctx_t *rctx, size_t *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  size_t sz;
+
+  for (i=0, sz=0; i<sizeof(size_t); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_int (save_ctx_t *sctx, int sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(int); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_int (restore_ctx_t *rctx, int *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  int sz;
+
+  for (i=0, sz=0; i<sizeof(int); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_uint (save_ctx_t *sctx, unsigned int sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(unsigned int); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_uint (restore_ctx_t *rctx, unsigned int *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  unsigned int sz;
+
+  for (i=0, sz=0; i<sizeof(unsigned int); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_int32 (save_ctx_t *sctx, int32_t sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(int32_t); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  int32_t sz;
+
+  for (i=0, sz=0; i<sizeof(int32_t); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_uint32 (save_ctx_t *sctx, uint32_t sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(uint32_t); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_uint32 (restore_ctx_t *rctx, uint32_t *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  uint32_t sz;
+
+  for (i=0, sz=0; i<sizeof(int32_t); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_long (save_ctx_t *sctx, long sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(long); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_long (restore_ctx_t *rctx, long *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  long sz;
+
+  for (i=0, sz=0; i<sizeof(long); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_ulong (save_ctx_t *sctx, unsigned long sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(unsigned long); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_ulong (restore_ctx_t *rctx, unsigned long *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  unsigned long sz;
+
+  for (i=0, sz=0; i<sizeof(unsigned long); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_ctime (save_ctx_t *sctx, time_t sz)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(time_t); i++)
+    {
+      c = sz & 0xff;
+      err = putc (c, f);
+      if (err)
+	return err;
+      sz >>= 8;
+    }
+  return 0;
+}
+
+int restore_ctime (restore_ctx_t *rctx, time_t *szp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+  time_t sz;
+
+  for (i=0, sz=0; i<sizeof(time_t); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      sz <<= 8;
+      sz |= c;
+    }
+  *szp = sz;
+  return 0;
+}
+
+int save_double (save_ctx_t *sctx, double x)
+{
+  int i, c, err;
+  FILE *f = sctx->f;
+
+  for (i=0; i<sizeof(double); i++)
+    {
+      c = ((char *)&x)[i];
+      err = putc (c, f);
+      if (err)
+	return err;
+    }
+  return 0;
+}
+
+int restore_double (restore_ctx_t *rctx, double *xp)
+{
+  FILE *f = rctx->f;
+  int i, c;
+
+  *xp = 0.0;
+  for (i=0; i<sizeof(double); i++)
+    {
+      c = getc (f);
+      if (c==EOF)
+	return c;
+      ((char *)xp)[i] = c;
+    }
+  return 0;
+}
+
+int save_string (save_ctx_t *sctx, char *s)
+{
+  FILE *f = sctx->f;
+  int c, err;
+  size_t j, m;
+
+  if (s==NULL)
+    return save_size_t (sctx, (size_t)-1L);
+  m = strlen (s);
+  err = save_size_t (sctx, m);
+  if (err) return err;
+  for (j=0; j<m; j++)
+    {
+      c = s[j];
+      err = putc (c, f);
+      if (err) return err;
+    }
+  return 0;
+}
+
+int restore_string (restore_ctx_t *rctx, char **sp)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  FILE *f = rctx->f;
+  size_t j, m;
+  char *s;
+  int c, err;
+
+  *sp = NULL;
+  err = restore_size_t (rctx, &m);
+  if (err) return err;
+  if (m==(size_t)-1L)
+    return 0;
+  s = gc_base_malloc (gc_ctx, m+1);
+  for (j=0; j<m; j++)
+    {
+      c = getc (f);
+      if (c==EOF) return c;
+      s[j] = c;
+    }
+  s[m] = '\0';
+  *sp = s;
+  return 0;
+}
+
+
+
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

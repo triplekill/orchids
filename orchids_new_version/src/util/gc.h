@@ -33,6 +33,23 @@ struct gc_traverse_ctx_s {
 #define TRAVERSE_MARSHALL 2 /* reserved */
 };
 
+typedef struct save_ctx_s save_ctx_t;
+struct save_ctx_s {
+  gc_t *gc_ctx;
+  FILE *f;
+};
+
+struct strhash_s; /* in strhash.h */
+
+typedef struct restore_ctx_s restore_ctx_t;
+typedef int (*readc_f) (void *data);
+struct restore_ctx_s {
+  gc_t *gc_ctx;
+  FILE *f;
+  struct strhash_s *externs; /* from orchids_context_t->xclasses */
+  struct strhash_s *functions_hash; /* from rule_compiler_t->functions_hash */
+};
+
 typedef struct gc_class_s gc_class_t;
 struct gc_class_s
 {
@@ -54,6 +71,11 @@ struct gc_class_s
   int (*traverse) (gc_traverse_ctx_t *gc_traverse_ctx,
 		   gc_header_t *p,
 		   void *data);
+  /* Save structure (to file, typically): */
+  int (*save) (save_ctx_t *sctx, gc_header_t *p);
+  /* Restore a structure (from file, typically);
+     if error, then returns NULL and sets errno: */
+  gc_header_t *(*restore) (restore_ctx_t *rctx);
 };
 
 struct gc_header_s
@@ -228,10 +250,32 @@ void gc_check (gc_t *gc_ctx); /* Looks for inconsistencies in memory.
 				 Works similarly to fsck on Unix
 				 systems.  Used to detect memory
 				 and garbage-collector related bugs. */
+
+int save_size_t (save_ctx_t *sctx, size_t sz);
+int restore_size_t (restore_ctx_t *rctx, size_t *szp);
+int save_int (save_ctx_t *sctx, int sz);
+int restore_int (restore_ctx_t *rctx, int *szp);
+int save_uint (save_ctx_t *sctx, unsigned int sz);
+int restore_uint (restore_ctx_t *rctx, unsigned int *szp);
+int save_int32 (save_ctx_t *sctx, int32_t sz);
+int restore_int32 (restore_ctx_t *rctx, int32_t *szp);
+int save_uint32 (save_ctx_t *sctx, uint32_t sz);
+int restore_uint32 (restore_ctx_t *rctx, uint32_t *szp);
+int save_long (save_ctx_t *sctx, long sz);
+int restore_long (restore_ctx_t *rctx, long *szp);
+int save_ulong (save_ctx_t *sctx, unsigned long sz);
+int restore_ulong (restore_ctx_t *rctx, unsigned long *szp);
+int save_ctime (save_ctx_t *sctx, time_t sz);
+int restore_ctime (restore_ctx_t *rctx, time_t *szp);
+int save_double (save_ctx_t *sctx, double x);
+int restore_double (restore_ctx_t *rctx, double *xp);
+int save_string (save_ctx_t *sctx, char *s);
+int restore_string (restore_ctx_t *rctx, char **sp);
+
 #endif /* ORCHIDS_GC */
 
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

@@ -35,7 +35,7 @@ struct strhash_s
 {
   strhash_elmt_t **htable;
   size_t size;
-  int elmts;
+  size_t elmts;
   strhashfunc_t hash;
 };
 

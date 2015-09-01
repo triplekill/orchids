@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <errno.h>
 
 #include "orchids.h"
 #include "gc.h"
@@ -29,6 +30,7 @@
 #include "db.h"
 
 static db_map *empty_db;
+static int db_nfields (db_map *m);
 
 /* A total ordering on objects stored in databases:
    this is total because of typing.  Notably we never
@@ -236,11 +238,6 @@ static void db_small_table_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, t->next);
 }
 
-static void db_small_table_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int db_small_table_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 				    void *data)
 {
@@ -258,11 +255,74 @@ static int db_small_table_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t db_small_table_class = {
+static int db_small_table_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  int i, n, err;
+  db_small_table *t = (db_small_table *)p;
+
+  n = t->nfields;
+  err = save_int (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = save_gc_struct (sctx, (gc_header_t *)t->tuple[i]);
+      if (err) return err;
+    }
+  err = save_gc_struct (sctx, (gc_header_t *)t->next);
+  return err;
+}
+
+gc_class_t db_small_table_class;
+
+static gc_header_t *db_small_table_restore (restore_ctx_t *rctx)
+{
+  int i, n, err;
+  gc_t *gc_ctx = rctx->gc_ctx;
+  gc_header_t *p;
+  db_small_table *t;
+
+  GC_START (gc_ctx, 1);
+  err = restore_int (rctx, &n);
+  if (err) goto errlab;
+  t = gc_alloc (gc_ctx, DBST_SIZE(n), &db_small_table_class);
+  t->gc.type = T_DB_SMALL_TABLE;
+  t->nfields = n;
+  t->next = NULL;
+  for (i=0; i<n; i++)
+    t->tuple[i] = NULL;
+  GC_UPDATE (gc_ctx, 0, t);
+  for (i=0; i<n; i++)
+    {
+      p = restore_gc_struct (rctx);
+      if (p==NULL && errno!=0)
+	goto err;
+      GC_TOUCH (gc_ctx, t->tuple[i] = (OBJTYPE)p);
+    }
+  p = restore_gc_struct (rctx);
+  if (p==NULL && errno!=0)
+    goto err;
+  if (p!=NULL && TYPE(p)!=T_DB_SMALL_TABLE)
+    { errno = -3; goto errlab; }
+  if (p!=NULL && ((db_small_table *)p)->nfields!=n)
+    { errno = -4; goto errlab; }
+  GC_TOUCH (gc_ctx, t->next = (db_small_table *)p);
+  GC_END (gc_ctx);
+  goto normal;
+ errlab:
+  errno = err;
+ err:
+  t = NULL;
+ normal:
+  return (gc_header_t *)t;
+}
+
+gc_class_t db_small_table_class = {
   GC_ID('d','b','s','t'),
   db_small_table_mark_subfields,
-  db_small_table_finalize,
-  db_small_table_traverse
+  NULL,
+  db_small_table_traverse,
+  db_small_table_save,
+  db_small_table_restore
 };
 
 static void db_tuples_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -270,11 +330,6 @@ static void db_tuples_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   db_map *m = (db_map *)p;
 
   GC_TOUCH (gc_ctx, m->what.tuples.table);
-}
-
-static void db_tuples_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int db_tuples_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -287,11 +342,74 @@ static int db_tuples_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t db_tuples_class = {
+static int db_tuples_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  db_map *m = (db_map *)p;
+  // int i, nfields;
+  int err;
+
+  /* No, don't save hash table: this will be reconstructed
+     at restoration time */
+  /*
+  nfields = m->what.tuples.table->nfields;
+  for (i=0; i<nfields; i++)
+    {
+      err = save_ulong (sctx, m->what.tuples.hash[i]);
+      if (err) return err;
+    }
+  */
+  err = save_gc_struct (sctx, (gc_header_t *)m->what.tuples.table);
+  return err;
+}
+
+gc_class_t db_tuples_class;
+
+static gc_header_t *db_tuples_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  db_small_table *t, *next;
+  db_map *m, *singleton;
+  int i, nfields;
+
+  GC_START (gc_ctx, 1);
+  t = (db_small_table *)restore_gc_struct (rctx);
+  if (t==NULL)
+    m = empty_db;
+  else if (TYPE(t)!=T_DB_SMALL_TABLE)
+    {
+      errno = -3;
+      m = NULL;
+    }
+  else
+    {
+      nfields = t->nfields;
+      m = empty_db;
+      while (t!=NULL)
+	{
+	  next = t->next;
+	  t->next = NULL;
+	  singleton = gc_alloc (gc_ctx, DB_TUPLE_SIZE(nfields), &db_tuples_class);
+	  singleton->gc.type = T_DB_SINGLETON;
+	  GC_TOUCH (gc_ctx, singleton->what.tuples.table = t);
+	  GC_UPDATE (gc_ctx, 0, singleton);
+	  for (i=0; i<nfields; i++) /* recompute hashes */
+	    singleton->what.tuples.hash[i] = issdl_hash (t->tuple[i]);
+	  m = db_union (gc_ctx, nfields, m, singleton);
+	  GC_UPDATE (gc_ctx, 0, m);
+	  t = next;
+	}
+    }
+  GC_END (gc_ctx);
+  return (gc_header_t *)m;
+}
+
+gc_class_t db_tuples_class = {
   GC_ID('d','b','t','p'),
   db_tuples_mark_subfields,
-  db_tuples_finalize,
-  db_tuples_traverse
+  NULL,
+  db_tuples_traverse,
+  db_tuples_save,
+  db_tuples_restore
 };
 
 static void db_branch_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -300,11 +418,6 @@ static void db_branch_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   GC_TOUCH (gc_ctx, m->what.branch.left);
   GC_TOUCH (gc_ctx, m->what.branch.right);
-}
-
-static void db_branch_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
 }
 
 static int db_branch_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -320,11 +433,53 @@ static int db_branch_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t db_branch_class = {
+static int db_branch_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  db_map *m = (db_map *)p;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)m->what.branch.left);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)m->what.branch.right);
+  return err;
+}
+
+gc_class_t db_branch_class;
+
+static gc_header_t *db_branch_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  int nfields1, nfields2;
+  db_map *m1, *m2, *m;
+
+  GC_START (gc_ctx, 2);
+  m1 = (db_map *)restore_gc_struct (rctx);
+  if (m1==NULL || (TYPE(m1)!=T_DB_EMPTY && TYPE(m1)!=T_DB_MAP &&
+		   TYPE(m1)!=T_DB_SINGLETON))
+    { errno = -3; m = NULL; goto end; }
+  GC_UPDATE (gc_ctx, 0, m1);
+  nfields1 = db_nfields (m1);
+  m2 = (db_map *)restore_gc_struct (rctx);
+  if (m2==NULL || (TYPE(m2)!=T_DB_EMPTY && TYPE(m2)!=T_DB_MAP &&
+		   TYPE(m2)!=T_DB_SINGLETON))
+    { errno = -3; m = NULL; goto end; }
+  GC_UPDATE (gc_ctx, 1, m2);
+  nfields2 = db_nfields (m2);
+  if (nfields1!=nfields2)
+    { errno = -4; m = NULL; goto end; }
+  m = db_union (gc_ctx, nfields1, m1, m2);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)m;
+}
+
+gc_class_t db_branch_class = {
   GC_ID('d','b','b','r'),
   db_branch_mark_subfields,
-  db_branch_finalize,
-  db_branch_traverse
+  NULL,
+  db_branch_traverse,
+  db_branch_save,
+  db_branch_restore
 };
 
 static db_small_table *db_small_table_union (gc_t *gc_ctx, int nfields,
@@ -1927,6 +2082,7 @@ db_map *db_singleton (gc_t *gc_ctx, ovm_var_t **tuple, int nfields)
     GC_TOUCH (gc_ctx, t->tuple[i] = tuple[i]);
   GC_UPDATE(gc_ctx,0,t);
   m = gc_alloc (gc_ctx, DB_TUPLE_SIZE(nfields), &db_tuples_class);
+  m->gc.type = T_DB_SINGLETON;
   GC_TOUCH (gc_ctx, m->what.tuples.table = t);
   for (i=0; i<nfields; i++)
     m->what.tuples.hash[i] = issdl_hash (tuple[i]);
@@ -1934,9 +2090,30 @@ db_map *db_singleton (gc_t *gc_ctx, ovm_var_t **tuple, int nfields)
   return m;
 }
 
+static int empty_db_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  return 0;
+}
+
+gc_class_t empty_db_class;
+
+static gc_header_t *empty_db_restore (restore_ctx_t *rctx)
+{
+  return (gc_header_t *)empty_db;
+}
+
+gc_class_t empty_db_class = {
+  GC_ID('d','b','0','0'),
+  NULL,
+  NULL,
+  NULL,
+  empty_db_save,
+  empty_db_restore
+};
+
 void db_init (gc_t *gc_ctx)
 {
-  GC_TOUCH(gc_ctx, empty_db = gc_alloc(gc_ctx, sizeof(gc_header_t), NULL));
+  GC_TOUCH(gc_ctx, empty_db = gc_alloc(gc_ctx, sizeof(gc_header_t), &empty_db_class));
   empty_db->gc.type = T_DB_EMPTY;
   gc_add_root(gc_ctx, (gc_header_t **)&empty_db);
 }

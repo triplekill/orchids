@@ -89,7 +89,7 @@ void *strhash_to_array(gc_t *gc_ctx, strhash_t *hash)
 {
   void **array;
   strhash_elmt_t *helmt;
-  int elmts;
+  size_t elmts;
   int i;
   int hsize;
   int j;
@@ -928,7 +928,7 @@ fprintf_hash_info(FILE *fp, strhash_t *h)
 {
   fprintf(fp, "htable = %p\n", h->htable);
   fprintf(fp, "size = %i\n", h->size);
-  fprintf(fp, "elmts = %i\n", h->elmts);
+  fprintf(fp, "elmts = %zu\n", h->elmts);
   fprintf(fp, "hfunc = %p\n", h->hash);
 }
 

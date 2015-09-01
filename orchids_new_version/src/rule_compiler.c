@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 
 /* for inet_addr() */
 #include <sys/socket.h>
@@ -127,6 +128,91 @@ static void build_functions_hash(orchids_t *ctx);
 
 static void fprintf_term_expr(FILE *fp, node_expr_t *expr);
 
+/* Table of compute_stype() functions */
+
+static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_monop (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_return (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_break (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_action (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_cond (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_call (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_fieldname (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_dummy (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_integer (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_double (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_string (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_db_empty (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_event (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_db_singleton (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_db_collect (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_ipv4 (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_ipv6 (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_ctime (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_timeval (rule_compiler_t *ctx, node_expr_t *myself);
+static void compute_stype_regex (rule_compiler_t *ctx, node_expr_t *myself);
+
+static void (*compute_stype_fun[]) (rule_compiler_t *ctx, node_expr_t *myself) = {
+#define CS_NULL 0
+  NULL,
+#define CS_IFSTMT 1
+  compute_stype_ifstmt,
+#define CS_STRING_SPLIT 2
+  compute_stype_string_split,
+#define CS_BINOP 3
+  compute_stype_binop,
+#define CS_MONOP 4
+  compute_stype_monop,
+#define CS_RETURN 5
+  compute_stype_return,
+#define CS_BREAK 6
+  compute_stype_break,
+#define CS_ACTION 7
+  compute_stype_action,
+#define CS_COND 8
+  compute_stype_cond,
+#define CS_ASSOC 9
+  compute_stype_assoc,
+#define CS_CALL 10
+  compute_stype_call,
+#define CS_FIELDNAME 11
+  compute_stype_fieldname,
+#define CS_DUMMY 12
+  compute_stype_dummy,
+#define CS_INTEGER 13
+  compute_stype_integer,
+#define CS_DOUBLE 14
+  compute_stype_double,
+#define CS_STRING 15
+  compute_stype_string,
+#define CS_DB_EMPTY 16
+  compute_stype_db_empty,
+#define CS_EVENT 17
+  compute_stype_event,
+#define CS_DB_PATTERN 18
+  compute_stype_db_pattern,
+#define CS_DB_SINGLETON 19
+  compute_stype_db_singleton,
+#define CS_DB_COLLECT 20
+  compute_stype_db_collect,
+#define CS_IPV4 21
+  compute_stype_ipv4,
+#define CS_IPV6 22
+  compute_stype_ipv6,
+#define CS_CTIME 23
+  compute_stype_ctime,
+#define CS_TIMEVAL 24
+  compute_stype_timeval,
+#define CS_REGEX 25
+  compute_stype_regex,
+};
+
+#define CS_NUM 26
+
 static int is_logical_variable(node_expr_t *e)
 {
   if (e==NULL)
@@ -151,10 +237,10 @@ static type_t *stype_new (gc_t *gc_ctx, char *type_name, unsigned char tag)
   return type;
 }
 
-static type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
-				 unsigned char tag)
+type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
+			   unsigned char tag)
 {
-  static strhash_t *type_hash = NULL;
+  static strhash_t *type_hash = NULL; // XXX global variable here (remove?)
   type_t *type;
 
   if (type_hash==NULL)
@@ -383,7 +469,7 @@ rule_compiler_t *new_rule_compiler_ctx(gc_t *gc_ctx)
 
   GC_START (gc_ctx, 1);
   ctx = gc_alloc (gc_ctx, sizeof (rule_compiler_t), &rule_compiler_class);
-  ctx->gc.type = T_NULL;
+  ctx->gc.type = T_RULE_COMPILER;
   ctx->gc_ctx = gc_ctx;
   ctx->nprotected = 0;
   ctx->maxprotected = NPROTECTED;
@@ -481,11 +567,95 @@ static int node_state_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t node_state_class = {
+static int node_state_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_state_t *n = (node_state_t *)p;
+  int err;
+
+  err = save_int (sctx, n->state_id);
+  if (err) return err;
+  err = save_string (sctx, n->file);
+  if (err) return err;
+  err = save_int (sctx, n->line);
+  if (err) return err;
+  err = save_string (sctx, n->name);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->actionlist);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->translist);
+  if (err) return err;
+  err = save_ulong (sctx, n->flags);
+  if (err) return err;
+  err = save_ulong (sctx, n->an_flags);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->mustset);
+  return err;
+}
+
+gc_class_t node_state_class;
+
+static gc_header_t *node_state_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_state_t *n;
+  node_expr_t *actionlist, *translist;
+  varset_t *mustset;
+  int id, line;
+  char *file = NULL;
+  char *name = NULL;
+  unsigned long flags, an_flags;
+  int err;
+
+  GC_START (gc_ctx, 23);
+  n = NULL;
+  err = restore_int (rctx, &id);
+  if (err) { errlab: errno = err; goto end; }
+  err = restore_string (rctx, &file);
+  if (err) goto errlab;
+  err = restore_int (rctx, &line);
+  if (err) { end_freefile: gc_base_free (file); goto errlab; }
+  err = restore_string (rctx, &name);
+  if (err) goto end_freefile;
+  actionlist = (node_expr_t *)restore_gc_struct (rctx);
+  if (actionlist==NULL && errno!=0)
+    { err_freefilename: gc_base_free (name); gc_base_free (file); goto end; }
+  GC_UPDATE (gc_ctx, 0, actionlist);
+  translist = (node_expr_t *)restore_gc_struct (rctx);
+  if (translist==NULL && errno!=0)
+    goto err_freefilename;
+  GC_UPDATE (gc_ctx, 1, translist);
+  err = restore_ulong (rctx, &flags);
+  if (err) { errno = err; goto err_freefilename; }
+  err = restore_ulong (rctx, &an_flags);
+  if (err) { errno = err; goto err_freefilename; }
+  mustset = (varset_t *)restore_gc_struct (rctx);
+  if (mustset==NULL && errno!=0)
+    goto err_freefilename;
+  if (mustset!=NULL && TYPE(mustset)!=T_VARSET)
+    { errno = -2; goto err_freefilename; }
+  n = gc_alloc (gc_ctx, sizeof(node_state_t), &node_state_class);
+  n->gc.type = T_NODE_STATE;
+  n->state_id = id;
+  n->file = file;
+  n->line = line;
+  n->name = name;
+  GC_TOUCH (gc_ctx, n->actionlist = actionlist);
+  GC_TOUCH (gc_ctx, n->translist = translist);
+  n->flags = flags;
+  n->an_flags = an_flags;
+  GC_TOUCH (gc_ctx, n->mustset = mustset);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_state_class = {
   GC_ID('n','s','t','e'),
   node_state_mark_subfields,
   node_state_finalize,
-  node_state_traverse
+  node_state_traverse,
+  node_state_save,
+  node_state_restore
 };
 
 static void node_trans_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -520,11 +690,84 @@ static int node_trans_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t node_trans_class = {
+static int node_trans_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_trans_t *n = (node_trans_t *)p;
+  int err;
+
+  err = save_int (sctx, n->type);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->cond);
+  if (err) return err;
+  err = save_string (sctx, n->dest);
+  if (err) return err;
+  err = save_string (sctx, n->file);
+  if (err) return err;
+  err = save_uint (sctx, n->lineno);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->sub_state_dest);
+  if (err) return err;
+  err = save_ulong (sctx, n->an_flags);
+  return err;
+}
+
+gc_class_t node_trans_class;
+
+static gc_header_t *node_trans_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  int type;
+  node_expr_t *cond;
+  node_state_t *sub_state_dest;
+  char *dest, *file;
+  unsigned int lineno;
+  unsigned long an_flags;
+  node_trans_t *n;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  n = NULL;
+  err = restore_int (rctx, &type);
+  if (err) { errno = err; goto end; }
+  cond = (node_expr_t *)restore_gc_struct (rctx);
+  if (cond==NULL && errno!=0)
+    goto end;
+  GC_UPDATE (gc_ctx, 0, cond);
+  err = restore_string (rctx, &dest);
+  if (err) { errno = err; goto end; }
+  err = restore_string (rctx, &file);
+  if (err) { err_freedest: errno = err; gc_base_free (dest); goto end; }
+  err = restore_uint (rctx, &lineno);
+  if (err) { err_freedestfile: gc_base_free (file); goto err_freedest; }
+  sub_state_dest = (node_state_t *)restore_gc_struct (rctx);
+  if (sub_state_dest==NULL && errno!=0)
+    { gc_base_free (file); gc_base_free (dest); goto end; }
+  if (sub_state_dest!=NULL && TYPE(sub_state_dest)!=T_NODE_STATE)
+    { err = -2; goto err_freedestfile; }
+  GC_UPDATE (gc_ctx, 1, sub_state_dest);
+  err = restore_ulong (rctx, &an_flags);
+  if (err) goto err_freedestfile;
+  n = gc_alloc (gc_ctx, sizeof(node_trans_t), &node_trans_class);
+  n->gc.type = T_NODE_TRANS;
+  n->type = type;
+  GC_TOUCH (gc_ctx, n->cond = cond);
+  n->dest = dest;
+  n->file = file;
+  n->lineno = lineno;
+  GC_TOUCH (gc_ctx, n->sub_state_dest = sub_state_dest);
+  n->an_flags = an_flags;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_trans_class = {
   GC_ID('n','t','r','n'),
   node_trans_mark_subfields,
   node_trans_finalize,
-  node_trans_traverse
+  node_trans_traverse,
+  node_trans_save,
+  node_trans_restore
 };
 
 static void node_rule_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -570,19 +813,124 @@ static int node_rule_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int node_rule_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_rule_t *n = (node_rule_t *)p;
+  node_syncvarlist_t *sv;
+  size_t i, nvars;
+  int err;
+
+  err = save_string (sctx, n->file);
+  if (err) return err;
+  err = save_int (sctx, n->line);
+  if (err) return err;
+  err = save_string (sctx, n->name);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->init);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->statelist);
+  if (err) return err;
+  sv = n->sync_vars;
+  if (sv==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      nvars = sv->vars_nb;
+      err = save_size_t (sctx, nvars);
+      if (err) return err;
+      for (i=0; i<nvars; i++)
+	{
+	  err = save_string (sctx, sv->vars[i]);
+	  if (err) return err;
+	}
+      err = 0;
+    }
+  return err;
+}
+
+gc_class_t node_rule_class;
+
+static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_rule_t *n;
+  char *file;
+  int line;
+  char *name;
+  node_state_t *init;
+  node_expr_t *statelist;
+  size_t i, nvars;
+  char **vars;
+  node_syncvarlist_t *sv;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  n = NULL;
+  err = restore_string (rctx, &file);
+  if (err) { errno = err; goto end; }
+  err = restore_int (rctx, &line);
+  if (err)
+    { err_freefile: errno = err;
+    end_freefile: gc_base_free (file); goto end; }
+  err = restore_string (rctx, &name);
+  if (err) goto err_freefile;
+  if (name==NULL) { errno = -2; goto end_freefile; }
+  init = (node_state_t *)restore_gc_struct (rctx);
+  if (init==NULL && errno!=0)
+    { end_freefilename: gc_base_free (name); goto end_freefile; }
+  if (init==NULL || TYPE(init)!=T_NODE_STATE)
+    { errno = -2; goto end_freefilename; }
+  GC_UPDATE (gc_ctx, 0, init);
+  statelist = (node_expr_t *)restore_gc_struct (rctx);
+  if (statelist==NULL && errno!=0) goto end_freefilename;
+  GC_UPDATE (gc_ctx, 1, statelist);
+  err = restore_size_t (rctx, &nvars);
+  if (nvars==0)
+    sv = NULL;
+  else
+    {
+      vars = gc_base_malloc (gc_ctx, nvars*sizeof(char *));
+      for (i=0; i<nvars; i++)
+	{
+	  err = restore_string (rctx, &vars[i]);
+	  if (err)
+	    { while (i!=0) { --i; gc_base_free (vars[i]); }
+	      gc_base_free (vars); errno = err; goto end_freefilename; }
+	}
+      sv = gc_base_malloc (gc_ctx, sizeof(node_syncvarlist_t));
+      sv->vars_nb = nvars;
+      sv->size = nvars;
+      sv->grow = 8;
+      sv->vars = vars;
+    }
+  n = gc_alloc (gc_ctx, sizeof(node_rule_t), &node_rule_class);
+  n->gc.type = T_NODE_RULE;
+  n->line = line;
+  n->file = file;
+  n->name = name;
+  GC_TOUCH (gc_ctx, n->init = init);
+  GC_TOUCH (gc_ctx, n->statelist = statelist);
+  n->sync_vars = sv;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_rule_class = {
+  GC_ID('n','r','u','l'),
+  node_rule_mark_subfields,
+  node_rule_finalize,
+  node_rule_traverse,
+  node_rule_save,
+  node_rule_restore
+};
+
 static void node_expr_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
   node_expr_t *n = (node_expr_t *)p;
 
   GC_TOUCH (gc_ctx, n->file);
   GC_TOUCH (gc_ctx, n->parents);
-}
-
-static void node_expr_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  //node_expr_t *n = (node_expr_t *)p;
-
-  return;
 }
 
 static int node_expr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -600,12 +948,106 @@ static int node_expr_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return 0;
 }
 
-static gc_class_t node_rule_class = {
-  GC_ID('n','r','u','l'),
-  node_rule_mark_subfields,
-  node_rule_finalize,
-  node_rule_traverse
-};
+static int node_expr_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_t *n = (node_expr_t *)p;
+  FILE *f = sctx->f;
+  type_t *stype;
+  int err;
+
+  err = save_gc_struct (sctx, (gc_header_t *)n->file);
+  if (err) return err;
+  err = save_uint (sctx, n->lineno);
+  if (err) return err;
+  err = save_int (sctx, n->type);
+  if (err) return err;
+  err = save_ulong (sctx, n->hash);
+  if (err) return err;
+  stype = n->stype;
+  if (stype==NULL)
+    {
+      err = putc (T_NOTHING, f);
+      if (err) return err;
+      err = save_string (sctx, NULL);
+    }
+  else
+    {
+      err = putc ((int)stype->tag, f);
+      if (err) return err;
+      err = save_string (sctx, stype->name);
+    }
+  if (err) return err;
+  err = save_int (sctx, n->compute_stype);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->parents);
+  return err;
+}
+
+static int node_expr_restore (restore_ctx_t *rctx, node_expr_t *n)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  FILE *f = rctx->f;
+  unsigned char tag;
+  char *name;
+  int c, err;
+
+  GC_START (gc_ctx, 1);
+  GC_TOUCH (gc_ctx, n->file = (ovm_var_t *)restore_gc_struct (rctx));
+  if (n->file==NULL && errno!=0)
+    { err = errno; goto end; }
+  GC_UPDATE (gc_ctx, 0, n->file);
+  err = restore_uint (rctx, &n->lineno);
+  if (err) goto end;
+  err = restore_int (rctx, &n->type);
+  if (err) goto end;
+  err = restore_ulong (rctx, &n->hash);
+  if (err) goto end;
+  c = getc (f);
+  if (c==EOF) goto end;
+  tag = (unsigned char)c;
+  err = restore_string (rctx, &name);
+  if (err) goto end;
+  if (tag==T_NOTHING)
+    {
+      gc_base_free (name);
+      n->stype = NULL;
+    }
+  else
+    {
+      if (name==NULL) { err = -2; gc_base_free (name); goto end; }
+      n->stype = stype_from_string (gc_ctx, name, 1, tag);
+      gc_base_free (name);
+    }
+  err = restore_int (rctx, &n->compute_stype);
+  if (err) goto end;
+  if (n->compute_stype<0 || n->compute_stype>=CS_NUM)
+    { err = -2; goto end; }
+  GC_TOUCH (gc_ctx, n->parents = (node_expr_t *)restore_gc_struct (rctx));
+ end:
+  GC_END (gc_ctx);
+  return err;
+}
+
+#define NODE_EXPR_RESTORE(err,rctx,ne) do {				\
+  (ne)->file = NULL; (ne)->parents = NULL;				\
+  err = node_expr_restore (rctx, ne);					\
+  if (err==0)								\
+    {									\
+      GC_UPDATE (gc_ctx, 0, (ne)->file);				\
+      GC_UPDATE (gc_ctx, 1, (ne)->parents);				\
+    }									\
+  } while (0)
+
+#define NODE_EXPR_COPY(n,ne) do {					\
+    (n)->type = (ne)->type;						\
+    GC_TOUCH (gc_ctx, (n)->file = (ne)->file);				\
+    (n)->lineno = (ne)->lineno;						\
+    (n)->hash = (ne)->hash;						\
+    (n)->stype = (ne)->stype;						\
+    (n)->compute_stype = (ne)->compute_stype;				\
+    GC_TOUCH (gc_ctx, (n)->parents = (ne)->parents);			\
+  }									\
+  while (0)
 
 static void node_expr_term_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
@@ -613,12 +1055,6 @@ static void node_expr_term_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   node_expr_mark_subfields (gc_ctx, p);
   GC_TOUCH (gc_ctx, n->data);
-}
-
-static void node_expr_term_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  node_expr_finalize (gc_ctx, p);
-  return;
 }
 
 static int node_expr_term_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -633,11 +1069,56 @@ static int node_expr_term_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return (*gtc->do_subfield) (gtc, (gc_header_t *)n->data, data);
 }
 
-static gc_class_t node_expr_term_class = {
+static int node_expr_term_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_term_t *n = (node_expr_term_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_int (sctx, n->res_id);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->data);
+  return err;
+}
+
+gc_class_t node_expr_term_class;
+
+static gc_header_t *node_expr_term_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_term_t *n;
+  int id;
+  ovm_var_t *data;
+  int err;
+
+  GC_START (gc_ctx, 3);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  err = restore_int (rctx, &id);
+  if (err) { errno = err; goto end; }
+  data = (ovm_var_t *)restore_gc_struct (rctx);
+  if (data==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 2, data);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_term_t), &node_expr_term_class);
+  n->gc.type = T_NODE_CONST;
+  NODE_EXPR_COPY(n,&ne);
+  n->res_id = id;
+  GC_TOUCH (gc_ctx, n->data = data);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_term_class = {
   GC_ID('n','t','r','m'),
   node_expr_term_mark_subfields,
-  node_expr_term_finalize,
-  node_expr_term_traverse
+  NULL,
+  node_expr_term_traverse,
+  node_expr_term_save,
+  node_expr_term_restore
 };
 
 
@@ -652,7 +1133,6 @@ static void node_expr_sym_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_expr_sym_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  node_expr_finalize (gc_ctx, p);
   gc_base_free (SYM_NAME(p));
 }
 
@@ -668,11 +1148,88 @@ static int node_expr_sym_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return (*gtc->do_subfield) (gtc, (gc_header_t *)SYM_DEF(sym), data);
 }
 
-static gc_class_t node_expr_sym_class = {
-  GC_ID('n','s','y','m'),
+static int node_expr_sym_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_symbol_t *n = (node_expr_symbol_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_int (sctx, n->res_id);
+  if (err) return err;
+  err = save_string (sctx, n->name);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->def);
+  if (err) return err;
+  err = save_int (sctx, (int)n->mono);
+  return err;
+}
+
+static gc_header_t *node_expr_sym_restore (restore_ctx_t *rctx, gc_class_t *class,
+					   unsigned char type)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_symbol_t *n;
+  int id;
+  char *name;
+  node_expr_t *def;
+  int mono;
+  int err;
+
+  GC_START (gc_ctx, 3);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  err = restore_int (rctx, &id);
+  if (err) { errno = err; goto end; }
+  err = restore_string (rctx, &name);
+  if (err) { errno = err; goto end; }
+  if (name==NULL) { errno = -2; goto end; }
+  def = (node_expr_t *)restore_gc_struct (rctx);
+  if (def==NULL && errno!=0) { err_freename: gc_base_free(name); goto end; }
+  err = restore_int (rctx, &mono);
+  if (err) goto err_freename;
+  n = gc_alloc (gc_ctx, sizeof(node_expr_symbol_t), class);
+  n->gc.type = type;
+  NODE_EXPR_COPY(n,&ne);
+  n->res_id = id;
+  n->name = name;
+  GC_TOUCH (gc_ctx, n->def = def);
+  n->mono = (monotony)mono;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_var_class, node_expr_field_class;
+
+static gc_header_t *node_expr_var_restore (restore_ctx_t *rctx)
+{
+  return node_expr_sym_restore (rctx, &node_expr_var_class, T_NODE_VARIABLE);
+}
+
+static gc_header_t *node_expr_field_restore (restore_ctx_t *rctx)
+{
+  return node_expr_sym_restore (rctx, &node_expr_field_class, T_NODE_FIELD);
+}
+
+gc_class_t node_expr_var_class = {
+  GC_ID('n','v','a','r'),
   node_expr_sym_mark_subfields,
   node_expr_sym_finalize,
-  node_expr_sym_traverse
+  node_expr_sym_traverse,
+  node_expr_sym_save,
+  node_expr_var_restore
+};
+
+gc_class_t node_expr_field_class = {
+  GC_ID('n','f','l','d'),
+  node_expr_sym_mark_subfields,
+  node_expr_sym_finalize,
+  node_expr_sym_traverse,
+  node_expr_sym_save,
+  node_expr_field_restore
 };
 
 static void node_expr_bin_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -682,12 +1239,6 @@ static void node_expr_bin_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   node_expr_mark_subfields (gc_ctx, p);
   GC_TOUCH (gc_ctx, n->lval);
   GC_TOUCH (gc_ctx, n->rval);
-}
-
-static void node_expr_bin_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  node_expr_finalize (gc_ctx, p);
-  return;
 }
 
 static int node_expr_bin_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -706,11 +1257,62 @@ static int node_expr_bin_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t node_expr_bin_class = {
+static int node_expr_bin_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_bin_t *n = (node_expr_bin_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_int (sctx, n->op);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->lval);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->rval);
+  return err;
+}
+
+gc_class_t node_expr_bin_class;
+
+static gc_header_t *node_expr_bin_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_bin_t *n;
+  int op;
+  node_expr_t *lval, *rval;
+  int err;
+
+  GC_START (gc_ctx, 4);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  err = restore_int (rctx, &op);
+  if (err) { errno = err; goto end; }
+  lval = (node_expr_t *)restore_gc_struct (rctx);
+  if (lval==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 2, lval);
+  rval = (node_expr_t *)restore_gc_struct (rctx);
+  if (rval==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 3, rval);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
+  n->gc.type = T_NODE_BINOP;
+  NODE_EXPR_COPY(n,&ne);
+  n->op = op;
+  GC_TOUCH (gc_ctx, n->lval = lval);
+  GC_TOUCH (gc_ctx, n->rval = rval);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_bin_class = {
   GC_ID('n','b','i','n'),
   node_expr_bin_mark_subfields,
-  node_expr_bin_finalize,
-  node_expr_bin_traverse
+  NULL,
+  node_expr_bin_traverse,
+  node_expr_bin_save,
+  node_expr_bin_restore
 };
 
 static void node_expr_mon_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -719,12 +1321,6 @@ static void node_expr_mon_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
   node_expr_mark_subfields (gc_ctx, p);
   GC_TOUCH (gc_ctx, n->val);
-}
-
-static void node_expr_mon_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  node_expr_finalize (gc_ctx, p);
-  return;
 }
 
 static int node_expr_mon_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -740,11 +1336,56 @@ static int node_expr_mon_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t node_expr_mon_class = {
+static int node_expr_mon_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_mon_t *n = (node_expr_mon_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_int (sctx, n->op);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->val);
+  return err;
+}
+
+gc_class_t node_expr_mon_class;
+
+static gc_header_t *node_expr_mon_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_mon_t *n;
+  int op;
+  node_expr_t *val;
+  int err;
+
+  GC_START (gc_ctx, 3);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  err = restore_int (rctx, &op);
+  if (err) { errno = err; goto end; }
+  val = (node_expr_t *)restore_gc_struct (rctx);
+  if (val==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 2, val);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_mon_t), &node_expr_mon_class);
+  n->gc.type = T_NODE_MONOP;
+  NODE_EXPR_COPY(n,&ne);
+  n->op = op;
+  GC_TOUCH (gc_ctx, n->val = val);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_mon_class = {
   GC_ID('n','m','o','n'),
   node_expr_mon_mark_subfields,
-  node_expr_mon_finalize,
-  node_expr_mon_traverse
+  NULL,
+  node_expr_mon_traverse,
+  node_expr_mon_save,
+  node_expr_mon_restore
 };
 
 static void node_expr_call_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -757,7 +1398,6 @@ static void node_expr_call_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_expr_call_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  node_expr_finalize (gc_ctx, p);
   gc_base_free (CALL_SYM(p));
 }
 
@@ -773,11 +1413,61 @@ static int node_expr_call_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return (*gtc->do_subfield) (gtc, (gc_header_t *)n->paramlist, data);
 }
 
-static gc_class_t node_expr_call_class = {
+static int node_expr_call_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_call_t *n = (node_expr_call_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_string (sctx, n->symbol);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->paramlist);
+  return err;
+}
+
+gc_class_t node_expr_call_class;
+
+static gc_header_t *node_expr_call_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_call_t *n;
+  char *name;
+  issdl_function_t *func;
+  node_expr_t *params;
+  int err;
+
+  GC_START (gc_ctx, 3);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  err = restore_string (rctx, &name);
+  if (err) { errno = err; goto end; }
+  if (name==NULL) { errno = -2; goto end; }
+  func = strhash_get(rctx->functions_hash, name);
+  if (func==NULL) { gc_base_free (name); errno = -2; goto end; }
+  params = (node_expr_t *)restore_gc_struct (rctx);
+  if (params==NULL && errno!=0) { gc_base_free (name); goto end; }
+  GC_UPDATE (gc_ctx, 2, params);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_call_t), &node_expr_call_class);
+  n->gc.type = T_NODE_CALL;
+  NODE_EXPR_COPY(n,&ne);
+  n->symbol = name;
+  n->f = func;
+  GC_TOUCH (gc_ctx, n->paramlist = params);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_call_class = {
   GC_ID('n','c','l','l'),
   node_expr_call_mark_subfields,
   node_expr_call_finalize,
-  node_expr_call_traverse
+  node_expr_call_traverse,
+  node_expr_call_save,
+  node_expr_call_restore
 };
 
 static void node_expr_ifstmt_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
@@ -788,12 +1478,6 @@ static void node_expr_ifstmt_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, n->cond);
   GC_TOUCH (gc_ctx, n->then);
   GC_TOUCH (gc_ctx, n->els);
-}
-
-static void node_expr_ifstmt_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  node_expr_finalize (gc_ctx, p);
-  return;
 }
 
 static int node_expr_ifstmt_traverse (gc_traverse_ctx_t *gtc,
@@ -816,33 +1500,88 @@ static int node_expr_ifstmt_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t node_expr_ifstmt_class = {
+static int node_expr_ifstmt_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_if_t *n = (node_expr_if_t *)p;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->cond);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->then);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->els);
+  return err;
+}
+
+gc_class_t node_expr_ifstmt_class;
+
+static gc_header_t *node_expr_ifstmt_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_if_t *n;
+  node_expr_t *cond, *then, *els;
+  int err;
+
+  GC_START (gc_ctx, 5);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  cond = (node_expr_t *)restore_gc_struct (rctx);
+  if (cond==NULL && errno!=0) goto end;
+  if (cond==NULL) { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 2, cond);
+  then = (node_expr_t *)restore_gc_struct (rctx);
+  if (then==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 3, then);
+  els = (node_expr_t *)restore_gc_struct (rctx);
+  if (els==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 4, els);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_if_t), &node_expr_ifstmt_class);
+  n->gc.type = T_NODE_IFSTMT;
+  NODE_EXPR_COPY(n,&ne);
+  GC_TOUCH (gc_ctx, n->cond = cond);
+  GC_TOUCH (gc_ctx, n->then = then);
+  GC_TOUCH (gc_ctx, n->els = els);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_ifstmt_class = {
   GC_ID('n','i','f','s'),
   node_expr_ifstmt_mark_subfields,
-  node_expr_ifstmt_finalize,
-  node_expr_ifstmt_traverse
+  NULL,
+  node_expr_ifstmt_traverse,
+  node_expr_ifstmt_save,
+  node_expr_ifstmt_restore
 };
 
 static void node_expr_regsplit_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
   node_expr_regsplit_t *rs = (node_expr_regsplit_t *)p;
+  size_t i, nvars;
+  node_varlist_t *dv;
 
   node_expr_mark_subfields (gc_ctx, p);
   GC_TOUCH (gc_ctx, rs->string);
   GC_TOUCH (gc_ctx, rs->split_pat);
+  dv = rs->dest_vars;
+  if (dv!=NULL)
+    for (i=0, nvars=dv->vars_nb; i<nvars; i++)
+      GC_TOUCH (gc_ctx, dv->vars[i]);
 }
 
 static void node_expr_regsplit_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
   node_expr_regsplit_t *rs = (node_expr_regsplit_t *)p;
   node_varlist_t *dv = rs->dest_vars;
-  size_t i, n;
 
-  node_expr_finalize (gc_ctx, p);
+  //node_expr_finalize (gc_ctx, p);
   if (dv!=NULL)
     {
-      for (i=0, n=dv->vars_nb; i<n; i++)
-	gc_base_free (dv->vars[i]);
       gc_base_free (dv->vars);
       gc_base_free (dv);
     }
@@ -853,6 +1592,8 @@ static int node_expr_regsplit_traverse (gc_traverse_ctx_t *gtc,
 {
   node_expr_regsplit_t *rs = (node_expr_regsplit_t *)p;
   subfield_action do_subfield = gtc->do_subfield;
+  size_t i, nvars;
+  node_varlist_t *dv;
   int err;
 
   err = node_expr_traverse (gtc, p, data);
@@ -862,14 +1603,112 @@ static int node_expr_regsplit_traverse (gc_traverse_ctx_t *gtc,
   if (err)
     return err;
   err = (*do_subfield) (gtc, (gc_header_t *)rs->split_pat, data);
+  if (err)
+    return err;
+  dv = rs->dest_vars;
+  if (dv!=NULL)
+    for (i=0, nvars=dv->vars_nb; i<nvars; i++)
+      {
+	err = (*do_subfield) (gtc, (gc_header_t *)dv->vars[i], data);
+	if (err)
+	  return err;
+      }
   return err;
 }
 
-static gc_class_t node_expr_regsplit_class = {
+static int node_expr_regsplit_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  node_expr_regsplit_t *n = (node_expr_regsplit_t *)p;
+  size_t i, nvars;
+  node_varlist_t *dv;
+  int err;
+
+  err = node_expr_save (sctx, p);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->string);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)n->split_pat);
+  if (err) return err;
+  dv = n->dest_vars;
+  if (dv==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      nvars = dv->vars_nb;
+      err = save_size_t (sctx, nvars);
+      if (err) return err;
+      for (i=0; i<nvars; i++)
+	{
+	  err = save_gc_struct (sctx, (gc_header_t *)dv->vars[i]);
+	  if (err) return err;
+	}
+    }
+  return err;
+}
+
+gc_class_t node_expr_regsplit_class;
+
+static gc_header_t *node_expr_regsplit_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  node_expr_t ne;
+  node_expr_regsplit_t *n;
+  node_expr_t *string, *split_pat;
+  size_t i, nvars;
+  node_varlist_t *dv;
+  node_expr_t **vars, *e;
+  int err;
+
+  GC_START (gc_ctx, 4);
+  n = NULL;
+  NODE_EXPR_RESTORE(err,rctx,&ne);
+  if (err) { errno = err; goto end; }
+  string = (node_expr_t *)restore_gc_struct (rctx);
+  if (string==NULL && errno!=0) goto end;
+  if (string==NULL) { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 2, string);
+  split_pat = (node_expr_t *)restore_gc_struct (rctx);
+  if (split_pat==NULL && errno!=0) goto end;
+  if (split_pat==NULL) { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 3, split_pat);
+  n = gc_alloc (gc_ctx, sizeof(node_expr_regsplit_t), &node_expr_regsplit_class);
+  n->gc.type = T_NODE_REGSPLIT;
+  NODE_EXPR_COPY(n,&ne);
+  GC_TOUCH (gc_ctx, n->string = string);
+  GC_TOUCH (gc_ctx, n->split_pat = split_pat);
+  n->dest_vars = NULL;
+  GC_UPDATE (gc_ctx, 2, n);
+  err = restore_size_t (rctx, &nvars);
+  if (err) { errno = err; n = NULL; goto end; }
+  if (nvars!=0)
+    {
+      dv = gc_base_malloc (gc_ctx, sizeof(node_varlist_t));
+      dv->vars_nb = 0;
+      dv->size = nvars;
+      dv->grow = 8; /* whatever */
+      dv->vars = vars = gc_base_malloc (gc_ctx, nvars*sizeof(node_expr_t *));
+      n->dest_vars = dv;
+      for (i=0; i<nvars; )
+	{
+	  e = (node_expr_t *)restore_gc_struct (rctx);
+	  if (e==NULL && errno!=0) { n = NULL; goto end; }
+	  if (e==NULL) { errno = -2; n = NULL; goto end; }
+	  GC_TOUCH (gc_ctx, vars[i] = e);
+	  dv->vars_nb = ++i;
+	}
+    }
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)n;
+}
+
+gc_class_t node_expr_regsplit_class = {
   GC_ID('r','g','s','p'),
   node_expr_regsplit_mark_subfields,
   node_expr_regsplit_finalize,
-  node_expr_regsplit_traverse
+  node_expr_regsplit_traverse,
+  node_expr_regsplit_save,
+  node_expr_regsplit_restore
 };
 
 /**
@@ -968,6 +1807,7 @@ static void type_solve (rule_compiler_t *ctx)
 {
   node_expr_t *e, *l, *parent;
   type_t *t, *newt;
+  int cs;
 
   GC_START(ctx->gc_ctx, 2);
   /* Compute types by solving a fixed point system */
@@ -1002,7 +1842,13 @@ static void type_solve (rule_compiler_t *ctx)
 	{
 	  parent = BIN_LVAL(l);
 	  /*if (--parent->npending_argtypes==0)*/
-	  (*parent->compute_stype) (ctx, parent);
+	  cs = parent->compute_stype;
+	  if (cs<0 || cs>=CS_NUM || compute_stype_fun[cs]==NULL)
+	    {
+	      DebugLog (DF_OLC, DS_ERROR, "unknown compute_stype number %d.\n", cs);
+	    }
+	  else
+	    (*compute_stype_fun[cs]) (ctx, parent);
 	}
     }
   GC_END(ctx->gc_ctx);
@@ -1085,7 +1931,16 @@ static void type_explore_expr (rule_compiler_t *ctx,
       exit(EXIT_FAILURE);
       break;
     }
-  (*expr->compute_stype) (ctx, expr);
+  {
+    int cs = expr->compute_stype;
+    
+    if (cs<0 || cs>=CS_NUM || compute_stype_fun[cs]==NULL)
+      {
+	DebugLog (DF_OLC, DS_ERROR, "unknown compute_stype number %d.\n", cs);
+      }
+    else
+      (*compute_stype_fun[cs]) (ctx, expr);
+  }
 }
 
 #define type_explore_stmt(ctx,expr) type_explore_expr(ctx,expr)
@@ -1262,11 +2117,6 @@ static void varset_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, vs->next);
 }
 
-static void varset_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int varset_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			    void *data)
 {
@@ -1275,11 +2125,59 @@ static int varset_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return (*gtc->do_subfield) (gtc, (gc_header_t *)vs->next, data);
 }
 
-static gc_class_t varset_class = {
+static int varset_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  varset_t *vs = (varset_t *)p;
+  varset_t *v;
+  int err;
+  size_t n;
+
+  for (v=vs, n=0; v!=NULL; v=v->next)
+    n++;
+  err = save_size_t (sctx, n);
+  for (v=vs; v!=NULL; v=v->next)
+    {
+      err = save_int (sctx, v->n);
+      if (err) return err;
+    }
+  return 0;
+}
+
+gc_class_t varset_class;
+
+static gc_header_t *varset_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  varset_t *vs, *one;
+  size_t i, n;
+  int var;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  vs = NULL;
+  err = restore_size_t (rctx, &n);
+  if (err) { errno = err; goto end; }
+  for (i=0; i<n; i++)
+    {
+      err = restore_int (rctx, &var);
+      if (err) { errno = err; goto end; }
+      one = vs_one_element (gc_ctx, var);
+      GC_UPDATE (gc_ctx, 1, one);
+      vs = vs_union (gc_ctx, vs, one);
+      GC_UPDATE (gc_ctx, 0, vs);
+    }
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)vs;
+}
+
+gc_class_t varset_class = {
   GC_ID('v','s','e','t'),
   varset_mark_subfields,
-  varset_finalize,
-  varset_traverse
+  NULL,
+  varset_traverse,
+  varset_save,
+  varset_restore
 };
 
 varset_t *vs_one_element (gc_t *gc_ctx, int n)
@@ -1288,7 +2186,7 @@ varset_t *vs_one_element (gc_t *gc_ctx, int n)
 
 //gc_check(gc_ctx);
   vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-  vs->gc.type = T_NULL;
+  vs->gc.type = T_VARSET;
   vs->n = n;
   vs->next = NULL;
 //gc_check(gc_ctx);
@@ -1309,7 +2207,7 @@ varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
       vs = vs_union (gc_ctx, vs1->next, vs2);
       GC_UPDATE (gc_ctx, 0, vs);
       vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-      vs->gc.type = T_NULL;
+      vs->gc.type = T_VARSET;
       vs->n = vs1->n;
       vs->next = (varset_t *)GC_LOOKUP(0);
     }
@@ -1318,7 +2216,7 @@ varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
       vs = vs_union (gc_ctx, vs1, vs2->next);
       GC_UPDATE (gc_ctx, 0, vs);
       vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-      vs->gc.type = T_NULL;
+      vs->gc.type = T_VARSET;
       vs->n = vs2->n;
       vs->next = (varset_t *)GC_LOOKUP(0);
     }
@@ -1327,7 +2225,7 @@ varset_t *vs_union (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
       vs = vs_union (gc_ctx, vs1->next, vs2->next);
       GC_UPDATE (gc_ctx, 0, vs);
       vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-      vs->gc.type = T_NULL;
+      vs->gc.type = T_VARSET;
       vs->n = vs1->n;
       vs->next = (varset_t *)GC_LOOKUP(0);
     }
@@ -1368,7 +2266,7 @@ varset_t *vs_inter (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
   GC_START(gc_ctx, 1);
   GC_UPDATE (gc_ctx, 0, vs);
   vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-  vs->gc.type = T_NULL;
+  vs->gc.type = T_VARSET;
   vs->n = vs1->n;
   vs->next = (varset_t *)GC_LOOKUP(0);
   GC_END(gc_ctx);
@@ -1395,7 +2293,7 @@ varset_t *vs_diff (gc_t *gc_ctx, varset_t *vs1, varset_t *vs2)
       GC_START(gc_ctx, 1);
       GC_UPDATE (gc_ctx, 0, vs);
       vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
-      vs->gc.type = T_NULL;
+      vs->gc.type = T_VARSET;
       vs->n = vs1->n;
       vs->next = (varset_t *)GC_LOOKUP(0);
       GC_END(gc_ctx);
@@ -2863,7 +3761,7 @@ node_state_t *build_state(rule_compiler_t *ctx,
 
   s = gc_alloc (ctx->gc_ctx, sizeof(node_state_t),
 		&node_state_class);
-  s->gc.type = T_NULL;
+  s->gc.type = T_NODE_STATE;
   s->state_id = 0; /* not set: will be set by compile_and_add_rule_ast() */
   s->file = NULL; /* not set: will be set by set_state_label() */
   s->line = 0; /* not set: will be set by set_state_label() */
@@ -3199,7 +4097,6 @@ static unsigned long h_cons (node_expr_t *e, unsigned long l)
   return h_pair (e->hash, l);
 }
 
-static void compute_stype_ifstmt (rule_compiler_t *ctx, node_expr_t *myself);
 static void add_parent (rule_compiler_t *ctx, node_expr_t *node,
 			node_expr_t *parent);
 
@@ -3211,7 +4108,7 @@ static void add_boolean_check (rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   bool_check = gc_alloc (ctx->gc_ctx, sizeof(node_expr_if_t),
 			 &node_expr_ifstmt_class);
-  bool_check->gc.type = T_NULL;
+  bool_check->gc.type = T_NODE_IFSTMT;
   bool_check->type = NODE_IFSTMT;
   GC_TOUCH (ctx->gc_ctx, bool_check->file = expr->file);
   bool_check->lineno = expr->lineno;
@@ -3222,7 +4119,7 @@ static void add_boolean_check (rule_compiler_t *ctx,
 						     H_NULL))));
   /* hash = '(NODE_IFSTMT expr NULL NULL)' mod bigprime */
   bool_check->stype = NULL; /* not known yet */
-  bool_check->compute_stype = compute_stype_ifstmt;
+  bool_check->compute_stype = CS_IFSTMT;
   bool_check->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, bool_check->cond = expr);
   bool_check->then = NULL;
@@ -3254,7 +4151,7 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx,1);
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
-  trans->gc.type = T_NULL;
+  trans->gc.type = T_NODE_TRANS;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   trans->file = file;
@@ -3292,7 +4189,7 @@ node_trans_t *build_indirect_transition(rule_compiler_t *ctx,
     }
   trans = gc_alloc (ctx->gc_ctx, sizeof(node_trans_t),
 		    &node_trans_class);
-  trans->gc.type = T_NULL;
+  trans->gc.type = T_NODE_TRANS;
   trans->type = -1;
   GC_TOUCH (ctx->gc_ctx, trans->cond = cond);
   check_expect_condition (ctx, cond);
@@ -3314,7 +4211,7 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
 
   new_rule = gc_alloc (ctx->gc_ctx, sizeof(node_rule_t),
 		       &node_rule_class);
-  new_rule->gc.type = T_NULL;
+  new_rule->gc.type = T_NODE_RULE;
   new_rule->name = sym->name;
   new_rule->file = sym->file;
   new_rule->line = sym->line;
@@ -3346,11 +4243,6 @@ static void type_heap_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, h->right);
 }
 
-static void type_heap_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int type_heap_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			       void *data)
 {
@@ -3367,11 +4259,113 @@ static int type_heap_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t type_heap_class = {
+static size_t type_heap_count (type_heap_t *h)
+{
+  if (h==NULL)
+    return 0;
+  return 1 + type_heap_count (h->left) + type_heap_count (h->right);
+}
+
+static int type_heap_save_recursive (save_ctx_t *sctx, type_heap_t *h)
+{
+  type_t *stype;
+  int err;
+  
+  if (h==NULL)
+    return 0;
+  err = save_gc_struct (sctx, (gc_header_t *)h->e);
+  if (err) return err;
+  stype = h->stype;
+  if (stype==NULL)
+    {
+      err = putc (T_NOTHING, sctx->f);
+      if (err) return err;
+      err = save_string (sctx, NULL);
+    }
+  else
+    {
+      err = putc ((int)stype->tag, sctx->f);
+      if (err) return err;
+      err = save_string (sctx, stype->name);
+    }
+  if (err) return err;
+  err = type_heap_save_recursive (sctx, h->left);
+  if (err) return err;
+  err = type_heap_save_recursive (sctx, h->right);
+  return err;
+}
+
+static int type_heap_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  type_heap_t *h = (type_heap_t *)p;
+  size_t n;
+  int err;
+
+  n = type_heap_count (h);
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  err = type_heap_save_recursive (sctx, h);
+  return err;
+}
+
+gc_class_t type_heap_class;
+
+static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp,
+			    node_expr_t *e, type_t *t);
+
+static gc_header_t *type_heap_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  type_heap_t *h;
+  node_expr_t *e;
+  char *typename;
+  type_t *stype;
+  size_t i, n;
+  unsigned char tag;
+  int c;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  h = NULL;
+  /* GC_UPDATE (gc_ctx, 1, NULL); */
+  err = restore_size_t (rctx, &n);
+  if (err) { errno = err; goto end; }
+  for (i=0; i<n; i++)
+    {
+      e = (node_expr_t *)restore_gc_struct (rctx);
+      GC_UPDATE (gc_ctx, 0, e);
+      if (e==NULL && errno!=0) { h = NULL; goto end; }
+      c = getc (rctx->f);
+      if (c==EOF) { h = NULL; goto end; }
+      tag = (unsigned char)c;
+      err = restore_string (rctx, &typename);
+      if (err) { errno = err; h = NULL; goto end; }
+      if (tag==T_NOTHING)
+	{
+	  gc_base_free (typename);
+	  stype = NULL;
+	}
+      else
+	{
+	  if (typename==NULL) { errno = -2; h = NULL; goto end; }
+	  stype = stype_from_string (gc_ctx, typename, 1, tag);
+	  gc_base_free (typename);
+	}
+      push_type_node (gc_ctx, (type_heap_t **)&GC_LOOKUP(1), e, stype);
+    }
+  h = GC_LOOKUP(1);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)h;
+}
+
+gc_class_t type_heap_class = {
   GC_ID('t','p','h','p'),
   type_heap_mark_subfields,
-  type_heap_finalize,
-  type_heap_traverse
+  NULL,
+  type_heap_traverse,
+  type_heap_save,
+  type_heap_restore
 };
 
 /* Priority queues, implemented as skew heaps */
@@ -3449,7 +4443,7 @@ static void push_type_node (gc_t *gc_ctx, type_heap_t **rtp,
 	}
     }
   rt = gc_alloc (gc_ctx, sizeof(type_heap_t), &type_heap_class);
-  rt->gc.type = T_NULL;
+  rt->gc.type = T_TYPE_HEAP;
   GC_TOUCH (gc_ctx, rt->e = e);
   rt->stype = t;
   rt->left = NULL;
@@ -3678,11 +4672,12 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 				node_varlist_t *dest_list)
 {
   node_expr_regsplit_t *n;
+  size_t i, nvars;
 
   GC_START(ctx->gc_ctx, 1);
-  n = gc_alloc (ctx->gc_ctx, sizeof (node_expr_t),
+  n = gc_alloc (ctx->gc_ctx, sizeof (node_expr_regsplit_t),
 		&node_expr_regsplit_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_REGSPLIT;
   n->type = NODE_REGSPLIT;
   GC_TOUCH (ctx->gc_ctx, n->file = pattern->file);
   n->lineno = pattern->lineno;
@@ -3692,11 +4687,14 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 				    h_varlist (dest_list))));
   /* hash = '(NODE_REGSPLIT source pattern x1 ... xn)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_string_split;
+  n->compute_stype = CS_STRING_SPLIT;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->string = source);
   GC_TOUCH (ctx->gc_ctx, n->split_pat = pattern);
   n->dest_vars = dest_list;
+  if (dest_list!=NULL)
+    for (i=0, nvars = dest_list->vars_nb; i<nvars; i++)
+      GC_TOUCH (ctx->gc_ctx, dest_list->vars[i]);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   REGEXNUM(TERM_DATA(pattern)) = (dest_list==NULL)?0:dest_list->vars_nb;
   if (REGEXNUM(TERM_DATA(pattern))!=REGEX(TERM_DATA(pattern)).re_nsub)
@@ -3875,7 +4873,7 @@ node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
   GC_START(ctx->gc_ctx, 1);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_BINOP;
   n->type = NODE_BINOP;
   GC_TOUCH (ctx->gc_ctx, n->file = left_node->file);
   n->lineno = left_node->lineno;
@@ -3886,7 +4884,7 @@ node_expr_t *build_expr_binop(rule_compiler_t *ctx, int op,
 					    H_NULL))));
   /* hash = '(NODE_BINOP op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_binop;
+  n->compute_stype = CS_BINOP;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -3976,7 +4974,7 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
   GC_START(ctx->gc_ctx, 1);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
 		&node_expr_mon_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_MONOP;
   n->type = NODE_MONOP;
   GC_TOUCH (ctx->gc_ctx, n->file = arg_node->file);
   n->lineno = arg_node->lineno;
@@ -3985,7 +4983,7 @@ node_expr_t *build_expr_monop(rule_compiler_t *ctx, int op,
 			    h_cons (arg_node, H_NULL)));
   /* hash = '(NODE_MONOP op arg_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_monop;
+  n->compute_stype = CS_MONOP;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->val = arg_node);
@@ -4013,7 +5011,7 @@ node_expr_t *build_expr_return(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
 		&node_expr_mon_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_RETURN;
   n->type = NODE_RETURN;
   GC_TOUCH (ctx->gc_ctx, n->file = arg_node->file);
   n->lineno = arg_node->lineno;
@@ -4021,7 +5019,7 @@ node_expr_t *build_expr_return(rule_compiler_t *ctx,
 		    h_cons (arg_node, H_NULL));
   /* hash = '(NODE_RETURN arg_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_return;
+  n->compute_stype = CS_RETURN;
   n->parents = NULL;
   n->op = -1;
   GC_TOUCH (ctx->gc_ctx, n->val = arg_node);
@@ -4060,14 +5058,14 @@ node_expr_t *build_expr_break(rule_compiler_t *ctx)
   GC_START(ctx->gc_ctx, 1);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t),
 		&node_expr_mon_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_BREAK;
   n->type = NODE_BREAK;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->hash = h_pair (NODE_BREAK, H_NULL);
   /* hash = '(NODE_BREAK)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_break;
+  n->compute_stype = CS_BREAK;
   n->parents = NULL;
   n->op = -1;
   n->val = NULL;
@@ -4100,13 +5098,13 @@ node_expr_t *build_expr_cons(rule_compiler_t *ctx,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONS;
   n->type = NODE_CONS;
   n->file = NULL;
   n->lineno = 0;
   n->hash = h_cons (left_node, (right_node==NULL)?H_NULL:right_node->hash);
   n->stype = NULL;
-  n->compute_stype = NULL;
+  n->compute_stype = CS_NULL;
   n->parents = NULL;
   n->op = 0;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -4144,7 +5142,7 @@ node_expr_t *build_expr_action(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   n = build_expr_cons (ctx, action, rest);
   GC_UPDATE(ctx->gc_ctx, 0, n);
-  n->compute_stype = compute_stype_action;
+  n->compute_stype = CS_ACTION;
   add_parent (ctx, action, (node_expr_t *)n);
   GC_END(ctx->gc_ctx);
   return n;
@@ -4288,7 +5286,7 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_COND;
   n->type = NODE_COND;
   GC_TOUCH (ctx->gc_ctx, n->file = left_node?left_node->file:right_node->file);
   n->lineno = left_node?left_node->lineno:right_node->lineno;
@@ -4299,7 +5297,7 @@ node_expr_t *build_expr_cond(rule_compiler_t *ctx,
 					    H_NULL))));
   /* hash = '(NODE_COND op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_cond;
+  n->compute_stype = CS_COND;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -4363,7 +5361,7 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *nop_var,
   GC_START(ctx->gc_ctx, 1);
   n = (node_expr_bin_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 				   &node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_ASSOC;
   n->type = NODE_ASSOC;
   GC_TOUCH (ctx->gc_ctx, n->file = nop_var->file);
   n->lineno = nop_var->lineno;
@@ -4372,7 +5370,7 @@ node_expr_t *build_assoc(rule_compiler_t *ctx, node_expr_t *nop_var,
 			    h_cons (expr, H_NULL)));
   /* hash = '(NODE_ASSOC var expr)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_assoc;
+  n->compute_stype = CS_ASSOC;
   n->parents = NULL;
   n->op = EQ;
   GC_TOUCH (ctx->gc_ctx, n->lval = var);
@@ -4505,7 +5503,7 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   call_node = (node_expr_call_t *)gc_alloc (ctx->gc_ctx,
 					    sizeof(node_expr_call_t),
 					    &node_expr_call_class);
-  call_node->gc.type = T_NULL;
+  call_node->gc.type = T_NODE_CALL;
   call_node->file = NULL;
   call_node->hash = h_pair (NODE_CALL,
 			    h_pair (h_string (sym->name),
@@ -4520,7 +5518,7 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
   GC_TOUCH (ctx->gc_ctx, call_node->file = currfile);
   call_node->lineno = sym->line;
   call_node->stype = NULL; /* not known yet */
-  call_node->compute_stype = compute_stype_call;
+  call_node->compute_stype = CS_CALL;
   for (l=paramlist; l!=NULL; l=BIN_RVAL(l))
     add_parent (ctx, BIN_LVAL(l), (node_expr_t *)call_node);
   call_node->symbol = sym->name;
@@ -4605,7 +5603,7 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
   GC_START(ctx->gc_ctx, 1);
   i = gc_alloc (ctx->gc_ctx, sizeof(node_expr_if_t),
 		&node_expr_ifstmt_class);
-  i->gc.type = T_NULL;
+  i->gc.type = T_NODE_IFSTMT;
   i->type = NODE_IFSTMT;
   GC_TOUCH (ctx->gc_ctx, i->file = cond->file);
   i->lineno = cond->lineno;
@@ -4616,7 +5614,7 @@ node_expr_t *build_expr_ifstmt(rule_compiler_t *ctx,
 					    H_NULL))));
   /* hash = '(NODE_IFSTMT cond then els)' mod bigprime */
   i->stype = NULL; /* not known yet */
-  i->compute_stype = compute_stype_ifstmt;
+  i->compute_stype = CS_IFSTMT;
   i->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, i->cond = cond);
   GC_TOUCH (ctx->gc_ctx, i->then = then);
@@ -4657,8 +5655,8 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   }
   GC_START(ctx->gc_ctx, 1);
   n = (node_expr_symbol_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_symbol_t),
-				      &node_expr_sym_class);
-  n->gc.type = T_NULL;
+				      &node_expr_field_class);
+  n->gc.type = T_NODE_FIELD;
   n->type = NODE_FIELD;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4666,7 +5664,7 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
 		    h_string (fieldname));
   /* hash = '(NODE_FIELD n a m e)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_fieldname;
+  n->compute_stype = CS_FIELDNAME;
   n->parents = NULL;
   n->name = fieldname;
   n->res_id = f->id;
@@ -4696,13 +5694,13 @@ node_expr_t *build_varname(rule_compiler_t *ctx, char *varname)
     }
 
   n = (node_expr_symbol_t *)gc_alloc (ctx->gc_ctx, sizeof(node_expr_symbol_t),
-				      &node_expr_sym_class);
-  n->gc.type = T_NULL;
+				      &node_expr_var_class);
+  n->gc.type = T_NODE_VARIABLE;
   n->type = NODE_VARIABLE;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_dummy;
+  n->compute_stype = CS_DUMMY;
   n->parents = NULL;
   n->name = varname;
   n->res_id = ctx->rule_env->elmts;
@@ -4739,7 +5737,7 @@ node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4749,7 +5747,7 @@ node_expr_t *build_integer(rule_compiler_t *ctx, unsigned long i)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_UINT i)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_integer;
+  n->compute_stype = CS_INTEGER;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = integer);
   n->res_id = ctx->statics_nb;
@@ -4777,7 +5775,7 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4787,7 +5785,7 @@ node_expr_t *build_double(rule_compiler_t *ctx, double f)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_FLOAT byte1 ... byten)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_double;
+  n->compute_stype = CS_DOUBLE;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = fpdouble);
   n->res_id = ctx->statics_nb;
@@ -4822,7 +5820,7 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4831,7 +5829,7 @@ node_expr_t *build_string(rule_compiler_t *ctx, char *str)
 			    h_string (str)));
   /* hash = '(NODE_CONST T_STR c h a r s)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_string;
+  n->compute_stype = CS_STRING;
   n->parents = NULL;
   GC_TOUCH(ctx->gc_ctx, n->data = string);
   n->res_id = ctx->statics_nb;
@@ -4859,7 +5857,7 @@ node_expr_t *build_db_nothing(rule_compiler_t *ctx)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4867,7 +5865,7 @@ node_expr_t *build_db_nothing(rule_compiler_t *ctx)
 		    h_pair (T_DB_EMPTY, H_NULL));
   /* hash = '(NODE_CONST T_DB_EMPTY)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_db_empty;
+  n->compute_stype = CS_DB_EMPTY;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = empty);
   n->res_id = ctx->statics_nb;
@@ -4909,7 +5907,7 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_EVENT;
   n->type = NODE_EVENT;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -4919,7 +5917,7 @@ node_expr_t *build_expr_event(rule_compiler_t *ctx, int op,
 				    h_cons (right_node, H_NULL))));
   /* hash = '(NODE_EVENT op left_node right_node)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_event;
+  n->compute_stype = CS_EVENT;
   n->parents = NULL;
   n->op = op;
   GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
@@ -5065,7 +6063,7 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
   node_expr_t *l, *e;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_DB_PATTERN;
   n->type = NODE_DB_PATTERN;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5074,7 +6072,7 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
   /* hash = '(NODE_DB_PATTERN db arg1 ... argn)' mod bigprime */
   /* note that tuple->hash is correct, because tuples are never empty */
   n->stype = NULL;
-  n->compute_stype = compute_stype_db_pattern;
+  n->compute_stype = CS_DB_PATTERN;
   n->parents = NULL;
   n->op = -1;
   GC_TOUCH (ctx->gc_ctx, n->lval = db);
@@ -5192,7 +6190,7 @@ node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
   node_expr_t *l;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_mon_t), &node_expr_mon_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_DB_SINGLETON;
   n->type = NODE_DB_SINGLETON;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5202,7 +6200,7 @@ node_expr_t *build_db_singleton(rule_compiler_t *ctx, node_expr_t *tuple)
      where tuple = (arg1 ... argn) */
   /* note that tuple->hash is correct, because tuples are never empty */
   n->stype = NULL;
-  n->compute_stype = compute_stype_db_singleton;
+  n->compute_stype = CS_DB_SINGLETON;
   n->parents = NULL;
   n->op = -1;
   GC_TOUCH (ctx->gc_ctx, n->val = tuple);
@@ -5264,7 +6262,7 @@ node_expr_t *build_db_collect(rule_compiler_t *ctx,
   node_expr_t *action;
 
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_DB_COLLECT;
   n->type = NODE_DB_COLLECT;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5277,7 +6275,7 @@ node_expr_t *build_db_collect(rule_compiler_t *ctx,
 				    (patterns==NULL)?H_NULL:patterns->hash)));
   /* hash = '(NODE_DB_COLLECT returns (actions . collect) pat1 ... patn)' mod bigprime */
   n->stype = NULL;
-  n->compute_stype = compute_stype_db_collect;
+  n->compute_stype = CS_DB_COLLECT;
   n->parents = NULL;
   n->op = -1;
   action = build_expr_cons (ctx, action, patterns);
@@ -5324,7 +6322,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5334,7 +6332,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 				   sizeof(struct in_addr))));
   /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_ipv4;
+  n->compute_stype = CS_IPV4;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
@@ -5375,7 +6373,7 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5385,7 +6383,7 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 				   sizeof(struct in6_addr))));
   /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_ipv6;
+  n->compute_stype = CS_IPV6;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = addr);
   n->res_id = ctx->statics_nb;
@@ -5407,12 +6405,12 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
   GC_START(ctx->gc_ctx,1);
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
-  n->compute_stype = NULL;
+  n->compute_stype = CS_NULL;
   n->parents = NULL;
   
   /* resolve host name */
@@ -5435,7 +6433,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
     GC_TOUCH (ctx->gc_ctx, n->data = addr);
     n->res_id = ctx->statics_nb;
     GC_UPDATE(ctx->gc_ctx, 0, n);
-    n->compute_stype = compute_stype_ipv4;
+    n->compute_stype = CS_IPV4;
   }
   else
   {
@@ -5450,7 +6448,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
     GC_TOUCH (ctx->gc_ctx, n->data = addr);
     n->res_id = ctx->statics_nb;
     GC_UPDATE(ctx->gc_ctx, 0, n);
-    n->compute_stype = compute_stype_ipv6;
+    n->compute_stype = CS_IPV6;
   }
    
   freeaddrinfo(sa);
@@ -5480,7 +6478,7 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5490,7 +6488,7 @@ node_expr_t *build_ctime_from_int(rule_compiler_t *ctx, time_t ctime)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_ctime;
+  n->compute_stype = CS_CTIME;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -5551,7 +6549,7 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5561,7 +6559,7 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
 				    H_NULL)));
   /* hash = '(NODE_CONST T_CTIME timeval)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_ctime;
+  n->compute_stype = CS_CTIME;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = time);
   n->res_id = ctx->statics_nb;
@@ -5591,7 +6589,7 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5602,7 +6600,7 @@ node_expr_t *build_timeval_from_int(rule_compiler_t *ctx, long sec, long usec)
 					    H_NULL))));
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_timeval;
+  n->compute_stype = CS_TIMEVAL;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -5637,7 +6635,7 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5648,7 +6646,7 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
 					    H_NULL))));
   /* hash = '(NODE_CONST T_TIMEVAL sec usec)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_timeval;
+  n->compute_stype = CS_TIMEVAL;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = timeval);
   n->res_id = ctx->statics_nb;
@@ -5694,12 +6692,12 @@ node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
     }
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_regex;
+  n->compute_stype = CS_REGEX;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -5736,7 +6734,7 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
   }
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
-  n->gc.type = T_NULL;
+  n->gc.type = T_NODE_CONST;
   n->type = NODE_CONST;
   GC_TOUCH (ctx->gc_ctx, n->file = ctx->currfile);
   n->lineno = ctx->issdllineno;
@@ -5745,7 +6743,7 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
 			    h_string (regex_str)));
   /* hash = '(NODE_CONST T_REGEX r e g e x)' mod bigprime */
   n->stype = NULL; /* not known yet */
-  n->compute_stype = compute_stype_regex;
+  n->compute_stype = CS_REGEX;
   n->parents = NULL;
   GC_TOUCH (ctx->gc_ctx, n->data = regex);
   n->res_id = ctx->statics_nb;
@@ -6112,11 +7110,172 @@ static int rule_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t rule_class = {
+static int save_bytecode (save_ctx_t *sctx, bytecode_t *bc, size_t n)
+{
+  size_t i;
+  int err;
+
+  for (i=0; i<n; i++)
+    {
+      err = save_ulong (sctx, bc[i]);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static int transition_save (save_ctx_t *sctx, state_t *state_array,
+			    transition_t *t)
+{
+  size_t stateno;
+  size_t i, n;
+  int err;
+
+  stateno = t->dest - state_array;
+  err = save_size_t (sctx, stateno);
+  if (err) return err;
+  n = t->required_fields_nb;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = save_int32 (sctx, t->required_fields[i]);
+      if (err) return err;
+    }
+  n = t->eval_code_length;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  err = save_bytecode (sctx, t->eval_code, n);
+  if (err) return err;
+  err = save_int32 (sctx, t->id);
+  if (err) return err;
+  err = save_int32 (sctx, t->global_id);
+  if (err) return err;
+  err = save_uint32 (sctx, t->flags);
+  return err;
+}
+
+static int state_save (save_ctx_t *sctx, state_t *state_array, state_t *state)
+{
+  size_t i, n;
+  int err;
+
+  err = save_string (sctx, state->name);
+  if (err) return err;
+  err = save_int32 (sctx, state->line);
+  if (err) return err;
+  n = state->actionlength;
+  err = save_size_t (sctx, state->actionlength);
+  if (err) return err;
+  err = save_bytecode (sctx, state->action, n);
+  if (err) return err;
+  n = state->trans_nb;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = transition_save (sctx, state_array, &state->trans[i]);
+      if (err) return err;
+    }
+  /* Do not save state->rule, which must be our parent anyway */
+  err = save_uint32 (sctx, state->flags);
+  if (err) return err;
+  err = save_int32 (sctx, state->id);
+  return err;
+}
+
+static int rule_sync_lock_save_walk (void *key, void *elmt, void *data)
+{
+  save_ctx_t *sctx = data;
+  int err;
+
+  err = save_gc_struct (sctx, key);
+  if (err) return err;
+  err = save_gc_struct (sctx, elmt);
+  return err;
+}
+
+static int rule_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  rule_t *rule = (rule_t *)p;
+  size_t i, n;
+  int32_t var, nvars;
+  objhash_t *sync_lock;
+  int err;
+
+  err = save_string (sctx, rule->filename);
+  if (err) return err;
+  err = save_ctime (sctx, rule->file_mtime);
+  if (err) return err;
+  err = save_int32 (sctx, rule->lineno);
+  if (err) return err;
+  err = save_string (sctx, rule->name);
+  if (err) return err;
+  n = rule->state_nb;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = state_save (sctx, rule->state, &rule->state[i]);
+      if (err) return err;
+    }
+  err = save_size_t (sctx, rule->trans_nb);
+  if (err) return err;
+  n = rule->static_env_sz;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = save_gc_struct (sctx, (gc_header_t *)rule->static_env[i]);
+      if (err) return err;
+    }
+  nvars = rule->dynamic_env_sz;
+  err = save_int32 (sctx, nvars);
+  if (err) return err;
+  for (var=0; var<nvars; var++)
+    {
+      err = save_string (sctx, rule->var_name[var]);
+      if (err) return err;
+    }
+  err = save_size_t (sctx, rule->instances);
+  if (err) return err;
+  err = save_int32 (sctx, rule->id);
+  if (err) return err;
+  err = save_int (sctx, rule->flags);
+  if (err) return err;
+  nvars = rule->sync_vars_sz;
+  err = save_size_t (sctx, nvars);
+  if (err) return err;
+  for (var=0; var<nvars; var++)
+    {
+      err = save_int32 (sctx, rule->sync_vars[var]);
+      if (err) return err;
+    }
+  sync_lock = rule->sync_lock;
+  if (sync_lock==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      n = sync_lock->elmts;
+      err = save_size_t (sctx, n);
+      if (err) return err;
+      err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
+			  (void *)sctx);
+    }
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)rule->next);
+  return err;
+}
+
+gc_class_t rule_class;
+
+/*!!! write rule_restore() */
+
+gc_class_t rule_class = {
   GC_ID('r','u','l','e'),
   rule_mark_subfields,
   rule_finalize,
-  rule_traverse
+  rule_traverse,
+  rule_save,
 };
 
 void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
@@ -6153,15 +7312,13 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
-  rule->gc.type = T_NULL;
+  rule->gc.type = T_RULE;
   rule->filename = NULL;
   rule->name = NULL;
   rule->state = NULL;
   rule->static_env = NULL;
   rule->var_name = NULL;
-  rule->start_conds = NULL;
   rule->next = NULL;
-  rule->init = NULL;
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
@@ -6377,11 +7534,13 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
 	state->flags |= BYTECODE_HAS_PUSHFIELD;
       }
 
+      state->actionlength = code.pos;
       state->action = bytecode;
       FREE_LABELS(code.labels);
     }
   else
     {
+      state->actionlength = 0;
       state->action = NULL;
       DebugLog(DF_OLC, DS_INFO, "state \"%s\" has no action\n", state->name);
     }
@@ -6605,6 +7764,7 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
   DebugLog(DF_OLC, DS_TRACE, "bytecode size: %i\n", code.pos);
   DebugLog(DF_OLC, DS_TRACE, "used fields: %i\n", code.used_fields_sz);
 
+  trans->eval_code_length = code.pos;
   trans->eval_code = gc_base_malloc (ctx->gc_ctx,
 				     code.pos * sizeof (bytecode_t));
   memcpy(trans->eval_code, code.bytecode, code.pos * sizeof (bytecode_t));
@@ -6614,9 +7774,9 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
     {
       trans->required_fields = gc_base_malloc (ctx->gc_ctx,
 					       code.used_fields_sz
-					       * sizeof(int));
+					       * sizeof(int32_t));
       memcpy (trans->required_fields, code.used_fields,
-	      code.used_fields_sz * sizeof(int));
+	      code.used_fields_sz * sizeof(int32_t));
     }
   FREE_LABELS(code.labels);
   return trans->eval_code;
@@ -7124,8 +8284,8 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	size_t n;
 
 	i = SYM_RES_ID(expr);
-	idx = i / (8 * sizeof(int));
-	shift = i % (8 * sizeof(int));
+	idx = i / (8 * sizeof(int32_t));
+	shift = i % (8 * sizeof(int32_t));
 	if (idx>=MAX_FIELD_SZ)
 	  {
 	    DebugLog (DF_OLC, DS_FATAL,
@@ -7387,7 +8547,9 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	{
 	  trans = &state->trans[i];
 	  trans->dest = NULL;
+	  trans->required_fields_nb = 0;
 	  trans->required_fields = NULL;
+	  trans->eval_code_length = 0;
 	  trans->eval_code = NULL;
 	  /* to prevent garbage collector bugs:
 	     in case the allocations below
@@ -7514,7 +8676,7 @@ fprintf_rule_environment(FILE *fp, orchids_t *ctx)
     fprintf(fp, "res_id: %3i: ", i);
     fprintf_issdl_val(fp, ctx, ctx->rule_compiler->statics[i]);
   }
-  fprintf(fp, "  dynamic environment size : %i\n",
+  fprintf(fp, "  dynamic environment size : %zu\n",
 	  ctx->rule_compiler->rule_env->elmts);
 }
 
@@ -7795,7 +8957,7 @@ fprintf_rule_stats(const orchids_t *ctx, FILE *fp)
 
   for (r = ctx->rule_compiler->first_rule, rn = 0; r; r = r->next, rn++)
     {
-      fprintf(fp, " %3i | %12.12s | %3zi | %3zi | %3i | %3i | %3zi | %.24s:%i\n",
+      fprintf(fp, " %3i | %12.12s | %3zi | %3zi | %3zu | %3i | %3zi | %.24s:%i\n",
               rn, r->name, r->state_nb, r->trans_nb,
               r->static_env_sz, r->dynamic_env_sz,
               r->instances, r->filename, r->lineno);

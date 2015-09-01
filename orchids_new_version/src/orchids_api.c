@@ -154,15 +154,135 @@ static int field_record_table_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t field_record_table_class = {
+static int field_record_table_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  size_t i, n;
+  field_record_table_t *frt = (field_record_table_t *)p;
+  field_record_t *rec;
+  FILE *f = sctx->f;
+  int mono;
+  int err;
+
+  if (frt->fields==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      n = frt->num_fields;
+      err = save_size_t (sctx, n);
+      if (err) return err;
+      for (i=0; i<n; i++)
+	{
+	  rec = &frt->fields[i];
+	  err = save_int32 (sctx, rec->active);
+	  if (err) return err;
+	  err = save_string (sctx, rec->name);
+	  if (err) return err;
+	  err = putc ((int)rec->type->tag, f);
+	  if (err) return err;
+	  err = save_string (sctx, rec->type->name);
+	  if (err) return err;
+	  err = save_string (sctx, rec->desc);
+	  if (err) return err;
+	  err = save_int32 (sctx, rec->id);
+	  if (err) return err;
+	  mono = rec->mono;
+	  err = save_int (sctx, mono); /* save mono as int (=monotony) */
+	  if (err) return err;
+	  err = save_gc_struct (sctx, (gc_header_t *)rec->val);
+	}
+    }
+  return err;
+}
+
+gc_class_t field_record_table_class;
+
+static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  FILE *f = rctx->f;
+  field_record_table_t *frt;
+  field_record_t *rec;
+  size_t i, n;
+  char *s;
+  int32_t active, id;
+  unsigned char tag;
+  int mono;
+  ovm_var_t *val;
+  int c, err;
+
+  GC_START (gc_ctx, 1);
+  err = restore_size_t (rctx, &n);
+  frt = gc_alloc (gc_ctx, sizeof(field_record_table_t),
+		  &field_record_table_class);
+  frt->gc.type = T_FIELD_RECORD_TABLE;
+  frt->num_fields = 0;
+  frt->fields = NULL;
+  GC_UPDATE (gc_ctx, 0, frt);
+  frt->fields = gc_base_malloc (gc_ctx, n*sizeof(field_record_t));
+  for (i=0; i<n; )
+    {
+      rec = &frt->fields[i];
+      err = restore_int32 (rctx, &active);
+      if (err) goto errlab_freeentries;
+      rec->active = active;
+      err = restore_string (rctx, &rec->name);
+      /* allocates rec->name but will never free it, unless an
+	 error occurs; who cares. */
+      if (err) goto errlab_freeentries;
+      c = getc (f);
+      if (c==EOF) { err = c; goto errlab_freename; }
+      tag = (unsigned char)c;
+      err = restore_string (rctx, &s);
+      if (err) goto errlab_freename;
+      if (s==NULL) { err = -2; goto errlab_freename; }
+      rec->type = stype_from_string (gc_ctx, s, 1, tag);
+      gc_base_free (s);
+      err = restore_string (rctx, &rec->desc);
+      /* allocates rec->name but will never free it, unless an
+	 error occurs; who cares. */
+      if (err) goto errlab_freename;
+      err = restore_int32 (rctx, &id);
+      if (err) goto errlab_freenamedesc;
+      rec->id = id;
+      err = restore_int (rctx, &mono);
+      if (err) goto errlab_freenamedesc;
+      rec->mono = (monotony)mono;
+      val = (ovm_var_t *)restore_gc_struct (rctx);
+      if (val==NULL && errno!=0)
+	goto errlab_freenamedesc;
+      GC_TOUCH (gc_ctx, rec->val = val);
+      frt->num_fields = ++i;
+    }
+  goto normal;
+ errlab_freenamedesc:
+  gc_base_free (rec->desc);
+ errlab_freename:
+  gc_base_free (rec->name);
+ errlab_freeentries:
+  while (i!=0)
+    {
+      --i;
+      rec = &frt->fields[i];
+      gc_base_free (rec->desc);
+      gc_base_free (rec->name);      
+    }
+  errno = err;
+  frt = NULL;
+ normal:
+  GC_END (gc_ctx);
+  return (gc_header_t *)frt;
+}
+
+gc_class_t field_record_table_class = {
   GC_ID('f','r','c','t'),
   field_record_table_mark_subfields,
   field_record_table_finalize,
-  field_record_table_traverse
+  field_record_table_traverse,
+  field_record_table_save,
+  field_record_table_restore
 };
 
-orchids_t *
-new_orchids_context(void)
+orchids_t *new_orchids_context(void)
 {
   orchids_t *ctx;
 
@@ -244,6 +364,7 @@ new_orchids_context(void)
   ctx->evt_fb_fp = NULL;
 #endif
   ctx->temporal = NULL; /* for now, will be replaced below */
+  ctx->xclasses = NULL; /* for now, will be replaced below */
   ctx->runtime_user = NULL;
   /* ctx->ru not initialized */
   ctx->pid = getpid();
@@ -269,7 +390,7 @@ new_orchids_context(void)
 	   ctx->global_fields = gc_alloc (ctx->gc_ctx,
 					  sizeof(field_record_table_t),
 					  &field_record_table_class));
-  ctx->global_fields->gc.type = T_NULL;
+  ctx->global_fields->gc.type = T_FIELD_RECORD_TABLE;
   ctx->global_fields->num_fields = 0;
   ctx->global_fields->fields = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->global_fields);
@@ -290,6 +411,7 @@ new_orchids_context(void)
   //set_yaccer_context(ctx->rule_compiler);
 
   ctx->temporal = new_strhash(ctx->gc_ctx, 65537);
+  ctx->xclasses = new_strhash(ctx->gc_ctx, 137);
   return ctx;
 }
 
@@ -620,11 +742,6 @@ static void event_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, e->next);
 }
 
-static void event_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return;
-}
-
 static int event_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			   void *data)
 {
@@ -638,11 +755,57 @@ static int event_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
-static gc_class_t event_class = {
+static int event_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  event_t *e = (event_t *)p;
+  int err;
+
+  err = save_int32 (sctx, e->field_id);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)e->value);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)e->next);
+  return err;
+}
+
+gc_class_t event_class;
+
+static gc_header_t *event_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  event_t *e, *next;
+  int32_t id;
+  ovm_var_t *val;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  e = NULL;
+  err = restore_int32 (rctx, &id);
+  if (err) { errno = err; goto end; }
+  val = (ovm_var_t *)restore_gc_struct (rctx);
+  if (val==NULL && errno!=0) goto end;
+  GC_UPDATE (gc_ctx, 0, val);
+  next = (event_t *)restore_gc_struct (rctx);
+  if (next==NULL && errno!=0) goto end;
+  if (next!=NULL && TYPE(next)!=T_EVENT)
+    { errno = -2; goto end; }
+  e = gc_alloc (gc_ctx, sizeof(event_t), &event_class);
+  e->gc.type = T_EVENT;
+  e->field_id = id;
+  GC_TOUCH (gc_ctx, e->value = val);
+  GC_TOUCH (gc_ctx, e->next = next);
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)e;
+}
+
+gc_class_t event_class = {
   GC_ID('e','v','n','t'),
   event_mark_subfields,
-  event_finalize,
-  event_traverse
+  NULL,
+  event_traverse,
+  event_save,
+  event_restore
 };
 
 void
@@ -673,11 +836,6 @@ static void field_record_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
   GC_TOUCH (gc_ctx, fr->val);
 }
 
-static void field_record_finalize (gc_t *gc_ctx, gc_header_t *p)
-{
-  return; /* nothing to do: name and desc are pointers to static data */
-}
-
 static int field_record_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 				  void *data)
 {
@@ -691,7 +849,7 @@ static int field_record_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 static gc_class_t field_record_class = {
   GC_ID('f','r','e','c'),
   field_record_mark_subfields,
-  field_record_finalize,
+  NULL,
   field_record_traverse
 };
 #endif
@@ -1085,11 +1243,64 @@ static int field_table_traverse (gc_traverse_ctx_t *gtc,
   return err;
 }
 
-static gc_class_t field_table_class = {
+static int field_table_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  field_table_t *gft = (field_table_t *)p;
+  size_t i, n;
+  int err;
+
+  n = gft->nfields;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = save_gc_struct (sctx, (gc_header_t *)gft->field_values[i]);
+      if (err) return err;
+    }
+  return 0;
+}
+
+gc_class_t field_table_class;
+
+static gc_header_t *field_table_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  field_table_t *gft;
+  size_t i, n;
+  ovm_var_t **vals;
+  gc_header_t *p;
+  int err;
+
+  GC_START (gc_ctx, 1);
+  gft = NULL;
+  err = restore_size_t (rctx, &n);
+  if (err) { errno = err; goto end; }
+  vals = gc_base_malloc (gc_ctx, n * sizeof (ovm_var_t *));
+  gft = gc_alloc (gc_ctx, sizeof(field_table_t), &field_table_class);
+  gft->gc.type = T_FIELD_TABLE;
+  gft->nfields = 0;
+  gft->field_values = vals;
+  GC_UPDATE (gc_ctx, 0, gft);
+  for (i=0; i<n; )
+    {
+      p = restore_gc_struct (rctx);
+      if (p==NULL && errno!=0)
+	{ gft = NULL; goto end; }
+      vals[i] = (ovm_var_t *)p;
+      gft->nfields = ++i;
+    }
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)gft;
+}
+
+gc_class_t field_table_class = {
   GC_ID('g','f','l','t'),
   field_table_mark_subfields,
   field_table_finalize,
-  field_table_traverse
+  field_table_traverse,
+  field_table_save,
+  field_table_restore
 };
 
 field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields)
@@ -1103,7 +1314,7 @@ field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields)
     fvals[i] = NULL;
   fields = gc_alloc (gc_ctx, sizeof(field_table_t),
 		     &field_table_class);
-  fields->gc.type = T_NULL;
+  fields->gc.type = T_FIELD_TABLE;
   fields->nfields = nfields;
   fields->field_values = fvals;
   return fields;

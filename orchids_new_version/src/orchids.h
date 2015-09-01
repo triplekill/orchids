@@ -279,8 +279,9 @@ typedef struct rule_compiler_s rule_compiler_t;
 struct transition_s
 {
   state_t *dest;
-  int32_t  required_fields_nb;
+  size_t   required_fields_nb;
   int32_t *required_fields;
+  size_t eval_code_length;
   bytecode_t *eval_code;
   int32_t id;
   int32_t global_id;
@@ -321,6 +322,7 @@ struct state_s
 {
   char         *name;
   int32_t       line;
+  size_t actionlength;
   bytecode_t   *action;
   size_t        trans_nb;
   transition_t *trans;
@@ -364,12 +366,6 @@ struct state_s
 /**   @var rule_s::var_name
  **     Dynamic environment variable name.
  **/
-/**   @var rule_s::start_conds
- **     Starting conditions array.
- **/
-/**   @var rule_s::start_conds_sz
- **     Starting conditions array size.
- **/
 /**   @var rule_s::next
  **     Next rule in list (used for complete enumeration).
  **/
@@ -390,29 +386,21 @@ struct rule_s
   state_t          *state;
   size_t            trans_nb;
   ovm_var_t       **static_env;
-  int32_t           static_env_sz;
+  size_t            static_env_sz;
   int32_t           dynamic_env_sz; /* do not change type to, e.g., size_t:
 				      ovm_write_value(), ovm_release_value() all depend on this
 				      to hold at most 32 bits---that should
 				      be enough anyway */
   char            **var_name;
-  int32_t          *start_conds;
-  size_t            start_conds_sz;
   rule_t           *next;
   size_t            instances;
   int32_t           id;
   int               flags;
 #define RULE_INITIAL_ALREADY_LAUNCHED 0x1
-  state_instance_t *init;
-#ifdef OBSOLETE
-  int32_t           nb_init_threads; /* XXX: UNUSED */
-#endif
 
   objhash_t        *sync_lock;
   int32_t          *sync_vars;
   size_t           sync_vars_sz;
-
-  /* XXX add rule stats here ??? */
 };
 
 typedef struct env_bind_s env_bind_t;
@@ -474,7 +462,7 @@ struct state_instance_s {
   gc_header_t gc;
   struct thread_group_s *pid;
   state_t *q;  /* pointer to some state
-		  in rule_instance->rule->state[] array */
+		  in pid->rule->state[] array */
   transition_t *t;
   ovm_var_t *env; /* 'rho' in the spec */
   handle_bitmask_t owned_handles; /* bitmask of handles I do own;
@@ -1174,6 +1162,7 @@ struct orchids_s
   /* global temporal information container */
   /* XXX: Move this into mod_period */
   strhash_t        *temporal;
+  strhash_t        *xclasses;
 
   char *runtime_user;
 
@@ -1533,6 +1522,11 @@ set_yaccer_context(rule_compiler_t *ctx);
  **/
 int issdlparse(void *__compiler_ctx_g); /* really of type rule_compiler_t * */
 
+/* rule_compiler.c */
+
+type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
+			   unsigned char tag);
+
 /* ovm.h */
 
 /**
@@ -1665,7 +1659,7 @@ register_core_functions(orchids_t *ctx);
 
 
 /*
-** Debugging stuffs...
+** Debugging stuff
 ******/
 
 #ifdef ORCHIDS_DEBUG
@@ -1688,6 +1682,9 @@ event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
 		    event_t *event);
 
 /* In lang.c: */
+struct ovm_extern_class_s;
+void register_extern_class (orchids_t *ctx, struct ovm_extern_class_s *xclass);
+
 char *time_convert(char *str, char *end, struct timeval *tv);
 char *orchids_atoi (char *str, size_t len, long *result);
 char *orchids_atoui (char *str, size_t len, unsigned long *result);
