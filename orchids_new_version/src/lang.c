@@ -2096,7 +2096,7 @@ static void regex_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
   ovm_regex_t *regex = (ovm_regex_t *)p;
 
-  if (REGEX(regex).re_magic!=0)
+  //if (REGEX(regex).re_magic!=0)
     regfree(&(REGEX(regex)));
   if (REGEXSTR(regex)!=NULL)
     gc_base_free(REGEXSTR(regex));
@@ -2123,18 +2123,17 @@ static gc_header_t *regex_restore (restore_ctx_t *rctx)
   regex = gc_alloc (rctx->gc_ctx, sizeof(ovm_regex_t), &regex_class);
   regex->gc.type = T_REGEX;
   regex->regex_str = str;
-  regex->regex.re_magic = 0;
+  //regex->regex.re_magic = 0;
   regex->splits = 0;
-  if (str!=NULL)
-    {
-      err = regcomp(&REGEX(regex), str, REG_EXTENDED);
-      if (err) goto errlab;
-      REGEXNUM(regex) = REGEX(regex).re_nsub;
-    }
+  if (str==NULL) { errno = -2; goto errlab2; }
+  err = regcomp(&REGEX(regex), str, REG_EXTENDED);
+  if (err) goto errlab;
+  REGEXNUM(regex) = REGEX(regex).re_nsub;
   goto normal;
  errlab:
-  regex = NULL;
   errno = err;
+ errlab2:
+  regex = NULL;
  normal:
   return (gc_header_t *)regex;
 }
@@ -2155,7 +2154,7 @@ ovm_var_t *ovm_regex_new(gc_t *gc_ctx)
   regex = gc_alloc (gc_ctx, sizeof (ovm_regex_t), &regex_class);
   regex->gc.type = T_REGEX;
   regex->regex_str = NULL;
-  regex->regex.re_magic = 0;
+  //regex->regex.re_magic = 0;
   regex->splits = 0;
   return OVM_VAR(regex);
 }
@@ -4454,7 +4453,7 @@ static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
   ovm_var_t *regex;
 
   str = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  if (str && (TYPE(str) == T_STR || TYPE(str) == T_VSTR))
+  if (str!=NULL && (TYPE(str) == T_STR || TYPE(str) == T_VSTR))
     {
       int ret;
       char *s;

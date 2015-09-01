@@ -19,6 +19,8 @@
 #endif
 
 #include <string.h>
+#include <stdint.h>
+
 #include "orchids.h"
 #include "orchids_api.h"
 #include "mod_utils.h"

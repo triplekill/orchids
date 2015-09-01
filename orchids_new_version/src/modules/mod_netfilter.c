@@ -27,6 +27,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "orchids.h"
 #include "orchids_api.h"

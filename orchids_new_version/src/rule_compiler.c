@@ -2184,12 +2184,12 @@ varset_t *vs_one_element (gc_t *gc_ctx, int n)
 {
   varset_t *vs;
 
-//gc_check(gc_ctx);
+gc_check(gc_ctx);
   vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
   vs->gc.type = T_VARSET;
   vs->n = n;
   vs->next = NULL;
-//gc_check(gc_ctx);
+gc_check(gc_ctx);
   return vs;
 }
 
@@ -2367,6 +2367,7 @@ varset_t *vs_bound_vars_tuple (gc_t *gc_ctx, node_expr_t *tuple)
   node_expr_t **vars;
 
   nargs = 0;
+  gc_check (gc_ctx);
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
     nargs++;
   vars = gc_base_malloc (gc_ctx, nargs*sizeof(node_expr_t *));
@@ -2389,7 +2390,7 @@ varset_t *vs_bound_vars_db_pattern (gc_t *gc_ctx, node_expr_t *patterns)
   vs = VS_EMPTY;
   for (; patterns!=NULL; patterns = BIN_RVAL(patterns))
     {
-      tuplevs = vs_bound_vars_tuple (gc_ctx, BIN_LVAL(BIN_LVAL(patterns)));
+      tuplevs = vs_bound_vars_tuple (gc_ctx, BIN_RVAL(BIN_LVAL(patterns)));
       vs = vs_union (gc_ctx, vs, tuplevs);
       GC_UPDATE (gc_ctx, 0, vs);
     }
@@ -2405,7 +2406,7 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
   res.mustset = VS_EMPTY;
   GC_START(gc_ctx, 4);
  again:
-//gc_check(gc_ctx);
+gc_check(gc_ctx);
   if (e==NULL)
     ;
   else switch (e->type)
@@ -6062,6 +6063,7 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
   node_expr_bin_t *n;
   node_expr_t *l, *e;
 
+  //gc_check(ctx->gc_ctx);
   n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t), &node_expr_bin_class);
   n->gc.type = T_NODE_DB_PATTERN;
   n->type = NODE_DB_PATTERN;
@@ -6080,6 +6082,7 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
   GC_START(ctx->gc_ctx, 1);
   GC_UPDATE(ctx->gc_ctx, 0, n);
   add_parent (ctx, db, (node_expr_t *)n);
+  //gc_check(ctx->gc_ctx);
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
     {
       e = BIN_LVAL(l);
@@ -6087,6 +6090,7 @@ node_expr_t *build_db_pattern(rule_compiler_t *ctx, node_expr_t *tuple, node_exp
 	add_parent (ctx, e, (node_expr_t *)n);
     }
   GC_END(ctx->gc_ctx);
+  //gc_check(ctx->gc_ctx);
   return (node_expr_t *)n;
 }
 
@@ -7679,7 +7683,7 @@ static void compile_bytecode_trans_cond (node_expr_t *e,
 					 bytecode_buffer_t *code)
 {
   normalized_trans_t nt;
-  unsigned int label_ok, label_fail, label_will_always_fail, label_end;
+  unsigned int label_ok, label_fail, label_will_always_fail;
   size_t i;
 
   label_ok = NEW_LABEL(code->labels)
@@ -7690,7 +7694,6 @@ static void compile_bytecode_trans_cond (node_expr_t *e,
   if (nt.npersistent!=0)
     label_will_always_fail = NEW_LABEL(code->labels)
   else label_will_always_fail = 0;
-  label_end = NEW_LABEL(code->labels);
   for (i=0; i<nt.npersistent; i++)
     {
       if (nt.persneg[i])

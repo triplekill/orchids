@@ -37,6 +37,7 @@
 #endif
 
 #include <errno.h>
+#include <stdint.h>
 
 #include "orchids.h"
 

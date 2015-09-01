@@ -17,6 +17,8 @@
 #ifndef ORCHIDS_GC
 #define ORCHIDS_GC
 
+#include <stdint.h>
+
 typedef struct gc_s gc_t;
 typedef struct gc_header_s gc_header_t;
 typedef struct gc_traverse_ctx_s gc_traverse_ctx_t;

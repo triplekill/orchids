@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <wchar.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "orchids.h"
 

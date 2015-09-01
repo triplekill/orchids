@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "orchids.h"
 #include "ovm.h"

@@ -172,4 +172,10 @@ mod_openbsm_la_LDFLAGS = -module -avoid-version
 # gen_mod_openbsm: gen_mod_openbsm.c
 # 	$(CC) $< -o $$
 
+#mod_sql_la_SOURCES = mod_sql.c mod_sql.h
+#mod_sql_la_CFLAGS = -lsqlite3 -lmysqlclient -lz
+#mod_sql_la_LDFLAGS = -module -avoid-version
+#mod_sql_la_LIBADD = -lsqlite3 -lmysqlclient -lz
+
+
 # End-of-file
