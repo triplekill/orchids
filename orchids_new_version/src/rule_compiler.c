@@ -2184,12 +2184,12 @@ varset_t *vs_one_element (gc_t *gc_ctx, int n)
 {
   varset_t *vs;
 
-gc_check(gc_ctx);
+  //gc_check(gc_ctx);
   vs = gc_alloc (gc_ctx, sizeof(varset_t), &varset_class);
   vs->gc.type = T_VARSET;
   vs->n = n;
   vs->next = NULL;
-gc_check(gc_ctx);
+  //gc_check(gc_ctx);
   return vs;
 }
 
@@ -2367,7 +2367,7 @@ varset_t *vs_bound_vars_tuple (gc_t *gc_ctx, node_expr_t *tuple)
   node_expr_t **vars;
 
   nargs = 0;
-  gc_check (gc_ctx);
+  //  gc_check (gc_ctx);
   for (l=tuple; l!=NULL; l=BIN_RVAL(l))
     nargs++;
   vars = gc_base_malloc (gc_ctx, nargs*sizeof(node_expr_t *));
@@ -2406,7 +2406,7 @@ node_expr_vars_t node_expr_vars (gc_t *gc_ctx, node_expr_t *e)
   res.mustset = VS_EMPTY;
   GC_START(gc_ctx, 4);
  again:
-gc_check(gc_ctx);
+  //gc_check(gc_ctx);
   if (e==NULL)
     ;
   else switch (e->type)

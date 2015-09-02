@@ -547,7 +547,7 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
       f->fd = fopen(filepath, "r");
-      if (f==NULL)
+      if (f->fd==NULL)
 	{
 	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);

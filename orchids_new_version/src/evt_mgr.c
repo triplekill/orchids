@@ -291,7 +291,7 @@ void event_dispatcher_main_loop(orchids_t *ctx)
   heap_entry_t *he;
   realtime_input_t *next;
 
-  if (ctx->realtime_handler_list == NULL)
+  if (ctx->realtime_handler_list==NULL && ctx->rtactionlist==NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
                "Nothing to do... No modules have requested input...\n");
