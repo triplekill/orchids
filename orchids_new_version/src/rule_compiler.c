@@ -2893,7 +2893,7 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
       return;
     }
   state->an_flags |= AN_EPSILON_REACHABLE;
-  if (state->flags & EPSILON_STATE)
+  if (state->flags & STATE_EPSILON)
     for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
       {
 	trans = (node_trans_t *)BIN_LVAL(l);
@@ -7534,9 +7534,11 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
 				 code.pos * sizeof (bytecode_t));
       memcpy(bytecode, code.bytecode, code.pos * sizeof (bytecode_t));
 
+      /*
       if (code.flags & BYTECODE_HAS_PUSHFIELD) {
 	state->flags |= BYTECODE_HAS_PUSHFIELD;
       }
+      */
 
       state->actionlength = code.pos;
       state->action = bytecode;
@@ -8300,7 +8302,7 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	  code->used_fields_sz = n;
 	code->used_fields[idx] |= (1 << shift);
       }
-      code->flags |= BYTECODE_HAS_PUSHFIELD;
+      // code->flags |= BYTECODE_HAS_PUSHFIELD; // XXX useless (code->flags is never used)
       break;
 
     case NODE_VARIABLE:
@@ -8567,9 +8569,9 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	  rule->trans_nb++; /* update rule stats */
 	  state->trans[i].id = i; /* set trans id */
 	  trans->flags = 0;
-	  if ((state->flags & EPSILON_STATE) || trans_no_wait_needed (ctx, node_trans))
+	  if ((state->flags & STATE_EPSILON) || trans_no_wait_needed (ctx, node_trans))
 	    {
-	      if (ctx->verbose>=1 && !(state->flags & EPSILON_STATE))
+	      if (ctx->verbose>=1 && !(state->flags & STATE_EPSILON))
 		{
 		  if (node_trans->file!=NULL)
 		    fprintf (stderr, "%s:", node_trans->file);

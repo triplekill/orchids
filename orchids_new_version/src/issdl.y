@@ -219,10 +219,10 @@ statedefs:
   { RESULT($$, build_state(compiler_ctx_g, $1, $2)); }
 | casestatements
 { RESULT($$, build_state(compiler_ctx_g, NULL, $1));
-  $$->flags |= EPSILON_STATE; }
+  $$->flags |= STATE_EPSILON; }
 | actions casestatements
 { RESULT($$, build_state(compiler_ctx_g, $1, $2));
-  $$->flags |= EPSILON_STATE; }
+  $$->flags |= STATE_EPSILON; }
 ;
 
 actions:

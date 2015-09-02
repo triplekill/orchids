@@ -93,16 +93,6 @@ extern unsigned long dmalloc_orchids;
 #define MODE_SYSLOG 1
 #define MODE_SNARE  2
 
-/* in state_t->flags (rule_compiler.h) */
-/* BYTECODE_HASH_PUSHFIELD is set if the state's code contains
-   a pushfield bytecode; this was once used to detect epsilon
-   transitions, but is no longer needed. */
-#define BYTECODE_HAS_PUSHFIELD 0x01
-  /* a state either has the EPSILON_STATE flag set, then all its outgoing transitions
-     are epsilon transitions; else, all its outgoing transitions are 'expect' transitions.
-  */
-#define EPSILON_STATE 0x02
-
 
 /**
  ** @struct config_directive_s
@@ -328,7 +318,14 @@ struct state_s
   transition_t *trans;
   rule_t       *rule;
   uint32_t      flags;
+  /* STATE_COMMIT is set if once we enter the state, we are sure
+     that this is the right one, and no other transition is worth
+     going through (see engine.c) */
 #define STATE_COMMIT 0x1
+  /* STATE_EPSILON is set if all outgoing transitions
+     are epsilon transitions; otherwise, all outgoing transitions
+     are 'expect' transitions, which wait on a future event. */
+#define STATE_EPSILON 0x2
   int32_t       id;
 };
 

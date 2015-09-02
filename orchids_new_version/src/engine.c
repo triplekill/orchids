@@ -640,7 +640,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	}
     }
   trans_nb = q->trans_nb;
-  if (q->flags & EPSILON_STATE) /* follow the first epsilon transition that matches */
+  if (q->flags & STATE_EPSILON) /* follow the first epsilon transition that matches */
     for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
       {
 	if (trans->eval_code==NULL ||
