@@ -1804,7 +1804,7 @@ void ovm_ipv6_fprintf(FILE *fp, ovm_ipv6_t *addr)
 
   /* inet_ntoa is not IPv6 aware. Use inet_ntop (defined in 
      arpa/inet.h) instead. */
-  inet_ntop (AF_INET6, &IPV6(addr), dst, sizeof(dst));
+  (void) inet_ntop (AF_INET6, &IPV6(addr), dst, sizeof(dst));
   fprintf(fp, "ipv6 : %s", dst);
 
   /* address resolution */
@@ -2765,7 +2765,7 @@ void fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	   fprintf(fp, ")");
 	   break;
 	 case T_IPV6:
-           inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+           (void) inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
 	   fprintf(fp, "%s", dst);
 	   hptr = gethostbyaddr((char *) &IPV6(val),
 				sizeof (struct in6_addr), AF_INET6);
@@ -2898,7 +2898,7 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
       fputs(")\n", fp);
       break;
     case T_IPV6:
-      inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
+      (void) inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
       fprintf(fp, "ipv6: %s", dst);
       if (resolve_ipv6_g) {
         hptr = gethostbyaddr((char *) &IPV6(val),
@@ -3208,7 +3208,7 @@ static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state)
 
   i = POP_VALUE(ctx);
   if (i!=NULL && i->gc.type == T_IPV6) {
-    inet_ntop(AF_INET6, &IPV6(i), buff, sizeof(buff));
+    (void) inet_ntop(AF_INET6, &IPV6(i), buff, sizeof(buff));
     len = strlen (buff);
     str = ovm_str_new(ctx->gc_ctx, len);
     memcpy(STR(str), buff, len);

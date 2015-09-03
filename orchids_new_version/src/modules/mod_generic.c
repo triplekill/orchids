@@ -134,8 +134,10 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 	  STAILQ_FOREACH(field, &match->field_list, fields)
 	    {
 	      char *buff;
+	      char savec;
 	      size_t res_sz;
 	      ovm_var_t *res;
+	      int n;
 
 	      res_sz = regmatch[ field->substring ].rm_eo
 		- regmatch[ field->substring ].rm_so;
@@ -160,7 +162,12 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  break;
 		case T_IPV4:
 		  res = ovm_ipv4_new(ctx->gc_ctx);
-		  if (inet_pton(AF_INET, buff, &IPV4(res)) != 1)
+		  savec = buff[res_sz];
+		  buff[res_sz] = '\0'; /* hack: temporarlily put a NUL
+					  at end of string to parse */
+		  n = inet_pton(AF_INET, buff, &IPV4(res));
+		  buff[res_sz] = savec;
+		  if (n != 1)
 		    {
 		      DebugLog(DF_MOD, DS_ERROR,
 			       "Error in IPV4 conversion\n");
@@ -170,7 +177,12 @@ static int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		  break;
 		case T_IPV6:
 		  res = ovm_ipv6_new(ctx->gc_ctx);
-		  if (inet_pton(AF_INET6, buff, &IPV6(res)) != 1)
+		  savec = buff[res_sz];
+		  buff[res_sz] = '\0'; /* hack: temporarlily put a NUL
+					  at end of string to parse */
+		  n = inet_pton(AF_INET6, buff, &IPV6(res));
+		  buff[res_sz] = savec;
+		  if (n != 1)
 		    {
 		      DebugLog(DF_MOD, DS_ERROR,
 			       "Error in IPV6 conversion\n");
