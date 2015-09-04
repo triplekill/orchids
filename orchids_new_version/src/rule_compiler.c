@@ -613,12 +613,14 @@ static gc_header_t *node_state_restore (restore_ctx_t *rctx)
   err = restore_string (rctx, &file);
   if (err) goto errlab;
   err = restore_int (rctx, &line);
-  if (err) { end_freefile: gc_base_free (file); goto errlab; }
+  if (err) { end_freefile: if (file!=NULL) gc_base_free (file); goto errlab; }
   err = restore_string (rctx, &name);
   if (err) goto end_freefile;
   actionlist = (node_expr_t *)restore_gc_struct (rctx);
   if (actionlist==NULL && errno!=0)
-    { err_freefilename: gc_base_free (name); gc_base_free (file); goto end; }
+    { err_freefilename:
+      if (name!=NULL) gc_base_free (name);
+      if (file!=NULL) gc_base_free (file); goto end; }
   GC_UPDATE (gc_ctx, 0, actionlist);
   translist = (node_expr_t *)restore_gc_struct (rctx);
   if (translist==NULL && errno!=0)
@@ -736,12 +738,15 @@ static gc_header_t *node_trans_restore (restore_ctx_t *rctx)
   err = restore_string (rctx, &dest);
   if (err) { errno = err; goto end; }
   err = restore_string (rctx, &file);
-  if (err) { err_freedest: errno = err; gc_base_free (dest); goto end; }
+  if (err) { err_freedest: errno = err;
+    if (dest!=NULL) gc_base_free (dest); goto end; }
   err = restore_uint (rctx, &lineno);
-  if (err) { err_freedestfile: gc_base_free (file); goto err_freedest; }
+  if (err) { err_freedestfile:
+    if (file!=NULL) gc_base_free (file); goto err_freedest; }
   sub_state_dest = (node_state_t *)restore_gc_struct (rctx);
   if (sub_state_dest==NULL && errno!=0)
-    { gc_base_free (file); gc_base_free (dest); goto end; }
+    { if (file!=NULL) gc_base_free (file);
+      if (dest!=NULL) gc_base_free (dest); goto end; }
   if (sub_state_dest!=NULL && TYPE(sub_state_dest)!=T_NODE_STATE)
     { err = -2; goto err_freedestfile; }
   GC_UPDATE (gc_ctx, 1, sub_state_dest);
@@ -795,7 +800,8 @@ static void node_rule_finalize (gc_t *gc_ctx, gc_header_t *p)
       for (i=0, n=sv->vars_nb; i<n; i++)
 	if (sv->vars[i]!=NULL)
 	  gc_base_free (sv->vars[i]);
-      gc_base_free (sv->vars);
+      if (sv->vars!=NULL)
+	gc_base_free (sv->vars);
       gc_base_free (sv);
   }
 }
@@ -871,13 +877,13 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   err = restore_int (rctx, &line);
   if (err)
     { err_freefile: errno = err;
-    end_freefile: gc_base_free (file); goto end; }
+    end_freefile: if (file!=NULL) gc_base_free (file); goto end; }
   err = restore_string (rctx, &name);
   if (err) goto err_freefile;
   if (name==NULL) { errno = -2; goto end_freefile; }
   init = (node_state_t *)restore_gc_struct (rctx);
   if (init==NULL && errno!=0)
-    { end_freefilename: gc_base_free (name); goto end_freefile; }
+    { end_freefilename: if (name!=NULL) gc_base_free (name); goto end_freefile; }
   if (init==NULL || TYPE(init)!=T_NODE_STATE)
     { errno = -2; goto end_freefilename; }
   GC_UPDATE (gc_ctx, 0, init);
@@ -894,8 +900,14 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
 	{
 	  err = restore_string (rctx, &vars[i]);
 	  if (err)
-	    { while (i!=0) { --i; gc_base_free (vars[i]); }
-	      gc_base_free (vars); errno = err; goto end_freefilename; }
+	    {
+	    end_freevars:
+	      while (i!=0) { --i; gc_base_free (vars[i]); }
+	      gc_base_free (vars);
+	      errno = err;
+	      goto end_freefilename;
+	    }
+	  if (vars[i]==NULL) { err = -2; goto end_freevars; }
 	}
       sv = gc_base_malloc (gc_ctx, sizeof(node_syncvarlist_t));
       sv->vars_nb = nvars;
@@ -1009,12 +1021,13 @@ static int node_expr_restore (restore_ctx_t *rctx, node_expr_t *n)
   if (err) goto end;
   if (tag==T_NOTHING)
     {
-      gc_base_free (name);
+      if (name!=NULL)
+	gc_base_free (name);
       n->stype = NULL;
     }
   else
     {
-      if (name==NULL) { err = -2; gc_base_free (name); goto end; }
+      if (name==NULL) { err = -2; goto end; }
       n->stype = stype_from_string (gc_ctx, name, 1, tag);
       gc_base_free (name);
     }
@@ -1133,7 +1146,8 @@ static void node_expr_sym_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_expr_sym_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  gc_base_free (SYM_NAME(p));
+  if (SYM_NAME(p)!=NULL)
+    gc_base_free (SYM_NAME(p));
 }
 
 static int node_expr_sym_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -1398,7 +1412,8 @@ static void node_expr_call_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 
 static void node_expr_call_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
-  gc_base_free (CALL_SYM(p));
+  if (CALL_SYM(p)!=NULL)
+    gc_base_free (CALL_SYM(p));
 }
 
 static int node_expr_call_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
@@ -1582,7 +1597,8 @@ static void node_expr_regsplit_finalize (gc_t *gc_ctx, gc_header_t *p)
   //node_expr_finalize (gc_ctx, p);
   if (dv!=NULL)
     {
-      gc_base_free (dv->vars);
+      if (dv->vars!=NULL)
+	gc_base_free (dv->vars);
       gc_base_free (dv);
     }
 }
@@ -4343,7 +4359,8 @@ static gc_header_t *type_heap_restore (restore_ctx_t *rctx)
       if (err) { errno = err; h = NULL; goto end; }
       if (tag==T_NOTHING)
 	{
-	  gc_base_free (typename);
+	  if (typename!=NULL)
+	    gc_base_free (typename);
 	  stype = NULL;
 	}
       else
@@ -6996,11 +7013,18 @@ static void rule_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
     }
 }
 
+static void transition_finalize (transition_t *trans)
+{
+  if (trans->required_fields!=NULL)
+    gc_base_free (trans->required_fields);
+  if (trans->eval_code!=NULL)
+    gc_base_free (trans->eval_code);
+}
+
 static void rule_finalize (gc_t *gc_ctx, gc_header_t *p)
 {
   rule_t *rule = (rule_t *)p;
   state_t *state;
-  transition_t *trans;
   size_t i, m, j, n;
 
   if (rule->state!=NULL)
@@ -7015,13 +7039,7 @@ static void rule_finalize (gc_t *gc_ctx, gc_header_t *p)
 	  if (state->trans!=NULL)
 	    {
 	      for (j=0, n=state->trans_nb; j<n; j++)
-		{
-		  trans = &state->trans[j];
-		  if (trans->required_fields!=NULL)
-		    gc_base_free (trans->required_fields);
-		  if (trans->eval_code!=NULL)
-		    gc_base_free (trans->eval_code);
-		}
+		transition_finalize (&state->trans[j]);
 	      gc_base_free (state->trans);
 	    }
 	}
@@ -7168,7 +7186,7 @@ static int state_save (save_ctx_t *sctx, state_t *state_array, state_t *state)
   err = save_int32 (sctx, state->line);
   if (err) return err;
   n = state->actionlength;
-  err = save_size_t (sctx, state->actionlength);
+  err = save_size_t (sctx, n);
   if (err) return err;
   err = save_bytecode (sctx, state->action, n);
   if (err) return err;
@@ -7222,8 +7240,7 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
       err = state_save (sctx, rule->state, &rule->state[i]);
       if (err) return err;
     }
-  err = save_size_t (sctx, rule->trans_nb);
-  if (err) return err;
+  /* rule->trans_nb is not saved, and will be recomputed at restore time */
   n = rule->static_env_sz;
   err = save_size_t (sctx, n);
   if (err) return err;
@@ -7246,9 +7263,9 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
   if (err) return err;
   err = save_int (sctx, rule->flags);
   if (err) return err;
-  nvars = rule->sync_vars_sz;
-  err = save_size_t (sctx, nvars);
+  err = save_size_t (sctx, rule->sync_vars_sz);
   if (err) return err;
+  nvars = rule->sync_vars_sz; /* saved as a size_t, but nvars is an int32_t */
   for (var=0; var<nvars; var++)
     {
       err = save_int32 (sctx, rule->sync_vars[var]);
@@ -7272,7 +7289,260 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
 
 gc_class_t rule_class;
 
-/*!!! write rule_restore() */
+static int restore_bytecode (restore_ctx_t *rctx, bytecode_t *bc, size_t n)
+{
+  size_t i;
+  int err;
+
+  for (i=0; i<n; i++)
+    {
+      err = restore_ulong (rctx, &bc[i]);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
+			       transition_t *trans, size_t nstates)
+{
+  size_t stateno;
+  size_t i, n;
+  int err;
+
+  err = restore_size_t (rctx, &stateno);
+  if (err) return err;
+  if (stateno>=nstates) return -3;
+  trans->dest = &state_array[stateno];
+  err = restore_size_t (rctx, &n);
+  if (err) return err;
+  trans->required_fields_nb = n;
+  trans->required_fields = gc_base_malloc (rctx->gc_ctx, n*sizeof(int32_t));
+  for (i=0; i<n; i++)
+    {
+      err = restore_int32 (rctx, &trans->required_fields[i]);
+      if (err) { err_freeflds: gc_base_free (trans->required_fields);
+	return err; }
+    }
+  err = restore_size_t (rctx, &n);
+  trans->eval_code_length = n;
+  trans->eval_code = NULL;
+  if (n!=0)
+    {
+      trans->eval_code = gc_base_malloc (rctx->gc_ctx, n*sizeof(bytecode_t));
+      err = restore_bytecode (rctx, trans->eval_code, n);
+      if (err)
+	{
+	err_freecode:
+	  if (trans->eval_code!=NULL)
+	    gc_base_free (trans->eval_code);
+	  goto err_freeflds;
+	}
+    }
+  err = restore_int32 (rctx, &trans->id);
+  if (err) goto err_freecode;
+  err = restore_int32 (rctx, &trans->global_id);
+  if (err) goto err_freecode;
+  err = restore_uint32 (rctx, &trans->flags);
+  if (err) goto err_freecode;
+  return 0;
+}
+
+static int state_restore (restore_ctx_t *rctx, state_t *state_array,
+			  state_t *state, size_t nstates)
+{
+  size_t i, n;
+  int err;
+
+  err = restore_string (rctx, &state->name);
+  if (err) return err;
+  if (state->name==NULL) return -2;
+  err = restore_int32 (rctx, &state->line);
+  if (err) { err_freename: gc_base_free (state->name); return err; }
+  err = restore_size_t (rctx, &n);
+  if (err) goto err_freename;
+  state->actionlength = n;
+  state->action = NULL;
+  if (n!=0)
+    {
+      state->action = gc_base_malloc (rctx->gc_ctx, n*sizeof(bytecode_t));
+      err = restore_bytecode (rctx, state->action, n);
+      if (err)
+	{
+	err_freebc:
+	  if (state->action!=NULL)
+	    gc_base_free (state->action);
+	  goto err_freename;
+	}
+    }
+  err = restore_size_t (rctx, &n);
+  if (err) goto err_freebc;
+  state->trans_nb = n;
+  state->trans = NULL;
+  if (n!=0)
+    {
+      state->trans = gc_base_malloc (rctx->gc_ctx, n*sizeof(transition_t));
+      for (i=0; i<n; i++)
+	{
+	  err = transition_restore (rctx, state_array, &state->trans[i],
+				    nstates);
+	  if (err)
+	    {
+	    err_freetrans:
+	      while (--i!=0)
+		transition_finalize (&state->trans[i]);
+	      goto err_freebc;
+	    }
+	}
+    }
+  i = n; /* for further 'goto err_freetrans' to work, even if n==0 */
+  err = restore_uint32 (rctx, &state->flags);
+  if (err) goto err_freetrans;
+  err = restore_int32 (rctx, &state->id);
+  if (err) goto err_freetrans;
+  return 0;
+}
+
+static gc_header_t *rule_restore (restore_ctx_t *rctx)
+{
+  gc_t *gc_ctx = rctx->gc_ctx;
+  rule_t *rule;
+  time_t mtime;
+  int32_t lineno;
+  int err;
+  char *filename, *name;
+  size_t i, nstates, n;
+  gc_header_t *p;
+  int32_t var, nvars;
+  char *s;
+  gc_header_t *si, *pid;
+
+  GC_START(gc_ctx, 3);
+  rule = NULL;
+  err = restore_string (rctx, &filename);
+  if (err) { errno = err; goto end; }
+  err = restore_ctime (rctx, &mtime);
+  if (err)
+    {
+      errno = err;
+    err_freefilename:
+      if (filename!=NULL)
+	gc_base_free (filename);
+      goto end;
+    }
+  err = restore_int32 (rctx, &lineno);
+  if (err) { errno = err; goto err_freefilename; }
+  err = restore_string (rctx, &name);
+  if (err) { errno = err; goto err_freefilename; }
+  if (name==NULL) { errno = -2; goto err_freefilename; }
+  err = restore_size_t (rctx, &nstates);
+  if (err)
+    {
+      errno = err;
+      if (name!=NULL)
+	gc_base_free (name);
+      goto err_freefilename;
+    }
+  rule = gc_alloc (gc_ctx, sizeof(rule_t), &rule_class);
+  rule->gc.type = T_RULE;
+  rule->filename = filename;
+  rule->file_mtime = mtime;
+  rule->lineno = lineno;
+  rule->name = name;
+  rule->state_nb = 0; /* will progressively be increased to nstates below */
+  rule->state = NULL;
+  rule->trans_nb = 0; /* will be recomputed below */
+  rule->static_env = NULL;
+  rule->static_env_sz = 0; /* will be set below */
+  rule->dynamic_env_sz = 0; /* will be set below */
+  rule->var_name = NULL;
+  rule->next = NULL;
+  rule->instances = 0; /* will be set below */
+  rule->id = 0; /* will be set below */
+  rule->flags = 0; /* will be set below */
+  rule->sync_lock = NULL;
+  rule->sync_vars = NULL;
+  rule->sync_vars_sz = 0; /* will be set below */
+  GC_UPDATE (gc_ctx, 0, rule);
+  rule->state = gc_base_malloc (gc_ctx, nstates*sizeof(state_t));
+  for (i=0; i<nstates; )
+    {
+      err = state_restore (rctx, rule->state, &rule->state[i], nstates);
+      if (err) { rule = NULL; errno = err; goto end; }
+      GC_TOUCH (gc_ctx, rule->state->rule = rule);
+      rule->trans_nb += rule->state[i].trans_nb;
+      rule->state_nb = ++i;
+    }
+  err = restore_size_t (rctx, &n);
+  if (err) { rule = NULL; errno = err; goto end; }
+  rule->static_env = gc_base_malloc (gc_ctx, n*sizeof(ovm_var_t *));
+  for (i=0; i<n; )
+    {
+      p = restore_gc_struct (rctx);
+      if (errno) { rule = NULL; goto end; }
+      GC_TOUCH (gc_ctx, rule->static_env[i] = (ovm_var_t *)p);
+      rule->static_env_sz = ++i;
+    }
+  err = restore_int32 (rctx, &nvars);
+  if (err) { rule = NULL; errno = err; goto end; }
+  if (nvars<0) { rule = NULL; errno = -2; goto end; }
+  rule->var_name = gc_base_malloc (gc_ctx, nvars*sizeof(char *));
+  for (var=0; var<nvars; )
+    {
+      err = restore_string (rctx, &s);
+      if (err) { rule = NULL; errno = err; goto end; }
+      if (s==NULL) { rule = NULL; errno = -2; goto end; }
+      rule->var_name[var] = s;
+      rule->dynamic_env_sz = ++var;
+    }
+  err = restore_size_t (rctx, &rule->instances);
+  if (err) { rule = NULL; errno = err; goto end; }
+  err = restore_int32 (rctx, &rule->id);
+  if (err) { rule = NULL; errno = err; goto end; }
+  err = restore_int (rctx, &rule->flags);
+  if (err) { rule = NULL; errno = err; goto end; }
+  err = restore_size_t (rctx, &n);
+  if (err) { rule = NULL; errno = err; goto end; }
+  nvars = n;
+  if (nvars<0 || nvars>=rule->dynamic_env_sz)
+    { rule = NULL; errno = -2; goto end; }
+  rule->sync_vars_sz = n;
+  if (nvars!=0)
+    {
+      rule->sync_vars = gc_base_malloc (gc_ctx, nvars*sizeof(int32_t));
+      for (var=0; var<nvars; var++)
+	{
+	  err = restore_int32 (rctx, &rule->sync_vars[var]);
+	  if (err) { rule = NULL; errno = err; goto end; }
+	}
+    }
+  err = restore_size_t (rctx, &n);
+  if (err) { rule = NULL; errno = err; goto end; }
+  if (n!=0 && rule->sync_vars==0) { rule = NULL; errno = -2; goto end; }
+  if (rule->sync_vars!=NULL)
+    {
+      rule->sync_lock = new_objhash (gc_ctx, 1021);
+      rule->sync_lock->hash = objhash_rule_instance;
+      rule->sync_lock->cmp = objhash_rule_instance_cmp;
+      for (i=0; i<n; i++)
+	{
+	  si = restore_gc_struct (rctx);
+	  if (errno) { rule = NULL; goto end; }
+	  GC_UPDATE (gc_ctx, 1, si);
+	  if (objhash_get (rule->sync_lock, si)!=NULL) /* duplicate entry */
+	    { rule = NULL; errno = -2; goto end; }
+	  pid = restore_gc_struct (rctx);
+	  if (errno) { rule = NULL; goto end; }
+	  GC_UPDATE (gc_ctx, 2, pid);
+	  objhash_add (gc_ctx, rule->sync_lock, si, pid);
+	}
+    }  
+  p = restore_gc_struct (rctx);
+  if (p==NULL && errno!=0) { rule = NULL; goto end; }
+  rule->next = (rule_t *)p;
+ end:
+  GC_END (gc_ctx);
+  return (gc_header_t *)rule;
+}
 
 gc_class_t rule_class = {
   GC_ID('r','u','l','e'),
@@ -7280,6 +7550,7 @@ gc_class_t rule_class = {
   rule_finalize,
   rule_traverse,
   rule_save,
+  rule_restore
 };
 
 void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)

@@ -5243,6 +5243,7 @@ extern gc_class_t node_expr_call_class;
 extern gc_class_t node_expr_ifstmt_class;
 extern gc_class_t node_expr_regsplit_class;
 extern gc_class_t type_heap_class;
+extern gc_class_t rule_class;
 
 static gc_header_t *nothing_restore (restore_ctx_t *rctx)
 {
@@ -5314,7 +5315,7 @@ static gc_class_t *gc_classes[256] = {
   /* d0 */ NULL, NULL, NULL, NULL,
   /* d4 */ NULL, NULL, NULL, NULL,
   /* d8 */ NULL, NULL, NULL, NULL,
-  /* dc */ NULL, NULL, NULL, NULL,
+  /* dc */ NULL, NULL, NULL, &rule_class,
   /* e0 */ &node_expr_term_class, &node_expr_var_class, &node_expr_field_class, &node_expr_call_class,
   /* e4 */ NULL, NULL, NULL, NULL,
   /* e8 */ NULL, NULL, NULL, NULL,

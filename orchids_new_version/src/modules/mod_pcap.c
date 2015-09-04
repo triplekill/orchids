@@ -32,6 +32,7 @@
 
 input_module_t mod_pcap;
 
+#ifdef OBSOLETE
 static void mod_pcap_if_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
   mod_pcap_if_t *pcapif = (mod_pcap_if_t *)p;
@@ -64,6 +65,7 @@ static gc_class_t mod_pcap_if_class = {
   mod_pcap_if_finalize,
   mod_pcap_if_traverse
 };
+#endif
 
 static void libpcap_callback(u_char *data,
 			     const pcap_pkthdr_t *pkthdr,
@@ -155,19 +157,16 @@ static void add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir
 
   DebugLog(DF_MOD, DS_INFO, "Add device %s\n", dir->args);
 
-  GC_START(gc_ctx, 2);
+  GC_START(gc_ctx, 1);
   len = strlen(dir->args);
   name = ovm_str_new(gc_ctx, len);
   memcpy (STR(name), dir->args, len);
   GC_UPDATE(gc_ctx, 0, name);
 
-  newif = gc_alloc (gc_ctx, sizeof (mod_pcap_if_t), &mod_pcap_if_class);
-  GC_TOUCH (gc_ctx, newif->name = name);
+  newif = gc_base_malloc (gc_ctx, sizeof (mod_pcap_if_t));
+
   newif->promisc = MODPCAP_DEFAULT_PROMISC;
   newif->snaplen = MODPCAP_DEFAULT_SNAPLEN;
-  newif->pcap = NULL;
-  GC_UPDATE(gc_ctx, 1, newif);
-
   newif->pcap = pcap_open_live(dir->args,
                                newif->snaplen,
                                newif->promisc,
@@ -187,6 +186,8 @@ static void add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir
 		   "pcap_get_selectable_fd error: "
 		   "can't get selectable descriptor on BPF interface '%s'.\n",
 		   dir->args);
+	  pcap_close (newif->pcap);
+	  gc_base_free (newif);
 	}
       else
 	{
@@ -194,6 +195,8 @@ static void add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir
 	  DebugLog(DF_MOD, DS_INFO,
 		   "Device %s have fd=%i and datalink=%i\n",
 		   dir->args, newif->fd, newif->datalink);
+	  GC_TOUCH (gc_ctx, newif->name = name);
+	  gc_add_root(gc_ctx, (gc_header_t **)&newif->name);
 
 	  add_input_descriptor(ctx, mod, modpcap_callback, newif->fd, newif);
 	}

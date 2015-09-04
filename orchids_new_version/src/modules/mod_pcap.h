@@ -39,7 +39,6 @@ struct pcap_cb_data_s
 
 struct mod_pcap_if_s
 {
-  gc_header_t gc;
   ovm_var_t *name;
   int     promisc;
   int     snaplen;

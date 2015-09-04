@@ -147,7 +147,8 @@ static void *xml_restore (restore_ctx_t *rctx)
 		   rctx->f,
 		   baseurl, /* not too sure about this (see xml_save()) */
 		   NULL, XML_PARSE_NOWARNING);
-  gc_base_free (baseurl);
+  if (baseurl!=NULL)
+    gc_base_free (baseurl);
   if (doc==NULL)
     { errno = -1; return NULL; }
   xpath_ctx = xmlXPathNewContext(doc);

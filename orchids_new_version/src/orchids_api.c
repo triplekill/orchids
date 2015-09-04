@@ -229,6 +229,7 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
       /* allocates rec->name but will never free it, unless an
 	 error occurs; who cares. */
       if (err) goto errlab_freeentries;
+      if (rec->name==NULL) { err = -2; goto errlab_freeentries; }
       c = getc (f);
       if (c==EOF) { err = c; goto errlab_freename; }
       tag = (unsigned char)c;
@@ -255,7 +256,8 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
     }
   goto normal;
  errlab_freenamedesc:
-  gc_base_free (rec->desc);
+  if (rec->desc!=NULL)
+    gc_base_free (rec->desc);
  errlab_freename:
   gc_base_free (rec->name);
  errlab_freeentries:
@@ -263,7 +265,8 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
     {
       --i;
       rec = &frt->fields[i];
-      gc_base_free (rec->desc);
+      if (rec->desc!=NULL)
+	gc_base_free (rec->desc);
       gc_base_free (rec->name);      
     }
   errno = err;

@@ -216,6 +216,7 @@ static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
   ** and initialize default configuration. */
   cfg = gc_alloc(ctx->gc_ctx, sizeof (sharedvars_config_t),
 		 &sharedvars_config_class);
+  cfg->gc.type = T_NULL;
   cfg->hash_size = DEFAULT_SHAREDVARS_HASH_SZ;
   cfg->vars_hash = NULL;
   mod_sharedvars_cfg_g = cfg;
