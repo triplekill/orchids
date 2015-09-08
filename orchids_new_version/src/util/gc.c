@@ -505,6 +505,55 @@ void gc_check (gc_t *gc_ctx)
     }
 }
 
+static int gc_estimate_sharing (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				void *data)
+{
+  if (p==NULL)
+    return 0;
+  if (p->flags & GC_FLAGS_EST_SEEN)
+    {
+      p->flags |= GC_FLAGS_EST_SHARED;
+      return 0;
+    }
+  p->flags |= GC_FLAGS_EST_SEEN;
+  if (p->class->traverse==NULL)
+    return 0;
+  return (*p->class->traverse) (gtc, p, NULL);
+}
+
+void estimate_sharing (gc_t *gc_ctx, gc_header_t *p)
+{
+  gc_traverse_ctx_t gtc;
+  
+  gtc.gc_ctx = gc_ctx;
+  gtc.do_subfield = gc_estimate_sharing;
+  gtc.traverse_action = TRAVERSE_MARSHALL;
+  (void) gc_estimate_sharing (&gtc, p, NULL);
+}
+
+static int gc_reset_sharing (gc_traverse_ctx_t *gtc, gc_header_t *p,
+				      void *data)
+{
+  if (p==NULL)
+    return 0;
+  if ((p->flags & (GC_FLAGS_EST_SEEN | GC_FLAGS_EST_SHARED))==0)
+    return 0;
+  p->flags &= ~(GC_FLAGS_EST_SEEN | GC_FLAGS_EST_SHARED);
+  if (p->class->traverse==NULL)
+    return 0;
+  return (*p->class->traverse) (gtc, p, NULL);
+}
+
+void reset_sharing (gc_t *gc_ctx, gc_header_t *p)
+{
+  gc_traverse_ctx_t gtc;
+  
+  gtc.gc_ctx = gc_ctx;
+  gtc.do_subfield = gc_reset_sharing;
+  gtc.traverse_action = TRAVERSE_MARSHALL;
+  (void) gc_reset_sharing (&gtc, p, NULL);
+}
+
 int save_size_t (save_ctx_t *sctx, size_t sz)
 {
   int i, c, err;

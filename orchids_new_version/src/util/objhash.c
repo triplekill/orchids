@@ -50,7 +50,7 @@ void objhash_resize(gc_t *ctx, objhash_t *hash, size_t newsize)
   size_t i;
 
   /* XXX: Not tested !!! */
-  printf("Not tested !...\n");
+  //printf("Not tested !...\n");
 
   old_htable = hash->htable;
   hash->htable = gc_base_malloc (ctx, newsize * sizeof (objhash_elmt_t *));
@@ -84,7 +84,7 @@ void free_objhash(objhash_t *hash, void (*elmt_free)(void *e))
     tmp = hash->htable[i];
     while (tmp) {
       tmp_next = tmp->next;
-      if (elmt_free)
+      if (elmt_free!=NULL)
         (*elmt_free)(tmp->data);
       gc_base_free(tmp);
       tmp = tmp_next;
@@ -93,8 +93,6 @@ void free_objhash(objhash_t *hash, void (*elmt_free)(void *e))
   gc_base_free(hash->htable);
   gc_base_free(hash);
 }
-
-/* !!! ecrire objhash_free() */
 
 void objhash_add(gc_t *ctx, objhash_t *hash, void *data, void *key)
 {

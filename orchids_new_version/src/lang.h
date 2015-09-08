@@ -70,6 +70,10 @@
 #define T_NOTHING 128
 /* T_NOTHING is not used; only as a tag in functions save_gc_struct()
    and related */
+#define T_SHARED_DEF 127
+/* not used, only as a tag in functions save_gc_struct() and related */
+#define T_SHARED_USE 126
+/* not used, only as a tag in functions save_gc_struct() and related */
 
 #define T_BIND 255
 /* T_BIND is for environments; see env_bind_t in orchids.h */

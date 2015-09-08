@@ -5259,6 +5259,61 @@ static gc_class_t nothing_class = {
   nothing_restore
 };
 
+static gc_header_t *shared_def_restore (restore_ctx_t *rctx)
+{
+  unsigned long id;
+  gc_header_t *p;
+  int err;
+
+  GC_START (rctx->gc_ctx, 1);
+  err = restore_ulong (rctx, &id);
+  p = hash_get (rctx->shared_hash, &id, sizeof(unsigned long));
+  if (p!=NULL) { errno = -2; p = NULL; }
+  else
+    {
+      p = restore_gc_struct (rctx);
+      if (p==NULL && errno!=0)
+	;
+      else
+	{
+	  GC_UPDATE (rctx->gc_ctx, 0, p);
+	  hash_add (rctx->gc_ctx, rctx->shared_hash, p, &id, sizeof(unsigned long));
+	}
+    }
+  GC_END (rctx->gc_ctx);
+  return p;
+}
+
+static gc_class_t shared_def_class = {
+  GC_ID('s','h','r','d'),
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  shared_def_restore
+};
+
+static gc_header_t *shared_use_restore (restore_ctx_t *rctx)
+{
+  unsigned long id;
+  gc_header_t *p;
+  int err;
+
+  err = restore_ulong (rctx, &id);
+  p = hash_get (rctx->shared_hash, &id, sizeof(unsigned long));
+  if (p==NULL) { errno = -2; }
+  return p;
+}
+
+static gc_class_t shared_use_class = {
+  GC_ID('s','h','r','u'),
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  shared_use_restore
+};
+
 static gc_class_t *gc_classes[256] = {
   /* 00 */ NULL, NULL, &int_class, &bstr_class,
   /* 04 */ &vbstr_class, &str_class, &vstr_class, NULL,
@@ -5291,7 +5346,7 @@ static gc_class_t *gc_classes[256] = {
   /* 70 */ NULL, NULL, NULL, NULL,
   /* 74 */ NULL, NULL, NULL, NULL,
   /* 78 */ NULL, NULL, NULL, NULL,
-  /* 7c */ NULL, NULL, NULL, NULL,
+  /* 7c */ NULL, NULL, &shared_use_class, &shared_def_class,
   /* 80 */ &nothing_class, NULL, NULL, NULL,
   /* 84 */ NULL, NULL, NULL, NULL,
   /* 88 */ NULL, NULL, NULL, NULL,
@@ -5326,23 +5381,55 @@ static gc_class_t *gc_classes[256] = {
   /* fc */ &db_small_table_class, NULL, &env_split_class, &env_bind_class
 };
 
-/*!!! deal with sharing */
-
 int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
 {
   int c, err;
+  unsigned long id;
   gc_class_t *gccl;
 
   if (p==NULL)
     err = putc (T_NOTHING, sctx->f);
-  else
+  else switch ((int)(unsigned int)(p->flags &
+				   (GC_FLAGS_EST_SEEN | GC_FLAGS_EST_SHARED)))
     {
+    case GC_FLAGS_EST_SEEN | GC_FLAGS_EST_SHARED:
+      /* ah, this object is shared, and it is the first time we try to save it; */
+      p->flags &= ~GC_FLAGS_EST_SEEN; /* mark it by resetting the *_SEEN
+					 flag, so that next time we see it,
+					 we shall enter the 'case GC_FLAGS_EST_SHARED'
+					 branch. */
+      err = putc (T_SHARED_DEF, sctx->f);
+      if (err) goto end;
+      /* compute unique identifier for pointer p;
+	 I assume an unsigned long will hold enough of the bits of p for that.
+	 We do not want to reveal too much of the memory layout, so we
+	 xor it with some (fixed) magic value, sctx->fuzz.  This is not meant as
+	 a serious security measure.
+      */
+      id = ((unsigned long)p) ^ sctx->fuzz;
+      err = save_ulong (sctx, id);
+      if (err) goto end;
+      /* now save the object itself */
+      /*FALLTHROUGH*/
+    case GC_FLAGS_EST_SEEN: /* normal case: object is reachable, but not shared */
       c = TYPE(p);
       err = putc (c, sctx->f);
       if (err) goto end;
       gccl = gc_classes[c];
       if (gccl==NULL) { err = -2; goto end; }
       err = (*gccl->save) (sctx, p);
+      break;
+    case GC_FLAGS_EST_SHARED: /* this one is shared, but we have already saved
+				 it at a previous iteration */
+      err = putc (T_SHARED_USE, sctx->f);
+      if (err) goto end;
+      id = ((unsigned long)p) ^ sctx->fuzz;
+      err = save_ulong (sctx, id);
+      break;
+    default: /* namely, 0: we are trying to save an unreachable object...
+		something's gone wrong. */
+      err = -2;
+      break;
     }
  end:
   return err;
@@ -5358,7 +5445,8 @@ gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
 
   c = getc (rctx->f);
   if (c==EOF) { errno = c; return NULL; }
-  if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL) { errno = -2; return NULL; }
+  if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL || gccl->restore==NULL)
+    { errno = -2; return NULL; }
   return (*gccl->restore) (rctx);
 }
 

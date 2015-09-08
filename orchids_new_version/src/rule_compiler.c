@@ -35,6 +35,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <ctype.h>
 
 /* for inet_addr() */
 #include <sys/socket.h>
@@ -1460,7 +1461,7 @@ static gc_header_t *node_expr_call_restore (restore_ctx_t *rctx)
   err = restore_string (rctx, &name);
   if (err) { errno = err; goto end; }
   if (name==NULL) { errno = -2; goto end; }
-  func = strhash_get(rctx->functions_hash, name);
+  func = strhash_get(rctx->rule_compiler->functions_hash, name);
   if (func==NULL) { gc_base_free (name); errno = -2; goto end; }
   params = (node_expr_t *)restore_gc_struct (rctx);
   if (params==NULL && errno!=0) { gc_base_free (name); goto end; }
@@ -7282,8 +7283,12 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
       err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
 			  (void *)sctx);
     }
-  if (err) return err;
-  err = save_gc_struct (sctx, (gc_header_t *)rule->next);
+  /*
+    if (err) return err;
+    err = save_gc_struct (sctx, (gc_header_t *)rule->next);
+    No: do not save rule->next; this is only used to traverse
+    the first_rule list in the compiler context.
+  */
   return err;
 }
 
@@ -7400,6 +7405,154 @@ static int state_restore (restore_ctx_t *rctx, state_t *state_array,
   err = restore_int32 (rctx, &state->id);
   if (err) goto err_freetrans;
   return 0;
+}
+
+static void install_rule (rule_compiler_t *ctx, rule_t *rule)
+{
+  gc_strhash_add(ctx->gc_ctx, ctx->rulenames_hash,
+		 (gc_header_t *)rule,
+		 gc_strdup (ctx->gc_ctx, rule->name));
+  if (ctx->first_rule!=NULL)
+    GC_TOUCH (ctx->gc_ctx, ctx->last_rule->next = rule);
+  else
+    GC_TOUCH (ctx->gc_ctx, ctx->first_rule = rule);
+  GC_TOUCH (ctx->gc_ctx, ctx->last_rule = rule);
+  ctx->rules++;
+}
+
+static int equal_trans (transition_t *t1, transition_t *t2,
+			state_t *sa1, state_t *sa2)
+{
+  if (t1->dest - sa1 != t2->dest - sa2)
+    return 0;
+  if (t1->eval_code_length != t2->eval_code_length)
+    return 0;
+  if (t1->eval_code_length!=0 &&
+      memcmp (t1->eval_code, t2->eval_code, t1->eval_code_length*sizeof(bytecode_t)))
+    return 0;
+  return 1;
+}
+
+static int equal_states (state_t *s1, state_t *s2, state_t *sa1, state_t *sa2)
+{
+  size_t i, n;
+    
+  /* disregard names of states */
+  if (s1->actionlength!=s2->actionlength)
+    return 0;
+  if (s1->actionlength!=0 &&
+      memcmp (s1->action, s2->action, s1->actionlength*sizeof(bytecode_t)))
+    return 0;
+  if (s1->flags!=s2->flags)
+    return 0;
+  n = s1->trans_nb;
+  if (n!=s2->trans_nb)
+    return 0;
+  for (i=0; i<n; i++)
+    if (!equal_trans (&s1->trans[i], &s2->trans[i], sa1, sa2))
+      return 0;
+  return 1;
+}
+
+static int equal_rules (rule_t *r1, rule_t *r2)
+{
+  size_t i, n;
+  
+  if (r1->state_nb!=r2->state_nb)
+    return 0;
+  n = r1->state_nb;
+  for (i=0; i<n; i++)
+    if (!equal_states (&r1->state[i], &r2->state[i], r1->state, r2->state))
+      return 0;
+  n = r1->static_env_sz;
+  if (n!=r2->static_env_sz)
+    return 0;
+  for (i=0; i<n; i++)
+    if (issdl_cmp (r1->static_env[i], r2->static_env[i], CMP_LEQ_MASK | CMP_GEQ_MASK)
+	!= (CMP_LEQ_MASK | CMP_GEQ_MASK))
+      return 0;
+  /* do not compare dynamic_env (size dynamic_env_sz, names var[]):
+     we are allowed to change variable names */
+  n = r1->sync_vars_sz;
+  if (n!=r2->sync_vars_sz)
+    return 0;
+  for (i=0; i<n; i++)
+    if (r1->sync_vars[i]!=r2->sync_vars[i])
+      return 0;
+  return 1;
+}
+
+struct merge_sync_lock_data {
+  gc_t *gc_ctx;
+  rule_t *oldrule;
+};
+
+static int do_merge_sync_lock (void *key, void *elmt, void *data)
+{
+  struct merge_sync_lock_data *sld = data;
+
+  (void) objhash_add (sld->gc_ctx, sld->oldrule->sync_lock, elmt, key);
+  return 0;
+}
+
+static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
+{
+  rule_t *oldrule;
+  size_t number = 1;
+  char *s, *start, *send, *newname;
+  struct merge_sync_lock_data sld;
+  int found;
+
+ again:
+  oldrule = strhash_get (ctx->rulenames_hash, rule->name);
+  if (oldrule==NULL)
+    {
+      install_rule (ctx, rule);
+      return rule;
+    }
+  else
+    /* Here we have a rule of the same name.
+       We must decide whether it is the same rule, or a modified rule. */
+    if (equal_rules (rule, oldrule))
+      { /* If so, we merge the two rules, and keep the old one. */
+	oldrule->instances += rule->instances;
+	if (rule->flags & RULE_INITIAL_ALREADY_LAUNCHED)
+	  oldrule->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
+	sld.gc_ctx = ctx->gc_ctx;
+	sld.oldrule = oldrule;
+	(void) objhash_walk (rule->sync_lock, do_merge_sync_lock, &sld);
+	return oldrule;
+      }
+    else
+      { /* We insert the new rule with a slightly different name, namely:
+	   - assume the initial rule name is "name"
+	   - we try "name (2)", then if this is also taken, "name (3)", and so on.
+	*/
+	++number;
+	found = 0;
+	start = rule->name;
+	s = send = start + strlen(start);
+	--s;
+	if (s>=start && *s==')')
+	  for (; --s>start; )
+	    {
+	      if (*s=='(')
+		{
+		  found = 1;
+		  break;
+		}
+	      else if (!isdigit(*s))
+		break;
+	    }
+	if (!found)
+	  s = send;
+	newname = gc_base_malloc (ctx->gc_ctx, s-start + 3 + 16);
+	memcpy (newname, start, s-start);
+	sprintf (newname + (s-start), " (%zi)", number);
+	gc_base_free (rule->name);
+	rule->name = newname;
+	goto again;
+      }
 }
 
 static gc_header_t *rule_restore (restore_ctx_t *rctx)
@@ -7535,10 +7688,14 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	  GC_UPDATE (gc_ctx, 2, pid);
 	  objhash_add (gc_ctx, rule->sync_lock, si, pid);
 	}
-    }  
-  p = restore_gc_struct (rctx);
-  if (p==NULL && errno!=0) { rule = NULL; goto end; }
-  rule->next = (rule_t *)p;
+    }
+  /*
+    p = restore_gc_struct (rctx);
+    if (p==NULL && errno!=0) { rule = NULL; goto end; }
+    rule->next = (rule_t *)p;
+    No: since we don't save the next field, don't restore it.
+  */
+  rule = install_restored_rule (rctx->rule_compiler, rule);
  end:
   GC_END (gc_ctx);
   return (gc_header_t *)rule;
@@ -7700,18 +7857,8 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
            node_rule->name, STR(ctx->currfile), node_rule->line);
   /* It is legal to pass STR(ctx->currfile) here, which was created
      NUL-terminated for that purpose */
+  install_rule (ctx, rule);
 
-  gc_strhash_add(ctx->gc_ctx, ctx->rulenames_hash,
-		 (gc_header_t *)rule,
-		 gc_strdup (ctx->gc_ctx, rule->name));
-
-  if (ctx->first_rule!=NULL)
-    GC_TOUCH (ctx->gc_ctx, ctx->last_rule->next = rule);
-  else
-    GC_TOUCH (ctx->gc_ctx, ctx->first_rule = rule);
-  GC_TOUCH (ctx->gc_ctx, ctx->last_rule = rule);
-
-  ctx->rules++;
   GC_END(ctx->gc_ctx);
 }
 

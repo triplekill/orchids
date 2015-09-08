@@ -39,9 +39,12 @@ typedef struct save_ctx_s save_ctx_t;
 struct save_ctx_s {
   gc_t *gc_ctx;
   FILE *f;
+  unsigned long fuzz;
 };
 
 struct strhash_s; /* in strhash.h */
+struct hash_s; /* in hash.h */
+struct rule_compiler_s; /* in orchids.h */
 
 typedef struct restore_ctx_s restore_ctx_t;
 typedef int (*readc_f) (void *data);
@@ -49,7 +52,8 @@ struct restore_ctx_s {
   gc_t *gc_ctx;
   FILE *f;
   struct strhash_s *externs; /* from orchids_context_t->xclasses */
-  struct strhash_s *functions_hash; /* from rule_compiler_t->functions_hash */
+  struct rule_compiler_s *rule_compiler; /* from orchids_context_t->rule_compiler */
+  struct hash_s *shared_hash; /* filled in while restoring */
 };
 
 typedef struct gc_class_s gc_class_t;
@@ -98,10 +102,11 @@ struct gc_header_s
   /* Flags used by gc_check() */
 #define GC_FLAGS_CHECKED (0x01 << 3)
 #define GC_FLAGS_IN_GREY_LIST (0x01 << 4)
+  /* Flags used by estimate_sharing() */
+#define GC_FLAGS_EST_SEEN (0x01 << 5)
+#define GC_FLAGS_EST_SHARED (0x01 << 6)
   /* Reserved flags */
-#define GC_FLAGS_VIRTUAL (0x01 << 5)
-#define GC_FLAGS_RESERVED1 (0x01 << 6)
-#define GC_FLAGS_RESERVED2 (0x01 << 7)
+#define GC_FLAGS_RESERVED (0x01 << 7)
   unsigned char magic[2]; /* padding; also for debugging */
   struct gc_class_s *class; /* NULL if no embedded pointer to
 			       garbage-collected data */
@@ -252,6 +257,28 @@ void gc_check (gc_t *gc_ctx); /* Looks for inconsistencies in memory.
 				 Works similarly to fsck on Unix
 				 systems.  Used to detect memory
 				 and garbage-collector related bugs. */
+
+void estimate_sharing (gc_t *gc_ctx, gc_header_t *p);
+/* Sets GC_FLAGS_EST_* flags of all objects reachable from p.
+   - GC_FLAGS_EST_SEEN means that object is reachable
+   - GC_FLAGS_EST_SHARED means that object is reachable from at least
+   two different objects.
+   Intended use is:
+   - start from a time where no object has any of the GC_FLAGS_EST_* set
+   - assume you want to know which objects are (reachable, shared) from
+   a group of objects p1, p2, ..., pn (i.e., from any of them)
+   - call estimate_sharing() on each of p1, p2, ..., pn successively
+   - if you need to know whether p is (reachable, shared) from p1, p2, ..., pn,
+   just read its p->type field, anded with GC_FLAGS_EST_SEEN, resp.,
+   GC_FLAGS_EST_SHARED;
+   - in the last item, you may decide to reset the GC_FLAGS_EST_SHARED
+   flag, or the GC_FLAGS_EST_SEEN flag, by hand (e.g., as in save_gc_struct()),
+   but do not reset both, as it would break the next step;
+   - once your are done,
+   restore memory to its prior state (with no GC_FLAGS_EST_* flag set),
+   by calling reset_sharing() on each of p1, p2, ..., pn in turn.
+ */
+void reset_sharing (gc_t *gc_ctx, gc_header_t *p);
 
 int save_size_t (save_ctx_t *sctx, size_t sz);
 int restore_size_t (restore_ctx_t *rctx, size_t *szp);

@@ -63,7 +63,11 @@ static gc_class_t mod_pcap_if_class = {
   GC_ID('p','c','a','p'),
   mod_pcap_if_mark_subfields,
   mod_pcap_if_finalize,
-  mod_pcap_if_traverse
+  mod_pcap_if_traverse,
+  NULL, /* it is in principle not legal to leave the save and restore
+	   hooks to NULL, but mod_pcap_if_class objects are not meant to be
+	   saved or restored */
+  NULL
 };
 #endif
 
