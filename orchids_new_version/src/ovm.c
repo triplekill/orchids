@@ -3,6 +3,7 @@
  ** Orchids 'virtual machine'
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.0
  ** @ingroup ovm
@@ -88,643 +89,156 @@ int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *byteco
   return INT(res);
 }
 
-void fprintf_bytecode(FILE *fp, bytecode_t *bytecode)
+int review_bytecode(bytecode_t *bytecode, size_t length,
+		    int (*review) (bytecode_t *bc, size_t sz,
+				   bytecode_t *start,
+				   void *data),
+		    void *data)
 {
-  bytecode_t *code;
-  int offset;
+  bytecode_t *code, *end;
+  size_t sz;
+  unsigned long nfields;
+  int res;
 
-  offset = 0;
   code = bytecode;
-  while (1)
+  end = bytecode + length;
+  while (code < end)
     {
       switch (*code)
 	{
 	case OP_END:
-	  fprintf(fp, "0x%04x: %08x             | end\n", offset, OP_END);
-	  return ;
+	  /*FALLTHROUGH*/
 	case OP_NOP:
-	  fprintf(fp, "0x%04x: %08x             | nop\n", offset, OP_NOP);
-	  offset += 1;
-	  break ;
-	case OP_PUSH:
-	  fprintf(fp, "0x%04x: %08x %08lx    | push [%lu]\n",
-		  offset, OP_PUSH, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_POP:
-	  fprintf(fp, "0x%04x: %08x %08lx    | pop [%lu]\n",
-		  offset, OP_POP, code[1], code[1]);
-	  offset += 2;
-	  break ;
 	case OP_PUSHZERO:
-	  fprintf(fp, "0x%04x: %08x             | pushzero\n",
-		  offset, OP_PUSHZERO);
-	  offset += 1;
-	  break;
 	case OP_PUSHMINUSONE:
-	  fprintf(fp, "0x%04x: %08x             | pushminusone\n",
-		  offset, OP_PUSHMINUSONE);
-	  offset += 1;
-	  break;
 	case OP_PUSHONE:
-	  fprintf(fp, "0x%04x: %08x             | pushone\n",
-		  offset, OP_PUSHONE);
-	  offset += 1;
-	  break;
 	case OP_PUSHNULL:
-	  fprintf(fp, "0x%04x: %08x             | pushnull\n",
-		  offset, OP_PUSHNULL);
-	  offset += 1;
-	  break;
-	case OP_PUSHSTATIC:
-	  fprintf(fp, "0x%04x: %08x %08lx    | pushstatic [%lu]\n",
-		  offset, OP_PUSHSTATIC, code[1], code[1]);
-	  offset += 2;
-	  break;
-	case OP_PUSHFIELD:
-	  fprintf(fp, "0x%04x: %08x %08lx    | pushfield [%lu]\n",
-		  offset, OP_PUSHFIELD, code[1], code[1]);
-	  offset += 2;
-	  break ;
 	case OP_TRASH:
-	  fprintf(fp, "0x%04x: %08x             | trash\n", offset, OP_TRASH);
-	  offset += 1;
-	  break ;
 	case OP_TRASH2:
-	  fprintf(fp, "0x%04x: %08x             | trash2\n", offset, OP_TRASH2);
-	  offset += 1;
-	  break ;
-	case OP_CALL:
-	  fprintf(fp, "0x%04x: %08x %08lx    | call [%lu]\n",
-		  offset, OP_CALL, code[1], code[1]);
-	  offset += 2;
-	  break ;
 	case OP_ADD:
-	  fprintf(fp, "0x%04x: %08lx             | add\n", offset, *code);
-	  offset += 1;
-	  break ;
 	case OP_SUB:
-	  fprintf(fp, "0x%04x: %08lx             | sub\n", offset, *code);
-	  offset += 1;
-	  break ;
 	case OP_OPP:
-	  fprintf(fp, "0x%04x: %08lx             | opp\n", offset, *code);
-	  offset += 1;
-	  break;
 	case OP_PLUS:
-	  fprintf(fp, "0x%04x: %08lx             | plus\n", offset, *code);
-	  offset += 1;
-	  break;
 	case OP_MUL:
-	  fprintf(fp, "0x%04x: %08lx             | mul\n", offset, *code);
-	  offset += 1;
-	  break ;
 	case OP_DIV:
-	  fprintf(fp, "0x%04x: %08lx             | div\n", offset, *code);
-	  offset += 1;
-	  break ;
 	case OP_MOD:
-	  fprintf(fp, "0x%04x: %08lx             | mod\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_INC:
-	  fprintf(fp, "not yet implemented\n");
-	  return ;
-	case OP_DEC:
-	  fprintf(fp, "not yet implemented\n");
-	  return ;
 	case OP_AND:
-	  fprintf(fp, "0x%04x: %08lx             | and\n", offset, *code);
-	  return ;
 	case OP_OR:
-	  fprintf(fp, "0x%04x: %08lx             | or\n", offset, *code);
-	  return ;
 	case OP_XOR:
-	  fprintf(fp, "0x%04x: %08lx             | xor\n", offset, *code);
-	  return ;
-	case OP_NEG:
-	  fprintf(fp, "unused opcode. See OP_OPP\n");
-	  return ;
 	case OP_NOT:
-	  fprintf(fp, "0x%04x: %08lx             | not\n", offset, *code);
-	  return ;
-	case OP_JMP:
-	  fprintf(fp, "0x%04x: %08lx             | jmp [%lu]\n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_POPCJMP:
-	  fprintf(fp, "0x%04x: %08lx             | popcjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CEQJMP:
-	  fprintf(fp, "0x%04x: %08lx             | ceqjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CEQJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | ceqjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNEQJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cneqjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNEQJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cneqjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CRMJMP:
-	  fprintf(fp, "0x%04x: %08lx             | crmjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CRMJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | crmjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNRMJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNRMJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGTJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cgtjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGTJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cgtjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLTJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cltjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLTJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cltjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGEJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cgejmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGEJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cgejmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLEJMP:
-	  fprintf(fp, "0x%04x: %08lx             | clejmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLEJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | clejmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
 	case OP_CEQ:
-	  fprintf(fp, "0x%04x: %08x             | ceq\n", offset, OP_CEQ);
-	  offset += 1;
-	  break ;
 	case OP_CNEQ:
-	  fprintf(fp, "0x%04x: %08x             | cneq\n", offset, OP_CNEQ);
-	  offset += 1;
-	  break ;
 	case OP_CRM:
-	  fprintf(fp, "0x%04x: %08x             | crm\n", offset, OP_CRM);
-	  offset += 1;
-	  break ;
 	case OP_CNRM:
-	  fprintf(fp, "0x%04x: %08x             | cnrm\n", offset, OP_CNRM);
-	  offset += 1;
-	  break ;
 	case OP_CLT:
-	  fprintf(fp, "0x%04x: %08x             | clt\n", offset, OP_CLT);
-	  offset += 1;
-	  break ;
 	case OP_CGT:
-	  fprintf(fp, "0x%04x: %08x             | cgt\n", offset, OP_CGT);
-	  offset += 1;
-	  break ;
 	case OP_CLE:
-	  fprintf(fp, "0x%04x: %08x             | cle\n", offset, OP_CLE);
-	  offset += 1;
-	  break ;
 	case OP_CGE:
-	  fprintf(fp, "0x%04x: %08x             | cge\n", offset, OP_CGE);
-	  offset += 1;
-	  break ;
 	case OP_REGSPLIT:
-	  fprintf(fp, "0x%04x: %08x             | regsplit\n", offset, OP_REGSPLIT);
-	  offset += 1;
-	  break ;
 	case OP_CESV:
-	  fprintf(fp, "0x%04x: %08x             | cesv\n", offset, OP_CESV);
-	  offset += 1;
-	  break ;
 	case OP_EMPTY_EVENT:
-	  fprintf(fp, "0x%04x: %08lx             | emptyevent\n",
-		  offset, *code);
-	  offset += 1;
-	  break ;
+	  sz = 1;
+	  break;
+	case OP_PUSH:
+	case OP_POP:
+	case OP_PUSHSTATIC:
+	case OP_PUSHFIELD:
+	case OP_CALL:
+	case OP_JMP:
+	case OP_POPCJMP:
+	case OP_CEQJMP:
+	case OP_CEQJMP_OPPOSITE:
+	case OP_CNEQJMP:
+	case OP_CNEQJMP_OPPOSITE:
+	case OP_CRMJMP:
+	case OP_CRMJMP_OPPOSITE:
+	case OP_CNRMJMP:
+	case OP_CNRMJMP_OPPOSITE:
+	case OP_CGTJMP:
+	case OP_CGTJMP_OPPOSITE:
+	case OP_CLTJMP:
+	case OP_CLTJMP_OPPOSITE:
+	case OP_CGEJMP:
+	case OP_CGEJMP_OPPOSITE:
+	case OP_CLEJMP:
+	case OP_CLEJMP_OPPOSITE:
 	case OP_ADD_EVENT:
-	  fprintf(fp, "0x%04x: %08x %08lx    | addevent [%lu]\n",
-		  offset, OP_ADD_EVENT, code[1], code[1]);
-	  offset += 2;
-	  break ;
+	case OP_DB_SINGLE:
+	case OP_DUP:
+	  sz = 2;
+	  break;
 	case OP_DB_FILTER:
-	  {
-	    int nfields = code[2];
-	    unsigned long val;
-	    int i;
-	    char *delim;
-
-	    fprintf(fp, "0x%04x: %08x ...         | db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
-		    offset, OP_DB_FILTER, code[1], code[2], code[3]);
-	    delim = "";
-	    for (i=0; i<nfields; i++)
-	      {
-		fputs (delim, fp);
-		val = code[4+i];
-		if (val==DB_VAR_NONE)
-		  fprintf (fp, "_");
-		else if (DB_IS_CST(val))
-		  fprintf (fp, "cst %lu", DB_CST(val));
-		else fprintf (fp, "var %lu", DB_VAR(val));
-		delim = ",";
-	      }
-	    fputs ("]\n", fp);
-	    offset += 4+nfields;
-	  }
+	  if (code+2 >= end)
+	    return -1;
+	  nfields = code[2];
+	  sz = 4+nfields;
 	  break;
 	case OP_DB_JOIN:
-	  {
-	    int nfields2 = code[2];
-	    int i;
-	    char *delim;
-	    unsigned long val;
-
-	    fprintf(fp, "0x%04x: %08x ...         | db_join [nfields1=%lu, nfields2=%lu] [",
-	      offset, OP_DB_JOIN, code[1], code[2]);
-	    delim = "";
-	    for (i=0; i<nfields2; i++)
-	      {
-		fputs (delim, fp);
-		val = code[3+i];
-		if (val==DB_VAR_NONE)
-		  fprintf (fp, "_");
-		else if (DB_IS_CST(val))
-		  fprintf (fp, "cst %lu", DB_CST(val));
-		else fprintf (fp, "var %lu", DB_VAR(val));
-		delim = ",";
-	      }
-	    fputs ("]\n", fp);
-	    offset += 3+nfields2;
-	  }
+	  if (code+2 >= end)
+	    return -1;
+	  nfields = code[2];
+	  sz = 3+nfields;
 	  break;
 	case OP_DB_PROJ:
-	  {
-	    int nfields_res = code[1];
-	    unsigned long val;
-	    int i;
-	    char *delim;
-
-	    fprintf(fp, "0x%04x: %08x ...         | db_proj [nfields_res=%lu, nconsts=%lu] [",
-		    offset, OP_DB_PROJ, code[1], code[2]);
-	    delim = "";
-	    for (i=0; i<nfields_res; i++)
-	      {
-		fputs (delim, fp);
-		val = code[3+i];
-		if (val==DB_VAR_NONE)
-		  fprintf (fp, "_");
-		else if (DB_IS_CST(val))
-		  fprintf (fp, "cst %lu", DB_CST(val));
-		else fprintf (fp, "var %lu", DB_VAR(val));
-		delim = ",";
-	      }
-	    fputs ("]\n", fp);
-	    offset += 3+nfields_res;
-	  }
+	  if (code+1 >= end)
+	    return -1;
+	  nfields = code[1];
+	  sz = 3+nfields;
 	  break;
 	case OP_DB_MAP:
-	  fprintf(fp, "0x%04x: %08x %08lx %08lx | db_map [%lu] [%lu]\n",
-		  offset, OP_DB_MAP, code[1], code[2], code[1], code[2]);
-	  fprintf(fp, "{{\n");
-	  fprintf_bytecode (fp, code+3);
-	  fprintf(fp, "}}\n");
-	  offset += code[1]+2;
-	  break ;
-	case OP_DB_SINGLE:
-	  fprintf (fp, "0x%04x: %08x %08lx    | db_single [%lu]\n",
-		   offset, OP_DB_SINGLE, code[1], code[1]);
-	  offset += 2;
+	  sz = 3;
 	  break;
-	case OP_DUP:
-	  fprintf(fp, "0x%04x: %08x %08lx    | dup [%lu]\n",
-		  offset, OP_DUP, code[1], code[1]);
-	  offset += 2;
-	  break ;
+	case OP_INC:
+	case OP_DEC:
+	case OP_NEG:
+	  /* not implemented */
 	default:
-	  DebugLog(DF_OVM, DS_ERROR, "unknown opcode %lu\n", *code);
-	  return ;
-	  /* exit(EXIT_FAILURE); */
+	  return -1; /* unknown opcode */
 	}
-      code = bytecode + offset;
+      if (code+sz > end)
+	return -1;
+      res = (*review) (code, sz, bytecode, data);
+      if (res)
+	return res;
+      code += sz;
     }
-  return;
+  return 0;
 }
 
-void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
+static int do_review_fprintf (bytecode_t *bc, size_t sz,
+			      bytecode_t *start, void *data)
 {
-  bytecode_t *code;
-  int offset;
+  FILE *fp = data;
 
-  offset = 0;
-  code = bytecode;
-  while (1)
+  switch (sz)
     {
-      switch (*code)
+    case 1:
+      fprintf (fp, "0x%04lx: %08lx            | %s\n", bc-start, bc[0],
+	       ops_g[bc[0]].name);
+      break;
+    case 2:
+      fprintf(fp, "0x%04lx: %08lx %08lx    | %s [%lu] \n",
+	      bc-start, bc[0], bc[1], ops_g[bc[0]].name, 
+	      bc[1]);
+      break;
+    default:
+      switch (bc[0])
 	{
-	case OP_END:
-	  fprintf(fp, "%04x: %02x       | end\n", offset, OP_END);
-	  return ;
-	case OP_NOP:
-	  fprintf(fp, "%04x: %02x       | nop\n", offset, OP_NOP);
-	  offset += 1;
-	  break ;
-	case OP_PUSH:
-	  fprintf(fp, "%04x: %02x %02lx    | push [%lu]\n",
-		  offset, OP_PUSH, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_POP:
-	  fprintf(fp, "%04x: %02x %02lx    | pop [%lu]\n",
-		  offset, OP_POP, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_PUSHZERO:
-	  fprintf(fp, "0x%04x: %02x       | pushzero\n",
-		  offset, OP_PUSHZERO);
-	  offset += 1;
-	  break;
-	case OP_PUSHMINUSONE:
-	  fprintf(fp, "0x%04x: %02x       | pushminusone\n",
-		  offset, OP_PUSHMINUSONE);
-	  offset += 1;
-	  break;
-	case OP_PUSHONE:
-	  fprintf(fp, "0x%04x: %02x       | pushone\n",
-		  offset, OP_PUSHONE);
-	  offset += 1;
-	  break;
-	case OP_PUSHNULL:
-	  fprintf(fp, "0x%04x: %02x       | pushnull\n",
-		  offset, OP_PUSHNULL);
-	  offset += 1;
-	  break;
-	case OP_PUSHSTATIC:
-	  fprintf(fp, "0x%04x: %02x %02lx    | pushstatic [%lu]\n",
-		  offset, OP_PUSHSTATIC, code[1], code[1]);
-	  offset += 2;
-	  break;
-	case OP_PUSHFIELD:
-	  fprintf(fp, "%04x: %02x %02lx    | pushfield [%lu]\n",
-		  offset, OP_PUSHFIELD, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_TRASH:
-	  fprintf(fp, "0x%04x: %08x        | trash\n", offset, OP_TRASH);
-	  offset += 1;
-	  break ;
-	case OP_TRASH2:
-	  fprintf(fp, "0x%04x: %08x        | trash2\n", offset, OP_TRASH2);
-	  offset += 1;
-	  break ;
-	case OP_CALL:
-	  fprintf(fp, "%04x: %02x %02lx    | call [%lu]\n",
-		  offset, OP_CALL, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_ADD:
-	  fprintf(fp, "%04x: %02lx       | add\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_SUB:
-	  fprintf(fp, "%04x: %02lx       | sub\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_OPP:
-	  fprintf(fp, "%04x: %02lx       | opp\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_PLUS:
-	  fprintf(fp, "%04x: %02lx       | plus\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_MUL:
-	  fprintf(fp, "%04x: %02lx       | mul\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_DIV:
-	  fprintf(fp, "%04x: %02lx       | div\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_MOD:
-	  fprintf(fp, "%04x: %02lx       | mod\n", offset, *code);
-	  offset += 1;
-	  break ;
-	case OP_INC:
-	  fprintf(fp, "not yet implemented\n");
-	  return ;
-	case OP_DEC:
-	  fprintf(fp, "not yet implemented\n");
-	  return ;
-	case OP_AND:
-	  fprintf(fp, "%04x: %02lx       | and\n", offset, *code);
-	  return ;
-	case OP_OR:
-	  fprintf(fp, "%04x: %02lx       | or\n", offset, *code);
-	  return ;
-	case OP_XOR:
-	  fprintf(fp, "%04x: %02lx       | xor\n", offset, *code);
-	  return ;
-	case OP_NEG:
-	  fprintf(fp, "unused opcode, see OP_OPP\n");
-	  return ;
-	case OP_NOT:
-	  fprintf(fp, "%04x: %02lx       | not\n", offset, *code);
-	  return ;
-	case OP_JMP:
-	  fprintf(fp, "0x%04x: %08lx             | jmp [%lu]\n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_POPCJMP:
-	  fprintf(fp, "0x%04x: %08lx             | popcjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CEQJMP:
-	  fprintf(fp, "0x%04x: %08lx             | ceqjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CEQJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | ceqjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNEQJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cneqjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNEQJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cneqjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CRMJMP:
-	  fprintf(fp, "0x%04x: %08lx             | crmjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CRMJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | crmjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNRMJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CNRMJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cnrmjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGTJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cgtjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGTJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cgtjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLTJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cltjmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLTJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cltjmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGEJMP:
-	  fprintf(fp, "0x%04x: %08lx             | cgejmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CGEJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | cgejmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLEJMP:
-	  fprintf(fp, "0x%04x: %08lx             | clejmp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CLEJMP_OPPOSITE:
-	  fprintf(fp, "0x%04x: %08lx             | clejmp_opp [%lu] \n", offset,
-		  *code, code[1]);
-	  offset += 2;
-	  break ;
-	case OP_CEQ:
-	  fprintf(fp, "%04x: %02x       | ceq\n", offset, OP_CEQ);
-	  offset += 1;
-	  break ;
-	case OP_CNEQ:
-	  fprintf(fp, "%04x: %02x       | cneq\n", offset, OP_CNEQ);
-	  offset += 1;
-	  break ;
-	case OP_CRM:
-	  fprintf(fp, "%04x: %02x       | crm\n", offset, OP_CRM);
-	  offset += 1;
-	  break ;
-	case OP_CNRM:
-	  fprintf(fp, "%04x: %02x       | cnrm\n", offset, OP_CNRM);
-	  offset += 1;
-	  break ;
-	case OP_CLT:
-	  fprintf(fp, "%04x: %02x       | clt\n", offset, OP_CLT);
-	  offset += 1;
-	  break ;
-	case OP_CGT:
-	  fprintf(fp, "%04x: %02x       | cgt\n", offset, OP_CGT);
-	  offset += 1;
-	  break ;
-	case OP_CLE:
-	  fprintf(fp, "%04x: %02x       | cle\n", offset, OP_CLE);
-	  offset += 1;
-	  break ;
-	case OP_CGE:
-	  fprintf(fp, "%04x: %02x       | cge\n", offset, OP_CGE);
-	  offset += 1;
-	  break ;
-	case OP_REGSPLIT:
-	  fprintf(fp, "%04x: %02x       | regsplit\n", offset, OP_REGSPLIT);
-	  offset += 1;
-	  break ;
-	case OP_CESV:
-	  fprintf(fp, "%04x: %02x       | cesv\n", offset, OP_CESV);
-	  offset += 1;
-	  break ;
-	case OP_EMPTY_EVENT:
-	  fprintf(fp, "%04x: %02x       | emptyevent\n",
-		  offset, OP_EMPTY_EVENT);
-	  offset += 1;
-	  break ;
-	case OP_ADD_EVENT:
-	  fprintf(fp, "%04x: %02x %02lx  | addevent [%lu]\n",
-		  offset, OP_ADD_EVENT, code[1], code[1]);
-	  offset += 2;
-	  break ;
 	case OP_DB_FILTER:
 	  {
-	    int nfields = code[2];
+	    int nfields = bc[2];
 	    unsigned long val;
 	    int i;
 	    char *delim;
 
-	    fprintf(fp, "0x%04x: %02x ...   | db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
-		    offset, OP_DB_FILTER, code[1], code[2], code[3]);
+	    fprintf(fp, "0x%04lx: %08x ...         | "
+		    "db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
+		    bc-start, OP_DB_FILTER, bc[1], bc[2], bc[3]);
 	    delim = "";
 	    for (i=0; i<nfields; i++)
 	      {
 		fputs (delim, fp);
-		val = code[4+i];
+		val = bc[4+i];
 		if (val==DB_VAR_NONE)
 		  fprintf (fp, "_");
 		else if (DB_IS_CST(val))
@@ -733,23 +247,23 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 		delim = ",";
 	      }
 	    fputs ("]\n", fp);
-	    offset += 4+nfields;
+	    break;
 	  }
-	  break;
 	case OP_DB_JOIN:
 	  {
-	    int nfields2 = code[2];
+	    int nfields2 = bc[2];
 	    int i;
 	    char *delim;
 	    unsigned long val;
 
-	    fprintf(fp, "0x%04x: %02x ...   | db_join [nfields1=%lu, nfields2=%lu] [",
-	      offset, OP_DB_JOIN, code[1], code[2]);
+	    fprintf(fp, "0x%04lx: %08x ...         | "
+		    "db_join [nfields1=%lu, nfields2=%lu] [",
+	      bc-start, OP_DB_JOIN, bc[1], bc[2]);
 	    delim = "";
 	    for (i=0; i<nfields2; i++)
 	      {
 		fputs (delim, fp);
-		val = code[3+i];
+		val = bc[3+i];
 		if (val==DB_VAR_NONE)
 		  fprintf (fp, "_");
 		else if (DB_IS_CST(val))
@@ -758,23 +272,23 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 		delim = ",";
 	      }
 	    fputs ("]\n", fp);
-	    offset += 3+nfields2;
+	    break;
 	  }
-	  break;
 	case OP_DB_PROJ:
 	  {
-	    int nfields_res = code[1];
+	    int nfields_res = bc[1];
 	    unsigned long val;
 	    int i;
 	    char *delim;
 
-	    fprintf(fp, "0x%04x: %02x ...   | db_proj [nfields_res=%lu, nconsts=%lu] [",
-		    offset, OP_DB_PROJ, code[1], code[2]);
+	    fprintf(fp, "0x%04lx: %08x ...         | "
+		    "db_proj [nfields_res=%lu, nconsts=%lu] [",
+		    bc-start, OP_DB_PROJ, bc[1], bc[2]);
 	    delim = "";
 	    for (i=0; i<nfields_res; i++)
 	      {
 		fputs (delim, fp);
-		val = code[3+i];
+		val = bc[3+i];
 		if (val==DB_VAR_NONE)
 		  fprintf (fp, "_");
 		else if (DB_IS_CST(val))
@@ -783,35 +297,134 @@ void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode)
 		delim = ",";
 	      }
 	    fputs ("]\n", fp);
-	    offset += 3+nfields_res;
+	    break;
 	  }
-	  break;
 	case OP_DB_MAP:
-	  fprintf(fp, "0x%04x: %02x %02lx %02lx | db_map [%lu] [%lu]\n",
-		  offset, OP_DB_MAP, code[1], code[2], code[1], code[2]);
-	  fprintf(fp, "{{\n");
-	  fprintf_bytecode_short (fp, code+3);
-	  fprintf(fp, "}}\n");
-	  offset += code[1]+2;
-	  break ;
-	case OP_DB_SINGLE:
-	  fprintf (fp, "%04x: %02x %02lx  | db_single [%lu]\n",
-		   offset, OP_DB_SINGLE, code[1], code[1]);
-	  offset += 2;
-	  break ;
-	case OP_DUP:
-	  fprintf(fp, "%04x: %02x %02lx  | dup [%lu]\n",
-		  offset, OP_DUP, code[1], code[1]);
-	  offset += 2;
-	  break ;
+	  fprintf(fp, "0x%04lx: %08x %08lx %08lx | db_map [%lu] [%lu]\n",
+		  bc-start, OP_DB_MAP, bc[1], bc[2], bc[1], bc[2]);
+	  break;
 	default:
-	  DebugLog(DF_OVM, DS_ERROR, "unknown opcode %lu\n", *code);
-	  return ;
-	  /* exit(EXIT_FAILURE); */
+	  return -1;
 	}
-      code = bytecode + offset;
+      break;
     }
-  return ;
+  return 0;
+}
+
+void fprintf_bytecode(FILE *fp, bytecode_t *bytecode, size_t length)
+{
+  (void) review_bytecode (bytecode, length, do_review_fprintf, fp);
+}
+
+static int do_review_fprintf_short (bytecode_t *bc, size_t sz,
+				    bytecode_t *start, void *data)
+{
+  FILE *fp = data;
+
+  switch (sz)
+    {
+    case 1:
+      fprintf (fp, "0x%04lx: %02lx       | %s\n", bc-start, bc[0],
+	       ops_g[bc[0]].name);
+      break;
+    case 2:
+      fprintf(fp, "0x%04lx: %02lx %02lx    | %s [%lu] \n",
+	      bc-start, bc[0], bc[1], ops_g[bc[0]].name, 
+	      bc[1]);
+      break;
+    default:
+      switch (bc[0])
+	{
+	case OP_DB_FILTER:
+	  {
+	    int nfields = bc[2];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04lx: %02x ...   | "
+		    "db_filter [nfields_res=%lu, nfields=%lu, nconsts=%lu] [",
+		    bc-start, OP_DB_FILTER, bc[1], bc[2], bc[3]);
+	    delim = "";
+	    for (i=0; i<nfields; i++)
+	      {
+		fputs (delim, fp);
+		val = bc[4+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    break;
+	  }
+	case OP_DB_JOIN:
+	  {
+	    int nfields2 = bc[2];
+	    int i;
+	    char *delim;
+	    unsigned long val;
+
+	    fprintf(fp, "0x%04lx: %02x ...   | "
+		    "db_join [nfields1=%lu, nfields2=%lu] [",
+	      bc-start, OP_DB_JOIN, bc[1], bc[2]);
+	    delim = "";
+	    for (i=0; i<nfields2; i++)
+	      {
+		fputs (delim, fp);
+		val = bc[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    break;
+	  }
+	case OP_DB_PROJ:
+	  {
+	    int nfields_res = bc[1];
+	    unsigned long val;
+	    int i;
+	    char *delim;
+
+	    fprintf(fp, "0x%04lx: %02x ...   | "
+		    "db_proj [nfields_res=%lu, nconsts=%lu] [",
+		    bc-start, OP_DB_PROJ, bc[1], bc[2]);
+	    delim = "";
+	    for (i=0; i<nfields_res; i++)
+	      {
+		fputs (delim, fp);
+		val = bc[3+i];
+		if (val==DB_VAR_NONE)
+		  fprintf (fp, "_");
+		else if (DB_IS_CST(val))
+		  fprintf (fp, "cst %lu", DB_CST(val));
+		else fprintf (fp, "var %lu", DB_VAR(val));
+		delim = ",";
+	      }
+	    fputs ("]\n", fp);
+	    break;
+	  }
+	case OP_DB_MAP:
+	  fprintf(fp, "0x%04lx: %02x %02lx %02lx | db_map [%lu] [%lu]\n",
+		  bc-start, OP_DB_MAP, bc[1], bc[2], bc[1], bc[2]);
+	  break;
+	default:
+	  return -1;
+	}
+      break;
+    }
+  return 0;
+}
+
+void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode, size_t length)
+{
+  (void) review_bytecode (bytecode, length, do_review_fprintf_short, fp);
 }
 
 void fprintf_bytecode_dump(FILE *fp, bytecode_t *code)
@@ -2252,70 +1865,70 @@ static int ovm_push_null(isn_param_t *param)
 }
 
 static ovm_insn_rec_t ops_g[] = {
-  { NULL,           1, "end"        },
-  { ovm_nop,        1, "nop"        },
-  { ovm_push,       2, "push"       },
-  { ovm_pop,        2, "pop"        },
-  { ovm_push_zero,  1, "pushzero"   },
-  { ovm_push_one,   1, "pushone"    },
-  { ovm_pushstatic, 2, "pushstatic" },
-  { ovm_pushfield,  2, "pushfield"  },
-  { ovm_trash,      0, "trash"      },
-  { ovm_call,       0, "call"       },
-  { ovm_add,        0, "add"        },
-  { ovm_sub,        0, "sub"        },
-  { ovm_opp,        0, "opp"        },
-  { ovm_mul,        0, "mul"        },
-  { ovm_div,        0, "div"        },
-  { ovm_mod,        0, "mod"        },
-  { ovm_inc,        0, "inc"        },
-  { ovm_dec,        0, "dec"        },
-  { ovm_and,        0, "and"        },
-  { ovm_or,         0, "or"         },
-  { ovm_xor,        0, "xor"        },
-  { ovm_neg,        0, "neg"        },
-  { ovm_not,        0, "not"        },
-  { ovm_jmp,        0, "jmp"        },
-  { ovm_popcjmp,    0, "popcjmp"    },
-  { ovm_ceq,        0, "ceq"        },
-  { ovm_cneq,       0, "cneq"       },
-  { ovm_crm,        0, "crm"        },
-  { ovm_cnrm,       0, "cnrm"       },
-  { ovm_clt,        0, "clt"        },
-  { ovm_cgt,        0, "cgt"        },
-  { ovm_cle,        0, "cle"        },
-  { ovm_cge,        0, "cge"        },
-  { ovm_regsplit,   0, "regsplit"   },
-  { ovm_cesv,       0, "cesrv"      },
-  { ovm_empty_event, 1, "emptyevent" },
-  { ovm_add_event,  2, "addevent" },
-  { ovm_db_filter, 0, "db_filter" },
-  { ovm_db_join, 0, "db_join" },
-  { ovm_db_proj, 0, "db_proj" },
-  { ovm_db_map, 0, "db_map" },
-  { ovm_db_single, 0, "db_single" },
-  { ovm_dup, 0, "dup" },
-  { ovm_push_null, 0, "pushnull" },
-  { ovm_push_minus_one, 0, "pushminusone" },
-  { ovm_ceqjmp, 0, "ceqjmp" },
-  { ovm_ceqjmp_opposite, 0, "ceqjmp_opp" },
-  { ovm_cneqjmp, 0, "cneqjmp" },
-  { ovm_cneqjmp_opposite, 0, "cneqjmp_opp" },
-  { ovm_crmjmp, 0, "crmjmp" },
-  { ovm_crmjmp_opposite, 0, "crmjmp_opp" },
-  { ovm_cnrmjmp, 0, "cnrmjmp" },
-  { ovm_cnrmjmp_opposite, 0, "cnrmjmp_opp" },
-  { ovm_cgtjmp, 0, "cgtjmp" },
-  { ovm_cgtjmp_opposite, 0, "cgtjmp_opp" },
-  { ovm_cltjmp, 0, "cltjmp" },
-  { ovm_cltjmp_opposite, 0, "cltjmp_opp" },
-  { ovm_cgejmp, 0, "cgejmp" },
-  { ovm_cgejmp_opposite, 0, "cgejmp_opp" },
-  { ovm_clejmp, 0, "clejmp" },
-  { ovm_clejmp_opposite, 0, "clejmp_opp" },
-  { ovm_trash2, 0, "trash2" },
-  { ovm_plus, 0, "plus" },
-  { NULL,           0, NULL         }
+  { NULL,           "end"        },
+  { ovm_nop,        "nop"        },
+  { ovm_push,       "push"       },
+  { ovm_pop,        "pop"        },
+  { ovm_push_zero,  "pushzero"   },
+  { ovm_push_one,   "pushone"    },
+  { ovm_pushstatic, "pushstatic" },
+  { ovm_pushfield,  "pushfield"  },
+  { ovm_trash,      "trash"      },
+  { ovm_call,       "call"       },
+  { ovm_add,        "add"        },
+  { ovm_sub,        "sub"        },
+  { ovm_opp,        "opp"        },
+  { ovm_mul,        "mul"        },
+  { ovm_div,        "div"        },
+  { ovm_mod,        "mod"        },
+  { ovm_inc,        "inc"        },
+  { ovm_dec,        "dec"        },
+  { ovm_and,        "and"        },
+  { ovm_or,         "or"         },
+  { ovm_xor,        "xor"        },
+  { ovm_neg,        "neg"        },
+  { ovm_not,        "not"        },
+  { ovm_jmp,        "jmp"        },
+  { ovm_popcjmp,    "popcjmp"    },
+  { ovm_ceq,        "ceq"        },
+  { ovm_cneq,       "cneq"       },
+  { ovm_crm,        "crm"        },
+  { ovm_cnrm,       "cnrm"       },
+  { ovm_clt,        "clt"        },
+  { ovm_cgt,        "cgt"        },
+  { ovm_cle,        "cle"        },
+  { ovm_cge,        "cge"        },
+  { ovm_regsplit,   "regsplit"   },
+  { ovm_cesv,       "cesrv"      },
+  { ovm_empty_event, "emptyevent" },
+  { ovm_add_event,  "addevent" },
+  { ovm_db_filter,  "db_filter" },
+  { ovm_db_join,    "db_join" },
+  { ovm_db_proj,    "db_proj" },
+  { ovm_db_map,     "db_map" },
+  { ovm_db_single,  "db_single" },
+  { ovm_dup,        "dup" },
+  { ovm_push_null,  "pushnull" },
+  { ovm_push_minus_one, "pushminusone" },
+  { ovm_ceqjmp,     "ceqjmp" },
+  { ovm_ceqjmp_opposite, "ceqjmp_opp" },
+  { ovm_cneqjmp,    "cneqjmp" },
+  { ovm_cneqjmp_opposite, "cneqjmp_opp" },
+  { ovm_crmjmp,     "crmjmp" },
+  { ovm_crmjmp_opposite, "crmjmp_opp" },
+  { ovm_cnrmjmp,    "cnrmjmp" },
+  { ovm_cnrmjmp_opposite, "cnrmjmp_opp" },
+  { ovm_cgtjmp,     "cgtjmp" },
+  { ovm_cgtjmp_opposite, "cgtjmp_opp" },
+  { ovm_cltjmp,     "cltjmp" },
+  { ovm_cltjmp_opposite, "cltjmp_opp" },
+  { ovm_cgejmp,     "cgejmp" },
+  { ovm_cgejmp_opposite, "cgejmp_opp" },
+  { ovm_clejmp,     "clejmp" },
+  { ovm_clejmp_opposite, "clejmp_opp" },
+  { ovm_trash2,     "trash2" },
+  { ovm_plus,       "plus" },
+  { NULL,           NULL         }
 };
 
 
@@ -2326,87 +1939,22 @@ static ovm_insn_rec_t ops_g[] = {
 ** tr A-Z a-z
 */
 
-static char *op_name[] = {
-  "end",
-  "nop",
-  "push",
-  "pop",
-  "pushzero",
-  "pushone",
-  "pushstatic",
-  "pushfield",
-  "trash",
-  "call",
-  "add",
-  "sub",
-  "opp",
-  "mul",
-  "div",
-  "mod",
-  "inc",
-  "dec",
-  "and",
-  "or",
-  "xor",
-  "neg",
-  "not",
-  "jmp",
-  "popcjmp",
-  "ceq",
-  "cneq",
-  "crm",
-  "cnrm",
-  "clt",
-  "cgt",
-  "cle",
-  "cge",
-  "regsplit",
-  "cesv",
-  "empty_event",
-  "add_event",
-  "db_filter",
-  "db_join",
-  "db_proj",
-  "db_map",
-  "db_single",
-  "dup",
-  "pushnull",
-  "pushminusone",
-  "ceqjmp",
-  "ceqjmp_opp",
-  "cneqjmp",
-  "cneqjmp_opp",
-  "crmjmp",
-  "crmjmp_opp",
-  "cnrmjmp",
-  "cnrmjmp_opp",
-  "cgtjmp",
-  "cgtjmp_opp",
-  "cltjmp",
-  "cltjmp_opp",
-  "cgejmp",
-  "cgejmp_opp",
-  "clejmp",
-  "clejmp_opp",
-  "trash2",
-  "plus",
-  NULL
-};
-
-
 const char *get_opcode_name(bytecode_t opcode)
 {
   if (opcode >= OPCODE_NUM)
     return NULL;
-  return op_name[opcode];
+  return ops_g[opcode].name;
 }
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

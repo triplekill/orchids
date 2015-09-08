@@ -45,6 +45,7 @@ struct save_ctx_s {
 struct strhash_s; /* in strhash.h */
 struct hash_s; /* in hash.h */
 struct rule_compiler_s; /* in orchids.h */
+struct field_record_table_s; /* in orchids.h */
 
 typedef struct restore_ctx_s restore_ctx_t;
 typedef int (*readc_f) (void *data);
@@ -53,6 +54,7 @@ struct restore_ctx_s {
   FILE *f;
   struct strhash_s *externs; /* from orchids_context_t->xclasses */
   struct rule_compiler_s *rule_compiler; /* from orchids_context_t->rule_compiler */
+  struct field_record_table_s *global_fields; /* not from orchids_context_t->global_fields: this one is meant to be restored first */
   struct hash_s *shared_hash; /* filled in while restoring */
 };
 

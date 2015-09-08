@@ -1557,19 +1557,16 @@ ovm_exec_stmt(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
  **
  ** @return  The corresponding mnemonic name string.
  **/
-const char *
-get_opcode_name(bytecode_t opcode);
+const char *get_opcode_name(bytecode_t opcode);
 
 /**
  ** Disassemble and display an ovm byte code.
  ** @param fp        Output stream.
  ** @param bytecode  Byte code to disassemble.
+ ** @param length    Length of byte code to disassemble.
  **/
-void
-fprintf_bytecode(FILE *fp, bytecode_t *bytecode);
-
-void
-fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode);
+void fprintf_bytecode(FILE *fp, bytecode_t *bytecode, size_t length);
+void fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode, size_t length);
 
 
 /**
@@ -1578,8 +1575,26 @@ fprintf_bytecode_short(FILE *fp, bytecode_t *bytecode);
  ** @param fp    Output stream.
  ** @param code  Byte code to display.
  **/
-void
-fprintf_bytecode_dump(FILE *fp, bytecode_t *code);
+void fprintf_bytecode_dump(FILE *fp, bytecode_t *code);
+
+/**
+ ** Generic bytecode processor
+ **
+ ** @param bytecode            Byte code to process.
+ ** @param length              Length of byte code to process.
+ ** @param review              Function called on each instruction;
+ **                this function takes a pointer bc to an instruction,
+ **                the number of byte codes the instruction takes,
+ **                the address where all byte codes start (equal to
+ **                the bytecode parameter to review_bytecode()),
+ **                and a pointer data to user-defined data.
+ ** @param data                User-defined data, passed to review().
+ **/
+int review_bytecode(bytecode_t *bytecode, size_t length,
+		    int (*review) (bytecode_t *bc, size_t sz,
+				   bytecode_t *start,
+				   void *data),
+		    void *data);
 
 
 /*

@@ -166,9 +166,7 @@ typedef struct ovm_insn_rec_s ovm_insn_rec_t;
 struct ovm_insn_rec_s
 {
   ovm_insn_t insn;
-  int        insn_sz; /* XXX: UNUSED */
   char      *name;
-  void      *padding; /* XXX: UNUSED: no longer needed if insn_sz is removed */
 };
 
 /**

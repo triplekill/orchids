@@ -7294,6 +7294,33 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
 
 gc_class_t rule_class;
 
+static int do_update_fields (bytecode_t *bc, size_t sz,
+			     bytecode_t *start, void *data)
+{
+  restore_ctx_t *rctx = data;
+  unsigned long fld;
+  char *name;
+  field_record_t *f;
+
+  switch (bc[0])
+    {
+    case OP_PUSHFIELD:
+    case OP_ADD_EVENT:
+      fld = bc[1];
+      if (fld>=rctx->global_fields->num_fields)
+	return -3;
+      name = rctx->global_fields->fields[fld].name;
+      f = strhash_get (rctx->rule_compiler->fields_hash, name);
+      if (f==NULL)
+	return -4; /* unknown field name */
+      bc[1] = f->id; /* modify field number: make it the new one */
+      break;
+    default:
+      break;
+    }
+  return 0;
+}
+
 static int restore_bytecode (restore_ctx_t *rctx, bytecode_t *bc, size_t n)
 {
   size_t i;
@@ -7304,7 +7331,17 @@ static int restore_bytecode (restore_ctx_t *rctx, bytecode_t *bc, size_t n)
       err = restore_ulong (rctx, &bc[i]);
       if (err) return err;
     }
-  return 0;
+  /* Now we change all field numbers.  Here is why.
+     Imagine the saved bytecode was bytecode for '$x = .mymodule.myfield;'.
+     The access to .mymodule.myfield would be compiled as
+     OP_PUSHFIELD <some-number>
+     where <some-number> is a unique integer associated with .mymodule.myfield.
+     There is no reason that, on restoring, .mymodule.myfield would
+     have the same number, so we change them.
+     This is needed for the OP_PUSHFIELD and OP_ADD_EVENT opcodes.
+   */
+  err = review_bytecode (bc, n, do_update_fields, rctx);
+  return err;
 }
 
 static int transition_restore (restore_ctx_t *rctx, state_t *state_array,

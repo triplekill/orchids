@@ -959,7 +959,8 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 	    if (r->state[s].action)
 	      {
 		fprintf(fp, "<pre>");
-		fprintf_bytecode_short(fp, r->state[s].action);
+		fprintf_bytecode_short(fp, r->state[s].action,
+				       r->state[s].actionlength);
 		fprintf(fp, "</pre> ");
 	      }
 	    else
@@ -997,7 +998,8 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 		if (r->state[s].trans[t].eval_code!=NULL)
 		  {
 		    fprintf(fp, "<pre>");
-		    fprintf_bytecode_short(fp, r->state[s].trans[t].eval_code);
+		    fprintf_bytecode_short(fp, r->state[s].trans[t].eval_code,
+					   r->state[s].trans[t].eval_code_length);
 		    fprintf(fp, "</pre> ");
 		  }
 		else
