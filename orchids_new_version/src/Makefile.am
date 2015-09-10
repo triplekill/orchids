@@ -9,7 +9,7 @@ orchids_SOURCES = \
 	db.c db.h					  \
 	prover.c prover.h				  \
         orchids_api.c orchids_api.h                       \
-        engine.c engine.h engine_priv.h                   \
+        engine.c engine.h		                  \
         rule_compiler.c rule_compiler.h                   \
         orchids_cfg.c                                     \
         lang.c lang.h lang_priv.h                         \

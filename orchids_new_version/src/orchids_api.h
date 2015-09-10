@@ -46,8 +46,7 @@
  ** @return         The same return code as the fcntl() system call (see your
  **                 system documentation).
  **/
-int
-lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len);
+int lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len);
 
 
 /**
@@ -71,8 +70,7 @@ lock_reg(int fd, int cmd, int type, off_t offset, int whence, off_t len);
  **
  ** @return The PID of the process which hold the lock, or 0 if unlocked.
  **/
-pid_t
-lock_test(int fd, int type, off_t offset, int whence, off_t len);
+pid_t lock_test(int fd, int type, off_t offset, int whence, off_t len);
 
 
 /**
@@ -128,6 +126,38 @@ void orchids_lock(const char *lockfile);
  **/
 orchids_t *new_orchids_context(void);
 
+/**
+ ** Save the current state of Orchids to file <name>.
+ ** The save is atomic, in the following sense: either
+ ** orchids_save() succeeds, returning 0, and a save file
+ ** will be present in file <name> (replacing the previous
+ ** contents of file <name> if any);
+ ** or orchids_save() fails, returning a cause for error,
+ ** and any previously existing file <name> will be left
+ ** untouched (in that case, a temporary file <name~> may
+ ** be created).
+ **
+ ** @param ctx The Orchids context.
+ ** @param name The name of the file to save to.
+ ** @return The error code (errno), or 0 if no error occurred.
+ **/
+int orchids_save (orchids_t *ctx, char *name);
+
+/**
+ ** Recover saved Orchids state.
+ **
+ ** @param ctx The Orchids state (current, not the saved one).
+ ** @param name The name of the save file.
+ ** @return The error code, or 0 if no error occurred.
+ **         The error code can be as stipulated in errno,
+ **         or a negative number (-1=end of file, -2=bad format,
+ **         -3=bad size, -4=database format error,
+ **         -5=bad magic, -6=unrecognized version number,
+ **         -7=unknown field name, -8=unknown primitive)
+ **/
+int orchids_restore (orchids_t *ctx, char *name);
+
+char *orchids_strerror (int err);
 
 /**
  ** Add a new real-time input descriptor.
@@ -384,8 +414,10 @@ void post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event,
  ** @param fp  The stdio stream to print on.
  ** @param ctx The Orchids applecation context to print.
  **/
+#ifdef OBSOLETE
 void
 fprintf_orchids_stats(FILE *fp, const orchids_t *ctx);
+#endif
 
 
 /**
@@ -395,9 +427,10 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx);
  ** @param data  Data to display.
  ** @param n     Data size.
  **/
+#ifdef OBSOLETE
 void
 fprintf_hexdump(FILE *fp, const void *data, size_t n);
-
+#endif
 
 /**
  ** Display all registered fields on a stream.
@@ -405,9 +438,10 @@ fprintf_hexdump(FILE *fp, const void *data, size_t n);
  ** @param fp   The output stream.
  ** @param ctx  Orchids application context.
  **/
+#ifdef OBSOLETE
 void
 fprintf_fields(FILE *fp, const orchids_t *ctx);
-
+#endif
 
 /**
  ** Display a state environment on a stream.
@@ -415,9 +449,10 @@ fprintf_fields(FILE *fp, const orchids_t *ctx);
  ** @param fp    The output stream.
  ** @param state The state instance which contains the environment to print.
  **/
+#ifdef OBSOLETE
 void fprintf_state_env(FILE *fp, const orchids_t *ctx,
 		       const state_instance_t *state);
-
+#endif
 
 #endif /* ORCHIDS_API_H */
 

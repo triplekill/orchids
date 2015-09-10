@@ -397,7 +397,7 @@ struct action_tree_s {
     struct action_tree_s *proceed[256];
     struct {
       action_doer action_do;
-      int field_num;
+      int32_t field_num;
       int dummy; /* dummy... only there to know how much to allocate,
 		    see action_insert() */
     } code;
@@ -520,7 +520,7 @@ char *orchids_atoui_hex (char *s, char *end, unsigned long *ip)
 }
 
 char *action_doer_int (action_orchids_ctx_t *octx, char *s, char *end,
-		       int field_num)
+		       int32_t field_num)
 {
   long i;
   ovm_var_t *v;
@@ -537,7 +537,7 @@ char *action_doer_int (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_uint (action_orchids_ctx_t *octx, char *s, char *end,
-			int field_num)
+			int32_t field_num)
 {
   unsigned long i;
   ovm_var_t *v;
@@ -554,7 +554,7 @@ char *action_doer_uint (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_uint_hex (action_orchids_ctx_t *octx, char *s, char *end,
-			    int field_num)
+			    int32_t field_num)
 {
   unsigned long i;
   ovm_var_t *v;
@@ -571,7 +571,7 @@ char *action_doer_uint_hex (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_dev (action_orchids_ctx_t *octx, char *s, char *end,
-		       int field_num)
+		       int32_t field_num)
 {
   int major=0, minor=0;
   unsigned long i;
@@ -603,7 +603,7 @@ char *action_doer_dev (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
-		      int field_num)
+		      int32_t field_num)
 {
   char c, *t;
   ovm_var_t *v;
@@ -620,7 +620,7 @@ char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
-			  int field_num)
+			  int32_t field_num)
 {
   gc_t *gc_ctx = octx->ctx->gc_ctx;
   char c;
@@ -730,7 +730,7 @@ char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
-		      int field_num)
+		      int32_t field_num)
 {
   gc_t *gc_ctx = octx->ctx->gc_ctx;
   ovm_var_t *addr;

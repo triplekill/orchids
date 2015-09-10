@@ -3,6 +3,7 @@
  ** Common program maintenance functions.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.0
  ** @ingroup core
@@ -177,8 +178,7 @@ static int field_record_table_save (save_ctx_t *sctx, gc_header_t *p)
 	  if (err) return err;
 	  err = save_string (sctx, rec->name);
 	  if (err) return err;
-	  err = putc ((int)rec->type->tag, f);
-	  if (err) return err;
+	  if (putc ((int)rec->type->tag, f) < 0) { return errno; }
 	  err = save_string (sctx, rec->type->name);
 	  if (err) return err;
 	  err = save_string (sctx, rec->desc);
@@ -187,8 +187,12 @@ static int field_record_table_save (save_ctx_t *sctx, gc_header_t *p)
 	  if (err) return err;
 	  mono = rec->mono;
 	  err = save_int (sctx, mono); /* save mono as int (=monotony) */
+	  /*
 	  if (err) return err;
 	  err = save_gc_struct (sctx, (gc_header_t *)rec->val);
+	  No: do not save value.  Anyway we only save when all values
+	  are NULL, namely outside of inject_event().
+	  */
 	}
     }
   return err;
@@ -207,7 +211,7 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
   int32_t active, id;
   unsigned char tag;
   int mono;
-  ovm_var_t *val;
+  /*ovm_var_t *val;*/
   int c, err;
 
   GC_START (gc_ctx, 1);
@@ -244,14 +248,21 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
       if (err) goto errlab_freename;
       err = restore_int32 (rctx, &id);
       if (err) goto errlab_freenamedesc;
+      /* We do not call update_field_number () here, since field_record_tables
+	 are loaded so as to know what the number of each field was at
+	 save time, not now. */
       rec->id = id;
       err = restore_int (rctx, &mono);
       if (err) goto errlab_freenamedesc;
       rec->mono = (monotony)mono;
+      /*
       val = (ovm_var_t *)restore_gc_struct (rctx);
       if (val==NULL && errno!=0)
 	goto errlab_freenamedesc;
       GC_TOUCH (gc_ctx, rec->val = val);
+      Since we don't save the val field, we do not restore it either.
+      */
+      rec->val = NULL;
       frt->num_fields = ++i;
     }
   goto normal;
@@ -316,6 +327,9 @@ orchids_t *new_orchids_context(void)
   ctx->poll_period.tv_usec = 0;
   ctx->rulefile_list = NULL;
   ctx->last_rulefile = NULL;
+  ctx->save_file = NULL;
+  ctx->save_interval.tv_sec = 60;
+  ctx->save_interval.tv_usec = 0;
 #ifdef OBSOLETE
   ctx->first_rule_instance = NULL;
   ctx->last_rule_instance = NULL;
@@ -372,10 +386,7 @@ orchids_t *new_orchids_context(void)
   /* ctx->ru not initialized */
   ctx->pid = getpid();
   ctx->reports = 0;
-  ctx->last_evt_act = ctx->start_time;
-  ctx->last_mod_act.tv_sec = ctx->last_mod_act.tv_usec = 0;
   ctx->last_rule_act.tv_sec = ctx->last_rule_act.tv_usec = 0;
-  ctx->last_ruleinst_act = ctx->start_time;
   ctx->rtactionlist = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->rtactionlist);
 #ifdef ENABLE_PREPROC
@@ -418,6 +429,178 @@ orchids_t *new_orchids_context(void)
   return ctx;
 }
 
+char *orchids_strerror (int err)
+{
+  switch (err)
+    {
+    case -1: return "end of file";
+    case -2: return "badly formatted data";
+    case -3: return "bad size in formatted data";
+    case -4: return "bad number of columns in database";
+    case -5: return "bad magic number";
+    case -6: return "unrecognized version number";
+    case -7: return "unknown record field name";
+    case -8: return "unknown primitive";
+    default: return strerror (err);
+    }
+}
+
+static int save_func_tbl (save_ctx_t *sctx, issdl_function_t *functbl, int32_t nfuncs)
+{
+  int32_t i;
+  int err;
+
+  err = save_int32 (sctx, nfuncs);
+  if (err) return err;
+  for (i=0; i<nfuncs; i++)
+    {
+      err = save_string (sctx, functbl[i].name);
+      if (err) return err;
+      err = save_int32 (sctx, functbl[i].args_nb);
+      if (err) return err;
+      err = save_int32 (sctx, functbl[i].id);
+      if (err) return err;
+      /* We don't save sigs, func, cm, desc */
+    }
+  return 0;
+}
+
+static char save_magic[] = "0RXZ";
+
+int orchids_save (orchids_t *ctx, char *name)
+{
+  save_ctx_t sctx;
+  size_t len;
+  char *tmpname;
+  int err = 0;
+  size_t version = 1;
+
+  errno = 0;
+  len = strlen (name);
+  tmpname = gc_base_malloc (ctx->gc_ctx, len+2);
+  memcpy (tmpname, name, len);
+  tmpname[len] = '~';
+  tmpname[len+1] = '\0';
+  sctx.gc_ctx = ctx->gc_ctx;
+  sctx.f = fopen (tmpname, "w");
+  if (sctx.f==NULL) { err = errno; goto end; }
+  sctx.fuzz = (unsigned long)random();
+  if (fputs (save_magic, sctx.f) < 0) { err = errno; goto errlab; }
+  err = save_size_t (&sctx, version);
+  if (err) goto errlab;
+
+  estimate_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
+  estimate_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
+
+  err = save_gc_struct (&sctx, (gc_header_t *)ctx->global_fields);
+  if (err) goto errlab;
+  err = save_func_tbl (&sctx, ctx->vm_func_tbl, ctx->vm_func_tbl_sz);
+  if (err) goto errlab;
+  err = save_gc_struct (&sctx, (gc_header_t *)ctx->thread_queue);
+  if (err) goto errlab;
+
+ errlab:
+  reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
+  reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
+  (void) fclose (sctx.f);
+  if (err==0)
+    err = rename (tmpname, name);
+ end:
+  gc_base_free (tmpname);
+  return err;
+}
+
+issdl_function_t *restore_func_tbl (restore_ctx_t *rctx, int32_t *nfuncs_sz)
+{
+  int32_t nfuncs, i;
+  issdl_function_t *functbl;
+  int err;
+
+  err = restore_int32 (rctx, &nfuncs);
+  if (err) { errno = err; return NULL; }
+  if (nfuncs<0) { errno = -2; return NULL; }
+  functbl = gc_base_malloc (rctx->gc_ctx, nfuncs*sizeof(issdl_function_t));
+  for (i=0; i<nfuncs; i++)
+    {
+      err = restore_string (rctx, &functbl[i].name);
+      if (err)
+	{
+	errlab1:
+	  errno = err;
+	errlab2:
+	  while (--i>=0)
+	    gc_base_free (functbl[i].name);
+	  gc_base_free (functbl);
+	  return NULL;
+	}
+      if (functbl[i].name==NULL) { errno = -2; goto errlab2; }
+      err = restore_int32 (rctx, &functbl[i].args_nb);
+      if (err) goto errlab1;
+      err = restore_int32 (rctx, &functbl[i].id);
+      if (err) goto errlab1;
+    }
+  *nfuncs_sz = nfuncs;
+  return functbl;
+}
+
+int orchids_restore (orchids_t *ctx, char *name)
+{
+  restore_ctx_t rctx;
+  int err = 0;
+  int c;
+  size_t i;
+  size_t version;
+
+  GC_START (ctx->gc_ctx, 1);
+  errno = 0;
+  rctx.gc_ctx = ctx->gc_ctx;
+  rctx.shared_hash = NULL; /* for now */
+  rctx.global_fields = NULL; /* for now */
+  rctx.vm_func_tbl = NULL; /* for now */
+  rctx.vm_func_tbl_sz = 0; /* for now */
+  rctx.f = fopen (name, "r");
+  if (rctx.f==NULL) { err = errno; goto end; }
+  for (i=0; i<4; i++)
+    {
+      c = getc (rctx.f);
+      if (c==EOF) { err = c; goto errlab; }
+      if (c!=(int)(unsigned int)save_magic[i])
+	{ errno = -5; goto errlab; }
+    }
+  err = restore_size_t (&rctx, &version);
+  if (err) goto errlab;
+  if (version!=1) { errno = -6; goto errlab; }
+  rctx.version = version;
+  rctx.externs = ctx->xclasses;
+  rctx.rule_compiler = ctx->rule_compiler;
+  rctx.new_vm_func_tbl = ctx->vm_func_tbl;
+  rctx.new_vm_func_tbl_sz = ctx->vm_func_tbl_sz;
+  rctx.shared_hash = new_hash (ctx->gc_ctx, 1021);
+  rctx.global_fields = (field_record_table_t *)restore_gc_struct (&rctx);
+  if (rctx.global_fields==NULL && errno!=0) { err = errno; goto errlab; }
+  if (rctx.global_fields==NULL || TYPE(rctx.global_fields)!=T_FIELD_RECORD_TABLE)
+    { err = -2; goto errlab; }
+  GC_UPDATE (ctx->gc_ctx, 0, rctx.global_fields);
+  rctx.vm_func_tbl = restore_func_tbl (&rctx, &rctx.vm_func_tbl_sz);
+  if (rctx.vm_func_tbl==NULL && errno!=0) goto errlab;
+  GC_TOUCH (ctx->gc_ctx, ctx->thread_queue = (thread_queue_t *)restore_gc_struct (&rctx));
+  if (ctx->thread_queue==NULL && errno!=0) { err = errno; goto errlab; }
+  if (ctx->thread_queue!=NULL && TYPE(ctx->thread_queue)!=T_THREAD_QUEUE)
+    { err = -2; ctx->thread_queue = NULL; goto errlab; }
+ errlab:
+  if (rctx.vm_func_tbl!=NULL)
+    {
+      for (i=0; i<rctx.vm_func_tbl_sz; i++)
+	gc_base_free (rctx.vm_func_tbl[i].name);
+      gc_base_free (rctx.vm_func_tbl);
+    }
+  if (rctx.shared_hash!=NULL)
+    free_hash (rctx.shared_hash, NULL);
+  (void) fclose (rctx.f);
+ end:
+  GC_END (ctx->gc_ctx);
+  return err;
+}
 
 void del_input_descriptor(orchids_t *ctx, int fd)
 {
@@ -785,6 +968,8 @@ static gc_header_t *event_restore (restore_ctx_t *rctx)
   e = NULL;
   err = restore_int32 (rctx, &id);
   if (err) { errno = err; goto end; }
+  err = update_field_number (rctx, &id);
+  if (err) { errno = err; goto end; }
   val = (ovm_var_t *)restore_gc_struct (rctx);
   if (val==NULL && errno!=0) goto end;
   GC_UPDATE (gc_ctx, 0, val);
@@ -1044,6 +1229,7 @@ void post_event(orchids_t *ctx, mod_entry_t *sender, event_t *event, int dissect
 }
 
 
+#ifdef OBSOLETE
 void
 fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
 {
@@ -1131,7 +1317,9 @@ fprintf_orchids_stats(FILE *fp, const orchids_t *ctx)
           "--------------------+"
           "-------------------------------------------------------\n");
 }
+#endif
 
+#ifdef OBSOLETE
 void
 fprintf_hexdump(FILE *fp, const void *data, size_t n)
 {
@@ -1141,8 +1329,9 @@ fprintf_hexdump(FILE *fp, const void *data, size_t n)
     fprintf(fp, "0x%02X ", ((unsigned char *)data)[i]);
   fprintf(stdout, "\n");
 }
+#endif
 
-
+#ifdef OBSOLETE
 void
 fprintf_fields(FILE *fp, const orchids_t *ctx)
 {
@@ -1185,8 +1374,9 @@ fprintf_fields(FILE *fp, const orchids_t *ctx)
           "------------------+"
           "-------------------\n");
 }
+#endif
 
-
+#ifdef OBSOLETE
 void fprintf_state_env(FILE *fp, const orchids_t *ctx,
 		       const state_instance_t *state)
 {
@@ -1208,6 +1398,7 @@ void fprintf_state_env(FILE *fp, const orchids_t *ctx,
       }
   }
 }
+#endif
 
 static void field_table_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
@@ -1326,8 +1517,11 @@ field_table_t *new_field_table(gc_t *gc_ctx, size_t nfields)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

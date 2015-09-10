@@ -86,7 +86,8 @@ extern unsigned long dmalloc_orchids;
 #define MODNAME_MAX 32
 #define MAX_MODULES 256
 
-/* this is a trick to allow optimizer enable or disable fields in modules (not used yet) */
+/* this is a trick to allow the optimizer to
+   enable or disable fields in modules (not used yet) */
 #define F_NOT_NEEDED ((void *)-1)
 
 #define MODE_ONLINE 0
@@ -135,7 +136,8 @@ struct config_directive_s
 /**
  ** @struct event_s
  **   Type of event built by dissection modules an injected in engine.
- **   (field_id MUST be sorted in decreasing order).
+ **   (field_id once needed to be sorted in decreasing order, but
+ **    apparently no longer needs to).
  **/
 /**   @var event_s::field_id
  **     Field identifier in the global field record table.
@@ -1065,15 +1067,8 @@ struct reportmod_s {
 /**   @var orchids_s::reports
  **     Total number of report generated since startup.
  **/
-/**   @var orchids_s::last_evt_act
- **     Last event activity: the last time when an event was kept.
- **/
 /**   @var orchids_s::last_rule_act
  **     Last rule activity: the last time when a rule was inserted or removed.
- **/
-/**   @var orchids_s::last_ruleinst_act
- **     Last rule instance activity: the last time when a rule instance
- **     was created or removed.
  **/
 /**   @var orchids_s::rtactionlist
  **     The list of real-time actions.  These actions are registered and
@@ -1117,6 +1112,8 @@ struct orchids_s
   timeval_t           poll_period;
   rulefile_t         *rulefile_list;
   rulefile_t         *last_rulefile;
+  char               *save_file;
+  timeval_t          save_interval;
 #ifdef OBSOLETE
   rule_instance_t    *first_rule_instance;
   rule_instance_t    *last_rule_instance;
@@ -1131,19 +1128,6 @@ struct orchids_s
   bool_t              daemon;
   bool_t              actmon;
 
-#ifdef OBSOLETE
-  wait_thread_t  *current_tail;
-  wait_thread_t  *cur_retrig_qh;
-  wait_thread_t  *cur_retrig_qt;
-  wait_thread_t  *new_qh;
-  wait_thread_t  *new_qt;
-  wait_thread_t  *retrig_qh;
-  wait_thread_t  *retrig_qt;
-
-  active_event_t *active_event_head;
-  active_event_t *active_event_tail;
-  active_event_t *active_event_cur;
-#endif
   struct thread_queue_s *thread_queue;
   event_t *current_event;
 
@@ -1163,16 +1147,12 @@ struct orchids_s
 
   char *runtime_user;
 
-  rusage_t ru; /* XXX useless? */
-
+  rusage_t ru;
   pid_t pid;
 
   size_t reports;
 
-  timeval_t last_evt_act;
-  timeval_t last_mod_act; /* XXX: UNUSED: last time when a mod was ins or rem */
   timeval_t last_rule_act;
-  timeval_t last_ruleinst_act;
 
   heap_t *rtactionlist;
 

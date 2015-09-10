@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 
 #include <signal.h>
 #include <sys/types.h>
@@ -85,6 +86,16 @@ static void change_run_id(char *username)
   }
 }
 
+static int orchids_periodic_save (orchids_t *ctx, heap_entry_t *he)
+{
+  timeval_t next;
+  
+  (void) orchids_save (ctx, ctx->save_file);
+  Timer_Add (&next, &he->date, &ctx->save_interval);
+  he->date = next;
+  register_rtaction (ctx, he);
+  return 0;
+}
 
 /**
  * Main function.
@@ -98,6 +109,7 @@ int
 main(int argc, char *argv[])
 {
   orchids_t *ctx;
+  int err;
 
 #ifdef ORCHIDS_DEBUG
   debuglog_enable_all(); /* enable ALL messages in debug mode */
@@ -146,6 +158,29 @@ main(int argc, char *argv[])
   /* change run id here */
   if (ctx->runtime_user)
     change_run_id(ctx->runtime_user);
+
+  if (ctx->save_file!=NULL)
+    {
+      err = orchids_restore (ctx, ctx->save_file);
+      if (err==0)
+	{
+	  DebugLog(DF_CORE, DS_INFO, "Orchids restored from '%s'\n", ctx->save_file);
+	}
+      else if (err==ENOENT) /* No such save file: silently proceed */
+	{
+	  DebugLog(DF_CORE, DS_WARN, "Orchids won't restart from save file: file '%s' does not exist.\n",
+		   ctx->save_file);
+	}
+      else
+	{
+	  DebugLog(DF_CORE, DS_ERROR,
+		   "Orchids can't restart from save file '%s': %s\n",
+		   ctx->save_file, orchids_strerror(err));
+	}
+    }
+  if (ctx->save_file!=NULL)
+    (void) register_rtcallback(ctx, orchids_periodic_save, NULL, NULL,
+			       ctx->save_interval.tv_sec, 0);
 
   if (ctx->off_line_mode == MODE_ONLINE)
     event_dispatcher_main_loop(ctx);

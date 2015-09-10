@@ -88,12 +88,12 @@ typedef struct action_orchids_ctx_s action_orchids_ctx_t;
 
 typedef char *(*action_doer) (action_orchids_ctx_t *octx,
 			      char *s, char *end,
-			      int field_num);
+			      int32_t field_num);
 
 typedef struct action_s action_t;
 struct action_s {
   char *name; /* <keyword> */
-  int field_num; /* orchids field number in given module */
+  int32_t field_num; /* orchids field number in given module */
   action_doer action_do; /* one of the action_doer_* functions below,
 			    or one that you would write for specific
 			    purposes */
@@ -115,19 +115,19 @@ action_tree_t *compile_actions(gc_t *gc_ctx, action_t *actions);
 
 void action_parse_event(action_orchids_ctx_t *octx, char *data, char *end);
 char *action_doer_int (action_orchids_ctx_t *octx, char *s, char *end,
-		       int field_num);
+		       int32_t field_num);
 char *action_doer_uint (action_orchids_ctx_t *octx, char *s, char *end,
-			int field_num);
+			int32_t field_num);
 char *action_doer_uint_hex (action_orchids_ctx_t *octx, char *s, char *end,
-			    int field_num);
+			    int32_t field_num);
 char *action_doer_dev (action_orchids_ctx_t *octx, char *s, char *end,
-		       int field_num); /* device number (64*major+minor) */
+		       int32_t field_num); /* device number (64*major+minor) */
 char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
-		      int field_num);
+		      int32_t field_num);
 char *action_doer_string (action_orchids_ctx_t *octx, char *s, char *end,
-			  int field_num);
+			  int32_t field_num);
 char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
-		      int field_num);
+		      int32_t field_num);
 
 
 #endif /* MOD_UTILS_H */

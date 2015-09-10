@@ -2,7 +2,7 @@
 # Set the module directory.  This is the place where
 # module binary files will be loaded.
 
-SetModuleDir @@LIBDIR@@/orchids
+ModuleDir @@LIBDIR@@/orchids
 
 
 # Module section.

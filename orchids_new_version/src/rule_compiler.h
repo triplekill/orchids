@@ -1089,6 +1089,9 @@ compiler_reset(rule_compiler_t *ctx);
  **/
 char *build_concat_string(rule_compiler_t *ctx, char *str1, char *str2);
 
+/* Function used to update field numbers when restoring. */
+int update_field_number (restore_ctx_t *rctx, int32_t *fld);
+
 
 /* DEBUG */
 /**

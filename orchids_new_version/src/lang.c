@@ -607,8 +607,7 @@ static int bstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=BSTRLEN(str), s=BSTR(str); i<n; i++)
     {
       c = s[i];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -740,8 +739,7 @@ static int vbstr_save (save_ctx_t *sctx, gc_header_t *p)
   size_t i, n;
   int c, err;
 
-  /*  err = putc (TYPE(p), f);
-      if (err) return err;
+  /*  if (putc (TYPE(p), f) < 0) return errno;
       // TYPE(p) will already have been saved.
       */
   err = save_size_t (sctx, VBSTRLEN(str));
@@ -749,8 +747,7 @@ static int vbstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=VBSTRLEN(str), s=VBSTR(str); i<n; i++)
     {
       c = s[i];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -880,8 +877,7 @@ static int str_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=STRLEN(str), s=STR(str); i<n; i++)
     {
       c = s[i];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -1060,8 +1056,7 @@ static int vstr_save (save_ctx_t *sctx, gc_header_t *p)
   size_t i, n;
   int c, err;
 
-  /*  err = putc (TYPE(p), f);
-      if (err) return err;
+  /*  if (putc (TYPE(p), f) < 0) return errno;
       // TYPE(p) will already have been saved.
       */
   err = save_size_t (sctx, VSTRLEN(str));
@@ -1069,8 +1064,7 @@ static int vstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=VSTRLEN(str), s=VSTR(str); i<n; i++)
     {
       c = s[i];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -1643,13 +1637,12 @@ static int ipv6_save (save_ctx_t *sctx, gc_header_t *p)
 {
   ovm_ipv6_t *addr = (ovm_ipv6_t *)p;
   FILE *f = sctx->f;
-  int i, c, err;
+  int i, c;
 
   for (i = 0 ; i < 16 ; i++)
     {
       c = (char)IPV6(addr).s6_addr[i];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -4488,10 +4481,10 @@ static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
 
 static void issdl_defined(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t *field;
+  ovm_var_t *val;
 
-  field = POP_VALUE(ctx);
-  if (IS_NULL(field))
+  val = POP_VALUE(ctx);
+  if (IS_NULL(val))
     PUSH_RETURN_FALSE(ctx);
   else
     PUSH_RETURN_TRUE(ctx);
@@ -5079,7 +5072,7 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_defined, 25, "defined",
     1, int_of_any_sigs, /* returns 0 or 1, in fact */
     m_unknown_1,
-    "Return if a field is defined" },
+    "Return whether a value is defined, i.e., different from NULL" },
 #ifdef OBSOLETE
   { issdl_difftime, 26, "difftime",
     2, difftime_sigs,
@@ -5388,7 +5381,11 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
   gc_class_t *gccl;
 
   if (p==NULL)
-    err = putc (T_NOTHING, sctx->f);
+    {
+      if (putc (T_NOTHING, sctx->f) < 0)
+	err = errno;
+      else err = 0;
+    }
   else switch ((int)(unsigned int)(p->flags &
 				   (GC_FLAGS_EST_SEEN | GC_FLAGS_EST_SHARED)))
     {
@@ -5398,8 +5395,7 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
 					 flag, so that next time we see it,
 					 we shall enter the 'case GC_FLAGS_EST_SHARED'
 					 branch. */
-      err = putc (T_SHARED_DEF, sctx->f);
-      if (err) goto end;
+      if (putc (T_SHARED_DEF, sctx->f) < 0) { err = errno; goto end; }
       /* compute unique identifier for pointer p;
 	 I assume an unsigned long will hold enough of the bits of p for that.
 	 We do not want to reveal too much of the memory layout, so we
@@ -5413,16 +5409,14 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
       /*FALLTHROUGH*/
     case GC_FLAGS_EST_SEEN: /* normal case: object is reachable, but not shared */
       c = TYPE(p);
-      err = putc (c, sctx->f);
-      if (err) goto end;
+      if (putc (c, sctx->f) < 0) { err = errno; goto end; }
       gccl = gc_classes[c];
       if (gccl==NULL) { err = -2; goto end; }
       err = (*gccl->save) (sctx, p);
       break;
     case GC_FLAGS_EST_SHARED: /* this one is shared, but we have already saved
 				 it at a previous iteration */
-      err = putc (T_SHARED_USE, sctx->f);
-      if (err) goto end;
+      if (putc (T_SHARED_USE, sctx->f) < 0) { err = errno; goto end; }
       id = ((unsigned long)p) ^ sctx->fuzz;
       err = save_ulong (sctx, id);
       break;

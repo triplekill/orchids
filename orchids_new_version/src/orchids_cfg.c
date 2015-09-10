@@ -305,7 +305,7 @@ static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 #endif
 
 /**
- ** Handler for the SetModuleDir configuration directive.
+ ** Handler for the ModuleDir configuration directive.
  ** @param ctx  A pointer to the Orchids application context.
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
@@ -315,7 +315,7 @@ static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
 
 
 /**
- ** Handler for the SetLockFile configuration directive.
+ ** Handler for the LockFile configuration directive.
  ** @param ctx  A pointer to the Orchids application context.
  ** @param mod  A pointer to the current module being configured.
  ** @param dir  A pointer to the configuration directive record.
@@ -1059,6 +1059,33 @@ static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
     }
 }
 
+static void set_save_file (orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
+{
+  DebugLog(DF_CORE, DS_INFO, "setting save file to '%s'\n", dir->args);
+  ctx->save_file = dir->args;
+}
+
+static void set_save_interval (orchids_t *ctx, mod_entry_t *mod,
+			   config_directive_t *dir)
+{
+  long sec;
+
+  DebugLog(DF_CORE, DS_INFO, "setting save interval to '%s'\n", dir->args);
+
+  sec = strtol(dir->args, (char **)NULL, 10);
+  if (sec <= 0)
+    {
+      DebugLog(DF_CORE, DS_ERROR,
+	       "Ignored invalid SaveInterval value %i "
+	       "(should be >0)\n",
+	       dir->args);
+      return;
+    }
+  ctx->save_interval.tv_sec = sec;
+  ctx->save_interval.tv_usec = 0;
+}
+
 static void set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   int nice_value;
@@ -1309,11 +1336,13 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },
   { "AddPreprocessorCmd", add_preproc_cmd, "Add a preprocessor command for a file suffix" },
 #endif
-  { "SetModuleDir", set_modules_dir, "Set the modules directory" },
-  { "SetLockFile", set_lock_file, "Set the lock file name" },
+  { "ModuleDir", set_modules_dir, "Set the modules directory" },
+  { "LockFile", set_lock_file, "Set the lock file name" },
   { "MaxMemorySize", set_max_memory_limit, "Set maximum memory limit" },
-  { "ResolveIP", set_resolve_ip, "Enable/Disable DNS name resolution" },
-  { "Nice", set_nice, "Set the process priority"},
+  { "ResolveIP", set_resolve_ip, "Enable/disable DNS name resolution" },
+  { "Nice", set_nice, "Set the priority of the Orchids process"},
+  { "SaveFile", set_save_file, "Set save file, for saving and restoring" },
+  { "SaveInterval", set_save_interval, "Set interval between saves" },
   { "INPUT", add_input_source, "Add an input source module"},
   { "DISSECT", add_cond_dissector, "Add a conditionnal dissector"},
   { NULL, NULL, NULL }
@@ -1579,7 +1608,7 @@ char *dir_parse_string (orchids_t *ctx, const char *file, uint32_t line,
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2014-20015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

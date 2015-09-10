@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include "gc.h"
 
 #include "safelib.h"
@@ -556,15 +557,13 @@ void reset_sharing (gc_t *gc_ctx, gc_header_t *p)
 
 int save_size_t (save_ctx_t *sctx, size_t sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(size_t); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -581,8 +580,8 @@ int restore_size_t (restore_ctx_t *rctx, size_t *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((size_t)c) << 8*(sizeof(size_t)-1));
     }
   *szp = sz;
   return 0;
@@ -590,15 +589,13 @@ int restore_size_t (restore_ctx_t *rctx, size_t *szp)
 
 int save_int (save_ctx_t *sctx, int sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(int); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -615,8 +612,8 @@ int restore_int (restore_ctx_t *rctx, int *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((int)c) << 8*(sizeof(int)-1));
     }
   *szp = sz;
   return 0;
@@ -624,15 +621,13 @@ int restore_int (restore_ctx_t *rctx, int *szp)
 
 int save_uint (save_ctx_t *sctx, unsigned int sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(unsigned int); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -649,8 +644,8 @@ int restore_uint (restore_ctx_t *rctx, unsigned int *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((unsigned int)c) << 8*(sizeof(unsigned int)-1));
     }
   *szp = sz;
   return 0;
@@ -658,15 +653,13 @@ int restore_uint (restore_ctx_t *rctx, unsigned int *szp)
 
 int save_int32 (save_ctx_t *sctx, int32_t sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(int32_t); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -683,8 +676,8 @@ int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((int32_t)c) << 8*(sizeof(int32_t)-1));
     }
   *szp = sz;
   return 0;
@@ -692,15 +685,13 @@ int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
 
 int save_uint32 (save_ctx_t *sctx, uint32_t sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(uint32_t); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -717,8 +708,8 @@ int restore_uint32 (restore_ctx_t *rctx, uint32_t *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((uint32_t)c) << 8*(sizeof(uint32_t)-1));
     }
   *szp = sz;
   return 0;
@@ -726,15 +717,13 @@ int restore_uint32 (restore_ctx_t *rctx, uint32_t *szp)
 
 int save_long (save_ctx_t *sctx, long sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(long); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -751,8 +740,8 @@ int restore_long (restore_ctx_t *rctx, long *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((long)c) << 8*(sizeof(long)-1));
     }
   *szp = sz;
   return 0;
@@ -760,15 +749,13 @@ int restore_long (restore_ctx_t *rctx, long *szp)
 
 int save_ulong (save_ctx_t *sctx, unsigned long sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(unsigned long); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -785,8 +772,8 @@ int restore_ulong (restore_ctx_t *rctx, unsigned long *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((unsigned long)c) << 8*(sizeof(unsigned long)-1));
     }
   *szp = sz;
   return 0;
@@ -794,15 +781,13 @@ int restore_ulong (restore_ctx_t *rctx, unsigned long *szp)
 
 int save_ctime (save_ctx_t *sctx, time_t sz)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(time_t); i++)
     {
       c = sz & 0xff;
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -819,8 +804,8 @@ int restore_ctime (restore_ctx_t *rctx, time_t *szp)
       c = getc (f);
       if (c==EOF)
 	return c;
-      sz <<= 8;
-      sz |= c;
+      sz >>= 8;
+      sz |= (((time_t)c) << 8*(sizeof(time_t)-1));
     }
   *szp = sz;
   return 0;
@@ -828,15 +813,13 @@ int restore_ctime (restore_ctx_t *rctx, time_t *szp)
 
 int save_double (save_ctx_t *sctx, double x)
 {
-  int i, c, err;
+  int i, c;
   FILE *f = sctx->f;
 
   for (i=0; i<sizeof(double); i++)
     {
       c = ((char *)&x)[i];
-      err = putc (c, f);
-      if (err)
-	return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -871,8 +854,7 @@ int save_string (save_ctx_t *sctx, char *s)
   for (j=0; j<m; j++)
     {
       c = s[j];
-      err = putc (c, f);
-      if (err) return err;
+      if (putc (c, f) < 0) return errno;
     }
   return 0;
 }

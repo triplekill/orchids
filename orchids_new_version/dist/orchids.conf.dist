@@ -13,15 +13,19 @@
 
 MaxMemorySize 134217728
 
-
-# Set the module directory.  This is the place where
-# module binary files will be loaded.
-
-SetModuleDir @@LIBDIR@@/orchids
-
-# This is the runtime user id in which Orchids will drop root provoleges.
+# This is the runtime user id which Orchids will drop root privileges to.
 
 RuntimeUser @@RUNUSER@@
+
+# SaveFile:
+# This is the Orchids save file, where Orchids will save its internal state regularly,
+# and from which Orchids will restore its state at startup.
+# Commenting this line out will disable this feature.
+#
+# SaveInterval: number of seconds between two saves.
+
+SaveFile @@VARDIR@@/run/orchids/orchids.sav
+SaveInterval 60
 
 # Disable Network name resolution by default
 

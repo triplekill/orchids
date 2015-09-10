@@ -979,14 +979,12 @@ static int node_expr_save (save_ctx_t *sctx, gc_header_t *p)
   stype = n->stype;
   if (stype==NULL)
     {
-      err = putc (T_NOTHING, f);
-      if (err) return err;
+      if (putc (T_NOTHING, f) < 0) { return errno; }
       err = save_string (sctx, NULL);
     }
   else
     {
-      err = putc ((int)stype->tag, f);
-      if (err) return err;
+      if (putc ((int)stype->tag, f) < 0) { return errno; }
       err = save_string (sctx, stype->name);
     }
   if (err) return err;
@@ -1462,7 +1460,7 @@ static gc_header_t *node_expr_call_restore (restore_ctx_t *rctx)
   if (err) { errno = err; goto end; }
   if (name==NULL) { errno = -2; goto end; }
   func = strhash_get(rctx->rule_compiler->functions_hash, name);
-  if (func==NULL) { gc_base_free (name); errno = -2; goto end; }
+  if (func==NULL) { gc_base_free (name); errno = -8; goto end; }
   params = (node_expr_t *)restore_gc_struct (rctx);
   if (params==NULL && errno!=0) { gc_base_free (name); goto end; }
   GC_UPDATE (gc_ctx, 2, params);
@@ -4296,14 +4294,12 @@ static int type_heap_save_recursive (save_ctx_t *sctx, type_heap_t *h)
   stype = h->stype;
   if (stype==NULL)
     {
-      err = putc (T_NOTHING, sctx->f);
-      if (err) return err;
+      if (putc (T_NOTHING, sctx->f) < 0) { return errno; }
       err = save_string (sctx, NULL);
     }
   else
     {
-      err = putc ((int)stype->tag, sctx->f);
-      if (err) return err;
+      if (putc ((int)stype->tag, sctx->f) < 0) { return errno; }
       err = save_string (sctx, stype->name);
     }
   if (err) return err;
@@ -7294,26 +7290,82 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
 
 gc_class_t rule_class;
 
+int update_field_number (restore_ctx_t *rctx, int32_t *fld)
+{
+  int32_t field = *fld;
+  char *name;
+  field_record_t *f;
+
+  if (field<0 || field>=rctx->global_fields->num_fields)
+    return -3;
+  name = rctx->global_fields->fields[field].name;
+  f = strhash_get (rctx->rule_compiler->fields_hash, name);
+  if (f==NULL)
+    return -7; /* unknown field name */
+  *fld = f->id; /* modify field number: make it the new one */
+  return 0;
+}
+
+int update_primitive_number (restore_ctx_t *rctx, int32_t *prim)
+{
+  int32_t func = *prim;
+  issdl_function_t *f, *ff;
+  char *name;
+  int32_t args_nb;
+  int32_t i, n;
+
+  if (func<0 || func>=rctx->vm_func_tbl_sz)
+    return -8;
+  f = &rctx->vm_func_tbl[func];
+  name = f->name;
+  args_nb = f->args_nb;
+  n = rctx->new_vm_func_tbl_sz;
+  /* Do a linear scan to find the same name/args_nb pair.
+     This is not efficient, but not that much of a problem.
+     Specially if we first try the frequent case where this
+     will occur at the same position (func) as it was already.
+  */
+  if (func<n)
+    {
+      ff = &rctx->new_vm_func_tbl[func];
+      if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
+	return 0;
+    }
+  for (i=0; i<n; i++)
+    {
+      if (i==func)
+	continue;
+      ff = &rctx->new_vm_func_tbl[i];
+      if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
+	{
+	  *prim = i;
+	  return 0;
+	}
+    }
+  return -8;
+}
+
 static int do_update_fields (bytecode_t *bc, size_t sz,
 			     bytecode_t *start, void *data)
 {
   restore_ctx_t *rctx = data;
-  unsigned long fld;
-  char *name;
-  field_record_t *f;
+  int32_t fld;
+  int err;
 
   switch (bc[0])
     {
     case OP_PUSHFIELD:
     case OP_ADD_EVENT:
-      fld = bc[1];
-      if (fld>=rctx->global_fields->num_fields)
-	return -3;
-      name = rctx->global_fields->fields[fld].name;
-      f = strhash_get (rctx->rule_compiler->fields_hash, name);
-      if (f==NULL)
-	return -4; /* unknown field name */
-      bc[1] = f->id; /* modify field number: make it the new one */
+      fld = (int32_t)bc[1];
+      err = update_field_number (rctx, &fld);
+      if (err) return err;
+      bc[1] = (bytecode_t)fld; /* modify field number: make it the new one */
+      break;
+    case OP_CALL: /* check that primitive is known!!! */
+      fld = (int32_t)bc[1];
+      err = update_primitive_number (rctx, &fld);
+      if (err) return err;
+      bc[1] = (bytecode_t)fld; /* modify primitive number: make it the new one */
       break;
     default:
       break;
@@ -7349,6 +7401,7 @@ static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
 {
   size_t stateno;
   size_t i, n;
+  int32_t field_num;
   int err;
 
   err = restore_size_t (rctx, &stateno);
@@ -7361,9 +7414,12 @@ static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
   trans->required_fields = gc_base_malloc (rctx->gc_ctx, n*sizeof(int32_t));
   for (i=0; i<n; i++)
     {
-      err = restore_int32 (rctx, &trans->required_fields[i]);
+      err = restore_int32 (rctx, &field_num);
       if (err) { err_freeflds: gc_base_free (trans->required_fields);
 	return err; }
+      err = update_field_number (rctx, &field_num);
+      if (err) goto err_freeflds;
+      trans->required_fields[i] = field_num;
     }
   err = restore_size_t (rctx, &n);
   trans->eval_code_length = n;
