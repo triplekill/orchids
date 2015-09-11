@@ -62,6 +62,9 @@ struct restore_ctx_s {
   int32_t vm_func_tbl_sz; /* not from orchids_context_t->vm_func_tbl_sz: this one is meant to be restored first */
   struct field_record_table_s *global_fields; /* not from orchids_context_t->global_fields: this one is meant to be restored first */
   struct hash_s *shared_hash; /* filled in while restoring */
+  int32_t errs;
+#define RESTORE_UNKNOWN_FIELD_NAME 0x1
+#define RESTORE_UNKNOWN_PRIMITIVE 0x2
 };
 
 typedef struct gc_class_s gc_class_t;

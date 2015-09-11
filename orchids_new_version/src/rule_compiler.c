@@ -7301,8 +7301,9 @@ int update_field_number (restore_ctx_t *rctx, int32_t *fld)
   name = rctx->global_fields->fields[field].name;
   f = strhash_get (rctx->rule_compiler->fields_hash, name);
   if (f==NULL)
-    return -7; /* unknown field name */
-  *fld = f->id; /* modify field number: make it the new one */
+    rctx->errs |= RESTORE_UNKNOWN_FIELD_NAME; /* unknown field name */
+  else
+    *fld = f->id; /* modify field number: make it the new one */
   return 0;
 }
 
@@ -7314,35 +7315,37 @@ int update_primitive_number (restore_ctx_t *rctx, int32_t *prim)
   int32_t args_nb;
   int32_t i, n;
 
-  if (func<0 || func>=rctx->vm_func_tbl_sz)
-    return -8;
-  f = &rctx->vm_func_tbl[func];
-  name = f->name;
-  args_nb = f->args_nb;
-  n = rctx->new_vm_func_tbl_sz;
-  /* Do a linear scan to find the same name/args_nb pair.
-     This is not efficient, but not that much of a problem.
-     Specially if we first try the frequent case where this
-     will occur at the same position (func) as it was already.
-  */
-  if (func<n)
+  if (func>=0 && func<rctx->vm_func_tbl_sz)
     {
-      ff = &rctx->new_vm_func_tbl[func];
-      if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
-	return 0;
-    }
-  for (i=0; i<n; i++)
-    {
-      if (i==func)
-	continue;
-      ff = &rctx->new_vm_func_tbl[i];
-      if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
+      f = &rctx->vm_func_tbl[func];
+      name = f->name;
+      args_nb = f->args_nb;
+      n = rctx->new_vm_func_tbl_sz;
+      /* Do a linear scan to find the same name/args_nb pair.
+	 This is not efficient, but not that much of a problem.
+	 Specially if we first try the frequent case where this
+	 will occur at the same position (func) as it was already.
+      */
+      if (func<n)
 	{
-	  *prim = i;
-	  return 0;
+	  ff = &rctx->new_vm_func_tbl[func];
+	  if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
+	    return 0;
+	}
+      for (i=0; i<n; i++)
+	{
+	  if (i==func)
+	    continue;
+	  ff = &rctx->new_vm_func_tbl[i];
+	  if (ff->args_nb==args_nb && strcmp (ff->name, name)==0)
+	    {
+	      *prim = i;
+	      return 0;
+	    }
 	}
     }
-  return -8;
+  rctx->errs |= RESTORE_UNKNOWN_PRIMITIVE;
+  return 0;
 }
 
 static int do_update_fields (bytecode_t *bc, size_t sz,
@@ -7661,9 +7664,12 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   int32_t var, nvars;
   char *s;
   gc_header_t *si, *pid;
+  int32_t save_errs;
 
   GC_START(gc_ctx, 3);
   rule = NULL;
+  save_errs = rctx->errs;
+  rctx->errs = 0;
   err = restore_string (rctx, &filename);
   if (err) { errno = err; goto end; }
   err = restore_ctime (rctx, &mtime);
@@ -7788,8 +7794,18 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     rule->next = (rule_t *)p;
     No: since we don't save the next field, don't restore it.
   */
-  rule = install_restored_rule (rctx->rule_compiler, rule);
+  if (rctx->errs!=0)
+    {
+      if (rctx->errs & RESTORE_UNKNOWN_FIELD_NAME)
+	rule->flags |= RULE_RESTORE_UNKNOWN_FIELD_NAME;
+      if (rctx->errs & RESTORE_UNKNOWN_PRIMITIVE)
+	rule->flags |= RESTORE_UNKNOWN_PRIMITIVE;
+      /* And do not install the restored rule */
+    }
+  else
+    rule = install_restored_rule (rctx->rule_compiler, rule);
  end:
+  rctx->errs = save_errs;
   GC_END (gc_ctx);
   return (gc_header_t *)rule;
 }

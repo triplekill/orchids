@@ -395,7 +395,13 @@ struct rule_s
   size_t            instances;
   int32_t           id;
   int               flags;
-#define RULE_INITIAL_ALREADY_LAUNCHED 0x1
+  /* The following two flags are taken from gc.h, and
+     are only used at restore() time */
+#define RULE_RESTORE_UNKNOWN_FIELD_NAME RESTORE_UNKNOWN_FIELD_NAME
+#define RULE_RESTORE_UNKNOWN_PRIMITIVE RESTORE_UNKNOWN_PRIMITIVE
+  /* The next one is used for rules whose initial state has
+     the STATE_COMMIT flag set */
+#define RULE_INITIAL_ALREADY_LAUNCHED 0x80
 
   objhash_t        *sync_lock;
   int32_t          *sync_vars;

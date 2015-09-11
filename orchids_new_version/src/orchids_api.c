@@ -558,6 +558,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   rctx.global_fields = NULL; /* for now */
   rctx.vm_func_tbl = NULL; /* for now */
   rctx.vm_func_tbl_sz = 0; /* for now */
+  rctx.errs = 0;
   rctx.f = fopen (name, "r");
   if (rctx.f==NULL) { err = errno; goto end; }
   for (i=0; i<4; i++)
@@ -587,6 +588,10 @@ int orchids_restore (orchids_t *ctx, char *name)
   if (ctx->thread_queue==NULL && errno!=0) { err = errno; goto errlab; }
   if (ctx->thread_queue!=NULL && TYPE(ctx->thread_queue)!=T_THREAD_QUEUE)
     { err = -2; ctx->thread_queue = NULL; goto errlab; }
+  if (rctx.errs & RESTORE_UNKNOWN_FIELD_NAME)
+    { err = -7; ctx->thread_queue = NULL; goto errlab; }
+  if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
+    { err = -8; ctx->thread_queue = NULL; goto errlab; }
  errlab:
   if (rctx.vm_func_tbl!=NULL)
     {
@@ -962,13 +967,18 @@ static gc_header_t *event_restore (restore_ctx_t *rctx)
   event_t *e, *next;
   int32_t id;
   ovm_var_t *val;
+  int32_t save_errs, errs;
   int err;
 
   GC_START (gc_ctx, 2);
   e = NULL;
+  save_errs = rctx->errs;
+  rctx->errs = 0;
   err = restore_int32 (rctx, &id);
-  if (err) { errno = err; goto end; }
+  if (err) { errno = err; rctx->errs = save_errs; goto end; }
   err = update_field_number (rctx, &id);
+  errs = rctx->errs;
+  rctx->errs = save_errs;
   if (err) { errno = err; goto end; }
   val = (ovm_var_t *)restore_gc_struct (rctx);
   if (val==NULL && errno!=0) goto end;
@@ -977,11 +987,16 @@ static gc_header_t *event_restore (restore_ctx_t *rctx)
   if (next==NULL && errno!=0) goto end;
   if (next!=NULL && TYPE(next)!=T_EVENT)
     { errno = -2; goto end; }
-  e = gc_alloc (gc_ctx, sizeof(event_t), &event_class);
-  e->gc.type = T_EVENT;
-  e->field_id = id;
-  GC_TOUCH (gc_ctx, e->value = val);
-  GC_TOUCH (gc_ctx, e->next = next);
+  if ((errs & RESTORE_UNKNOWN_FIELD_NAME) != 0)
+    e = next; /* ignore event value val: it uses unknown field names */
+  else
+    {
+      e = gc_alloc (gc_ctx, sizeof(event_t), &event_class);
+      e->gc.type = T_EVENT;
+      e->field_id = id;
+      GC_TOUCH (gc_ctx, e->value = val);
+      GC_TOUCH (gc_ctx, e->next = next);
+    }
  end:
   GC_END (gc_ctx);
   return (gc_header_t *)e;

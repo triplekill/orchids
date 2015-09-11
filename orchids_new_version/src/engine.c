@@ -269,6 +269,14 @@ static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
     goto end;
   if (si!=NULL && TYPE(si)!=T_STATE_INSTANCE)
     { errno = -2; goto end; }
+  if ((si->pid->rule->flags &
+       (RULE_RESTORE_UNKNOWN_FIELD_NAME | RULE_RESTORE_UNKNOWN_PRIMITIVE))
+      !=0)
+    { /* Kill those threads (and rules) that cannot be run under the current
+	 configuration */
+      si->pid->flags |= THREAD_KILL;
+      rctx->errs = 0;
+    }
   next = (thread_queue_elt_t *)restore_gc_struct (rctx);
   if (next==NULL && errno!=0)
     goto end;
