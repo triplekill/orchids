@@ -2,7 +2,7 @@
  ** @file mod_binfile.c
  ** binary file input module, for binary log files.
  **
- ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
@@ -492,6 +492,87 @@ static int rtaction_read_binfiles(orchids_t *ctx, heap_entry_t *he)
   return 0;
 }
 
+static int binfile_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  binfile_config_t *cfg;
+  binfile_t *bf;
+  size_t n;
+  size_t fpos;
+  off_t pos;
+  int err;
+
+  cfg = (binfile_config_t *)data;
+  for (n=0, bf = cfg->file_list; bf!=NULL; bf = bf->next)
+    n++;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  /* We save file positions for all text files, but we ignore
+     UNIX sockets (which are outside cfg->file_list) */
+  for (bf = cfg->file_list; bf!=NULL; bf = bf->next)
+    {
+      pos = lseek (bf->fd, 0, SEEK_CUR);
+      if (pos==-1)
+	{
+	  continue; /* ignore this file;
+		       this happens in particular if errno==ESPIPE, namely, for pipes.
+		    */
+	}
+      fpos = (size_t) pos;
+      err = save_string (sctx, STR(bf->file_name));
+      /* It is legal to save STR(bf->file_name), because:
+	 - bf->file_name is always a T_STR
+	 - STR(bf->file_name) is always NUL-terminated.
+      */
+      if (err) return err;
+      if (putc (bf->eof, sctx->f) < 0) return -1;
+      err = save_size_t (sctx, fpos);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static int binfile_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  binfile_config_t *cfg;
+  binfile_t *bf;
+  size_t i, n;
+  char *filename;
+  int eof;
+  size_t fpos;
+  int err;
+
+  cfg = (binfile_config_t *)data;
+  err = restore_size_t (rctx, &n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = restore_string (rctx, &filename);
+      if (err) return err;
+      if (filename==NULL) return -2;
+      eof = getc (rctx->f);
+      if (eof<0) { gc_base_free (filename); return eof; }
+      err = restore_size_t (rctx, &fpos);
+      if (err) { gc_base_free (filename); return err; }
+      for (bf=cfg->file_list; bf!=NULL; bf=bf->next)
+	{ /* linear search through all files; slow but OK if we do not
+	     have too many files... */
+	  if (strcmp(STR(bf->file_name), filename)==0)
+	    { /* found it.  By the way, it is legal to use strcmp()
+		 on STR(bf->file_name) because:
+		 - bf->file_name is always a T_STR
+		 - STR(bf->file_name) is always NUL-terminated.
+	      */
+	      err = lseek (bf->fd, (off_t)fpos, SEEK_SET);
+	      if (err==-1) { gc_base_free (filename); return errno; }
+	      bf->eof = eof;
+	      break;
+	    }
+	}
+      gc_base_free (filename);
+    }
+  return 0;
+}
+
 
 static mod_cfg_cmd_t binfile_dir[] =
 {
@@ -517,15 +598,20 @@ input_module_t mod_binfile = {
   binfile_postcompil,
   NULL,
   NULL,
-  NULL
+  NULL,
+  binfile_save,
+  binfile_restore,
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

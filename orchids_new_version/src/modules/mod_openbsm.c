@@ -114,7 +114,7 @@ static size_t openbsm_compute_length (unsigned char *first_bytes,
 				      /* available_bytes is ignored here */
 				      int *state,
 				      void *sd_data)
-{ /* n_first_bytes should be 5: 1 AUT_HEADER* byte + 4 bytes of length, in big-endian format */
+{
   int c;
 
   switch (*state)
@@ -1314,8 +1314,18 @@ static void *openbsm_predissect(orchids_t *ctx, mod_entry_t *mod,
 {
   blox_hook_t *hook;
 
-  hook = init_blox_hook (ctx, mod->config);
+  hook = init_blox_hook (ctx, mod->config, cond_param_str, cond_param_size);
   return hook;
+}
+
+static int openbsm_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  return blox_save (sctx, (struct blox_config_s *)data);
+}
+
+static int openbsm_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  return blox_restore (rctx, (struct blox_config_s *)data);
 }
 
 static void *openbsm_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -1343,11 +1353,13 @@ input_module_t mod_openbsm = {
   NULL,
   openbsm_predissect,
   openbsm_dissect,
-  &t_bstr		    /* type of fields it expects to dissect */
+  &t_bstr,		    /* type of fields it expects to dissect */
+  openbsm_save,
+  openbsm_restore,
 };
 
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

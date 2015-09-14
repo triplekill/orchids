@@ -180,11 +180,13 @@ input_module_t mod_netfilter = {
   NULL,                        /* Post-compil function */
   NULL,
   netfilter_dissect,           /* netfilter conditional dissector */
-  &t_str                       /* type of fields it expects to dissect */
+  &t_str,                      /* type of fields it expects to dissect */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 /*
-** Copyright (c) 2014 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>

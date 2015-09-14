@@ -3,6 +3,7 @@
  ** Public definitions for mod_mgr.c.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.0
  ** @ingroup core
@@ -102,7 +103,7 @@ find_module_id(orchids_t *ctx, const char *name);
 mod_entry_t *
 find_module_entry(orchids_t *ctx, const char *name);
 
-
+#ifdef OBSOLETE
 /**
  ** Try to call a module function, if the module is loaded and if the
  ** function is found.
@@ -119,7 +120,7 @@ call_mod_func(orchids_t *ctx,
               const char *modname,
               const char *funcname,
               void *funcparams);
-
+#endif
 
 /**
  ** Display loaded modules.
@@ -153,8 +154,11 @@ dir_handler_t dir_handler_lookup(orchids_t *ctx, input_module_t *mod, char *dir)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

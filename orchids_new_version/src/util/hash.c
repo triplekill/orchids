@@ -3,6 +3,7 @@
  ** Hash utility functions.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.2
  ** @ingroup util
@@ -53,17 +54,17 @@ void clear_hash(hash_t *hash, void (*elmt_free)(void *e))
   he = hash->htable;
   for (i = 0; i < sz; i++) {
     tmp = he[i];
-    while (tmp) {
-      tmp_next = tmp->next;
-      if (elmt_free)
-        (*elmt_free) (tmp->data);
-      gc_base_free (tmp);
-      tmp = tmp_next;
-    }
+    while (tmp!=NULL)
+      {
+	tmp_next = tmp->next;
+	if (elmt_free)
+	  (*elmt_free) (tmp->data);
+	gc_base_free (tmp);
+	tmp = tmp_next;
+      }
+    he[i] = NULL;
   }
   hash->elmts = 0;
-  for (i=0; i<sz; i++)
-    he[i] = NULL;
 }
 
 
@@ -92,23 +93,8 @@ void *hash_to_array(gc_t *gc_ctx, hash_t *hash)
 
 void free_hash(hash_t *hash, void (*elmt_free)(void *e))
 {
-  size_t i, sz;
-  hash_elmt_t **he, *tmp;
-  hash_elmt_t *tmp_next;
-
-  sz = hash->size;
-  he = hash->htable;
-  for (i = 0; i < sz; i++) {
-    tmp = he[i];
-    while (tmp) {
-      tmp_next = tmp->next;
-      if (elmt_free!=NULL)
-        (*elmt_free) (tmp->data);
-      gc_base_free (tmp);
-      tmp = tmp_next;
-    }
-  }
-  gc_base_free(he);
+  clear_hash (hash, elmt_free);
+  gc_base_free(hash->htable);
   gc_base_free(hash);
 }
 
@@ -955,8 +941,11 @@ fprintf_hash_info(FILE *fp, hash_t *h)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

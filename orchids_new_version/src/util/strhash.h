@@ -3,6 +3,7 @@
  ** Header for string hash functions.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.2
  ** @ingroup util
@@ -66,7 +67,7 @@ void *strhash_del(strhash_t *hash, char *key);
 void *gc_strhash_del(strhash_t *hash, char *key);
 strhash_t *strhash_clone(gc_t *gc_ctx,
 			 strhash_t *hash, void *(clone)(void *elmt));
-int strhash_walk(strhash_t *hash, int (*func)(void *elmt, void *data), void *data);
+int strhash_walk(strhash_t *hash, int (*func)(char *key, void *elmt, void *data), void *data);
 int strhash_collide_count(strhash_t *hash);
 
 strhcode_t strhash_pjw(char *key);
@@ -104,8 +105,11 @@ strhcode_t strhash_ethz(char *key);
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -60,7 +60,7 @@ static void *netfilter_preconfig(orchids_t *ctx, mod_entry_t *mod);
 #endif /* MOD_NETFILTER_H */
 
 /*
-** Copyright (c) 2014 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>

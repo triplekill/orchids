@@ -270,7 +270,7 @@ type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
   return type;
 }
 
-static int rule_compiler_mark_hash_walk_func (void *elt, void *data)
+static int rule_compiler_mark_hash_walk_func (char *key, void *elt, void *data)
 {
   GC_TOUCH ((gc_t *)data, elt);
   return 0;
@@ -364,7 +364,8 @@ struct rct_data {
   void *data;
 };
 
-static int rule_compiler_traverse_hash_walk_func (void *elt, void *data)
+static int rule_compiler_traverse_hash_walk_func (char *key, void *elt,
+						  void *data)
 {
   struct rct_data *walk_data = (struct rct_data *)data;
 

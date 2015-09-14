@@ -3,8 +3,9 @@
  ** Add the ability to use global shared variables between rule instances.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -23,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-
+#include <errno.h>
 #include "orchids.h"
 #include "ovm.h"
 #include "strhash.h"
@@ -32,6 +33,19 @@
 
 
 input_module_t mod_sharedvars;
+
+static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state);
+
+static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state);
+
+static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state);
+
+static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod);
+
+static void sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod);
+
+static void set_hash_size(orchids_t *ctx, mod_entry_t *mod,
+			  config_directive_t *dir);
 
 static sharedvars_config_t *mod_sharedvars_cfg_g = NULL;
 
@@ -132,7 +146,8 @@ static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
-static int sharedvars_config_mark_hash_walk_func (void *elt, void *data)
+static int sharedvars_config_mark_hash_walk_func (char *key, void *elt,
+						  void *data)
 {
   GC_TOUCH ((gc_t *)data, elt);
   return 0;
@@ -161,7 +176,8 @@ struct shv_data {
   void *data;
 };
 
-static int sharedvars_config_traverse_hash_walk_func (void *elt, void *data)
+static int sharedvars_config_traverse_hash_walk_func (char *key, void *elt,
+						      void *data)
 {
   struct shv_data *walk_data = (struct shv_data *)data;
 
@@ -183,11 +199,44 @@ static int sharedvars_config_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
   return err;
 }
 
+static int sharedvars_config_save_hash_walk_func (char *key, void *elt,
+						  void *data)
+{
+  save_ctx_t *sctx = (save_ctx_t *)data;
+  int err;
+
+  err = save_string (sctx, key);
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)elt);
+  return err;
+}
+
+static int sharedvars_config_save (save_ctx_t *sctx, gc_header_t *p)
+{
+  sharedvars_config_t *ctx = (sharedvars_config_t *)p;
+  int err;
+
+  if (ctx->vars_hash==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      err = save_size_t (sctx, ctx->vars_hash->elmts);
+      if (err) return err;
+      err = strhash_walk (ctx->vars_hash,
+			  sharedvars_config_save_hash_walk_func,
+			  sctx);
+    }
+  return err;
+}
+
 static gc_class_t sharedvars_config_class = {
   GC_ID('s','h','r','d'),
   sharedvars_config_mark_subfields,
   sharedvars_config_finalize,
-  sharedvars_config_traverse
+  sharedvars_config_traverse,
+  sharedvars_config_save,
+  NULL, /* restore is handled through the special function
+	   sharedvars_restore() directly */
 };
 
 static const type_t *shget_sig[] = { &t_str, &t_str };
@@ -258,12 +307,6 @@ static void sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static void sharedvars_postcompil(orchids_t *ctx, mod_entry_t *mod)
-{
-  /* Do all thing needed _AFTER_ rule compilation. */
-}
-
-
 static void set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   mod_sharedvars_cfg_g->hash_size = strtol(dir->args, (char **)NULL, 10);
@@ -272,6 +315,60 @@ static void set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *
            mod_sharedvars_cfg_g->hash_size);
 }
 
+static int sharedvars_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  sharedvars_config_t *cfg;
+  int err;
+
+  cfg = (sharedvars_config_t *)data;
+  /* Normally, cfg->shared_vars!=NULL (we are only called after postconfig) */
+  estimate_sharing (sctx->gc_ctx, (gc_header_t *)cfg->vars_hash);
+  err = save_gc_struct (sctx, (gc_header_t *)cfg->vars_hash);
+  /* We save vars_hash through the standard save_gc_struct() function.
+     This will cause it to output the gc.type of vars_hash, namely T_NULL,
+     followed by whatever sharedvars_config_save() will output.
+     Since T_NULL is not a valid tag, we shall not use restore_gc_struct()
+     to restore the hash table, but do a custom thing in sharedvars_restore().
+   */
+  reset_sharing (sctx->gc_ctx, (gc_header_t *)cfg->vars_hash);
+  return err;
+}
+
+static int sharedvars_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  sharedvars_config_t *cfg;
+  size_t i, n;
+  char *key;
+  ovm_var_t *value;
+  int err;
+
+  GC_START (rctx->gc_ctx, 1);
+  cfg = (sharedvars_config_t *)data;
+  err = getc (rctx->f);
+  if (err<0) goto end;
+  if (err!=T_NULL) { err = -2; goto end; }
+  err = restore_size_t (rctx, &n);
+  if (err) goto end;
+  if (n==0) goto end;
+  if (cfg->vars_hash==NULL)
+    cfg->vars_hash = new_strhash(rctx->gc_ctx, cfg->hash_size);
+  for (i=0; i<n; i++)
+    {
+      err = restore_string (rctx, &key);
+      if (err) goto end;
+      if (key==NULL) { err = -2; goto end; }
+      value = (ovm_var_t *)restore_gc_struct (rctx);
+      if (value==NULL && errno!=0)
+	{ err = errno; gc_base_free (key); goto end; }
+      GC_UPDATE (rctx->gc_ctx, 0, value);
+      (void) gc_strhash_update_or_add (rctx->gc_ctx,
+				       cfg->vars_hash,
+				       value, key);
+    }
+ end:
+  GC_END (rctx->gc_ctx);
+  return err;
+}
 
 static mod_cfg_cmd_t sharedvars_config_commands[] = {
   { "HashSize", set_hash_size, "Set the size of the hash" },
@@ -291,18 +388,23 @@ input_module_t mod_sharedvars = {
   sharedvars_preconfig,         /* called just after module registration */
   sharedvars_postconfig,        /* called after all mods preconfig,
                                and after all module configuration*/
-  sharedvars_postcompil,
-  NULL,
-  NULL,
-  NULL
+  NULL, /* postcompil */
+  NULL, /* predissect */
+  NULL, /* dissect */
+  NULL, /* dissect type */
+  sharedvars_save, /* save */
+  sharedvars_restore, /* restore */
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

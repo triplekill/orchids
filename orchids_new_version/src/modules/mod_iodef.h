@@ -3,8 +3,9 @@
  ** Definitions for mod_iodef.c
  **
  ** @author Baptiste GOURDIN <baptiste.gourdin@inria.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
@@ -50,11 +51,17 @@ xmlXPathContextPtr iodef_generate_report(orchids_t	*ctx,
 					 state_instance_t *state,
 					 char *fname, size_t len);
 
+
+#endif /* !MOD_IODEF_H_ */
+
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.
@@ -86,5 +93,4 @@ xmlXPathContextPtr iodef_generate_report(orchids_t	*ctx,
 ** knowledge of the CeCILL license and that you accept its terms.
 */
 
-
-#endif /* !MOD_IODEF_H_ */
+/* End-of-file */

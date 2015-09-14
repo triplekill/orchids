@@ -2,7 +2,7 @@
  ** @file mod_bintotext.c
  ** Converting raw binary data to lines of text.
  **
- ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  ** @version 1.0
  ** @ingroup modules
  ** 
@@ -31,17 +31,16 @@ input_module_t mod_bintotext;
 static size_t bintotext_compute_length (unsigned char *first_bytes,
 				      size_t n_first_bytes,
 				      size_t available_bytes,
-				      /* available_bytes is ignored here */
 				      int *state,
 				      void *sd_data)
 {
   unsigned char *fin;
 
-  /* n_first_bytes==1, and available_bytes>=1
-     is number of bytes available in first_bytes array */
   switch (*state)
     {
     case BLOX_INIT:
+      /* n_first_bytes==1, and available_bytes>=1
+	 is number of bytes available in first_bytes array */
     case BLOX_NOT_ALIGNED: /* should not happen */
     case BLOX_FINAL: /* should not happen */
       fin = memchr (first_bytes, '\n', available_bytes);
@@ -97,7 +96,7 @@ static void bintotext_subdissect (orchids_t *ctx, mod_entry_t *mod,
 	 is a string---otherwise (see below) our new event will
 	 instead be of the form
 	 [<some line of text>; ""; <some tag>; ...].
-	 This is needed because .bintotext.tag is document as being
+	 This is needed because .bintotext.tag is documented as being
 	 of type string.  I'm lazy and I'm only returning the
 	 empty string when <some tag> is not a string.  I hope
 	 it won't bother too many people.
@@ -133,8 +132,18 @@ static void *bintotext_predissect(orchids_t *ctx, mod_entry_t *mod,
 {
   blox_hook_t *hook;
 
-  hook = init_blox_hook (ctx, mod->config);
+  hook = init_blox_hook (ctx, mod->config, cond_param_str, cond_param_size);
   return hook;
+}
+
+static int bintotext_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  return blox_save (sctx, (struct blox_config_s *)data);
+}
+
+static int bintotext_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  return blox_restore (rctx, (struct blox_config_s *)data);
 }
 
 static void *bintotext_preconfig(orchids_t *ctx, mod_entry_t *mod)
@@ -164,10 +173,12 @@ input_module_t mod_bintotext = {
   bintotext_predissect,
   bintotext_dissect,
   &t_bstr, /* type of fields it expects to dissect */
+  bintotext_save,
+  bintotext_restore
 };
 
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

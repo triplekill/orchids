@@ -3,8 +3,9 @@
  ** Definitions for mod_idmef.c
  **
  ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **/
 
@@ -35,26 +36,26 @@
 #define MAX_IDMEF_FIELDS 128
 #define MAX_IDMEF_SIZE 8192
 
+struct blox_config_s;
+
 typedef struct	idmef_cfg_t
 {
-    unsigned int       	nb_fields;
-    char*		field_xpath[MAX_IDMEF_FIELDS];
-    char		buff[MAX_IDMEF_SIZE];
-    int			buff_len;
-    char		too_big;
-    char*		analyzer_id;
-    char*		analyzer_name;
-    char*		analyzer_node_address;
-    char*		analyzer_node_location;
-    char*		analyzer_node_name;
-    char*		report_dir;
-}		idmef_cfg_t;
+  unsigned int       	nb_fields;
+  char*		field_xpath[MAX_IDMEF_FIELDS];
+  struct blox_config_s *bcfg;
+  char*		analyzer_id;
+  char*		analyzer_name;
+  char*		analyzer_node_address;
+  char*		analyzer_node_location;
+  char*		analyzer_node_name;
+  char*		report_dir;
+} idmef_cfg_t;
 
 typedef struct idmef_buf_t
 {
     size_t	length;
     char*	message;
-}		idmef_buf_t;
+} idmef_buf_t;
 
 struct ovm_var_s;
 struct ovm_var_s *idmef_generate_alert(orchids_t	*ctx,
@@ -70,10 +71,13 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

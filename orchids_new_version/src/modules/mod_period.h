@@ -3,8 +3,9 @@
  ** Definitions for mod_period.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -42,39 +43,16 @@ struct period_config_s
 };
 
 
-static int
-qsort_strcmp(const void *a, const void *b);
-
-
-static int
-period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
-
-
-static void
-issdl_temporal(orchids_t *ctx, state_instance_t *state);
-
-
-static void *
-period_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-period_postconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-period_postcompil(orchids_t *ctx, mod_entry_t *mod);
-
-
-
-
 #endif /* MOD_PERIOD_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -3,6 +3,7 @@
  ** Manages orchids modules and plug-ins.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.0
  ** @ingroup core
@@ -30,6 +31,7 @@
    PATH_MAX undefined.
 */
 #endif
+#include <errno.h>
 
 #include "mod_mgr.h"
 
@@ -225,7 +227,7 @@ mod_entry_t *find_module_entry(orchids_t *ctx, const char *name)
   return NULL;
 }
 
-
+#ifdef OBSOLETE
 int call_mod_func(orchids_t *ctx,
 		  const char *modname,
 		  const char *funcname,
@@ -253,6 +255,7 @@ int call_mod_func(orchids_t *ctx,
     }
   return (*f) (ctx, m, funcparams);
 }
+#endif
 
 
 void fprintf_loaded_modules(orchids_t *ctx, FILE *fp)
@@ -269,13 +272,42 @@ void fprintf_loaded_modules(orchids_t *ctx, FILE *fp)
   fprintf(fp, "----+-----------+------------+-------------\n");
 }
 
+int begin_save_module (save_ctx_t *sctx, char *modname, off_t *startpos)
+{
+  int err;
+
+  if (putc ('M', sctx->f) < 0) return errno;
+  err = save_string (sctx, modname);
+  if (err) return err;
+  err = save_size_t (sctx, 0); /* will be changed to a length field
+				  by end_save_module() */
+  *startpos = ftello (sctx->f);
+  return err;
+}
+
+int end_save_module (save_ctx_t *sctx, off_t startpos)
+{
+  int err;
+  off_t fpos;
+
+  fpos = ftello (sctx->f);
+  err = fseeko (sctx->f, startpos, SEEK_SET);
+  if (err) return err;
+  err = save_size_t (sctx, (size_t)(fpos - startpos));
+  if (err) return err;
+  err = fseeko (sctx->f, fpos, SEEK_SET);
+  return err;
+}
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

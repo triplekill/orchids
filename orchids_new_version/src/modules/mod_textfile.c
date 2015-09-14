@@ -3,9 +3,9 @@
  ** textfile input module, for text log files.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
- ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.2
+ ** @version 1.0
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:07:26 2003
@@ -60,7 +60,7 @@ static void textfile_buildevent(orchids_t *ctx, mod_entry_t *mod,
 
   DebugLog(DF_MOD, DS_TRACE, "Dissecting: %s", buf);
 
-  val = ovm_int_new (gc_ctx, tf->line);
+  val = ovm_uint_new (gc_ctx, tf->line);
   GC_UPDATE(gc_ctx, F_LINE_NUM, val);
 
   GC_UPDATE(gc_ctx, F_FILE, tf->file_name);
@@ -125,7 +125,7 @@ static int textfile_process_new_lines(orchids_t *ctx, mod_entry_t *mod, textfile
 	  /* update line # */
 	  tf->line++;
 	  DebugLog(DF_MOD, DS_DEBUG,
-		   "read line %i %s",
+		   "read line %zi %s",
 		   tf->line, buff);
 
 	  textfile_buildevent(ctx, mod, tf, buff);
@@ -345,7 +345,7 @@ static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
 }
 
 static field_t tf_fields[] = {
-  { "textfile.line_num", &t_int, MONO_MONO,  "line number"                },
+  { "textfile.line_num", &t_uint, MONO_MONO,  "line number"                },
   { "textfile.file",     &t_str, MONO_UNKNOWN, "source file name"            },
   { "textfile.line",     &t_str, MONO_UNKNOWN,  "current line" }
 };
@@ -635,6 +635,92 @@ static int rtaction_read_textfiles(orchids_t *ctx, heap_entry_t *he)
   return 0;
 }
 
+static int textfile_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  textfile_config_t *cfg;
+  textfile_t *tf;
+  size_t n;
+  size_t fpos;
+  off_t pos;
+  int err;
+
+  cfg = (textfile_config_t *)data;
+  for (n=0, tf = cfg->file_list; tf!=NULL; tf = tf->next)
+    n++;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  /* We save file positions for all text files, but we ignore
+     UNIX sockets (which are outside cfg->file_list) */
+  for (tf = cfg->file_list; tf!=NULL; tf = tf->next)
+    {
+      pos = ftello (tf->fd);
+      if (pos==-1)
+	{
+	  continue; /* ignore this file;
+		       this happens in particular if errno==ESPIPE, namely, for pipes.
+		    */
+	}
+      fpos = (size_t) pos;
+      err = save_string (sctx, STR(tf->file_name));
+      /* It is legal to save STR(tf->file_name), because:
+	 - tf->file_name is always a T_STR
+	 - STR(tf->file_name) is always NUL-terminated.
+      */
+      if (err) return err;
+      err = save_size_t (sctx, tf->line);
+      if (err) return err;
+      if (putc (tf->eof, sctx->f) < 0) return -1;
+      err = save_size_t (sctx, fpos);
+      if (err) return err;
+    }
+  return 0;
+}
+
+static int textfile_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  textfile_config_t *cfg;
+  textfile_t *tf;
+  size_t i, n;
+  char *filename;
+  int eof;
+  size_t lineno;
+  size_t fpos;
+  int err;
+
+  cfg = (textfile_config_t *)data;
+  err = restore_size_t (rctx, &n);
+  if (err) return err;
+  for (i=0; i<n; i++)
+    {
+      err = restore_string (rctx, &filename);
+      if (err) return err;
+      if (filename==NULL) return -2;
+      err = restore_size_t (rctx, &lineno);
+      if (err) { gc_base_free (filename); return err; }
+      eof = getc (rctx->f);
+      if (eof<0) { gc_base_free (filename); return eof; }
+      err = restore_size_t (rctx, &fpos);
+      if (err) { gc_base_free (filename); return err; }
+      for (tf=cfg->file_list; tf!=NULL; tf=tf->next)
+	{ /* linear search through all files; slow but OK if we do not
+	     have too many files... */
+	  if (strcmp(STR(tf->file_name), filename)==0)
+	    { /* found it.  By the way, it is legal to use strcmp()
+		 on STR(tf->file_name) because:
+		 - tf->file_name is always a T_STR
+		 - STR(tf->file_name) is always NUL-terminated.
+	      */
+	      err = fseeko (tf->fd, (off_t)fpos, SEEK_SET);
+	      if (err) { gc_base_free (filename); return err; }
+	      tf->line = lineno;
+	      tf->eof = eof;
+	      break;
+	    }
+	}
+      gc_base_free (filename);
+    }
+  return 0;
+}
 
 static mod_cfg_cmd_t textfile_dir[] =
 {
@@ -660,15 +746,20 @@ input_module_t mod_textfile = {
   textfile_postcompil,
   NULL,
   NULL,
-  NULL
+  NULL,
+  textfile_save,
+  textfile_restore,
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

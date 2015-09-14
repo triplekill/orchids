@@ -3,8 +3,9 @@
  ** Listen to syslog event on a udp socket.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Wed Jan 15 17:21:55 2003
@@ -33,6 +34,13 @@
 #include "mod_syslog.h"
 
 input_module_t mod_syslog;
+
+static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod,
+			  event_t *event, void *data,
+			  int dissector_level);
+
+
+static void *syslog_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 /*
 ** priority = facility * 8 + severity
@@ -79,13 +87,6 @@ static char *syslog_facility_g[] = {
   NULL
 };
 #endif
-
-/*
-int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event, void *data)
-{
-  return syslog_dissect(ctx, mod, event, data);
-}
-*/
 
 
 static int syslog_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
@@ -401,14 +402,6 @@ static void *syslog_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return data;
 }
 
-#ifdef UNUSED
-static char *syslog_deps[] = {
-  "udp",
-  "textfile",
-  NULL
-};
-#endif
-
 static void syslog_set_default_year (orchids_t *ctx, mod_entry_t * mod, config_directive_t *dir)
 {
   syslog_data_t *data = mod->config;
@@ -521,7 +514,9 @@ input_module_t mod_syslog = {
   NULL,
   NULL,
   syslog_dissect,
-  &t_str		    /* type of fields it expects to dissect */
+  &t_str,		    /* type of fields it expects to dissect */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 
@@ -652,8 +647,11 @@ struct tm *syslog_getdate(const char *date, int date_len,
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

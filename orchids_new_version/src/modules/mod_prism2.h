@@ -3,8 +3,9 @@
  ** Definitions for mod_prism2.c
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  ** 
- ** @version 0.1.0
+ ** @version 0.1
  ** 
  ** @date  Started on: Fri Jun 15 09:17:58 2007
  **/
@@ -64,8 +65,11 @@ struct prism2_hdr_s
 /*
 ** Copyright (c) 2002-2007 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

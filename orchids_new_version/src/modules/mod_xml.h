@@ -2,10 +2,10 @@
  ** @file mod_xml.h
  ** Definitions for mod_xml.h
  **
- ** @author Baptiste Gourdin <gourdin@lsv.ens-cachan.fr>
- ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
+ ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Tue Apr 12 14:33:03 CEST 2011
@@ -37,18 +37,20 @@ xmlNode *new_xs_datetime_node(xmlNode *parent,
 			      const char *name,
 			      struct tm *time);
 
-xmlNodePtr
-xml_walk_and_create (xmlXPathContextPtr ctx,
-		     xmlChar	*path);
+xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
+				xmlChar	*path);
 
 
 #endif /* !MOD_XML_H_ */
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

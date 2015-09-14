@@ -3,8 +3,9 @@
  ** A snmptrap module.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
@@ -313,7 +314,9 @@ input_module_t mod_snmptrap = {
   NULL,
   NULL,
   snmptrap_dissect,
-  &t_bstr		    /* type of fields it expects to dissect */
+  &t_bstr,		    /* type of fields it expects to dissect */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 #endif /* HAVE_SNMP */
@@ -323,8 +326,11 @@ input_module_t mod_snmptrap = {
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

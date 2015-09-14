@@ -3,6 +3,7 @@
  ** Public definitions for orchids_api.c.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 1.0
  ** @ingroup core
@@ -153,7 +154,8 @@ int orchids_save (orchids_t *ctx, char *name);
  **         or a negative number (-1=end of file, -2=bad format,
  **         -3=bad size, -4=database format error,
  **         -5=bad magic, -6=unrecognized version number,
- **         -7=unknown field name, -8=unknown primitive)
+ **         -7=unknown field name, -8=unknown primitive,
+ **         -9=bad integer size)
  **/
 int orchids_restore (orchids_t *ctx, char *name);
 
@@ -459,8 +461,11 @@ void fprintf_state_env(FILE *fp, const orchids_t *ctx,
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

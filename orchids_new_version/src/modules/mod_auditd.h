@@ -4,9 +4,8 @@
  **
  **
  ** @author Hedi BENZINA <benzina@lsv.ens-cachan.fr>
- ** @author Jean Goubault-Larrecq <goubault@lsv.ens-cachan.fr>
- **  
- ** @version 0.2
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
+ ** @version 1.0
  ** @ingroup modules
  ** 
  **

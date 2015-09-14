@@ -3,8 +3,9 @@
  ** Module for parsing Linux-Snare text log files.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Thu Feb 13 13:03:07 2003
@@ -34,6 +35,11 @@
 
 
 input_module_t mod_snare;
+
+static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
+			 void *data, int dissector_level);
+
+static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
 static int snare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
@@ -111,12 +117,6 @@ static void *snare_preconfig(orchids_t *ctx, mod_entry_t *mod)
   return NULL;
 }
 
-static char *snare_deps[] = {
-  "udp",
-  "textfile",
-  NULL
-};
-
 
 input_module_t mod_snare = {
   MOD_MAGIC,
@@ -124,14 +124,16 @@ input_module_t mod_snare = {
   0,			    /* flags */
   "snare",
   "CeCILL2",
-  snare_deps,
+  NULL,
   NULL,
   snare_preconfig,
   NULL,
   NULL,
   NULL,
   snare_dissect,
-  &t_str		    /* type of fields it expects to dissect */
+  &t_str,		    /* type of fields it expects to dissect */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 

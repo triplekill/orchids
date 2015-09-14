@@ -190,8 +190,8 @@
 #define SYS_capset		185
 #define SYS_sigaltstack		186
 #define SYS_sendfile		187
-#define SYS_getpmsg		188	/* some people actually want streams */
-#define SYS_putpmsg		189	/* some people actually want streams */
+#define SYS_getpmsg		188
+#define SYS_putpmsg		189
 #define SYS_vfork		190
 #define SYS_ugetrlimit		191	/* SuS compliant getrlimit */
 #define SYS_mmap2		192
@@ -222,7 +222,6 @@
 #define SYS_pivot_root		217
 #define SYS_mincore		218
 #define SYS_madvise		219
-#define SYS_madvise1		219	/* delete when C lib stub is removed */
 #define SYS_getdents64		220
 #define SYS_fcntl64		221
 #define SYS_security		223     /* 223 is unused, really */
@@ -253,7 +252,7 @@
 #define SYS_io_submit		248
 #define SYS_io_cancel		249
 #define SYS_fadvise64		250
-/* 251 is available for reuse (was briefly sys_set_zone_reclaim) */
+/* 251 is available for reuse (was briefly SYS_set_zone_reclaim) */
 #define SYS_exit_group		252
 #define SYS_lookup_dcookie	253
 #define SYS_epoll_create	254

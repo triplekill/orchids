@@ -3,8 +3,9 @@
  ** A win32evt for new modules.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
@@ -28,13 +29,38 @@
 #include <stdint.h>
 
 #include "orchids.h"
-
 #include "orchids_api.h"
-
 #include "mod_win32evt.h"
 
 input_module_t mod_win32evt;
 
+#ifdef UNUSED
+static void fprintf_event_log_header(FILE *fp, event_log_header_t *hdr);
+#endif
+
+#ifdef UNUSED
+static void fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer);
+#endif
+
+#ifdef UNUSED
+static void fprintf_event_log_record(FILE *fp, event_log_record_t *event);
+#endif
+
+
+#ifdef UNUSED
+static int get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen);
+#endif
+
+
+#ifdef UNUSED
+static event_log_record_t * get_next_event_log_record(FILE *fp);
+#endif
+
+#ifdef UNUSED
+static void read_record(const char *file);
+#endif
+
+static void *win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 #ifdef UNUSED
 static void
@@ -97,8 +123,7 @@ fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer)
 
 
 #ifdef UNUSED
-static void
-fprintf_event_log_record(FILE *fp, event_log_record_t *event)
+static void fprintf_event_log_record(FILE *fp, event_log_record_t *event)
 {
   char asc_time[32];
   char *str;
@@ -211,8 +236,8 @@ fprintf_event_log_record(FILE *fp, event_log_record_t *event)
 
 
 #ifdef UNUSED
-static int
-get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
+static int get_next_event_log_record_2(FILE *fp, event_log_record_t *e,
+				       size_t elen)
 {
   int sz;
 
@@ -235,7 +260,7 @@ get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 
   if (e->length > EVENT_HEADER_SIZE) /* if there is extra data... */
     {
-      if ((e->length - EVENT_HEADER_SIZE) <= elen) /* ...and enought space */
+      if ((e->length - EVENT_HEADER_SIZE) <= elen) /* ...and enough space */
         sz = fread(e->extra_data, e->length - EVENT_HEADER_SIZE, 1, fp);
       else
         {
@@ -249,8 +274,7 @@ get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen)
 #endif
 
 #ifdef UNUSED
-static event_log_record_t *
-get_next_event_log_record(FILE *fp)
+static event_log_record_t *get_next_event_log_record(FILE *fp)
 {
   event_log_record_t header;
 
@@ -262,8 +286,7 @@ get_next_event_log_record(FILE *fp)
 #endif
 
 #ifdef UNUSED
-static void
-read_record(const char *file)
+static void read_record(const char *file)
 {
   FILE *fp;
   /* unsigned char header[48]; */
@@ -409,7 +432,7 @@ static int win32evt_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
   /* then, post resulting event */
   post_event(ctx, mod, e, dissection_level);
 
-  return (0);
+  return 0;
 }
 
 static field_t win32evt_fields[] = {
@@ -424,8 +447,7 @@ static field_t win32evt_fields[] = {
 };
 
 
-static void *
-win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   win32evt_config_t *cfg;
 
@@ -439,21 +461,6 @@ win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   /* return config structure, for module manager */
   return cfg;
-}
-
-
-static void
-win32evt_postconfig(orchids_t *ctx, mod_entry_t *mod)
-{
-  /* Do all thing needed _AFTER_ module configuration.
-  ** (register configurable callbacks for examples) */
-}
-
-
-static void
-win32evt_postcompil(orchids_t *ctx, mod_entry_t *mod)
-{
-  /* Do all thing needed _AFTER_ rule compilation. */
 }
 
 
@@ -472,20 +479,24 @@ input_module_t mod_win32evt = {
   win32evt_config_commands, /* module configuration commands,
                                for core config parser */
   win32evt_preconfig,       /* called just after module registration */
-  win32evt_postconfig,      /* called after all mods preconfig,
-                               and after all module configuration*/
-  win32evt_postcompil,
-  NULL,
+  NULL, /* postconfig */
+  NULL, /* postcompil */
+  NULL, /* predissect */
   win32evt_dissect,
-  &t_bstr		    /* type of fields it expects to dissect */
+  &t_bstr,		    /* type of fields it expects to dissect */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

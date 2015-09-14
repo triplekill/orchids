@@ -43,12 +43,15 @@ typedef void (*subdissect_fun) (orchids_t *ctx, mod_entry_t *mod,
 				void *sd_data,
 				int dissector_level);
 
+struct blox_hook_s;
+
 struct blox_config_s {
   size_t n_first_bytes; /* number of bytes to read off records to be able
 			   to compute length of record in state BLOX_INIT */
   compute_length_fun compute_length;
   subdissect_fun subdissect;
   mod_entry_t *mod;
+  struct blox_hook_s *hooks;
   void *sd_data;
 };
 
@@ -61,7 +64,10 @@ blox_config_t *init_blox_config(orchids_t *ctx,
 				);
 
 struct blox_hook_s {
+  struct blox_hook_s *next;
   struct blox_config_s *bcfg;
+  char *tag;
+  size_t taglen;
   size_t n_bytes;
   int dissector_level;
   int state;
@@ -74,11 +80,16 @@ struct blox_hook_s {
 
 
 blox_hook_t *init_blox_hook(orchids_t *ctx,
-			    blox_config_t *bcfg
+			    blox_config_t *bcfg,
+			    char *tag,
+			    size_t taglen
 			    );
 
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data, int dissector_level);
+
+int blox_save (save_ctx_t *sctx, blox_config_t *bcfg);
+int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg);
 
 /*** Quick parser functions
  *** can parse sequences of <keyword><data>, as used e.g. in mod_newauditd.c

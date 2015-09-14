@@ -441,6 +441,7 @@ char *orchids_strerror (int err)
     case -6: return "unrecognized version number";
     case -7: return "unknown record field name";
     case -8: return "unknown primitive";
+    case -9: return "bad integer size";
     default: return strerror (err);
     }
 }
@@ -473,7 +474,7 @@ int orchids_save (orchids_t *ctx, char *name)
   size_t len;
   char *tmpname;
   int err = 0;
-  size_t version = 1;
+  size_t version = 2;
 
   errno = 0;
   len = strlen (name);
@@ -486,6 +487,15 @@ int orchids_save (orchids_t *ctx, char *name)
   if (sctx.f==NULL) { err = errno; goto end; }
   sctx.fuzz = (unsigned long)random();
   if (fputs (save_magic, sctx.f) < 0) { err = errno; goto errlab; }
+  /* Now save various sizes of integer types */
+  if (putc (sizeof(size_t), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(int), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(unsigned int), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(long), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(unsigned long), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(time_t), sctx.f) < 0) goto errlab;
+  if (putc (sizeof(double), sctx.f) < 0) goto errlab;
+  /* Now we can save the version number (as a size_t) */
   err = save_size_t (&sctx, version);
   if (err) goto errlab;
 
@@ -502,6 +512,31 @@ int orchids_save (orchids_t *ctx, char *name)
  errlab:
   reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
   reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
+  /* Now save the internal states of modules that are able to.
+     We reset_sharing() before, since modules can be restored
+     independently. */
+  if (err==0)
+    {
+      off_t startpos;
+      int32_t m;
+      mod_entry_t *me;
+      input_module_t *mod;
+
+      for (m=0; m<ctx->loaded_modules; m++)
+	{
+	  me = &ctx->mods[m];
+	  mod = me->mod;
+	  err = begin_save_module (&sctx, mod->name, &startpos);
+	  if (err) break;
+	  if (mod->save_fun!=NULL)
+	    {
+	      err = (*mod->save_fun) (&sctx, me, me->config);
+	      if (err) break;
+	    }
+	  err = end_save_module (&sctx, startpos);
+	  if (err) break;
+	}
+    }
   (void) fclose (sctx.f);
   if (err==0)
     err = rename (tmpname, name);
@@ -543,6 +578,39 @@ issdl_function_t *restore_func_tbl (restore_ctx_t *rctx, int32_t *nfuncs_sz)
   return functbl;
 }
 
+int restore_module (orchids_t *ctx, restore_ctx_t *rctx)
+{
+  char *modname;
+  size_t offset;
+  int32_t m;
+  mod_entry_t *me;
+  input_module_t *mod;
+  int err;
+
+  err = restore_string (rctx, &modname);
+  if (err) return err;
+  if (modname==NULL) return -2;
+  err = restore_size_t (rctx, &offset);
+  if (err) goto errlab;
+  for (m=0; m<ctx->loaded_modules; m++)
+    { /* linear search through all the loaded modules;
+	 slow, but should be OK since there should not be that
+	 many modules, and we restore only once anyway. */
+      me = &ctx->mods[m];
+      mod = me->mod;
+      if (strcmp (mod->name, modname)==0)
+	break;
+    }
+  if (m<ctx->loaded_modules) /* found the module */
+    err = (*mod->restore_fun) (rctx, me, me->config);
+  else /* if not found, then skip whole block of saved data;
+	  this is what 'offset' is for. */
+    err = fseeko (rctx->f, (off_t)offset, SEEK_CUR);
+ errlab:
+  gc_base_free (modname);
+  return err;
+}
+
 int orchids_restore (orchids_t *ctx, char *name)
 {
   restore_ctx_t rctx;
@@ -561,6 +629,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   rctx.errs = 0;
   rctx.f = fopen (name, "r");
   if (rctx.f==NULL) { err = errno; goto end; }
+  /* Check magic number */
   for (i=0; i<4; i++)
     {
       c = getc (rctx.f);
@@ -568,9 +637,32 @@ int orchids_restore (orchids_t *ctx, char *name)
       if (c!=(int)(unsigned int)save_magic[i])
 	{ errno = -5; goto errlab; }
     }
+  /* Check integer sizes */
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(size_t)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(int)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(unsigned int)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(long)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(unsigned long)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(time_t)) { errno = -9; goto errlab; }
+  c = getc (rctx.f);
+  if (c==EOF) { err = c; goto errlab; }
+  if (c!=sizeof(double)) { errno = -9; goto errlab; }
+  /* Now check version number */
   err = restore_size_t (&rctx, &version);
   if (err) goto errlab;
-  if (version!=1) { errno = -6; goto errlab; }
+  if (version!=2) { errno = -6; goto errlab; }
   rctx.version = version;
   rctx.externs = ctx->xclasses;
   rctx.rule_compiler = ctx->rule_compiler;
@@ -592,6 +684,21 @@ int orchids_restore (orchids_t *ctx, char *name)
     { err = -7; ctx->thread_queue = NULL; goto errlab; }
   if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
     { err = -8; ctx->thread_queue = NULL; goto errlab; }
+  /* Now we look for modules requiring to be restored. */
+  while (err!=0)
+    switch (getc (rctx.f))
+      {
+      case EOF: goto errlab; /* we are done */
+      case 'M': /* restore module data */
+	/* For each module, we start from an empty shared_hash table,
+	   since sharing is local to each module (or to whatever
+	   was restored before any module).
+	*/
+	clear_hash (rctx.shared_hash, NULL);
+	err = restore_module (ctx, &rctx);
+	break;
+      default: err = -2; break;
+      }
  errlab:
   if (rctx.vm_func_tbl!=NULL)
     {

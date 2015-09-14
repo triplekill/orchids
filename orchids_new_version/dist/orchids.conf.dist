@@ -24,7 +24,7 @@ RuntimeUser @@RUNUSER@@
 #
 # SaveInterval: number of seconds between two saves.
 
-SaveFile @@VARDIR@@/run/orchids/orchids.sav
+SaveFile @@VARDIR@@/orchids/save/orchids.sav
 SaveInterval 60
 
 # Disable Network name resolution by default

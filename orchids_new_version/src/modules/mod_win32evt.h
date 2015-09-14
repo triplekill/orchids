@@ -3,8 +3,9 @@
  ** A win32evt for new modules.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb  7 11:07:42 2003
@@ -116,61 +117,16 @@ struct win32evt_config_s
 };
 
 
-#ifdef UNUSED
-static void
-fprintf_event_log_header(FILE *fp, event_log_header_t *hdr);
-#endif
-
-#ifdef UNUSED
-static void
-fprintf_event_log_trailer(FILE *fp, event_log_trailer_t *trailer);
-#endif
-
-#ifdef UNUSED
-static void
-fprintf_event_log_record(FILE *fp, event_log_record_t *event);
-#endif
-
-
-#ifdef UNUSED
-static int
-get_next_event_log_record_2(FILE *fp, event_log_record_t *e, size_t elen);
-#endif
-
-
-#ifdef UNUSED
-static event_log_record_t *
-get_next_event_log_record(FILE *fp);
-#endif
-
-#ifdef UNUSED
-static void
-read_record(const char *file);
-#endif
-
-
-static void *
-win32evt_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-win32evt_postconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-win32evt_postcompil(orchids_t *ctx, mod_entry_t *mod);
-
-
-
-
-
 #endif /* MOD_WIN32EVT_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

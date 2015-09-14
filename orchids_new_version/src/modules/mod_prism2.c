@@ -1,11 +1,12 @@
 /**
  ** @file mod_prism2.c
  ** Wifi Prism2 header decoding.
- ** This includes some code of the initial mod_wifi module made by Romdhane.
+ ** This includes some code of the initial mod_wifi module made by Romdhane BEN YOUNES.
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  ** 
- ** @version 0.1.0
+ ** @version 0.1
  ** 
  ** @date  Started on: Fri Jun 15 09:08:12 2007
  **/
@@ -148,14 +149,19 @@ input_module_t mod_prism2 = {
   NULL,
   NULL,
   prism2_dissect,
-  &t_bstr
+  &t_bstr,
+  NULL,
+  NULL,
 };
 
 /*
 ** Copyright (c) 2002-2007 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -3,8 +3,9 @@
  ** Module for frequencies and phase analysis.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -34,6 +35,23 @@
 
 input_module_t mod_period;
 
+static int qsort_strcmp(const void *a, const void *b);
+
+
+static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
+
+
+static void issdl_temporal(orchids_t *ctx, state_instance_t *state);
+
+
+static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod);
+
+
+static void period_postconfig(orchids_t *ctx, mod_entry_t *mod);
+
+
+static void period_postcompil(orchids_t *ctx, mod_entry_t *mod);
+
 static int qsort_strcmp(const void *a, const void *b)
 {
   return ( strcmp(*(char **)a, *(char **)b) );
@@ -55,7 +73,7 @@ static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
   fp = create_html_file(htmlcfg, "orchids-period.html", NO_CACHE);
   if (fp==NULL)
     return -1;
-  fprintf_html_header(fp, "Orchids frequencies / phases tables");
+  fprintf_html_header(fp, "Orchids frequencies / phase tables");
 
   fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
 
@@ -188,17 +206,22 @@ input_module_t mod_period = {
   period_postconfig,        /* called after all mods preconfig,
                                and after all module configuration*/
   period_postcompil,
-  NULL,
-  NULL,
-  NULL
+  NULL, /* predissect */
+  NULL, /* dissect */
+  NULL, /* dissect type */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -2,9 +2,10 @@
  ** @file mod_metaevent.c
  ** The metaevent module.
  **
- ** @author Baptiste GOURDIN <baptiste.gourdin@lsv.ens-cachan.fr>
+ ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -160,11 +161,6 @@ static void metaevent_postconfig(orchids_t *ctx, mod_entry_t *mod)
 		      vmod->field_array,
 		      vmod->nfields);
     }
-}
-
-static void metaevent_postcompil(orchids_t *ctx, mod_entry_t *mod)
-{
-  /* Do all thing needed _AFTER_ rule compilation. */
 }
 
 static void add_field(orchids_t *ctx,
@@ -324,18 +320,23 @@ input_module_t mod_metaevent = {
   metaevent_preconfig,       /* called just after module registration */
   metaevent_postconfig,      /* called after all mods preconfig,
                                and after all module configuration*/
-  metaevent_postcompil,
-  NULL,
-  NULL,
-  NULL
+  NULL,  /* postcompil */
+  NULL,  /* predissect */
+  NULL,  /* dissect */
+  NULL,  /* dissect type */
+  NULL,  /* save */
+  NULL,  /* restore */
 };
 
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

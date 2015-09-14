@@ -3,8 +3,9 @@
  ** Main Orchids header.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 1.0
+ ** @version 1.1
  ** @ingroup core
  **
  ** @date  Started on: Web Jan 22 16:47:31 2003
@@ -770,6 +771,16 @@ typedef void *(*pre_dissect_t)(orchids_t *ctx, mod_entry_t *mod,
 			       char *cond_param_str,
 			       int cond_param_size);
 
+/** @typedef save_t
+ ** Function meant to save the current state of a module.
+ **/
+typedef int (*save_t)(save_ctx_t *sctx, mod_entry_t *mod, void *data);
+
+/** @typedef restore_t
+ ** Function meant to restore the current state of a module.
+ **/
+typedef int (*restore_t)(restore_ctx_t *rctx, mod_entry_t *mod, void *data);
+
 /**
  ** @struct conditional_dissector_record_s
  **   This structure is used to wrap a conditional dissector,
@@ -1302,6 +1313,8 @@ struct input_module_s
   pre_dissect_t          pre_dissect;
   dissect_t		 dissect_fun;
   type_t                *dissect_type;
+  save_t                 save_fun;
+  restore_t              restore_fun;
 };
 
 
@@ -1739,6 +1752,10 @@ void *db_transitive_closure (gc_t *gc_ctx, int nfields, int nio,
 char *orchids_atoui_hex (char *s, char *end, unsigned long *ip);
 void remove_thread_local_entries (state_instance_t *state);
 
+/* In mod_mgr.c */
+int begin_save_module (save_ctx_t *sctx, char *modname, off_t *startpos);
+int end_save_module (save_ctx_t *sctx, off_t startpos);
+
 #endif /* ORCHID_H */
 
 
@@ -1746,8 +1763,11 @@ void remove_thread_local_entries (state_instance_t *state);
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

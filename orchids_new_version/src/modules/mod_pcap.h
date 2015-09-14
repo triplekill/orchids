@@ -3,8 +3,9 @@
  ** Definitions for mod_pcap.c
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  ** 
- ** @version 0.1.0
+ ** @version 0.1
  ** 
  ** @date  Started on: Fri May 25 14:29:20 2007
  **/
@@ -47,28 +48,16 @@ struct mod_pcap_if_s
   int     datalink;
 };
 
-static void
-libpcap_callback(u_char *data,
-                 const pcap_pkthdr_t *pkthdr,
-                 const u_char *pkt);
-
-static int
-modpcap_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
-
-static void *
-pcap_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-static void
-add_device(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
-
-
 #endif /* MOD_PCAP_H */
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2007 by Julien OLIVAIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -3,8 +3,9 @@
  ** Parse IDMEF alerts
  **
  ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **/
@@ -195,6 +196,7 @@ static int load_idmef_xmlDoc(orchids_t *ctx,
   return 1;
 }
 
+#ifdef OBSOLETE
 static char *my_strnstr (char *text, size_t len, char *pattern)
 {
   size_t patlen = strlen(pattern);
@@ -210,70 +212,100 @@ static char *my_strnstr (char *text, size_t len, char *pattern)
     }
   return NULL;
 }
+#endif
 
-static int idmef_dissect(orchids_t *ctx,
-			 mod_entry_t *mod,
-			 event_t *event,
-			 void *data,
-			 int dissector_level)
+static const unsigned char idmef_end_marker[] = "</idmef:IDMEF-Message>";
+
+static size_t idmef_compute_length (unsigned char *first_bytes,
+				    size_t n_first_bytes,
+				    size_t available_bytes,
+				    /* available_bytes is ignored here */
+				    int *state,
+				    void *sd_data)
 {
-  char *txt_line, *txt_end;
-  size_t txt_len, msg_len;
-  char *end;
-  idmef_cfg_t *cfg;
-
-  cfg = mod->config;
-  if (event->value==NULL)
+  int i;
+  
+  switch (*state)
     {
-      DebugLog(DF_MOD, DS_DEBUG, "NULL event value\n");
-      return -1;
+    case BLOX_INIT:
+      /* n_first_bytes==1 */
+    case BLOX_NOT_ALIGNED: /* should not happen */
+    case BLOX_FINAL: /* should not happen */
+      if (first_bytes[0]==idmef_end_marker[0])
+	*state = BLOX_NSTATES+1; /* already matched first character of
+				    idmef_end_marker */
+      else *state = BLOX_NSTATES;
+      return n_first_bytes+1;
+    default: /* in all cases, *states==BLOX_NSTATES+i,
+		where i is the length of the prefix of idmef_end_marker
+		that we have recognized */
+      i = *state - BLOX_NSTATES;
+      if (first_bytes[n_first_bytes-1]==idmef_end_marker[i])
+	{
+	  i++;
+	  if (idmef_end_marker[i]=='\0')
+	    {
+	      *state = BLOX_FINAL; /* we have found a match */
+	      return n_first_bytes;
+	    }
+	  *state = BLOX_NSTATES+i;
+	  return n_first_bytes+1; /* read one more character */
+	}
+      else
+	{ /* no match: since idmef_end_marker only contains one '<' at
+	     the beginning, return to BLOX_NSTATES state (or BLOX_NSTATES+1
+	     if last character added is '<'). For more complicated
+	     strings, one should use Simon's automaton construction. */
+	  if (first_bytes[n_first_bytes-1]==idmef_end_marker[0])
+	    *state = BLOX_NSTATES+1; /* already matched first character of
+					idmef_end_marker */
+	  else *state = BLOX_NSTATES;
+	  return n_first_bytes+1;
+	}
     }
-  switch (TYPE(event->value))
-    {
-    case T_STR: txt_line = STR(event->value); txt_len = STRLEN(event->value);
-      break;
-    case T_VSTR: txt_line = VSTR(event->value); txt_len = VSTRLEN(event->value);
-      break;
-    default:
-      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
-      return -1;
-    }
-  txt_end = txt_line + txt_len;
-
-  while ((end = my_strnstr(txt_line, txt_end-txt_line,
-			   "</idmef:IDMEF-Message>")) != NULL)
-  {
-    msg_len = end - txt_line + 22;
-    if (cfg->buff_len +  msg_len >= MAX_IDMEF_SIZE)
-      DebugLog(DF_MOD, DS_ERROR, "IDMEF message too big\n");
-    else
-      {
-	strncpy (cfg->buff+cfg->buff_len, txt_line, msg_len);
-	load_idmef_xmlDoc(ctx, mod, cfg->buff, cfg->buff_len + msg_len, dissector_level);
-      }
-    cfg->buff[0] = 0;
-    cfg->buff_len = 0;
-    txt_line = end + 22;
-    while (txt_line<txt_end && (*txt_line != '<'))
-      txt_line++;
-  }
-  msg_len = txt_end - txt_line;
-  if (msg_len > MAX_IDMEF_SIZE - cfg->buff_len)
-    msg_len = MAX_IDMEF_SIZE - cfg->buff_len; /* avoid overflows - may lose
-						 part of the message,
-						 in principle */
-  memcpy (cfg->buff+cfg->buff_len, txt_line, msg_len);
-  cfg->buff_len += msg_len;
-  return 1;
 }
 
-/*
-int generic_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-		    void *data)
+static void idmef_subdissect (orchids_t *ctx, mod_entry_t *mod,
+			      event_t *event,
+			      ovm_var_t *delegate,
+			      unsigned char *stream, size_t stream_len,
+			      void *sd_data,
+			      int dissector_level)
 {
-  return idmef_dissect(ctx, mod, event, data);
+  load_idmef_xmlDoc(ctx, mod, (char *)stream, stream_len, dissector_level);
 }
-*/
+
+static int idmef_dissect (orchids_t *ctx, mod_entry_t *mod,
+			  event_t *event, void *data, int dissector_level)
+{
+  return blox_dissect (ctx, mod, event, data, dissector_level);
+}
+
+static void *idmef_predissect(orchids_t *ctx, mod_entry_t *mod,
+			      char *parent_modname,
+			      char *cond_param_str,
+			      int cond_param_size)
+{
+  blox_hook_t *hook;
+  idmef_cfg_t *cfg = (idmef_cfg_t *)mod->config;
+
+  hook = init_blox_hook (ctx, cfg->bcfg, cond_param_str, cond_param_size);
+  return hook;
+}
+
+static int idmef_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
+{
+  idmef_cfg_t *cfg = (idmef_cfg_t *)data;
+  
+  return blox_save (sctx, cfg->bcfg);
+}
+
+static int idmef_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
+{
+  idmef_cfg_t *cfg = (idmef_cfg_t *)data;
+  
+  return blox_restore (rctx, cfg->bcfg);
+}
 
 static void add_analyzer_node(xmlNode *alert_root,
 			      idmef_cfg_t *cfg)
@@ -460,18 +492,22 @@ static const type_t **idmef_write_alert_sigs[] = { idmef_write_alert_sig, NULL }
 
 static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  idmef_cfg_t*	cfg;
+  idmef_cfg_t *cfg;
+  blox_config_t *bcfg;
   int i;
 
   DebugLog(DF_MOD, DS_INFO, "load() idmef@%p\n", (void *) &mod_idmef);
+
+  bcfg = init_blox_config (ctx, mod, 1,
+			   idmef_compute_length,
+			   idmef_subdissect,
+			   NULL);
 
   cfg = gc_base_malloc(ctx->gc_ctx, sizeof (idmef_cfg_t));
   cfg->nb_fields = 0; /* OBSOLETE: 1; */
   for (i=0; i<MAX_IDMEF_FIELDS; i++)
     cfg->field_xpath[i] = NULL;
-  cfg->buff[0] =  '\0';
-  cfg->buff_len = 0;
-  cfg->too_big = 0;
+  cfg->bcfg = bcfg;
   cfg->analyzer_id = 0;
   cfg->analyzer_name = NULL;
   cfg->analyzer_node_address = NULL;
@@ -620,16 +656,21 @@ input_module_t mod_idmef = {
   idmef_preconfig,
   idmef_postconfig,
   NULL,
-  NULL,
+  idmef_predissect,
   idmef_dissect,
-  &t_str		    /* type of fields it expects to dissect */
+  &t_str,		    /* type of fields it expects to dissect */
+  idmef_save,
+  idmef_restore,
 };
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

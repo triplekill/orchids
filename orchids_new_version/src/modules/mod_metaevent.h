@@ -2,9 +2,10 @@
  ** @file mod_metaevent.h
  ** Definitions for mod_metaevent.c
  **
- ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -72,17 +73,18 @@ static void * metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 static void metaevent_postconfig(orchids_t *ctx, mod_entry_t *mod);
 
-static void metaevent_postcompil(orchids_t *ctx, mod_entry_t *mod);
-
 static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he);
 
 #endif /* MOD_METAEVENT_H */
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

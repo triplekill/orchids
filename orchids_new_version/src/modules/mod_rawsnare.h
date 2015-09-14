@@ -3,8 +3,9 @@
  ** Definitions for mod_rawsnare.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 1.0
  ** @ingroup modules
  **
  ** @date  Started on: Fri Feb 14 18:36:36 2003
@@ -61,61 +62,16 @@
 #define F_KILLSIG 34
 
 
-static int read_io(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_pc(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_exec(gc_t *gc_ctx,
-		     ovm_var_t *delegate,
-		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_net(gc_t *gc_ctx,
-		    ovm_var_t *delegate,
-		    ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_pt(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_kill(gc_t *gc_ctx,
-		     ovm_var_t *delegate,
-		     ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_ch(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_cp(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_su(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-static int read_ad(gc_t *gc_ctx,
-		   ovm_var_t *delegate,
-		   ovm_var_t *attr[RAWSNARE_FIELDS], header_token_t *hdr);
-
-
-static int rawsnare_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
-			    void *data, int dissection_level);
-
-static void *rawsnare_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-
 #endif /* MOD_RAWSNARE_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

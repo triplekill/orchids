@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -354,13 +354,16 @@ blox_config_t *init_blox_config(orchids_t *ctx,
       cfg->compute_length = compute_length;
       cfg->subdissect = subdissect;
       cfg->mod = mod;
+      cfg->hooks = NULL;
       cfg->sd_data = sd_data;
     }
   return cfg;
 }
 
 blox_hook_t *init_blox_hook(orchids_t *ctx,
-			    blox_config_t *bcfg
+			    blox_config_t *bcfg,
+			    char *tag,
+			    size_t taglen
 			    )
 {
   gc_t *gc_ctx = ctx->gc_ctx;
@@ -369,7 +372,12 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
   hook = gc_base_malloc (gc_ctx, sizeof(blox_hook_t));
   if (hook!=NULL)
     {
+      hook->next = bcfg->hooks;
+      bcfg->hooks = hook;
       hook->bcfg = bcfg;
+      hook->tag = tag; /* XXX should we copy this? This comes from directives,
+			  which are never freed, as far as I know. */
+      hook->taglen = taglen;
       hook->n_bytes = bcfg->n_first_bytes;
       hook->dissector_level = 0; /* by default */
       hook->state = BLOX_INIT;
@@ -382,6 +390,119 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
       gc_add_root(gc_ctx, (gc_header_t **)&hook->event);
     }
   return hook;
+}
+
+int blox_save (save_ctx_t *sctx, blox_config_t *bcfg)
+{
+  struct blox_hook_s *hook;
+  size_t n;
+  int c;
+  size_t j, m;
+  int err;
+
+  for (n=0, hook=bcfg->hooks; hook!=NULL; hook=hook->next) n++;
+  err = save_size_t (sctx, n);
+  if (err) return err;
+  for (hook=bcfg->hooks; hook!=NULL; hook=hook->next)
+    {
+      m = hook->taglen;
+      err = save_size_t (sctx, m);
+      if (err) return err;
+      for (j=0; j<m; j++)
+	{
+	  c = hook->tag[j];
+	  if (putc (c, sctx->f) < 0) return errno;
+	}
+      err = save_size_t (sctx, hook->n_bytes);
+      if (err) return err;
+      err = save_int (sctx, hook->state);
+      if (err) return err;
+      err = save_int (sctx, hook->flags);
+      if (err) return err;
+      err = save_gc_struct (sctx, (gc_header_t *)hook->remaining);
+      if (err) return err;
+      err = save_gc_struct (sctx, (gc_header_t *)hook->event);
+      if (err) return err;
+    }
+  return err;
+}
+
+int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
+{
+  struct blox_hook_s *hook;
+  size_t i, n;
+  int c;
+  size_t j, m;
+  char *tag;
+  size_t n_bytes;
+  int state, flags;
+  ovm_var_t *remaining;
+  event_t *event;
+  int err = 0;
+
+  GC_START (rctx->gc_ctx, 2);
+  err = restore_size_t (rctx, &n);
+  if (err) goto end;
+  for (i=0; i<n; i++)
+    {
+      err = restore_size_t (rctx, &m);
+      if (err) goto end;
+      tag = gc_base_malloc (rctx->gc_ctx, m);
+      for (j=0; j<m; j++)
+	{
+	  c = getc (rctx->f);
+	  if (c==EOF)
+	    {
+	      err = c;
+	    err_freetag:
+	      gc_base_free (tag);
+	      goto end;
+	    }
+	}
+      err = restore_size_t (rctx, &n_bytes);
+      if (err) goto err_freetag;
+      err = restore_int (rctx, &state);
+      if (err) goto err_freetag;
+      err = restore_int (rctx, &flags);
+      if (err) goto err_freetag;
+      remaining = (ovm_var_t *)restore_gc_struct (rctx);
+      if (remaining==NULL && errno!=0) { err = errno; goto err_freetag; }
+      if (remaining==NULL || (TYPE(remaining)!=T_BSTR && TYPE(remaining)!=T_VBSTR))
+	{ err = -2; goto err_freetag; }
+      GC_UPDATE (rctx->gc_ctx, 0, remaining);
+      event = (event_t *)restore_gc_struct (rctx);
+      if (event==NULL && errno!=0) { err = errno; goto err_freetag; }
+      if (event!=NULL && TYPE(event)!=T_EVENT) { err = -2; goto err_freetag; }
+      GC_UPDATE (rctx->gc_ctx, 1, event);
+      for (hook=bcfg->hooks; hook!=NULL; hook=hook->next)
+	{ /* linear search through all hooks: this is inefficient,
+	     but there should not be many hooks here;
+	     otherwise we might use the module's sub_dissectors hash table,
+	     but that would not be reliable, since a module that uses
+	     the blox facilities is not forced to use only them. */
+	  if (hook->taglen==m && memcmp (hook->tag, tag, m)==0)
+	    { /* found the blox hook to modify */
+	      hook->n_bytes = n_bytes;
+	      hook->state = state;
+	      hook->flags = flags;
+	      GC_TOUCH (rctx->gc_ctx, hook->remaining = remaining);
+	      GC_TOUCH (rctx->gc_ctx, hook->event = event);
+	      break;
+	    }
+	  /* The blox API usually has hook->remaining be a vstring
+	     pointed into the middle of hook->event->value,
+	     but the save/restore mechanism does not keep this sharing
+	     (even if we used the estimate_sharing()/reset_sharing()
+	     mechanism).  On restoring, we may therefore use a bit more
+	     memory than stricly necessary, but that should not cause
+	     any other problem.
+	  */
+	}
+      gc_base_free (tag);
+    }
+ end:
+  GC_END (rctx->gc_ctx);
+  return err;
 }
 
 

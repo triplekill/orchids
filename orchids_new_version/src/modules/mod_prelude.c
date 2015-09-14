@@ -3,7 +3,9 @@
  ** Prelude module (See http://www.prelude-technologies.com/)
  **
  ** @author Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
- ** @version 0.1
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
+ **
+ ** @version 0.2
  ** @ingroup modules
  **
  **
@@ -112,7 +114,7 @@ static void get_field_from_idmef_value(orchids_t	*ctx,
 				       ovm_var_t	 **attr,
 				       idmef_message_t	*message,
 				       const char	*path,
-				       int		field_id,
+				       size_t		field_id,
 				       int		field_type)
 {
   idmef_value_t	*value = NULL;
@@ -222,7 +224,7 @@ static void process_idmef_alert(orchids_t *ctx,
 				idmef_message_t	*message,
 				int dissection_level)
 {
-  int c;
+  size_t c;
 #ifdef OBSOLETE
   ovm_var_t *val;
 #endif
@@ -835,10 +837,12 @@ input_module_t mod_prelude = {
   prelude_dir,
   mod_prelude_preconfig,
   mod_prelude_postconfig,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, /* postcompil */
+  NULL, /* predissect */
+  NULL, /* dissect */
+  NULL, /* dissect type */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 /*

@@ -3,8 +3,9 @@
  ** A module for implementing active real-time timeouts.
  ** 
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  ** 
- ** @version 0.1.0
+ ** @version 0.2
  ** 
  ** @date  Started on: Fri Jun 15 10:53:53 2007
  **/
@@ -31,6 +32,12 @@
 
 
 input_module_t mod_timeout;
+
+static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he);
+
+static void issdl_timeout(orchids_t *ctx, state_instance_t *state);
+
+static void *timeout_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 /* XXX: small hack to retrieve the mod entry
    in language function and/or rtcallback */
@@ -156,8 +163,7 @@ static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "Register a real-time timeout.");
 
   mod_entry_g = mod;
-
-  return (NULL);
+  return NULL;
 }
 
 
@@ -170,19 +176,24 @@ input_module_t mod_timeout = {
   NULL,
   NULL,
   timeout_preconfig,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, /* postconfig */
+  NULL, /* postcompil */
+  NULL, /* predissect */
+  NULL, /* dissect */
+  NULL, /* dissect type */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 
 /*
-** Copyright (c) 2002-2007 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2007 by Julien OLIVAIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

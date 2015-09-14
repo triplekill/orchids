@@ -3,6 +3,7 @@
  ** Listen to events on udp sockets.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
  ** @version 0.1
  ** @ingroup modules
@@ -36,6 +37,14 @@
 #include "mod_udp.h"
 
 input_module_t mod_udp;
+
+static int create_udp_socket(const char *file, uint32_t line, int udp_port);
+
+static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
+
+static void *udp_preconfig(orchids_t *ctx, mod_entry_t *mod);
+
+static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 static int create_udp_socket(const char *file, uint32_t line, int udp_port)
 {
@@ -188,19 +197,24 @@ input_module_t mod_udp = {
   NULL,
   udp_dir,
   udp_preconfig,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
+  NULL, /* postconfig */
+  NULL, /* postcompil */
+  NULL, /* predissect */
+  NULL, /* dissect */
+  NULL, /* dissect type */
+  NULL, /* save */
+  NULL, /* restore */
 };
 
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.
