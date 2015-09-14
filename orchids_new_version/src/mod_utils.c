@@ -471,6 +471,7 @@ int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
 	      gc_base_free (tag);
 	      goto end;
 	    }
+	  tag[j] = c;
 	}
       err = restore_size_t (rctx, &n_bytes);
       if (err) goto err_freetag;
@@ -480,7 +481,8 @@ int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
       if (err) goto err_freetag;
       remaining = (ovm_var_t *)restore_gc_struct (rctx);
       if (remaining==NULL && errno!=0) { err = errno; goto err_freetag; }
-      if (remaining==NULL || (TYPE(remaining)!=T_BSTR && TYPE(remaining)!=T_VBSTR))
+      if (remaining!=NULL &&
+	  (TYPE(remaining)!=T_BSTR && TYPE(remaining)!=T_VBSTR))
 	{ err = -2; goto err_freetag; }
       GC_UPDATE (rctx->gc_ctx, 0, remaining);
       event = (event_t *)restore_gc_struct (rctx);

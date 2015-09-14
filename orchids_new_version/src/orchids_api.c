@@ -684,7 +684,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
     { err = -8; ctx->thread_queue = NULL; goto errlab; }
   /* Now we look for modules requiring to be restored. */
-  while (err!=0)
+  while (err==0)
     switch (getc (rctx.f))
       {
       case EOF: goto errlab; /* we are done */

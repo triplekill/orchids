@@ -774,7 +774,7 @@ static gc_header_t *vbstr_restore (restore_ctx_t *rctx)
   /* We have already read the first byte, and it was T_VBSTR. */
   err = restore_size_t (rctx, &sz);
   if (err) goto errlab;
-  VBSTRLEN(vbstr) = sz+1;
+  VBSTRLEN(vbstr) = sz;
   bstr = gc_alloc (gc_ctx, offsetof(ovm_bstr_t,str[sz+1]), &bstr_class);
   bstr->gc.type = T_BSTR;
   bstr->len = sz;
@@ -788,6 +788,7 @@ static gc_header_t *vbstr_restore (restore_ctx_t *rctx)
   s[sz] = '\0'; /* some functions (e.g., error reporting in rule_compiler.c)
 		   assume a final NUL character */
   GC_TOUCH (gc_ctx, vbstr->delegate = (ovm_var_t *)bstr);
+  VBSTR(vbstr) = BSTR(bstr);
   goto normal;
  errlab:
   vbstr = NULL;
@@ -1090,7 +1091,7 @@ static gc_header_t *vstr_restore (restore_ctx_t *rctx)
   /* We have already read the first byte, and it was T_VSTR. */
   err = restore_size_t (rctx, &sz);
   if (err) goto errlab;
-  VSTRLEN(vstr) = sz+1;
+  VSTRLEN(vstr) = sz;
   str = gc_alloc (gc_ctx, offsetof(ovm_str_t,str[sz+1]), &str_class);
   str->gc.type = T_STR;
   str->len = sz;
@@ -1104,6 +1105,7 @@ static gc_header_t *vstr_restore (restore_ctx_t *rctx)
   s[sz] = '\0'; /* some functions (e.g., error reporting in rule_compiler.c)
 		   assume a final NUL character */
   GC_TOUCH (gc_ctx, vstr->delegate = (ovm_var_t *)str);
+  VSTR(vstr) = STR(str);
   goto normal;
  errlab:
   vstr = NULL;
@@ -2559,7 +2561,7 @@ int issdl_cmp(ovm_var_t *var1, ovm_var_t *var2, int dir)
     return (*issdl_types_g[var1->gc.type].cmp) (var1, var2, dir);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_cmp(): comparison doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return CMP_ERROR;
 }
 
@@ -2569,7 +2571,7 @@ ovm_var_t *issdl_add(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].add) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_add(): addition doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2579,7 +2581,7 @@ ovm_var_t *issdl_sub(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].sub) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_sub(): subtraction doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2589,7 +2591,7 @@ ovm_var_t *issdl_opp(gc_t *gc_ctx, ovm_var_t *var)
     return (*issdl_types_g[var->gc.type].opp) (gc_ctx, var);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_opp(): opposite doesn't apply for type '%s'\n",
-	   STRTYPE(var));
+	   var==NULL?"null":STRTYPE(var));
   return NULL;
 }
 
@@ -2599,7 +2601,7 @@ ovm_var_t *issdl_plus(gc_t *gc_ctx, ovm_var_t *var)
     return (*issdl_types_g[var->gc.type].plus) (gc_ctx, var);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_plus(): same sign conversion doesn't apply for type '%s'\n",
-	   STRTYPE(var));
+	   var==NULL?"null":STRTYPE(var));
   return NULL;
 }
 
@@ -2609,7 +2611,7 @@ ovm_var_t *issdl_mul(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].mul) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_mul(): multiplication doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2619,7 +2621,7 @@ ovm_var_t *issdl_div(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].div) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_div(): division doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2629,7 +2631,7 @@ ovm_var_t *issdl_mod(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].mod) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_mod(): modulo doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2652,7 +2654,7 @@ ovm_var_t *issdl_and(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].and) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_and(): bitwise and doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2662,7 +2664,7 @@ ovm_var_t *issdl_or(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].or) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_and(): bitwise inclusive or doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2672,7 +2674,7 @@ ovm_var_t *issdl_xor(gc_t *gc_ctx, ovm_var_t *var1, ovm_var_t *var2)
     return (*issdl_types_g[ var1->gc.type ].xor) (gc_ctx, var1, var2);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_and(): bitwise exclusive or doesn't apply for type '%s'\n",
-	   STRTYPE(var1));
+	   var1==NULL?"null":STRTYPE(var1));
   return NULL;
 }
 
@@ -2682,7 +2684,7 @@ ovm_var_t *issdl_not(gc_t *gc_ctx, ovm_var_t *var)
     return (*issdl_types_g[var->gc.type].not) (gc_ctx, var);
   DebugLog(DF_OVM, DS_WARN,
 	   "issdl_not(): bitwise complement doesn't apply for type '%s'\n",
-	   STRTYPE(var));
+	   var==NULL?"null":STRTYPE(var));
   return NULL;
 }
 

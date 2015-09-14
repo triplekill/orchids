@@ -164,7 +164,7 @@ main(int argc, char *argv[])
       err = orchids_restore (ctx, ctx->save_file);
       if (err==0)
 	{
-	  DebugLog(DF_CORE, DS_INFO, "Orchids restored from '%s'\n", ctx->save_file);
+	  DebugLog(DF_CORE, DS_NOTICE, "Orchids restored from '%s'\n", ctx->save_file);
 	}
       else if (err==ENOENT) /* No such save file: silently proceed */
 	{

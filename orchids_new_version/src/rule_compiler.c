@@ -7863,6 +7863,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->next = NULL;
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
+  rule->sync_vars_sz = 0;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
 
   rule->filename = gc_strdup (ctx->gc_ctx, node_rule->file);
