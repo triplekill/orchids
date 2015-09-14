@@ -526,13 +526,12 @@ int orchids_save (orchids_t *ctx, char *name)
 	{
 	  me = &ctx->mods[m];
 	  mod = me->mod;
+	  if (mod->save_fun==NULL)
+	    continue;
 	  err = begin_save_module (&sctx, mod->name, &startpos);
 	  if (err) break;
-	  if (mod->save_fun!=NULL)
-	    {
-	      err = (*mod->save_fun) (&sctx, me, me->config);
-	      if (err) break;
-	    }
+	  err = (*mod->save_fun) (&sctx, me, me->config);
+	  if (err) break;
 	  err = end_save_module (&sctx, startpos);
 	  if (err) break;
 	}

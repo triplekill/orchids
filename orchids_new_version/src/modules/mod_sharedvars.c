@@ -211,30 +211,13 @@ static int sharedvars_config_save_hash_walk_func (char *key, void *elt,
   return err;
 }
 
-static int sharedvars_config_save (save_ctx_t *sctx, gc_header_t *p)
-{
-  sharedvars_config_t *ctx = (sharedvars_config_t *)p;
-  int err;
-
-  if (ctx->vars_hash==NULL)
-    err = save_size_t (sctx, 0);
-  else
-    {
-      err = save_size_t (sctx, ctx->vars_hash->elmts);
-      if (err) return err;
-      err = strhash_walk (ctx->vars_hash,
-			  sharedvars_config_save_hash_walk_func,
-			  sctx);
-    }
-  return err;
-}
-
 static gc_class_t sharedvars_config_class = {
   GC_ID('s','h','r','d'),
   sharedvars_config_mark_subfields,
   sharedvars_config_finalize,
   sharedvars_config_traverse,
-  sharedvars_config_save,
+  NULL, /* save is handled through the special function
+	   shared_vars_save() directly */
   NULL, /* restore is handled through the special function
 	   sharedvars_restore() directly */
 };
@@ -322,15 +305,28 @@ static int sharedvars_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
 
   cfg = (sharedvars_config_t *)data;
   /* Normally, cfg->shared_vars!=NULL (we are only called after postconfig) */
-  estimate_sharing (sctx->gc_ctx, (gc_header_t *)cfg->vars_hash);
-  err = save_gc_struct (sctx, (gc_header_t *)cfg->vars_hash);
-  /* We save vars_hash through the standard save_gc_struct() function.
-     This will cause it to output the gc.type of vars_hash, namely T_NULL,
-     followed by whatever sharedvars_config_save() will output.
-     Since T_NULL is not a valid tag, we shall not use restore_gc_struct()
-     to restore the hash table, but do a custom thing in sharedvars_restore().
-   */
-  reset_sharing (sctx->gc_ctx, (gc_header_t *)cfg->vars_hash);
+  estimate_sharing (sctx->gc_ctx, (gc_header_t *)cfg);
+  /* We simulate the operation of save_gc_struct(), saving
+     a type tag first (T_NULL), then the contents of the hash table.
+     We do not use save_gc_struct() directly, because that
+     would require us to add a new T_* type tag, with a new entry
+     to the gc_classes[] array, breaking modularity.
+     (The usual way to add a new piece of data is through ovm_extern_t,
+     not creating new type tags.)
+  */
+  if (putc (T_NULL, sctx->f) < 0) return errno;
+  if (cfg->vars_hash==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      err = save_size_t (sctx, cfg->vars_hash->elmts);
+      if (err) return err;
+      err = strhash_walk (cfg->vars_hash,
+			  sharedvars_config_save_hash_walk_func,
+			  sctx);
+    }
+  if (err) return err;
+  reset_sharing (sctx->gc_ctx, (gc_header_t *)cfg);
   return err;
 }
 

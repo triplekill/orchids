@@ -138,7 +138,7 @@ static void *bintotext_predissect(orchids_t *ctx, mod_entry_t *mod,
 
 static int bintotext_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
 {
-  return blox_save (sctx, (struct blox_config_s *)data);
+  return blox_save (sctx, (struct blox_config_s *)data, 1);
 }
 
 static int bintotext_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)

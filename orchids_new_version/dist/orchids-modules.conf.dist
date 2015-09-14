@@ -25,11 +25,9 @@ LoadModule snmptrap
 LoadModule consoles
 LoadModule period
 LoadModule pcap
-LoadModule wifi
+#LoadModule wifi
 LoadModule timeout
 LoadModule sharedvars
-LoadModule mark
-#LoadModule ruletrace
 #LoadModule prelude
 LoadModule xml
 LoadModule idmef

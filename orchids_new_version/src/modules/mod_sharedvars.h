@@ -19,7 +19,7 @@
 #ifndef MOD_SHAREDVARS_H
 #define MOD_SHAREDVARS_H
 
-#define DEFAULT_SHAREDVARS_HASH_SZ 262144
+#define DEFAULT_SHAREDVARS_HASH_SZ 1021
 
 
 typedef struct sharedvars_config_s sharedvars_config_t;

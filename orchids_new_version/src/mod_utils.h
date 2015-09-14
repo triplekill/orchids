@@ -88,7 +88,7 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
 int blox_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *event,
 		 void *data, int dissector_level);
 
-int blox_save (save_ctx_t *sctx, blox_config_t *bcfg);
+int blox_save (save_ctx_t *sctx, blox_config_t *bcfg, int manage_sharing);
 int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg);
 
 /*** Quick parser functions

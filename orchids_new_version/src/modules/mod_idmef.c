@@ -297,7 +297,7 @@ static int idmef_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
 {
   idmef_cfg_t *cfg = (idmef_cfg_t *)data;
   
-  return blox_save (sctx, cfg->bcfg);
+  return blox_save (sctx, cfg->bcfg, 1);
 }
 
 static int idmef_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)

@@ -291,7 +291,7 @@ int end_save_module (save_ctx_t *sctx, off_t startpos)
   off_t fpos;
 
   fpos = ftello (sctx->f);
-  err = fseeko (sctx->f, startpos, SEEK_SET);
+  err = fseeko (sctx->f, startpos - sizeof(size_t), SEEK_SET);
   if (err) return err;
   err = save_size_t (sctx, (size_t)(fpos - startpos));
   if (err) return err;

@@ -392,7 +392,7 @@ blox_hook_t *init_blox_hook(orchids_t *ctx,
   return hook;
 }
 
-int blox_save (save_ctx_t *sctx, blox_config_t *bcfg)
+int blox_save (save_ctx_t *sctx, blox_config_t *bcfg, int manage_sharing)
 {
   struct blox_hook_s *hook;
   size_t n;
@@ -403,27 +403,40 @@ int blox_save (save_ctx_t *sctx, blox_config_t *bcfg)
   for (n=0, hook=bcfg->hooks; hook!=NULL; hook=hook->next) n++;
   err = save_size_t (sctx, n);
   if (err) return err;
+  if (manage_sharing)
+    for (n=0, hook=bcfg->hooks; hook!=NULL; hook=hook->next)
+      {
+	estimate_sharing (sctx->gc_ctx, (gc_header_t *)hook->remaining);
+	estimate_sharing (sctx->gc_ctx, (gc_header_t *)hook->event);
+      }
   for (hook=bcfg->hooks; hook!=NULL; hook=hook->next)
     {
       m = hook->taglen;
       err = save_size_t (sctx, m);
-      if (err) return err;
+      if (err) goto end;
       for (j=0; j<m; j++)
 	{
 	  c = hook->tag[j];
-	  if (putc (c, sctx->f) < 0) return errno;
+	  if (putc (c, sctx->f) < 0) { err = errno; goto end; }
 	}
       err = save_size_t (sctx, hook->n_bytes);
-      if (err) return err;
+      if (err) goto end;
       err = save_int (sctx, hook->state);
-      if (err) return err;
+      if (err) goto end;
       err = save_int (sctx, hook->flags);
-      if (err) return err;
+      if (err) goto end;
       err = save_gc_struct (sctx, (gc_header_t *)hook->remaining);
-      if (err) return err;
+      if (err) goto end;
       err = save_gc_struct (sctx, (gc_header_t *)hook->event);
-      if (err) return err;
+      if (err) goto end;
     }
+ end:
+  if (manage_sharing)
+    for (n=0, hook=bcfg->hooks; hook!=NULL; hook=hook->next)
+      {
+	reset_sharing (sctx->gc_ctx, (gc_header_t *)hook->remaining);
+	reset_sharing (sctx->gc_ctx, (gc_header_t *)hook->event);
+      }
   return err;
 }
 

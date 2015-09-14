@@ -466,6 +466,8 @@ static void add_vmod(orchids_t *ctx, generic_hook_t *h,
       vmod->mod_entry.post_compil = NULL;
       vmod->mod_entry.dissect_fun = generic_dissect;
       vmod->mod_entry.dissect_type = &t_str;
+      vmod->mod_entry.save_fun = NULL;
+      vmod->mod_entry.restore_fun = NULL;
       vmod->nfields = 0;
       vmod->field_array = NULL;
       vmod->field_hash = new_strhash(ctx->gc_ctx, 257);

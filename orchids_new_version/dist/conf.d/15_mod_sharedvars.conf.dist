@@ -5,6 +5,6 @@
 <module sharedvars>
 
   # This is the size of the hash, in number of entries.
-  HashSize 262144
+  HashSize 1021
 
 </module>
