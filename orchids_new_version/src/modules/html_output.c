@@ -1026,7 +1026,9 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
 	    fprintf(fp,
 		    "<tr> <td class=\"e%i\"> %zu </td> <td class=\"v%i\"> %s </td>",
 		    p, j,
-		    p, str_issdltype(TYPE(r->static_env[j])));
+		    p,
+		    (r->static_env[j]==NULL)?"null":
+		    str_issdltype(TYPE(r->static_env[j])));
 	    fprintf(fp, "<td class=\"v%i\"> ", p);
 	    fprintf_ovm_var(fp, r->static_env[j]);
 	    fprintf(fp, "</td> </tr>\n");

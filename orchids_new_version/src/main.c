@@ -188,7 +188,11 @@ int main(int argc, char *argv[])
   orchids_t *ctx;
   int err;
 
-  //(void) ptrace (PT_DENY_ATTACH, 0, NULL, 0);
+#ifndef ORCHIDS_DEBUG
+  /* disallow any form of debugging, unless ORCHIDS_DEBUG is set */
+  (void) ptrace (PT_DENY_ATTACH, 0, NULL, 0);
+#endif
+  
 #ifdef ORCHIDS_DEBUG
   debuglog_enable_all(); /* enable ALL messages in debug mode */
   libdebug_openlog("orchids",

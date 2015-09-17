@@ -144,7 +144,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
 #endif /* MOD_UTILS_H */
 
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

@@ -540,6 +540,8 @@ int orchids_save (orchids_t *ctx, char *name)
   if (err==0)
     err = rename (tmpname, name);
  end:
+  DebugLog(DF_CORE, DS_INFO, "saving Orchids state: %s\n",
+	   (err==0)?"done":strerror (err));
   gc_base_free (tmpname);
   return err;
 }

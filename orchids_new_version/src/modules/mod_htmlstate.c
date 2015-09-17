@@ -6,7 +6,7 @@
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
  ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
@@ -32,6 +32,12 @@
 #include "mod_htmlstate.h"
 
 input_module_t mod_htmlstate;
+
+static void *htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod);
+
+static void htmlstate_postconfig(orchids_t *ctx, mod_entry_t *mod);
+
+static void enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 static void *htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
@@ -63,28 +69,28 @@ static void *htmlstate_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   html_output_preconfig(ctx);
 
-  /* register cache cleanup periodic job */
-  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, mod_cfg, 10, 0);
-
-  /* register regeneration job */
-  register_rtcallback(ctx, rtaction_html_regeneration, NULL, mod_cfg, 2, 0);
-
-
-
-  /* register report output*/
-  register_report_output(ctx, mod, generate_html_report_cb, mod_cfg);
-
   return (mod_cfg);
 }
 
 static void
 htmlstate_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
+  html_output_cfg_t *mod_cfg = mod->config;
 //  html_output_postconfig(ctx, (html_output_cfg_t *)mod->config);
+
+  /* register cache cleanup periodic job */
+  register_rtcallback(ctx, rtaction_html_cache_cleanup, NULL, mod_cfg,
+		      mod_cfg->auto_refresh_delay, 0);
+
+  /* register regeneration job */
+  register_rtcallback(ctx, rtaction_html_regeneration, NULL, mod_cfg,
+		      mod_cfg->cache_cleanup_delay, 0);
+
+  /* register report output*/
+  register_report_output(ctx, mod, generate_html_report_cb, mod_cfg);
 }
 
-static void
-enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   html_output_cfg_t *cfg;
 
@@ -92,29 +98,42 @@ enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   cfg->enable_cache = 1;
 }
 
-static void
-add_cache_params(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void set_HTML_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  // XXX FIXME
-}
-
-static void
-set_HTML_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
-{
-  html_output_cfg_t *cfg;
-
-  cfg = (html_output_cfg_t *)mod->config;
-
+  html_output_cfg_t *cfg = (html_output_cfg_t *)mod->config;
 
   cfg->html_output_dir = gc_strdup(ctx->gc_ctx, dir->args);
+}
+
+static void set_HTML_auto_refresh_delay(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  long value;
+  
+  html_output_cfg_t *cfg = (html_output_cfg_t *)mod->config;
+  value = strtol(dir->args, (char **)NULL, 10);
+  if (value < 1)
+    value = 1;
+  cfg->auto_refresh_delay = value;
+}
+
+static void set_HTML_cache_cleanup_delay(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  long value;
+  
+  html_output_cfg_t *cfg = (html_output_cfg_t *)mod->config;
+  value = strtol(dir->args, (char **)NULL, 10);
+  if (value < 1)
+    value = 1;
+  cfg->cache_cleanup_delay = value;
 }
 
 
 static mod_cfg_cmd_t htmlstate_dir[] =
 {
   { "EnableCache", enable_cache, "Enable file cache" },
-  { "<cache", add_cache_params, "Add cache parameters" },
   { "HTMLOutputDir", set_HTML_output_dir, "set HTML output directory" },
+  { "HTMLAutoRefreshDelay", set_HTML_auto_refresh_delay, "set delay before next HTML refresh" },
+  { "HTMLCacheCleanupDelay", set_HTML_cache_cleanup_delay, "set delay between HTML cache cleanups" },
   { NULL, NULL }
 };
 

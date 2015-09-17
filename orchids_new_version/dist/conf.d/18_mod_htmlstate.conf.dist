@@ -4,4 +4,10 @@
 
 <module htmlstate>
 	HTMLOutputDir @@VARDIR@@/orchids/htmlstate
+	
+	/* Delay between two refreshes, in seconds: */
+	HTMLAutoRefreshDelay 10
+
+	/* Delay between two cache cleanups, in seconds: */
+	HTMLCacheCleanupDelay 60
 </module>

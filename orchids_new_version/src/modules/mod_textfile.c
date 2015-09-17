@@ -607,7 +607,7 @@ static void textfile_setexit_process_all(orchids_t *ctx, mod_entry_t *mod, confi
 
 static void textfile_setpoll_period(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  int value;
+  long value;
 
   DebugLog(DF_MOD, DS_INFO, "setting PollPeriod to %s\n", dir->args);
 

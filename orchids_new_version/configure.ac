@@ -87,15 +87,15 @@ dnl AC_DEFINE([HAVE_DOT], 1, [Set to 1 if GraphViz is present])
 dnl AC_DEFINE_UNQUOTED([PATH_TO_DOT], "$DOT", [Path to Dot])
 
 
-dnl AC_ARG_ENABLE(debug,
-dnl               [  --enable-debug    Turn on debugging],
-dnl               [case "${enableval}" in
-dnl                 yes) debug=true ;;
-dnl                 no)  debug=false ;;
-dnl                 *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
-dnl                 esac], [debug=false]
-dnl )
-dnl AM_CONDITIONAL(ORCHIDS_DEBUG, test x$debug = xtrue)
+AC_ARG_ENABLE(debug,
+              [  --enable-debug    Turn on debugging],
+              [case "${enableval}" in
+                yes) debug=true ;;
+                no)  debug=false ;;
+                *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
+                esac], [debug=false]
+)
+AM_CONDITIONAL(ORCHIDS_DEBUG, test x$debug = xtrue)
 
 
 AC_ARG_ENABLE(dmalloc,

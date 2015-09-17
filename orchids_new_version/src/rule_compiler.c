@@ -463,7 +463,7 @@ rule_compiler_t *new_rule_compiler_ctx(gc_t *gc_ctx)
 #define NPROTECTED 256
 
   functions_hash  = new_strhash(gc_ctx, 1021);
-  fields_hash     = new_strhash(gc_ctx, 1021);
+  fields_hash     = new_strhash(gc_ctx, 2503);
   rulenames_hash  = new_strhash(gc_ctx, 251);
   statenames_hash = new_strhash(gc_ctx, 251);
   rule_env        = new_strhash(gc_ctx, 251);

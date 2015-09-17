@@ -322,7 +322,7 @@ void event_dispatcher_main_loop(orchids_t *ctx)
   wait_time_ptr = &wait_time;
 
   DebugLog(DF_CORE, DS_NOTICE,
-           "*** Setup done. Entering in event dispatcher main loop ***\n");
+           "*** Setup done. Entering event dispatcher main loop ***\n");
 
   if (ctx->actmon)
     {
@@ -387,7 +387,7 @@ void event_dispatcher_main_loop(orchids_t *ctx)
     memcpy(&rfds, &ctx->fds, sizeof(fd_set));
 
     DebugLog(DF_CORE, DS_DEBUG,
-             "*** waiting for real-time event (or timeout) *** wait=%li.%06li\n",
+             "*** waiting for real-time event (or timeout) *** wait=%lu.%06lu\n",
              wait_time_ptr ? wait_time_ptr->tv_sec : 0,
              wait_time_ptr ? wait_time_ptr->tv_usec : 0);
 
