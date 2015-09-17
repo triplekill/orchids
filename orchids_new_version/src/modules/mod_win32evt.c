@@ -296,11 +296,14 @@ static void read_record(const char *file)
   unsigned char data[65336];
   long off;
 
+ reopen:
   fp = fopen(file, "r");
-  if (fp == NULL) {
-    perror("fopen()");
-    exit(EXIT_FAILURE);
-  }
+  if (fp == NULL)
+    {
+      if (errno==EINTR) goto reopen;
+      perror("fopen()");
+      exit(EXIT_FAILURE);
+    }
 
   memset(data, 0, sizeof(data));
 

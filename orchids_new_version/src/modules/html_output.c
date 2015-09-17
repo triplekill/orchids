@@ -1714,9 +1714,13 @@ static int do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
   int ret = 0;
 
   /* Acquire lock or return */
+ reopen:
   fd = open(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
   if (fd<0)
-    return fd;
+    {
+      if (errno==EINTR) goto reopen;
+      return fd;
+    }
   ret = Write_lock(fd, 0, SEEK_SET, 0);
   if (ret)
     {

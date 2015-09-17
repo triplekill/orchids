@@ -263,6 +263,8 @@ static int textsocket_callback(orchids_t *ctx, mod_entry_t *mod,
   //sz = Xrecvfrom(fd,f->buf+f->write_off,f->buf_sz-f->write_off,0, NULL, NULL);
   if (sz<0)
     {
+      if (errno==EINTR)
+	return 0;
       DebugLog(DF_MOD, DS_ERROR, "read() failed, errno=%d.\n", errno);
       return -1;
     }
@@ -520,9 +522,11 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
+    reopen:
       fd = open(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
       if (fd < 0)
 	{
+	  if (errno==EINTR) goto reopen;
 	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);
@@ -546,9 +550,11 @@ static void add_input_textfile(orchids_t *ctx, mod_entry_t *mod, config_directiv
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
+    reopen2:
       f->fd = fopen(filepath, "r");
       if (f->fd==NULL)
 	{
+	  if (errno==EINTR) goto reopen2;
 	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);

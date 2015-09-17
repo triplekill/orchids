@@ -3,8 +3,9 @@
  ** Runtime main loop: dispatch events and real-time actions.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 1.0
+ ** @version 1.1
  ** @ingroup core
  **
  ** @date  Started on: Wed Jan 22 16:32:26 2003
@@ -24,16 +25,19 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
-
+#include <signal.h>
+#include <errno.h>
 #include "orchids.h"
 
 #include "evt_mgr.h"
 #include "evt_mgr_priv.h"
+#include "orchids_api.h" /* for orchids_save() */
 
 #ifdef DMALLOC
 unsigned long dmalloc_orchids;
 #endif
 
+extern sig_atomic_t signo_g;
 
 static void heap_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
@@ -278,6 +282,21 @@ static heap_entry_t *get_next_rtaction(orchids_t *ctx)
   return he;
 }
 
+void deal_with_signals(orchids_t *ctx, int signo)
+{
+  signo_g = 0;
+  switch (signo)
+    {
+    case SIGTERM:
+    case SIGXCPU:
+    case SIGXFSZ:
+      exit(orchids_save (ctx, ctx->save_file));
+      break;
+    default:
+      (void) orchids_save (ctx, ctx->save_file);
+      break;
+    }
+}
 
 void event_dispatcher_main_loop(orchids_t *ctx)
 {
@@ -326,6 +345,8 @@ void event_dispatcher_main_loop(orchids_t *ctx)
     gc (ctx->gc_ctx);
     gettimeofday(&cur_time, NULL);
     ctx->cur_loop_time = cur_time;
+    if (signo_g)
+      deal_with_signals(ctx,signo_g);
 
     /* Consume past event, if any */
     while (he!=NULL && timercmp (&he->date, &cur_time, <=))
@@ -370,7 +391,27 @@ void event_dispatcher_main_loop(orchids_t *ctx)
              wait_time_ptr ? wait_time_ptr->tv_sec : 0,
              wait_time_ptr ? wait_time_ptr->tv_usec : 0);
 
-    retval = Xselect(ctx->maxfd + 1, &rfds, NULL, NULL, wait_time_ptr);
+  again:
+    retval = select(ctx->maxfd + 1, &rfds, NULL, NULL, wait_time_ptr);
+    if (retval<0)
+      {
+	switch (errno)
+	  {
+	  case EINTR:
+	    if (signo_g)
+	      deal_with_signals(ctx,signo_g);
+	    goto again;
+	  case EAGAIN: /* temporary failure: do as though a timeout
+			  had occurred. */
+	    retval = 0;
+	    break;
+	  default:
+	    fprintf(stderr, "Fatal error:select(): errno=%i: %s\n",
+		    errno, strerror(errno));
+	    exit(EXIT_FAILURE);
+	    break;
+	  }
+      }
 
     if (retval!=0)
       {
@@ -460,8 +501,11 @@ static void monitor_activity(void)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

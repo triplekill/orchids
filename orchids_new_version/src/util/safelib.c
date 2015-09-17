@@ -156,8 +156,7 @@ __safelib_xrealpath(const char *file, const int line, const char *path, char *re
   }
 }
 
-DIR *
-__safelib_xopendir(const char *file, const int line,  const char *name)
+DIR *__safelib_xopendir(const char *file, const int line,  const char *name)
 {
   DIR *dir;
 
@@ -182,12 +181,13 @@ __safelib_xfclose(const char *file, const int line, FILE *fp)
   }
 }
 
-FILE *
-__safelib_xfdopen(const char *file, const int line, int fd, const char *type)
+FILE *__safelib_xfdopen(const char *file, const int line, int fd, const char *type)
 {
   FILE *fp;
 
+ again:
   if ( (fp = fdopen(fd, type)) == NULL) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:xfdopen(fd=%i,mode=%s): errno=%i: %s\n",
             file, line, fd, type, errno, strerror(errno));
     exit(EXIT_FAILURE);
@@ -209,12 +209,13 @@ __safelib_xfgets(const char *file, const int line, char *ptr, int n, FILE *strea
   return (rptr);
 }
 
-FILE *
-__safelib_xfopen(const char *file, const int line, const char *filename, const char *mode)
+FILE *__safelib_xfopen(const char *file, const int line, const char *filename, const char *mode)
 {
   FILE *fp;
 
+ again:
   if ( (fp = fopen(filename, mode)) == NULL) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:xfopen(filename=%s,mode=%s): errno=%i: %s\n",
             file, line, filename, mode, errno, strerror(errno));
     exit(EXIT_FAILURE);
@@ -289,7 +290,9 @@ __safelib_xopen(const char *file, const int line, const char *pathname, int flag
 {
   int fd;
 
+ again:
   if ((fd = open(pathname, flags, mode)) < 0) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:open(path=%s,flags=%08x,mode=%04o): errno=%i: %s\n",
             file, line, pathname, flags, mode, errno, strerror(errno));
     exit(EXIT_FAILURE);
@@ -446,7 +449,9 @@ __safelib_xrecvfrom(const char *file, const int line, int fd, void *ptr, size_t 
 {
   ssize_t n;
 
+ again:
   if ( (n = recvfrom(fd, ptr, nbytes, flags, sa, salenptr)) < 0) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:recvfrom(): errno=%i: %s\n", file, line, errno, strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -459,7 +464,9 @@ __safelib_xread(const char *file, const int line, int fd, void *buf, size_t coun
 {
   ssize_t n;
 
+ again:
   if ( (n = read(fd, buf, count)) == -1) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:read(): errno=%i: %s\n", file, line, errno, strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -472,7 +479,9 @@ __safelib_xwrite(const char *file, const int line, int fd, void *ptr, size_t nby
 {
   size_t n;
 
+ again:
   if ((n = write(fd, ptr, nbytes)) == -1) {
+    if (errno==EINTR) goto again;
     fprintf(stderr, "%s:%i:write(): errno=%i: %s\n", file, line, errno, strerror(errno));
     exit(EXIT_FAILURE);
   }

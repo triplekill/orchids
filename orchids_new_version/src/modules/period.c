@@ -28,7 +28,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
-
+#include <errno.h>
 #include "orchids_types.h"
 #include "period.h"
 
@@ -180,22 +180,27 @@ tvdiff(struct timeval *dst, const struct timeval *ref1, const struct timeval *re
 }
 
 #ifdef UNUSED
-static void
-write_period_snapshot(periodctx_t *ctx)
+static void write_period_snapshot(periodctx_t *ctx)
 {
   char filename[1024];
   FILE *fp;
 
   snprintf(filename, sizeof (filename), "%s-period-snapshot.plot", ctx->name);
-  fp = fopen(filename, "a");
-  fprintf_period_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT|O_SNAPSHOT);
-  fclose(fp);
+  while ((fp = fopen(filename, "a"))==NULL && errno==EINTR);
+  if (fp!=NULL)
+    {
+      fprintf_period_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT|O_SNAPSHOT);
+      fclose(fp);
+    }
 
   snprintf(filename, sizeof (filename), "%s-period-snapshot-%lu-%06lu.dat",
            ctx->name, ctx->last.tv_sec, (unsigned long)ctx->last.tv_usec);
-  fp = fopen(filename, "w");
-  fprintf_period_data_timewin(fp, ctx);
-  fclose(fp);
+  while ((fp = fopen(filename, "w"))==NULL && errno==EINTR);
+  if (fp!=NULL)
+    {
+      fprintf_period_data_timewin(fp, ctx);
+      fclose(fp);
+    }
 }
 #endif
 
@@ -207,14 +212,20 @@ write_period_file(periodctx_t *ctx)
   FILE *fp;
 
   snprintf(filename, sizeof (filename), "%s-period.plot", ctx->name);
-  fp = fopen(filename, "w");
-  fprintf_period_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT);
-  fclose(fp);
+  while ((fp = fopen(filename, "w"))==NULL && errno==EINTR);
+  if (fp!=NULL)
+    {
+      fprintf_period_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT);
+      fclose(fp);
+    }
 
   snprintf(filename, sizeof (filename), "%s-period.dat", ctx->name);
-  fp = fopen(filename, "w");
-  fprintf_period_data(fp, ctx);
-  fclose(fp);
+  while ((fp = fopen(filename, "w"))==NULL && errno==EINTR);
+  if (fp!=NULL)
+    {
+      fprintf_period_data(fp, ctx);
+      fclose(fp);
+    }
 }
 #endif
 
@@ -806,16 +817,22 @@ write_phase_file(phasectx_t *ctx)
   int i;
 
   snprintf(filename, sizeof (filename), "%s-phase.plot", ctx->name);
-  fp = fopen(filename, "w");
-  fprintf_phase_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT|O_SHOWENDS|O_LOOPAVG);
-  fclose(fp);
+  while ((fp = fopen(filename, "w"))==NULL && errno==EINTR);
+  if (fp!=NULL)
+    {
+      fprintf_phase_plot(fp, ctx, O_OUTPNG|O_VERBOSEPLOT|O_SHOWENDS|O_LOOPAVG);
+      fclose(fp);
+    }
 
   for (i = 0, p = ctx->phasespec; p->name ; p++, i++) {
     snprintf(filename, sizeof (filename), "%s-phase-%i-%s.dat",
              ctx->name, i, p->name);
-    fp = fopen(filename, "w");
-    fprintf_phase_data(fp, ctx, p, ctx->count[i]);
-    fclose(fp);
+    while ((fp = fopen(filename, "w"))==NULL && errno==EINTR);
+    if (fp!=NULL)
+      {
+	fprintf_phase_data(fp, ctx, p, ctx->count[i]);
+	fclose(fp);
+      }
   }
 }
 
@@ -1199,14 +1216,15 @@ new_phasectx(phasespec_t *spec, char *name)
 }
 
 
-void
-write_period_kullback_plot(periodctx_t *ctx)
+void write_period_kullback_plot(periodctx_t *ctx)
 {
   FILE *fp;
   char buffer[64];
 
   snprintf(buffer, sizeof (buffer), "%s-period-kullback.plot", ctx->name);
-  fp = fopen(buffer, "w");
+  while ((fp = fopen(buffer, "w"))==NULL && errno==EINTR);
+  if (fp==NULL)
+    return;
   fprintf(fp, "set grid\n");
   fprintf(fp, "set xlabel \"Event number\"\n");
   fprintf(fp, "set ylabel \"Kullback-Leibler distance\"\n");
@@ -1257,85 +1275,89 @@ main(int argc, char *argv[])
   if (!strcmp("-", argv[2]))
     file = stdin;
   else {
+  reopen:
     file = fopen(argv[2], "r");    
     if (file == NULL) {
+      if (errno==EINTR) goto reopen;
       perror("fopen()");
       exit(EXIT_FAILURE);
     }      
   }
 
   snprintf(buffer, sizeof (buffer), "%s-period-kullback.dat", argv[1]);
-  kullback = fopen(buffer, "w");
+  while ((kullback = fopen(buffer, "w"))==NULL && errno==EINTR);
+  if (kullback!=NULL)
+    {
+      while (fgets(buffer, BUFFER_SIZE, file)) {
+	line++;
+	/*     ret = regexec(&ctx->time_regex, buffer, 2, pmatch, 0); */
+	/*     strncpy(date_string, &buffer[ pmatch[1].rm_so ], pmatch[1].rm_eo - pmatch[1].rm_so); */
+	memset(&tm, 0, sizeof (struct tm) );
+	tm.tm_year = cur_year;
+	retval = (char *)strptime(buffer, "%b %d %OH:%M:%S", &tm);
+	if (retval == NULL) {
+	  fprintf(stderr, "Warning, time convertion failed!\n");
+	  continue ;
+	}
 
-  while (fgets(buffer, BUFFER_SIZE, file)) {
-    line++;
-/*     ret = regexec(&ctx->time_regex, buffer, 2, pmatch, 0); */
-/*     strncpy(date_string, &buffer[ pmatch[1].rm_so ], pmatch[1].rm_eo - pmatch[1].rm_so); */
-    memset(&tm, 0, sizeof (struct tm) );
-    tm.tm_year = cur_year;
-    retval = (char *)strptime(buffer, "%b %d %OH:%M:%S", &tm);
-    if (retval == NULL) {
-      fprintf(stderr, "Warning, time convertion failed!\n");
-      continue ;
-    }
+	/*     fprintf_tm(stdout, &tm); */
 
-/*     fprintf_tm(stdout, &tm); */
+	tv.tv_sec = mktime(&tm);
+	if (tv.tv_sec == last_time)
+	  tv.tv_usec += TVUSEC_INCREMENT;
+	else if (tv.tv_sec < last_time) {
+	  fprintf(stderr, "Warning, assuming year change at line %i (%i -> %i)!\n",
+		  line, 1900 + cur_year, 1901 + cur_year);
+	  cur_year++;
+	  memset(&tm, 0, sizeof (struct tm) );
+	  tm.tm_year = cur_year;
+	  retval = (char *)strptime(buffer, "%b %d %OH:%M:%S", &tm);
+	  if (retval == NULL) {
+	    fprintf(stderr, "Warning, time convertion failed!\n");
+	    continue ;
+	  }
+	  tv.tv_sec = mktime(&tm);
+	  tv.tv_usec = 0;
+	}
+	else
+	  tv.tv_usec = 0;
+	last_time = tv.tv_sec;
+	
+	period(periodctx, &tv);
+	phase(phasectx, &tv);
 
-    tv.tv_sec = mktime(&tm);
-    if (tv.tv_sec == last_time)
-      tv.tv_usec += TVUSEC_INCREMENT;
-    else if (tv.tv_sec < last_time) {
-      fprintf(stderr, "Warning, assuming year change at line %i (%i -> %i)!\n",
-              line, 1900 + cur_year, 1901 + cur_year);
-      cur_year++;
-      memset(&tm, 0, sizeof (struct tm) );
-      tm.tm_year = cur_year;
-      retval = (char *)strptime(buffer, "%b %d %OH:%M:%S", &tm);
-      if (retval == NULL) {
-        fprintf(stderr, "Warning, time convertion failed!\n");
-        continue ;
+	kl = kullback_leibler(periodctx);
+	if ((kl > periodctx->threshold)
+	    && !(periodctx->flags & 1)) {
+	  periodctx->flags |= 1;
+	  /*       fprintf(stderr, "ALARM '%s' (thres=%6.4f) from event %i ", */
+	  /*               periodctx->name, periodctx->threshold, line); */
+	  fprintf(stderr, "%i,", line);
+	  fflush(stderr);
+	}
+
+	if ((kl <= periodctx->threshold)
+	    && (periodctx->flags & 1)) {
+	  periodctx->flags &= ~1;
+	  /*       fprintf(stderr, "to %i\n", line); */
+	  fprintf(stderr, "%ip; ", line);
+	  fflush(stderr);
+	}
+
+
+	if (line > 0 && !(line % 1000)) {
+	  write_period_snapshot(periodctx);
+	  /*       printf("%6i %lu.%06lu %12.10f\n", line, tv.tv_sec, tv.tv_usec, kullback_leibler(periodctx)); */
+	  fprintf(kullback, "%6i %12.10f\n", line, kullback_leibler_time(periodctx));
+	}
       }
-      tv.tv_sec = mktime(&tm);
-      tv.tv_usec = 0;
+
+      write_phase_file(phasectx);
+      write_period_file(periodctx);
+      write_period_kullback_plot(periodctx);
+
+      fclose(kullback);
     }
-    else
-      tv.tv_usec = 0;
-    last_time = tv.tv_sec;
-
-    period(periodctx, &tv);
-    phase(phasectx, &tv);
-
-    kl = kullback_leibler(periodctx);
-    if ((kl > periodctx->threshold)
-        && !(periodctx->flags & 1)) {
-      periodctx->flags |= 1;
-/*       fprintf(stderr, "ALARM '%s' (thres=%6.4f) from event %i ", */
-/*               periodctx->name, periodctx->threshold, line); */
-      fprintf(stderr, "%i,", line);
-      fflush(stderr);
-    }
-
-    if ((kl <= periodctx->threshold)
-        && (periodctx->flags & 1)) {
-      periodctx->flags &= ~1;
-/*       fprintf(stderr, "to %i\n", line); */
-      fprintf(stderr, "%ip; ", line);
-      fflush(stderr);
-    }
-
-
-    if (line > 0 && !(line % 1000)) {
-      write_period_snapshot(periodctx);
-/*       printf("%6i %lu.%06lu %12.10f\n", line, tv.tv_sec, tv.tv_usec, kullback_leibler(periodctx)); */
-      fprintf(kullback, "%6i %12.10f\n", line, kullback_leibler_time(periodctx));
-    }
-  }
-
-  write_phase_file(phasectx);
-  write_period_file(periodctx);
-  write_period_kullback_plot(periodctx);
-
-  fclose(kullback);
 
 #if 0
   for ( ; ; ) {

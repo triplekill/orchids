@@ -465,9 +465,11 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
 	  // Write the report into the reports dir
 	  snprintf(buff, sizeof (buff), "%s/%s%08lx-%08lx%s",
 		   cfg->report_dir, "report-", ntph, ntpl, ".xml");
+	reopen:
 	  fp = fopen(buff, "w");
 	  if (fp==NULL)
 	    {
+	      if (errno==EINTR) goto reopen;
 	      DebugLog(DF_MOD, DS_ERROR, "Cannot open file '%s' for writing, %s.\n",
 		       buff, strerror(errno));
 	      STACK_DROP(ctx->ovm_stack, 1);

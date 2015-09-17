@@ -86,13 +86,13 @@ void db_small_table_check (int nfields, db_small_table *t)
     {
       fprintf (stderr, "db_small_table is empty: 0x%p.\n", t);
       fflush (stderr);
-      abort ();
+      exit(EXIT_FAILURE);
     }
   if (t->nfields!=nfields)
     {
       fprintf (stderr, "db_small_table: has %d fields, should have %d.\n", t->nfields, nfields);
       fflush (stderr);
-      abort ();
+      exit(EXIT_FAILURE);
     }
   for (tt=t; tt=t->next, tt!=NULL; t=tt)
     {
@@ -101,7 +101,7 @@ void db_small_table_check (int nfields, db_small_table *t)
 	  fprintf (stderr, "db_small_table: has %d fields, should have %d.\n",
 		   tt->nfields, nfields);
 	  fflush (stderr);
-	  abort ();
+	  exit(EXIT_FAILURE);
 	}
       cmp = db_tuple_cmp (nfields, t->tuple, tt->tuple);
       if (CMP_LESS(cmp))
@@ -111,7 +111,7 @@ void db_small_table_check (int nfields, db_small_table *t)
       else
 	fprintf (stderr, "db_small_table: ordered the wrong way: 0x%p.\n", t);
       fflush (stderr);
-      abort ();
+      exit(EXIT_FAILURE);
     }
 }
 
@@ -131,7 +131,7 @@ void db_map_check_small (int nfields, db_map *m)
 	  {
 	    fprintf (stderr, "db_map_check_small: wrong hash[%d]: 0x%p.\n", i, t);
 	    fflush (stderr);
-	    abort ();
+	    exit(EXIT_FAILURE);
 	  }
       }
 }
@@ -183,7 +183,7 @@ void db_map_check_large (int nfields, db_map *m,
 	    fprintf (stderr,
 		     "db_map_check_large: branch on too few tuples: 0x%p.\n", m);
 	    fflush (stderr);
-	    abort ();
+	    exit(EXIT_FAILURE);
 	  }
       }
     case T_DB_SINGLETON:
@@ -196,7 +196,7 @@ void db_map_check_large (int nfields, db_map *m,
 		fprintf (stderr,
 			 "db_map_check_large: hash[%d] on wrong branch: 0x%p.\n", i, m);
 		fflush (stderr);
-		abort ();
+		exit(EXIT_FAILURE);
 	      }	  
 	  }
 	newmask = mask-1;
@@ -207,7 +207,7 @@ void db_map_check_large (int nfields, db_map *m,
 		fprintf (stderr,
 			 "db_map_check_large: hash[%d] on wrong branch: 0x%p.\n", i, m);
 		fflush (stderr);
-		abort ();
+		exit(EXIT_FAILURE);
 	      }	  
 	  }
 	db_map_check_small (nfields, m);
@@ -215,7 +215,7 @@ void db_map_check_large (int nfields, db_map *m,
     default:
       fprintf (stderr, "db_map_check_large: wrong gc.type %d.\n", m->gc.type);
       fflush (stderr);
-      abort ();
+      exit(EXIT_FAILURE);
     }
 }
 

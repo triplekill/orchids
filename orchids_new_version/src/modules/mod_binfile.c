@@ -59,8 +59,11 @@ static int binfile_process_new_block(orchids_t *ctx, mod_entry_t *mod, binfile_t
   len = read (bf->fd, BSTR(val), BIN_BUFF_SIZE);
   if (len < 0)
     {
-      DebugLog (DF_MOD, DS_ERROR, "error while reading, errno=%d.\n", errno);
-      eof = 1;
+      if (errno!=EINTR)
+	{
+	  DebugLog (DF_MOD, DS_ERROR, "error while reading, errno=%d.\n", errno);
+	  eof = 1;
+	}
     }
   else if (len==0)
     eof = 1;
@@ -186,8 +189,11 @@ static int binsocket_callback(orchids_t *ctx, mod_entry_t *mod,
   len = read (f->fd, BSTR(val), BIN_BUFF_SIZE);
   if (len<0)
     {
-      DebugLog (DF_MOD, DS_ERROR, "error while reading, errno=%d.\n", errno);
-      res = -1;
+      if (errno!=EINTR)
+	{
+	  DebugLog (DF_MOD, DS_ERROR, "error while reading, errno=%d.\n", errno);
+	  res = -1;
+	}
     }
   else if (len==0) /* connection lost */
     {
@@ -380,9 +386,11 @@ static void add_input_binfile(orchids_t *ctx, mod_entry_t *mod, config_directive
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
+    reopen:
       fd = open(filepath, O_RDWR, 0); // not O_RDONLY, otherwise open() may block
       if (fd < 0)
 	{
+	  if (errno==EINTR) goto reopen;
 	  fprintf (stderr, "%s:%u: could not open pipe '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);
@@ -406,9 +414,11 @@ static void add_input_binfile(orchids_t *ctx, mod_entry_t *mod, config_directive
       STRLEN(f->file_name) = len;
       gc_add_root (ctx->gc_ctx, (gc_header_t **)&f->file_name);
 
+    reopen2:
       f->fd = open(filepath, O_RDONLY);
       if (f->fd < 0)
 	{
+	  if (errno==EINTR) goto reopen2;
 	  fprintf (stderr, "%s:%u: could not open file '%s' for reading\n",
 		   dir->file, dir->line, filepath);
 	  exit (EXIT_FAILURE);

@@ -84,8 +84,7 @@ lock_test(int fd, int type, off_t offset, int whence, off_t len)
 }
 
 
-void
-orchids_lock(const char *lockfile)
+void orchids_lock(const char *lockfile)
 {
   int fd;
   pid_t pid;
@@ -483,8 +482,9 @@ int orchids_save (orchids_t *ctx, char *name)
   tmpname[len] = '~';
   tmpname[len+1] = '\0';
   sctx.gc_ctx = ctx->gc_ctx;
+ reopen:
   sctx.f = fopen (tmpname, "w");
-  if (sctx.f==NULL) { err = errno; goto end; }
+  if (sctx.f==NULL) { if (errno==EINTR) goto reopen; err = errno; goto end; }
   sctx.fuzz = (unsigned long)random();
   if (fputs (save_magic, sctx.f) < 0) { err = errno; goto errlab; }
   /* Now save various sizes of integer types */
@@ -626,8 +626,9 @@ int orchids_restore (orchids_t *ctx, char *name)
   rctx.vm_func_tbl = NULL; /* for now */
   rctx.vm_func_tbl_sz = 0; /* for now */
   rctx.errs = 0;
+ reopen:
   rctx.f = fopen (name, "r");
-  if (rctx.f==NULL) { err = errno; goto end; }
+  if (rctx.f==NULL) { if (errno==EINTR) goto reopen; err = errno; goto end; }
   /* Check magic number */
   for (i=0; i<4; i++)
     {

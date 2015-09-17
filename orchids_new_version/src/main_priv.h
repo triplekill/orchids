@@ -3,8 +3,9 @@
  ** Private definitions for main.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
@@ -25,16 +26,14 @@
  * @param argc  The argument counter.
  * @param argv  The argument vector.
  **/
-static void
-parse_cmdline(orchids_t *ctx, int argc, char **argv);
+static void parse_cmdline(orchids_t *ctx, int argc, char **argv);
 
 
 /**
  * Display the usage page.
  * @param prg  The program name.
  **/
-static void
-orchids_usage(char *prg);
+static void orchids_usage(char *prg);
 
 /**
  * Daemonize the process.  This is done following the common BSD way:
@@ -47,20 +46,18 @@ orchids_usage(char *prg);
  *                      redirected (if NULL is given, "/dev/null" will
  *                      be used).
  */
-static void
-daemonize(const char *stdout_file, const char *stderr_file);
+static void daemonize(const char *stdout_file, const char *stderr_file);
 
 
 /**
  * The SIGCHLD signal handler.  This is a minimal process reaper for
  * fork()ed children.  Orchids does not fork() very often.  This signal
  * handler function was introduced for the mod_htmlstate html output
- * module, which fork Orchids to dump the Orchids state in background,
+ * module, which forks Orchids to dump the Orchids state in background,
  * trying to not interfere with the main detection process.
  * @param signo  The signal number.
  **/
-static void
-sig_chld(int signo);
+static void sig_chld(int signo, siginfo_t *si, void *uctxt);
 
 
 /**
@@ -69,16 +66,18 @@ sig_chld(int signo);
  * configuration), for security reasons.
  * @param username  The user to change to for runtime operation.
  **/
-static void
-change_run_id(char *username);
+static void change_run_id(char *username);
 
 #endif /* MAIN_PRIV_H */
 
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -80,7 +80,7 @@ static void rtaction_check_unique_data_1 (heap_t *rt, char *data, int limit)
     {
       fprintf (stderr, "non unique data 0x%p (count=%d)\n", data, n);
       fflush (stderr);
-      abort ();
+      exit(EXIT_FAILURE);
     }
 }
 
@@ -908,7 +908,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
 }
 
 /*
-** Copyright (c) 2014 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>

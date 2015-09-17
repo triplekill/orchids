@@ -3,8 +3,9 @@
  ** Main entry point for Orchids.
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup core
  **
  ** @date  Started on: Mon Jan 13 10:05:09 2003
@@ -28,7 +29,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
+#include <sys/ptrace.h>
 #include <pwd.h>
 #include <sys/types.h> /* for stat() */
 #include <limits.h> /* for PATH_MAX */
@@ -49,14 +50,91 @@
 
 #include "main_priv.h"
 
+sig_atomic_t signo_g = 0;
 
-static void
-sig_chld(int signo)
+static void sig_chld(int signo, siginfo_t *si, void *uctxt)
 {
-  while ( waitpid(-1, NULL, WNOHANG) > 0 )
+  while (waitpid(-1, NULL, WNOHANG) > 0)
     ;
 }
 
+static void sig_catchall(int signo, siginfo_t *si, void *uctxt)
+{
+  signo_g = signo;
+}
+
+static void install_signals(void)
+{
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(struct sigaction));
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = sig_chld;
+  sa.sa_flags = SA_SIGINFO;
+  /* We are not using the SA_RESTART flag here, although that
+     would be a good thing.  The issue is that some systems do
+     not have it.  Instead, we have to handle restarting
+     system calls that set errno to EINTR ourselves.  According to
+     'man sigaction' on Mac OS X 10.9.2, those
+     system calls are:
+     open(), read(), write(), sendto(), recvfrom(), sendmsg(), recvmsg(),
+     wait(), ioctl()
+     By experience, there is also select().
+     There should also be fopen(), fdopen().
+  */
+  if (sigaction(SIGCHLD, &sa, NULL) < 0)
+    {
+    errlab:
+      perror("sigaction()");
+      exit(EXIT_FAILURE);
+    }
+  sa.sa_sigaction = sig_catchall;
+  if (sigaction(SIGHUP, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGINT, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGQUIT, &sa, NULL) < 0) goto errlab;
+  /* SIGILL should do the default action: core dump */
+  if (sigaction(SIGTRAP, &sa, NULL) < 0) goto errlab;
+  /* SIGABRT should do the default action: core dump */
+  /* SIGEMT should do the default action: core dump */
+  /* SIGFPE should do the default action: core dump */
+  /* SIGKILL should do the default action: terminate process
+     (cannot be caught anyway) */
+  /* SIGBUS should do the default action: core dump */
+  /* SIGSEGV should do the default action: core dump */
+  /* SIGSYS should do the default action: core dump */
+  if (sigaction(SIGALRM, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGTERM, &sa, NULL) < 0) goto errlab;
+  /* SIGURG should do the default action: discard signal */
+  /* SIGSTOP should do the default action: stop process
+     (cannot be caught anyway) */
+  if (sigaction(SIGTSTP, &sa, NULL) < 0) goto errlab;
+  /* SIGCONT should do the default action: discard signal */
+  if (sigaction(SIGTTIN, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGTTOU, &sa, NULL) < 0) goto errlab;
+  /* SIGIO should do the default action: discard signal */
+  if (sigaction(SIGXCPU, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGXFSZ, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGVTALRM, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGPROF, &sa, NULL) < 0) goto errlab;
+  /* SIGWINCH should do the default action: discard signal */
+  /* SIGINFO should do the default action: discard signal */
+  if (sigaction(SIGUSR1, &sa, NULL) < 0) goto errlab;
+  if (sigaction(SIGUSR2, &sa, NULL) < 0) goto errlab;
+#ifdef SIGSTKFLT
+  /* SIGSTKFLT should do the default action (terminate?) */
+#endif
+#ifdef SIGPWR
+  /* SIGPWR should do the default action (discard signal?) */
+#endif
+#ifdef SIGSYS
+  /* SIGSYS should do the default action (terminate?) */
+#endif
+  sa.sa_handler = SIG_IGN;
+  sa.sa_flags = 0; /* unset SA_SIGINFO to install SIG_IGN. */
+  /* SIGPIPE should not do the default action (core dump),
+   but be ignored */
+  if (sigaction(SIGUSR2, &sa, NULL) < 0) goto errlab;
+}
 
 static void change_run_id(char *username)
 {
@@ -105,12 +183,12 @@ static int orchids_periodic_save (orchids_t *ctx, heap_entry_t *he)
  * @param argc argument counter
  * @param argv argument vector
  **/
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   orchids_t *ctx;
   int err;
 
+  //(void) ptrace (PT_DENY_ATTACH, 0, NULL, 0);
 #ifdef ORCHIDS_DEBUG
   debuglog_enable_all(); /* enable ALL messages in debug mode */
   libdebug_openlog("orchids",
@@ -125,8 +203,6 @@ main(int argc, char *argv[])
 
   DebugLog(DF_CORE, DS_NOTICE, "ORCHIDS -- starting\n");
 
-  Xsignal(SIGCHLD, sig_chld);
-
   ctx = new_orchids_context();
   parse_cmdline(ctx, argc, argv);
   if (ctx->verbose)
@@ -135,6 +211,7 @@ main(int argc, char *argv[])
       fflush (stdout);
     }
 
+  install_signals();
   if (ctx->daemon)
     daemonize(LOCALSTATEDIR "/orchids/log/orchids.stdout",
               LOCALSTATEDIR "/orchids/log/orchids.stderr");
@@ -327,16 +404,20 @@ daemonize(const char *stdout_file, const char *stderr_file)
   }
 
   close(STDOUT_FILENO);
+ again_stdout:
   stdout_fd = open(stdout_file,
                    O_CREAT | O_RDWR,
                    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+  if (errno==EINTR) goto again_stdout;
   dup2(stdout_fd, STDOUT_FILENO);
   close(stdout_fd);
 
   close(STDERR_FILENO);
+ again_stderr:
   stderr_fd = open(stderr_file,
                    O_CREAT | O_RDWR,
                    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+  if (errno==EINTR) goto again_stderr;
   dup2(stderr_fd, STDERR_FILENO);
   close(stderr_fd);
 }
@@ -345,8 +426,11 @@ daemonize(const char *stdout_file, const char *stderr_file)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

@@ -160,7 +160,9 @@ fopen_cached(const char *path)
   ret = stat(path, &stat_buf);
   if (ret) {
     if (errno == ENOENT) {
+    reopen:
       fp = fopen(path, "w");
+      if (fp==NULL && errno==EINTR) goto reopen;
 
       DebugLog(DF_CORE, DS_INFO, "cache MISS for \"%s\"\n", path);
 
