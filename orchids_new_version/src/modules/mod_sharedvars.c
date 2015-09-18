@@ -314,7 +314,7 @@ static int sharedvars_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
      (The usual way to add a new piece of data is through ovm_extern_t,
      not creating new type tags.)
   */
-  if (putc (T_NULL, sctx->f) < 0) return errno;
+  if (putc_unlocked (T_NULL, sctx->f) < 0) return errno;
   if (cfg->vars_hash==NULL)
     err = save_size_t (sctx, 0);
   else
@@ -340,7 +340,7 @@ static int sharedvars_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data
 
   GC_START (rctx->gc_ctx, 1);
   cfg = (sharedvars_config_t *)data;
-  err = getc (rctx->f);
+  err = getc_unlocked (rctx->f);
   if (err<0) goto end;
   if (err!=T_NULL) { err = -2; goto end; }
   err = restore_size_t (rctx, &n);

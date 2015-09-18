@@ -177,9 +177,13 @@ static int prelude_save (save_ctx_t *sctx, void *ptr)
   
   err = prelude_io_new (&pio);
   if (err) return err;
+  funlockfile (sctx->f); /* To avoid any problems, we first unlock
+			    the file, so that idmef_message_print()
+			    has access to it */
   prelude_io_set_file_io (pio, sctx->f);
   errno = 0;
   idmef_message_print (ptr, pio);
+  flockfile (sctx->f); /* and we re-lock it afterwards */
   if (errno) { err = errno; goto end; }
  end:
   prelude_io_destroy (pio);
@@ -195,9 +199,13 @@ static void *prelude_restore (restore_ctx_t *rctx)
 
   err = prelude_io_new (&pio);
   if (err) return err;
+  funlockfile (rctx->f); /* To avoid any problems, we first unlock
+			    the file, so that idmef_message_print()
+			    has access to it */
   prelude_io_set_file_io (pio, rctx->f);
   msg = NULL;
   err = prelude_msg_read (&msg, pio);
+  flockfile (sctx->f); /* and we re-lock it afterwards */
   if (err) goto end;
   err = idmef_message_new (&idmef);
   if (err) goto end_msg;

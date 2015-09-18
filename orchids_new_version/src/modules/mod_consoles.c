@@ -228,12 +228,14 @@ static int output_console_msg(char *console, char *msg, size_t len)
       return 0;
     }
   fp = con->fp;
+  flockfile (fp);
   for (i=0; i<len; i++)
     {
       c = msg[i];
-      putc (c, fp);
+      putc_unlocked (c, fp);
     }
-  putc ('\n', fp);
+  putc_unlocked ('\n', fp);
+  funlockfile (fp);
   fflush(fp);
   return 1;
 }

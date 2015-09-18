@@ -607,7 +607,7 @@ static int bstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=BSTRLEN(str), s=BSTR(str); i<n; i++)
     {
       c = s[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -631,7 +631,7 @@ static gc_header_t *bstr_restore (restore_ctx_t *rctx)
   bstr->len = sz;
   for (i=0, s=bstr->str; i<sz; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	{ err = c; goto errlab; }
       s[i] = c;
@@ -739,7 +739,7 @@ static int vbstr_save (save_ctx_t *sctx, gc_header_t *p)
   size_t i, n;
   int c, err;
 
-  /*  if (putc (TYPE(p), f) < 0) return errno;
+  /*  if (putc_unlocked (TYPE(p), f) < 0) return errno;
       // TYPE(p) will already have been saved.
       */
   err = save_size_t (sctx, VBSTRLEN(str));
@@ -747,7 +747,7 @@ static int vbstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=VBSTRLEN(str), s=VBSTR(str); i<n; i++)
     {
       c = s[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -780,7 +780,7 @@ static gc_header_t *vbstr_restore (restore_ctx_t *rctx)
   bstr->len = sz;
   for (i=0, s=bstr->str; i<sz; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	{ err = c; goto errlab; }
       s[i] = c;
@@ -878,7 +878,7 @@ static int str_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=STRLEN(str), s=STR(str); i<n; i++)
     {
       c = s[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -902,7 +902,7 @@ static gc_header_t *str_restore (restore_ctx_t *rctx)
   str->len = sz;
   for (i=0, s=str->str; i<sz; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	{ err = c; goto errlab; }
       s[i] = c;
@@ -1057,7 +1057,7 @@ static int vstr_save (save_ctx_t *sctx, gc_header_t *p)
   size_t i, n;
   int c, err;
 
-  /*  if (putc (TYPE(p), f) < 0) return errno;
+  /*  if (putc_unlocked (TYPE(p), f) < 0) return errno;
       // TYPE(p) will already have been saved.
       */
   err = save_size_t (sctx, VSTRLEN(str));
@@ -1065,7 +1065,7 @@ static int vstr_save (save_ctx_t *sctx, gc_header_t *p)
   for (i=0, n=VSTRLEN(str), s=VSTR(str); i<n; i++)
     {
       c = s[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -1097,7 +1097,7 @@ static gc_header_t *vstr_restore (restore_ctx_t *rctx)
   str->len = sz;
   for (i=0, s=str->str; i<sz; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	{ err = c; goto errlab; }
       s[i] = c;
@@ -1644,7 +1644,7 @@ static int ipv6_save (save_ctx_t *sctx, gc_header_t *p)
   for (i = 0 ; i < 16 ; i++)
     {
       c = (char)IPV6(addr).s6_addr[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -1663,7 +1663,7 @@ static gc_header_t *ipv6_restore (restore_ctx_t *rctx)
   addr->gc.type = T_IPV6;
   for (i=0; i<16; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	{ err = c; goto errlab; }
       IPV6(addr).s6_addr[i] = (unsigned char)c;
@@ -2697,6 +2697,7 @@ void fprintf_ovm_var(FILE *fp, ovm_var_t *val)
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
   char dst[INET6_ADDRSTRLEN];
+  int c;
 
   if (val==NULL)
     fprintf(fp, "(null)\n");
@@ -2710,34 +2711,48 @@ void fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	   fprintf(fp, "%lu", UINT(val));
 	   break;
 	 case T_BSTR:
+	   flockfile (fp);
 	   for (i = 0; i < BSTRLEN(val); i++) {
-	     if (isprint(BSTR(val)[i]))
-	       fprintf(fp, "%c", BSTR(val)[i]);
+	     c = BSTR(val)[i];
+	     if (isprint(c))
+	       putc_unlocked (c, fp);
 	     else
-	       fprintf(fp, ". ");
+	       putc_unlocked ('.', fp);
 	   }
+	   funlockfile (fp);
 	   break;
 	 case T_VBSTR:
+	   flockfile (fp);
 	   for (i = 0; i < VBSTRLEN(val); i++) {
-	     if (isprint(VBSTR(val)[i]))
-	       fprintf(fp, "%c", VBSTR(val)[i]);
+	     c = VBSTR(val)[i];
+	     if (isprint(c))
+	       putc_unlocked (c, fp);
 	     else
-	       fprintf(fp, ". ");
+	       putc_unlocked ('.', fp);
 	   }
+	   funlockfile (fp);
 	   break;
 	 case T_STR:
-	   for (i = 0; i < STRLEN(val); i++)
-	     if (isprint(BSTR(val)[i]))
-	       fprintf(fp, "%c", STR(val)[i]);
+	   flockfile (fp);
+	   for (i = 0; i < STRLEN(val); i++) {
+	     c = STR(val)[i];
+	     if (isprint(c))
+	       putc_unlocked (c, fp);
 	     else
-	       fprintf(fp, ". ");
+	       putc_unlocked ('.', fp);
+	   }
+	   funlockfile (fp);
 	   break;
 	 case T_VSTR:
-	   for (i = 0; i < VSTRLEN(val); i++)
-	     if (isprint(BSTR(val)[i]))
-	       fprintf(fp, "%c", VSTR(val)[i]);
+	   flockfile (fp);
+	   for (i = 0; i < VSTRLEN(val); i++) {
+	     c = VSTR(val)[i];
+	     if (isprint(c))
+	       putc_unlocked (c, fp);
 	     else
-	       fprintf(fp, ". ");
+	       putc_unlocked ('.', fp);
+	   }
+	   funlockfile (fp);
 	   break;
 	 case T_CTIME:
 	   strftime(asc_time, 32,
@@ -2820,6 +2835,7 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
   struct hostent *hptr; /* for IPV4ADDR */
   char **pptr; /* for IPV4ADDR */
   char dst[INET6_ADDRSTRLEN];
+  int c;
 
   if (val==NULL)
     fprintf (fp, "null\n");
@@ -2833,34 +2849,50 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
       break;
     case T_BSTR:
       fprintf(fp, "bstr[%zd]: \"", BSTRLEN(val));
+      flockfile (fp);
       for (i = 0; i < BSTRLEN(val); i++) {
-        if (isprint(BSTR(val)[i]))
-          fputc(BSTR(val)[i], fp);
+	c = BSTR(val)[i];
+        if (isprint(c))
+          putc_unlocked(c, fp);
         else
-          fputc('.', fp);
+          putc_unlocked('.', fp);
       }
+      funlockfile (fp);
       fputs("\"\n", fp);
       break;
     case T_VBSTR:
       fprintf(fp, "vbstr[%zd]: \"", VBSTRLEN(val));
+      flockfile (fp);
       for (i = 0; i < VBSTRLEN(val); i++) {
-        if (isprint(VBSTR(val)[i]))
-          fputc(VBSTR(val)[i], fp);
+	c = VBSTR(val)[i];
+        if (isprint(c))
+          putc_unlocked (c, fp);
         else
-          fputc('.', fp);
+          putc_unlocked ('.', fp);
       }
+      funlockfile (fp);
       fputs("\"\n", fp);
       break;
     case T_STR:
       fprintf(fp, "str[%zd]: \"", STRLEN(val));
+      flockfile (fp);
       for (i = 0; i < STRLEN(val); i++)
-        fputc(STR(val)[i], fp);
+	{
+	  c = STR(val)[i];
+	  putc_unlocked (c, fp);
+	}
+      funlockfile (fp);
       fputs("\"\n", fp);
       break;
     case T_VSTR:
       fprintf(fp, "vstr[%zd]: \"", VSTRLEN(val));
+      flockfile (fp);
       for (i = 0; i < VSTRLEN(val); i++)
-        fputc(VSTR(val)[i], fp);
+	{
+	  c = VSTR(val)[i];
+	  putc_unlocked (c, fp);
+	}
+      funlockfile (fp);
       fprintf(fp, "\"\n");
       break;
     case T_CTIME:
@@ -2969,6 +3001,7 @@ static void issdl_print_string (orchids_t *ctx, state_instance_t *state)
   ovm_var_t *param;
   char *s;
   size_t len, i;
+  int c;
 
   DebugLog(DF_OVM, DS_DEBUG, "issdl_print_string()\n");
   param = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
@@ -2985,8 +3018,13 @@ static void issdl_print_string (orchids_t *ctx, state_instance_t *state)
 	DebugLog(DF_OVM, DS_DEBUG, "parameter error\n");
 	break;
       }
+  flockfile (stdout);
   for (i = 0; i < len; i++)
-    fputc(s[i], stdout);
+    {
+      c = s[i];
+      putc_unlocked(c, stdout);
+    }
+  funlockfile (stdout);
   fflush (stdout);
   STACK_DROP(ctx->ovm_stack, 1);
   PUSH_RETURN_TRUE(ctx);
@@ -4084,11 +4122,13 @@ issdl_sendmail(orchids_t *ctx, state_instance_t *state)
     if (body_str)
       {
 	size_t i;
- 
+
+	flockfile (ftmp);
 	for (i=0; i<body_len; i++)
 	  {
-	    putc (body_str[i], ftmp);
+	    putc_unlocked (body_str[i], ftmp);
 	  }
+	funlockfile (ftmp);
       }
     rewind(ftmp);
     Xdup2(fileno(ftmp), fileno(stdin));
@@ -4218,11 +4258,13 @@ static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
   if (body_str)
     {
       size_t i;
- 
+
+      flockfile (ftmp);
       for (i=0; i<body_len; i++)
 	{
-	  putc (body_str[i], ftmp);
+	  putc_unlocked (body_str[i], ftmp);
 	}
+      funlockfile (ftmp);
     }
   /* report */
   fprintf(ftmp, "Report for rule %s, at state %s:\n\n", state->pid->rule->name,
@@ -5384,7 +5426,7 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
 
   if (p==NULL)
     {
-      if (putc (T_NOTHING, sctx->f) < 0)
+      if (putc_unlocked (T_NOTHING, sctx->f) < 0)
 	err = errno;
       else err = 0;
     }
@@ -5397,7 +5439,7 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
 					 flag, so that next time we see it,
 					 we shall enter the 'case GC_FLAGS_EST_SHARED'
 					 branch. */
-      if (putc (T_SHARED_DEF, sctx->f) < 0) { err = errno; goto end; }
+      if (putc_unlocked (T_SHARED_DEF, sctx->f) < 0) { err = errno; goto end; }
       /* compute unique identifier for pointer p;
 	 I assume an unsigned long will hold enough of the bits of p for that.
 	 We do not want to reveal too much of the memory layout, so we
@@ -5411,14 +5453,14 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
       /*FALLTHROUGH*/
     case GC_FLAGS_EST_SEEN: /* normal case: object is reachable, but not shared */
       c = TYPE(p);
-      if (putc (c, sctx->f) < 0) { err = errno; goto end; }
+      if (putc_unlocked (c, sctx->f) < 0) { err = errno; goto end; }
       gccl = gc_classes[c];
       if (gccl==NULL) { err = -2; goto end; }
       err = (*gccl->save) (sctx, p);
       break;
     case GC_FLAGS_EST_SHARED: /* this one is shared, but we have already saved
 				 it at a previous iteration */
-      if (putc (T_SHARED_USE, sctx->f) < 0) { err = errno; goto end; }
+      if (putc_unlocked (T_SHARED_USE, sctx->f) < 0) { err = errno; goto end; }
       id = ((unsigned long)p) ^ sctx->fuzz;
       err = save_ulong (sctx, id);
       break;
@@ -5439,7 +5481,7 @@ gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
   int c;
   gc_class_t *gccl;
 
-  c = getc (rctx->f);
+  c = getc_unlocked (rctx->f);
   if (c==EOF) { errno = c; return NULL; }
   if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL || gccl->restore==NULL)
     { errno = -2; return NULL; }

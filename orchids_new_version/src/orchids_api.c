@@ -177,7 +177,7 @@ static int field_record_table_save (save_ctx_t *sctx, gc_header_t *p)
 	  if (err) return err;
 	  err = save_string (sctx, rec->name);
 	  if (err) return err;
-	  if (putc ((int)rec->type->tag, f) < 0) { return errno; }
+	  if (putc_unlocked ((int)rec->type->tag, f) < 0) { return errno; }
 	  err = save_string (sctx, rec->type->name);
 	  if (err) return err;
 	  err = save_string (sctx, rec->desc);
@@ -233,7 +233,7 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
 	 error occurs; who cares. */
       if (err) goto errlab_freeentries;
       if (rec->name==NULL) { err = -2; goto errlab_freeentries; }
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF) { err = c; goto errlab_freename; }
       tag = (unsigned char)c;
       err = restore_string (rctx, &s);
@@ -485,16 +485,17 @@ int orchids_save (orchids_t *ctx, char *name)
  reopen:
   sctx.f = fopen (tmpname, "w");
   if (sctx.f==NULL) { if (errno==EINTR) goto reopen; err = errno; goto end; }
+  flockfile (sctx.f);
   sctx.fuzz = (unsigned long)random();
   if (fputs (save_magic, sctx.f) < 0) { err = errno; goto errlab; }
   /* Now save various sizes of integer types */
-  if (putc (sizeof(size_t), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(int), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(unsigned int), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(long), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(unsigned long), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(time_t), sctx.f) < 0) goto errlab;
-  if (putc (sizeof(double), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(size_t), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(int), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(unsigned int), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(long), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(unsigned long), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(time_t), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(double), sctx.f) < 0) goto errlab;
   /* Now we can save the version number (as a size_t) */
   err = save_size_t (&sctx, version);
   if (err) goto errlab;
@@ -536,6 +537,7 @@ int orchids_save (orchids_t *ctx, char *name)
 	  if (err) break;
 	}
     }
+  funlockfile (sctx.f);
   (void) fclose (sctx.f);
   if (err==0)
     err = rename (tmpname, name);
@@ -631,34 +633,35 @@ int orchids_restore (orchids_t *ctx, char *name)
  reopen:
   rctx.f = fopen (name, "r");
   if (rctx.f==NULL) { if (errno==EINTR) goto reopen; err = errno; goto end; }
+  flockfile (rctx.f);
   /* Check magic number */
   for (i=0; i<4; i++)
     {
-      c = getc (rctx.f);
+      c = getc_unlocked (rctx.f);
       if (c==EOF) { err = c; goto errlab; }
       if (c!=(int)(unsigned int)save_magic[i])
 	{ errno = -5; goto errlab; }
     }
   /* Check integer sizes */
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(size_t)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(int)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(unsigned int)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(long)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(unsigned long)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(time_t)) { errno = -9; goto errlab; }
-  c = getc (rctx.f);
+  c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
   if (c!=sizeof(double)) { errno = -9; goto errlab; }
   /* Now check version number */
@@ -688,7 +691,7 @@ int orchids_restore (orchids_t *ctx, char *name)
     { err = -8; ctx->thread_queue = NULL; goto errlab; }
   /* Now we look for modules requiring to be restored. */
   while (err==0)
-    switch (getc (rctx.f))
+    switch (getc_unlocked (rctx.f))
       {
       case EOF: goto errlab; /* we are done */
       case 'M': /* restore module data */
@@ -710,6 +713,7 @@ int orchids_restore (orchids_t *ctx, char *name)
     }
   if (rctx.shared_hash!=NULL)
     free_hash (rctx.shared_hash, NULL);
+  funlockfile (rctx.f);
   (void) fclose (rctx.f);
  end:
   GC_END (ctx->gc_ctx);

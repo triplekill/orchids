@@ -104,7 +104,10 @@ static int xml_save (save_ctx_t *sctx, void *ptr)
     return -2;
   err = save_string (sctx, doc->name);
   if (err) return err;
+  funlockfile (sctx->f); /* this is normally locked; to avoid problems,
+			    we unlock it before calling xmlDocDump() */
   err = xmlDocDump (sctx->f, doc);
+  flockfile (sctx->f); /* and we re-lock it */
   if (err) return err;
   xmlHashScan (xpath_ctx->nsHash, xml_hash_count_scanner, &n);
   err = save_size_t (sctx, n);
@@ -121,7 +124,7 @@ static int xml_restore_input_callback (void *context, char *buffer, int len)
 
   for (i=0; i<len; i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF) return c;
       buffer[i] = (char)c;
     }

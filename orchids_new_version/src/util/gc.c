@@ -563,7 +563,7 @@ int save_size_t (save_ctx_t *sctx, size_t sz)
   for (i=0; i<sizeof(size_t); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -577,7 +577,7 @@ int restore_size_t (restore_ctx_t *rctx, size_t *szp)
 
   for (i=0, sz=0; i<sizeof(size_t); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -595,7 +595,7 @@ int save_int (save_ctx_t *sctx, int sz)
   for (i=0; i<sizeof(int); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -609,7 +609,7 @@ int restore_int (restore_ctx_t *rctx, int *szp)
 
   for (i=0, sz=0; i<sizeof(int); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -627,7 +627,7 @@ int save_uint (save_ctx_t *sctx, unsigned int sz)
   for (i=0; i<sizeof(unsigned int); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -641,7 +641,7 @@ int restore_uint (restore_ctx_t *rctx, unsigned int *szp)
 
   for (i=0, sz=0; i<sizeof(unsigned int); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -659,7 +659,7 @@ int save_int32 (save_ctx_t *sctx, int32_t sz)
   for (i=0; i<sizeof(int32_t); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -673,7 +673,7 @@ int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
 
   for (i=0, sz=0; i<sizeof(int32_t); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -691,7 +691,7 @@ int save_uint32 (save_ctx_t *sctx, uint32_t sz)
   for (i=0; i<sizeof(uint32_t); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -705,7 +705,7 @@ int restore_uint32 (restore_ctx_t *rctx, uint32_t *szp)
 
   for (i=0, sz=0; i<sizeof(int32_t); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -723,7 +723,7 @@ int save_long (save_ctx_t *sctx, long sz)
   for (i=0; i<sizeof(long); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -737,7 +737,7 @@ int restore_long (restore_ctx_t *rctx, long *szp)
 
   for (i=0, sz=0; i<sizeof(long); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -755,7 +755,7 @@ int save_ulong (save_ctx_t *sctx, unsigned long sz)
   for (i=0; i<sizeof(unsigned long); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -769,7 +769,7 @@ int restore_ulong (restore_ctx_t *rctx, unsigned long *szp)
 
   for (i=0, sz=0; i<sizeof(unsigned long); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -787,7 +787,7 @@ int save_ctime (save_ctx_t *sctx, time_t sz)
   for (i=0; i<sizeof(time_t); i++)
     {
       c = sz & 0xff;
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
       sz >>= 8;
     }
   return 0;
@@ -801,7 +801,7 @@ int restore_ctime (restore_ctx_t *rctx, time_t *szp)
 
   for (i=0, sz=0; i<sizeof(time_t); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       sz >>= 8;
@@ -819,7 +819,7 @@ int save_double (save_ctx_t *sctx, double x)
   for (i=0; i<sizeof(double); i++)
     {
       c = ((char *)&x)[i];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -832,7 +832,7 @@ int restore_double (restore_ctx_t *rctx, double *xp)
   *xp = 0.0;
   for (i=0; i<sizeof(double); i++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF)
 	return c;
       ((char *)xp)[i] = c;
@@ -854,7 +854,7 @@ int save_string (save_ctx_t *sctx, char *s)
   for (j=0; j<m; j++)
     {
       c = s[j];
-      if (putc (c, f) < 0) return errno;
+      if (putc_unlocked (c, f) < 0) return errno;
     }
   return 0;
 }
@@ -875,7 +875,7 @@ int restore_string (restore_ctx_t *rctx, char **sp)
   s = gc_base_malloc (gc_ctx, m+1);
   for (j=0; j<m; j++)
     {
-      c = getc (f);
+      c = getc_unlocked (f);
       if (c==EOF) return c;
       s[j] = c;
     }

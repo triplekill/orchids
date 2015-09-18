@@ -276,7 +276,7 @@ int begin_save_module (save_ctx_t *sctx, char *modname, off_t *startpos)
 {
   int err;
 
-  if (putc ('M', sctx->f) < 0) return errno;
+  if (putc_unlocked ('M', sctx->f) < 0) return errno;
   err = save_string (sctx, modname);
   if (err) return err;
   err = save_size_t (sctx, 0); /* will be changed to a length field

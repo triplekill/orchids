@@ -980,12 +980,12 @@ static int node_expr_save (save_ctx_t *sctx, gc_header_t *p)
   stype = n->stype;
   if (stype==NULL)
     {
-      if (putc (T_NOTHING, f) < 0) { return errno; }
+      if (putc_unlocked (T_NOTHING, f) < 0) { return errno; }
       err = save_string (sctx, NULL);
     }
   else
     {
-      if (putc ((int)stype->tag, f) < 0) { return errno; }
+      if (putc_unlocked ((int)stype->tag, f) < 0) { return errno; }
       err = save_string (sctx, stype->name);
     }
   if (err) return err;
@@ -1014,7 +1014,7 @@ static int node_expr_restore (restore_ctx_t *rctx, node_expr_t *n)
   if (err) goto end;
   err = restore_ulong (rctx, &n->hash);
   if (err) goto end;
-  c = getc (f);
+  c = getc_unlocked (f);
   if (c==EOF) goto end;
   tag = (unsigned char)c;
   err = restore_string (rctx, &name);
@@ -4295,12 +4295,12 @@ static int type_heap_save_recursive (save_ctx_t *sctx, type_heap_t *h)
   stype = h->stype;
   if (stype==NULL)
     {
-      if (putc (T_NOTHING, sctx->f) < 0) { return errno; }
+      if (putc_unlocked (T_NOTHING, sctx->f) < 0) { return errno; }
       err = save_string (sctx, NULL);
     }
   else
     {
-      if (putc ((int)stype->tag, sctx->f) < 0) { return errno; }
+      if (putc_unlocked ((int)stype->tag, sctx->f) < 0) { return errno; }
       err = save_string (sctx, stype->name);
     }
   if (err) return err;
@@ -4350,7 +4350,7 @@ static gc_header_t *type_heap_restore (restore_ctx_t *rctx)
       e = (node_expr_t *)restore_gc_struct (rctx);
       GC_UPDATE (gc_ctx, 0, e);
       if (e==NULL && errno!=0) { h = NULL; goto end; }
-      c = getc (rctx->f);
+      c = getc_unlocked (rctx->f);
       if (c==EOF) { h = NULL; goto end; }
       tag = (unsigned char)c;
       err = restore_string (rctx, &typename);
@@ -9222,7 +9222,7 @@ fprintf_rule_environment(FILE *fp, orchids_t *ctx)
  **/
 static void fprintf_term_expr(FILE *fp, node_expr_t *expr)
 {
-  size_t i, n;
+  size_t i, n, c;
   char *s;
 
   switch (expr->type)
@@ -9249,8 +9249,13 @@ static void fprintf_term_expr(FILE *fp, node_expr_t *expr)
 	  s = VSTR(TERM_DATA(expr)); n = VSTRLEN(TERM_DATA(expr));
 	print_string:
 	  fprintf (fp, "push string \"");
+	  flockfile (fp);
 	  for (i=0; i<n; i++)
-	    fputc (*s++, fp);
+	    {
+	      c = *s++;
+	      putc_unlocked (c, fp);
+	    }
+	  funlockfile (fp);
 	  fprintf (fp, "\" (res_id %i)\n",
 		   TERM_RES_ID(expr));
           break;

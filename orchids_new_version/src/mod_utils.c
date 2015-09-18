@@ -102,8 +102,13 @@ void rtaction_print (heap_t *rt, int lmargin)
 {
   int i;
 
-  for (i=0; i<lmargin; i++)
-    fputc (' ', stderr);
+  if (lmargin>0)
+    {
+      flockfile (lmargin);
+      for (i=0; i<lmargin; i++)
+	fputc_unlocked (' ', stderr);
+      funlockfile (lmargin);
+    }
   if (rt==NULL)
     fputs ("- 0\n", stderr);
   else
@@ -417,7 +422,7 @@ int blox_save (save_ctx_t *sctx, blox_config_t *bcfg, int manage_sharing)
       for (j=0; j<m; j++)
 	{
 	  c = hook->tag[j];
-	  if (putc (c, sctx->f) < 0) { err = errno; goto end; }
+	  if (putc_unlocked (c, sctx->f) < 0) { err = errno; goto end; }
 	}
       err = save_size_t (sctx, hook->n_bytes);
       if (err) goto end;
@@ -463,7 +468,7 @@ int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
       tag = gc_base_malloc (rctx->gc_ctx, m);
       for (j=0; j<m; j++)
 	{
-	  c = getc (rctx->f);
+	  c = getc_unlocked (rctx->f);
 	  if (c==EOF)
 	    {
 	      err = c;

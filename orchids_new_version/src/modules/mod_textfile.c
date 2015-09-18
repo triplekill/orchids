@@ -675,7 +675,7 @@ static int textfile_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
       if (err) return err;
       err = save_size_t (sctx, tf->line);
       if (err) return err;
-      if (putc (tf->eof, sctx->f) < 0) return -1;
+      if (putc_unlocked (tf->eof, sctx->f) < 0) return -1;
       err = save_size_t (sctx, fpos);
       if (err) return err;
     }
@@ -703,7 +703,7 @@ static int textfile_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
       if (filename==NULL) return -2;
       err = restore_size_t (rctx, &lineno);
       if (err) { gc_base_free (filename); return err; }
-      eof = getc (rctx->f);
+      eof = getc_unlocked (rctx->f);
       if (eof<0) { gc_base_free (filename); return eof; }
       err = restore_size_t (rctx, &fpos);
       if (err) { gc_base_free (filename); return err; }

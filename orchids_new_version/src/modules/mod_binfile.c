@@ -534,7 +534,7 @@ static int binfile_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
 	 - STR(bf->file_name) is always NUL-terminated.
       */
       if (err) return err;
-      if (putc (bf->eof, sctx->f) < 0) return -1;
+      if (putc_unlocked (bf->eof, sctx->f) < 0) return -1;
       err = save_size_t (sctx, fpos);
       if (err) return err;
     }
@@ -559,7 +559,7 @@ static int binfile_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data)
       err = restore_string (rctx, &filename);
       if (err) return err;
       if (filename==NULL) return -2;
-      eof = getc (rctx->f);
+      eof = getc_unlocked (rctx->f);
       if (eof<0) { gc_base_free (filename); return eof; }
       err = restore_size_t (rctx, &fpos);
       if (err) { gc_base_free (filename); return err; }

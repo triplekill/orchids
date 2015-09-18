@@ -831,8 +831,12 @@ static void fprintf_file(FILE *fp, const char *filename)
   int c;
 
   in = Xfopen(filename, "r");
-  while ( (c = fgetc(in)) != EOF )
-    fputc(c, fp);
+  flockfile (in);
+  flockfile (fp);
+  while ( (c = fgetc_unlocked (in)) != EOF )
+    fputc_unlocked (c, fp);
+  funlockfile (fp);
+  funlockfile (in);
   Xfclose(in);
 }
 
@@ -1169,7 +1173,7 @@ void generate_html_report_cb(orchids_t	*ctx,
 }
 
 void fprint_html_s_len (FILE *fp, char *s, size_t len)
-{
+{ /* assumes fp is locked */
   size_t i;
   int c;
 
@@ -1179,22 +1183,54 @@ void fprint_html_s_len (FILE *fp, char *s, size_t len)
       if (isprint (c))
 	switch (c)
 	  {
-	  case '&': fputs ("&amp;", fp); break;
-	  case '"': fputs ("&quot;", fp); break;
-	  case '\'': fputs ("&apos;", fp); break;
-	  case '<': fputs ("&lt;", fp); break;
-	  case '>': fputs ("&gt;", fp); break;
+	  case '&':
+	    putc_unlocked ('&', fp);
+	    putc_unlocked ('a', fp);
+	    putc_unlocked ('m', fp);
+	    putc_unlocked ('p', fp);
+	    putc_unlocked (';', fp);
+	    break;
+	  case '"':
+	    putc_unlocked ('&', fp);
+	    putc_unlocked ('q', fp);
+	    putc_unlocked ('u', fp);
+	    putc_unlocked ('o', fp);
+	    putc_unlocked ('t', fp);
+	    putc_unlocked (';', fp);
+	    break;
+	  case '\'':
+	    putc_unlocked ('&', fp);
+	    putc_unlocked ('a', fp);
+	    putc_unlocked ('p', fp);
+	    putc_unlocked ('o', fp);
+	    putc_unlocked ('s', fp);
+	    putc_unlocked (';', fp);
+	    break;
+	  case '<':
+	    putc_unlocked ('&', fp);
+	    putc_unlocked ('l', fp);
+	    putc_unlocked ('t', fp);
+	    putc_unlocked (';', fp);
+	    break;
+	  case '>':
+	    putc_unlocked ('&', fp);
+	    putc_unlocked ('g', fp);
+	    putc_unlocked ('t', fp);
+	    putc_unlocked (';', fp);
+	    break;
 	  default:
-	    fputc (c, fp);
+	    putc_unlocked (c, fp);
 	    break;
 	  }
-      else fputc ('.', fp);
+      else putc_unlocked ('.', fp);
     }
 }
 
 void fprint_html_s (FILE *fp, char *s)
 {
+  flockfile (fp);
   fprint_html_s_len (fp, s, strlen(s));
+  funlockfile (fp);
 }
 
 void fprintf_html_var(FILE *fp, ovm_var_t *val) /* imitated from fprintf_ovm_var() in lang.c */
@@ -1217,22 +1253,30 @@ void fprintf_html_var(FILE *fp, ovm_var_t *val) /* imitated from fprintf_ovm_var
 	   break;
 	 case T_BSTR:
 	   fprintf (fp, "\"");
+	   flockfile (fp);
 	   fprint_html_s_len (fp, (char *)BSTR(val), BSTRLEN(val));
+	   funlockfile (fp);
 	   fprintf (fp, "\"");
 	   break;
 	 case T_VBSTR:
 	   fprintf (fp, "\"");
+	   flockfile (fp);
 	   fprint_html_s_len (fp, (char *)VBSTR(val), VBSTRLEN(val));
+	   funlockfile (fp);
 	   fprintf (fp, "\"");
 	   break;
 	 case T_STR:
 	   fprintf (fp, "\"");
+	   flockfile (fp);
 	   fprint_html_s_len (fp, STR(val), STRLEN(val));
+	   funlockfile (fp);
 	   fprintf (fp, "\"");
 	   break;
 	 case T_VSTR:
 	   fprintf (fp, "\"");
+	   flock_file (fp);
 	   fprint_html_s_len (fp, VSTR(val), VSTRLEN(val));
+	   funlock_file (fp);
 	   fprintf (fp, "\"");
 	   break;
 	 case T_CTIME:
