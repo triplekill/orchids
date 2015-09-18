@@ -173,6 +173,19 @@ if test "$orchids_debug" = "true" ; then
    CFLAGS="$CFLAGS -g"
 fi
 
+AC_ARG_ENABLE(profile,
+AS_HELP_STRING([--enable-gprof], [enable profiling (default is off)]),
+[case "${enableval}" in
+    yes) orchids_gprof=true ;;
+    no)  orchids_gprof=false ;;
+    *)   AC_MSG_ERROR(bad value ${enableval} for --enable-gprof) ;;
+esac],
+[orchids_gprof=false]
+)
+if test "$orchids_gprof" = "true" ; then
+   CFLAGS="$CFLAGS -pg"
+fi
+
 AC_ARG_ENABLE(pcre,
 AS_HELP_STRING([--enable-pcre], [enable pcre regex (default is off)]),
 [case "${enableval}" in
