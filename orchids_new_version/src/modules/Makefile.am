@@ -172,10 +172,20 @@ mod_openbsm_la_LDFLAGS = -module -avoid-version
 # gen_mod_openbsm: gen_mod_openbsm.c
 # 	$(CC) $< -o $$
 
-#mod_sql_la_SOURCES = mod_sql.c mod_sql.h
-#mod_sql_la_CFLAGS = -lsqlite3 -lmysqlclient -lz
-#mod_sql_la_LDFLAGS = -module -avoid-version
-#mod_sql_la_LIBADD = -lsqlite3 -lmysqlclient -lz
+# if HAVE_SQL
+# mod_sql_la_SOURCES = mod_sql.c mod_sql.h
+# mod_sql_la_LDFLAGS = -module -avoid-version
+# mod_sql_la_CFLAGS =
+# mod_sql_la_LIBADD = 
+# if HAVE_MYSQL
+# mod_sql_la_CFLAGS += $(LIBMYSQL_CFLAGS)
+# mod_sql_la_LIBADD += $(LIBMYSQL_LDFLAGS)
+# endif
+# if HAVE_SQLITE
+# mod_sql_la_LIBADD += $(SQLITE_LDFLAGS)
+# endif
+# pkglib_LTLIBRARIES += mod_sql.la
+# endif
 
 
 # End-of-file
