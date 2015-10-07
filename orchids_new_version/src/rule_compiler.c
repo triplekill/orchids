@@ -7786,7 +7786,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	  pid = restore_gc_struct (rctx);
 	  if (errno) { rule = NULL; goto end; }
 	  GC_UPDATE (gc_ctx, 2, pid);
-	  objhash_add (gc_ctx, rule->sync_lock, si, pid);
+	  objhash_add (gc_ctx, rule->sync_lock, pid, si);
 	}
     }
   /*

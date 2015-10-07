@@ -733,7 +733,7 @@ static mod_cfg_cmd_t textfile_dir[] =
   { "AddInputFile", add_input_textfile, "Add a text file as input source" },
   { "ProcessAll", textfile_set_process_all, "Process all lines from start" },
   { "ExitAfterProcessAll", textfile_setexit_process_all, "Exit after processing all files" },
-  { "SetPollPeriod", textfile_setpoll_period, "Set poll period in second for files" },
+  { "SetPollPeriod", textfile_setpoll_period, "Set poll period for files, in seconds" },
   { "INPUT", add_input_textfile, "Add a text file as input source" },
   { NULL, NULL }
 };

@@ -153,8 +153,7 @@ void gc_free_strhash(strhash_t *hash, void (*elmt_free)(void *e))
 }
 
 
-void
-strhash_resize(gc_t *gc_ctx, strhash_t *hash, size_t newsize)
+void strhash_resize(gc_t *gc_ctx, strhash_t *hash, size_t newsize)
 {
   strhash_elmt_t **old_htable;
   int i, n;
@@ -171,7 +170,7 @@ strhash_resize(gc_t *gc_ctx, strhash_t *hash, size_t newsize)
     for (tmp = old_htable[i]; tmp; tmp = tmp->next) {
       strhcode_t hcode;
 
-      hcode = hash->hash(tmp->key) % newsize;
+      hcode = (*hash->hash) (tmp->key) % newsize;
       tmp->next = hash->htable[hcode];
       hash->htable[hcode] = tmp;
     }
@@ -182,8 +181,7 @@ strhash_resize(gc_t *gc_ctx, strhash_t *hash, size_t newsize)
 }
 
 
-void
-strhash_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
+void strhash_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
 {
   strhash_elmt_t *elmt;
   strhcode_t hcode;
@@ -193,7 +191,7 @@ strhash_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
   elmt->key = key;
   elmt->data = data;
 
-  hcode = hash->hash(key) % hash->size;
+  hcode = (*hash->hash) (key) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -208,20 +206,19 @@ void gc_strhash_add(gc_t *ctx, strhash_t *hash, gc_header_t *data, char *key)
   elmt->key = key;
   GC_TOUCH (ctx, elmt->data = (void *)data);
 
-  hcode = hash->hash(key) % hash->size;
+  hcode = (*hash->hash) (key) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
 }
 
 
-void *
-strhash_check_and_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
+void *strhash_check_and_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
 {
   strhash_elmt_t *elmt;
   strhcode_t hcode;
 
-  elmt = hash->htable[hash->hash(key) % hash->size];
+  elmt = hash->htable[(*hash->hash) (key) % hash->size];
   for (; elmt; elmt = elmt->next) {
     if (!strcmp(key, elmt->key))
       return (elmt->data);
@@ -233,7 +230,7 @@ strhash_check_and_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
   elmt->key = key;
   elmt->data = data;
 
-  hcode = hash->hash(key) % hash->size;
+  hcode = (*hash->hash) (key) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -242,13 +239,12 @@ strhash_check_and_add(gc_t *gc_ctx, strhash_t *hash, void *data, char *key)
 }
 
 
-void *
-strhash_update(strhash_t *hash, void *new_data, char *key)
+void *strhash_update(strhash_t *hash, void *new_data, char *key)
 {
   strhash_elmt_t *elmt;
   void *old_data;
 
-  elmt = hash->htable[hash->hash(key) % hash->size];
+  elmt = hash->htable[(*hash->hash) (key) % hash->size];
   for (; elmt; elmt = elmt->next) {
     if (!strcmp(key, elmt->key)) {
       old_data = elmt->data;
@@ -262,13 +258,13 @@ strhash_update(strhash_t *hash, void *new_data, char *key)
 }
 
 
-void * gc_strhash_update_or_add(gc_t *gc_ctx, strhash_t *hash, void *new_data, char *key)
+void *gc_strhash_update_or_add(gc_t *gc_ctx, strhash_t *hash, void *new_data, char *key)
 {
   strhash_elmt_t *elmt;
   void *old_data;
   strhcode_t hcode;
 
-  elmt = hash->htable[hash->hash(key) % hash->size];
+  elmt = hash->htable[(*hash->hash) (key) % hash->size];
   for (; elmt; elmt = elmt->next) {
     if (!strcmp(key, elmt->key)) {
       old_data = elmt->data;
@@ -282,7 +278,7 @@ void * gc_strhash_update_or_add(gc_t *gc_ctx, strhash_t *hash, void *new_data, c
   elmt->key = key;
   elmt->data = new_data;
 
-  hcode = hash->hash(key) % hash->size;
+  hcode = (*hash->hash) (key) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -291,7 +287,7 @@ void * gc_strhash_update_or_add(gc_t *gc_ctx, strhash_t *hash, void *new_data, c
 }
 
 
-void * strhash_del(strhash_t *hash, char *key)
+void *strhash_del(strhash_t *hash, char *key)
 {
   strhash_elmt_t **head;
   strhash_elmt_t  *elmt;
@@ -299,7 +295,7 @@ void * strhash_del(strhash_t *hash, char *key)
   void            *data;
 
   prev = NULL;
-  head = &hash->htable[hash->hash(key) % hash->size];
+  head = &hash->htable[(*hash->hash) (key) % hash->size];
   for (elmt = *head; elmt; elmt = elmt->next) {
     if (!strcmp(key, elmt->key)) {
       data = elmt->data;
@@ -317,7 +313,7 @@ void * strhash_del(strhash_t *hash, char *key)
   return (NULL);
 }
 
-void * gc_strhash_del(strhash_t *hash, char *key)
+void *gc_strhash_del(strhash_t *hash, char *key)
 {
   strhash_elmt_t **head;
   strhash_elmt_t  *elmt;
@@ -325,7 +321,7 @@ void * gc_strhash_del(strhash_t *hash, char *key)
   void            *data;
 
   prev = NULL;
-  head = &hash->htable[hash->hash(key) % hash->size];
+  head = &hash->htable[(*hash->hash) (key) % hash->size];
   for (elmt = *head; elmt; elmt = elmt->next) {
     if (!strcmp(key, elmt->key)) {
       data = elmt->data;
@@ -345,8 +341,7 @@ void * gc_strhash_del(strhash_t *hash, char *key)
 }
 
 
-void *
-strhash_get(strhash_t *hash, char *key)
+void *strhash_get(strhash_t *hash, char *key)
 {
   strhash_elmt_t *elmt;
 

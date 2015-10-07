@@ -833,8 +833,8 @@ static void fprintf_file(FILE *fp, const char *filename)
   in = Xfopen(filename, "r");
   flockfile (in);
   flockfile (fp);
-  while ( (c = fgetc_unlocked (in)) != EOF )
-    fputc_unlocked (c, fp);
+  while ( (c = getc_unlocked (in)) != EOF )
+    putc_unlocked (c, fp);
   funlockfile (fp);
   funlockfile (in);
   Xfclose(in);
@@ -1274,9 +1274,9 @@ void fprintf_html_var(FILE *fp, ovm_var_t *val) /* imitated from fprintf_ovm_var
 	   break;
 	 case T_VSTR:
 	   fprintf (fp, "\"");
-	   flock_file (fp);
+	   flockfile (fp);
 	   fprint_html_s_len (fp, VSTR(val), VSTRLEN(val));
-	   funlock_file (fp);
+	   funlockfile (fp);
 	   fprintf (fp, "\"");
 	   break;
 	 case T_CTIME:

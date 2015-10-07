@@ -11,7 +11,7 @@
 #
 #  # The default behavior is to process all data in files, at startup.
   ProcessAll 1
-#  # Stop orchids after processing all files. Usefull for benchmarks
+#  # Stop orchids after processing all files. Useful for benchmarks
 # ExitAfterProcessAll 1
 #
 </module>

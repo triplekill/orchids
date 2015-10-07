@@ -630,7 +630,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 		{ /* declare si->pid to be the new synchronization group */
 		  objhash_del (lock_table, si);
 		  GC_TOUCH (gc_ctx, si->pid);
-		  objhash_add (gc_ctx, lock_table, si, si->pid);
+		  objhash_add (gc_ctx, lock_table, si->pid, si);
 		}
 	      else
 		{ /* join the synchronization group */
@@ -644,7 +644,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	  else
 	    { /* create a lock. */
 	      GC_TOUCH (gc_ctx, si->pid);
-	      objhash_add (gc_ctx, lock_table, si, si->pid);
+	      objhash_add (gc_ctx, lock_table, si->pid, si);
 	    }
 	}
     }

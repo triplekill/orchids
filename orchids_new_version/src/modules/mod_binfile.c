@@ -589,7 +589,7 @@ static mod_cfg_cmd_t binfile_dir[] =
   { "AddInputFile", add_input_binfile, "Add a binary file as input source" },
   { "ProcessAll", binfile_set_process_all, "Process all lines from start" },
   { "ExitAfterProcessAll", binfile_set_exit_process_all, "Exit after processing all files" },
-  { "SetPollPeriod", binfile_set_poll_period, "Set poll period in second for files" },
+  { "SetPollPeriod", binfile_set_poll_period, "Set poll period for files, in seconds" },
   { "INPUT", add_input_binfile, "Add a binary file as input source" },
   { NULL, NULL }
 };

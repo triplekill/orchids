@@ -64,7 +64,7 @@ void objhash_resize(gc_t *ctx, objhash_t *hash, size_t newsize)
         {
           unsigned long hcode;
 
-          hcode = hash->hash(tmp->key) % newsize;
+          hcode = (*hash->hash) (tmp->key) % newsize;
           tmp->next = hash->htable[hcode];
           hash->htable[hcode] = tmp;
         }
@@ -104,7 +104,7 @@ void objhash_add(gc_t *ctx, objhash_t *hash, void *data, void *key)
   GC_TOUCH (ctx, elmt->key = key);
   GC_TOUCH (ctx, elmt->data = data);
 
-  hcode = hash->hash(key) % hash->size;
+  hcode = (*hash->hash) (key) % hash->size;
   elmt->next = hash->htable[hcode];
   hash->htable[hcode] = elmt;
   hash->elmts++;
@@ -118,7 +118,7 @@ void *objhash_del(objhash_t *hash, void *key)
   void            *data;
 
   prev = NULL;
-  head = &hash->htable[hash->hash(key) % hash->size];
+  head = &hash->htable[(*hash->hash) (key) % hash->size];
   for (elmt = *head; elmt; elmt = elmt->next) {
     if (!hash->cmp(key, elmt->key)) {
       data = elmt->data;
@@ -141,7 +141,7 @@ void *objhash_get(objhash_t *hash, void *key)
 {
   objhash_elmt_t *elmt;
 
-  elmt = hash->htable[hash->hash(key) % hash->size];
+  elmt = hash->htable[(*hash->hash) (key) % hash->size];
   for (; elmt; elmt = elmt->next) {
       if (!hash->cmp(key, elmt->key))
         return elmt->data;
