@@ -12,4 +12,4 @@ install-data-hook:
 #	-rm $(DESTDIR)$(localstatedir)/run/orchids/void_source
 #	-mknod $(DESTDIR)$(localstatedir)/run/orchids/void_source p
 	mkdir -p $(DESTDIR)$(localstatedir)/orchids/save
-	-chown -R $(ORCHIDS_RUNTIME_USER) $(DESTDIR)$(localstatedir)/orchids $(DESTDIR)$(localstatedir)/run/orchids
+	-chown -R $(ORCHIDS_RUNTIME_USER) $(DESTDIR)$(localstatedir)/orchids $(DESTDIR)$(localstatedir)/orchids/save $(DESTDIR)$(localstatedir)/run/orchids
