@@ -306,45 +306,13 @@ if test "$CPP" != "" ; then
 fi
 ])
 
-dnl AC_DEFUN([AC_CHECK_LIBMYSQL],
-dnl [
-dnl AC_PATH_PROG(LIBMYSQL_CONFIG, mysql_config)
-dnl AC_CHECK_HEADERS(mysql/mysql.h)
-dnl if test "$LIBMYSQL_CONFIG" != "" \
-dnl   -a "ac_cv_header_mysql_mysql_h" = "yes" ; then
-dnl     AC_DEFINE([HAVE_MYSQL], 1 , [Set to 1 if libmysql is present])
-dnl     have_mysql=true
-dnl     LIBMYSQL_LDFLAGS=$($LIBMYSQL_CONFIG --libs)
-dnl     LIBMYSQL_CFLAGS=$($LIBMYSQL_CONFIG --cflags)
-dnl     AC_SUBST(LIBMYSQL_LDFLAGS)
-dnl     AC_SUBST(LIBMYSQL_CFLAGS)
-dnl else
-dnl     have_mysql=false
-dnl fi
-dnl AM_CONDITIONAL(HAVE_MYSQL, [test x$have_mysql = xtrue])
-dnl ])
-dnl 
-dnl AC_DEFUN([AC_CHECK_SQLITE],
-dnl [
-dnl AC_CHECK_HEADERS(sqlite3.h)
-dnl if test "ac_cv_header_sqlite3_h" = "yes" ; then
-dnl     AC_DEFINE([HAVE_SQLITE], 1 , [Set to 1 if sqlite3 is present])
-dnl     have_sqlite=true
-dnl     SQLITE_LDFLAGS=$(-lsqlite3)
-dnl     AC_SUBST(SQLITE_LDFLAGS)
-dnl else
-dnl     have_sqlite=false
-dnl fi
-dnl AM_CONDITIONAL(HAVE_SQLITE, [test x$have_sqlite = xtrue])
-dnl ])
-
 AC_DEFUN([AC_CHECK_SQL],
 [
 have_sql=false
 AC_PATH_PROG(LIBMYSQL_CONFIG, mysql_config)
 AC_CHECK_HEADERS(mysql/mysql.h)
 if test "$LIBMYSQL_CONFIG" != "" \
-  -a "ac_cv_header_mysql_mysql_h" = "yes" ; then
+  -a "$ac_cv_header_mysql_mysql_h" = "yes" ; then
     AC_DEFINE([HAVE_MYSQL], 1 , [Set to 1 if libmysql is present])
     AC_DEFINE([HAVE_SQL], 1 , [Set to 1 if a SQL library is present])
     have_mysql=true
@@ -357,12 +325,12 @@ else
     have_mysql=false
 fi
 AC_CHECK_HEADERS(sqlite3.h)
-if test "ac_cv_header_sqlite3_h" = "yes" ; then
+if test "$ac_cv_header_sqlite3_h" = "yes" ; then
     AC_DEFINE([HAVE_SQLITE], 1 , [Set to 1 if sqlite3 is present])
     AC_DEFINE([HAVE_SQL], 1 , [Set to 1 if a SQL library is present])
     have_sqlite=true
     have_sql=true
-    SQLITE_LDFLAGS=$(-lsqlite3)
+    SQLITE_LDFLAGS=-lsqlite3
     AC_SUBST(SQLITE_LDFLAGS)
 else
     have_sqlite=false
