@@ -621,12 +621,15 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	    { /* some pid sync_lock (with the same rule) already holds the lock;
 		 then we redirect our pid to be sync_lock;
 		 this is rule (7), p.22 in the spec */
+	      if (sync_lock==si->pid) /* Oh, it might just be us; in that case,
+					 don't do anything */
+		;
 	      /* As an exception, it may be that sync_lock is a group
 		 of threads that have been killed (typically because we
 		 just entered a STATE_COMMIT state), in which case we do
 		 not join that group, instead we declare the synchronization
 		 group to be our own group---with should not be killed. */
-	      if (sync_lock->flags & THREAD_KILL)
+	      else if (sync_lock->flags & THREAD_KILL)
 		{ /* declare si->pid to be the new synchronization group */
 		  objhash_del (lock_table, si);
 		  GC_TOUCH (gc_ctx, si->pid);
