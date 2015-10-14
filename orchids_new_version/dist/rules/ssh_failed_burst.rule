@@ -77,6 +77,8 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   {
     print_string ("Alert: Burst ==> More than ");
     print_string (str_from_uint (THRESH));
+    print_string (". Count=");
+    print_string (str_from_uint ($count));
     print_string (". Source : ");
     print_string (str_from_ipv4($source));
     print_string (". Burst started at ");

@@ -656,7 +656,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
     for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
       {
 	if (trans->eval_code==NULL ||
-	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
+	    ovm_exec_trans_cond (ctx, si, trans->eval_code)>0)
 	  {
 	    si->q = trans->dest;
 	    enter_state_and_follow_epsilon_transitions (ctx, si, tq, only_once);
@@ -669,7 +669,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	   and flag only_once is set: create temporary fresh state_instance and try to match
 	   transition; then cleanup the fresh state_instance, since it is not enqueued */
 	if (trans->eval_code==NULL ||
-	    ovm_exec_expr (ctx, si, trans->eval_code)==0)
+	    ovm_exec_trans_cond (ctx, si, trans->eval_code)>0)
 	  {
 	    newsi = create_state_instance (ctx, si->pid, trans->dest, trans, si->env, si->nhandles);
 	    GC_UPDATE (gc_ctx, 0, newsi);

@@ -1532,11 +1532,14 @@ type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
  ** @param s         State instance for the execution context.
  ** @param bytecode  Byte code to execute.
  **
- ** @return  0 if expr is true (= non-zero T_INT), error code otherwise
+ ** @return  value computed (bytecode must return an object of type T_INT)
  **/
-int ovm_exec_expr (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
 
 int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
+#ifdef OBSOLETE
+int ovm_exec_expr (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode);
+#endif
+
 /**
  ** Orchids virtual machine entry point.
  **

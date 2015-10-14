@@ -5341,7 +5341,7 @@ static gc_header_t *shared_use_restore (restore_ctx_t *rctx)
   int err;
 
   err = restore_ulong (rctx, &id);
-  if (err) { errno = err; return NULL; }
+  if (err) { errno = err; return NULL; }
   p = hash_get (rctx->shared_hash, &id, sizeof(unsigned long));
   if (p==NULL) { errno = -2; }
   return p;

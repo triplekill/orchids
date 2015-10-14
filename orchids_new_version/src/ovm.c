@@ -66,6 +66,7 @@ void ovm_exec_stmt(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
   ovm_flush(ctx);
 }
 
+#ifdef OBSOLETE
 int ovm_exec_expr(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
 {
   ovm_var_t *res;
@@ -74,10 +75,11 @@ int ovm_exec_expr(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
   res = POP_VALUE(ctx);
   ovm_flush(ctx);
   if ((!(IS_NULL(res))) && TYPE(res) == T_INT)
-    return (!(INT(res)));
+    return INT(res);
   else
-    return 1;
+    return 0;
 }
+#endif
 
 int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
 {
@@ -86,7 +88,7 @@ int ovm_exec_trans_cond (orchids_t *ctx, state_instance_t *s, bytecode_t *byteco
   ovm_exec_base(ctx, s, bytecode);
   res = POP_VALUE(ctx); /* res is guaranteed to be a T_INT */
   ovm_flush(ctx);
-  return INT(res);
+  return (IS_NULL(res))?0:INT(res);
 }
 
 int review_bytecode(bytecode_t *bytecode, size_t length,
