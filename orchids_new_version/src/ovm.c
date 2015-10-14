@@ -450,7 +450,7 @@ static int ovm_push(isn_param_t *param)
   bytecode_t op = param->ip[1];
 
   DebugLog(DF_OVM, DS_DEBUG,
-           "OP_PUSH [%02lx] ($%s)\n",
+           "OP_PUSH [%02lx] (%s)\n",
             op, state->q->rule->var_name[op]);
 
   res = ovm_read_value (state->env, op);
@@ -468,7 +468,7 @@ static int ovm_pop(isn_param_t *param)
   orchids_t *ctx = param->ctx;
   gc_t *gc_ctx = ctx->gc_ctx;
 
-  DebugLog(DF_OVM, DS_DEBUG, "OP_POP [%02lx] ($%s)\n",
+  DebugLog(DF_OVM, DS_DEBUG, "OP_POP [%02lx] (%s)\n",
             op, state->q->rule->var_name[op]);
   val = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   env = ovm_write_value (gc_ctx, state->env, op, val);
