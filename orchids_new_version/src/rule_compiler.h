@@ -377,6 +377,7 @@ struct node_trans_s
   node_state_t *sub_state_dest;
   unsigned long an_flags;
 #define AN_NONEXISTENT_TARGET_ALREADY_SAID 0x01
+#define AN_TRANS_NO_WAIT 0x02
 };
 
 

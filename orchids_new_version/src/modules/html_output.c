@@ -112,6 +112,7 @@ int rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he)
            "HTML cache cleanup...\n");
 
   html_output_cache_cleanup(he->data);
+  gettimeofday(&he->date, NULL);
   he->date.tv_sec += 60; /* XXX: use a customizable parameter */
   register_rtaction(ctx, he);
   return 0;
@@ -124,6 +125,7 @@ int rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he)
            "HTML periodic regeneration...\n");
 
   html_output(ctx, he->data);
+  gettimeofday(&he->date, NULL);
   he->date.tv_sec += 20; /* XXX: use a customizable parameter */
   register_rtaction(ctx, he);
   return 0;

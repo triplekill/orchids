@@ -287,6 +287,7 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
 	  break;
 	}
     }
+  gettimeofday(&he->date, NULL);
   he->date.tv_sec += prelude_data->poll_period;
   register_rtaction(ctx, he);
   return 0;

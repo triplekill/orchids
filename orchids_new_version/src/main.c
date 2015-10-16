@@ -169,6 +169,7 @@ static int orchids_periodic_save (orchids_t *ctx, heap_entry_t *he)
   timeval_t next;
   
   (void) orchids_save (ctx, ctx->save_file);
+  gettimeofday(&he->date, NULL);
   Timer_Add (&next, &he->date, &ctx->save_interval);
   he->date = next;
   register_rtaction (ctx, he);

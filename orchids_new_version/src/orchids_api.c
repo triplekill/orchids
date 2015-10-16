@@ -473,7 +473,7 @@ int orchids_save (orchids_t *ctx, char *name)
   size_t len;
   char *tmpname;
   int err = 0;
-  size_t version = 2;
+  size_t version = 3;
 
   errno = 0;
   len = strlen (name);
@@ -566,16 +566,17 @@ issdl_function_t *restore_func_tbl (restore_ctx_t *rctx, int32_t *nfuncs_sz)
 	errlab1:
 	  errno = err;
 	errlab2:
-	  while (--i>=0)
-	    gc_base_free (functbl[i].name);
+	  if (i!=0)
+	    while (--i>=0)
+	      gc_base_free (functbl[i].name);
 	  gc_base_free (functbl);
 	  return NULL;
 	}
       if (functbl[i].name==NULL) { errno = -2; goto errlab2; }
       err = restore_int32 (rctx, &functbl[i].args_nb);
-      if (err) goto errlab1;
+      if (err) { i++; goto errlab1; }
       err = restore_int32 (rctx, &functbl[i].id);
-      if (err) goto errlab1;
+      if (err) { i++; goto errlab1; }
     }
   *nfuncs_sz = nfuncs;
   return functbl;
@@ -667,7 +668,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   /* Now check version number */
   err = restore_size_t (&rctx, &version);
   if (err) goto errlab;
-  if (version!=2) { errno = -6; goto errlab; }
+  if (version!=3) { errno = -6; goto errlab; }
   rctx.version = version;
   rctx.externs = ctx->xclasses;
   rctx.rule_compiler = ctx->rule_compiler;

@@ -63,8 +63,18 @@ struct edge_info_s {
 struct complexity_graph_s {
   vertex_t n; /* number of nodes */
   vertex_t nmax; /* number of allocated nodes until now */
+  vertex_t first_bad; /* will be filled in by sg_compute_sccs(), and will contain either
+			 ULONG_MAX or the first found bad vertex in a non-trivial scc
+			 (causing exponential behavior). */
   vertex_info_t *nodes; /* table of n vertices */
 };
+
+#define CG_TYPE(g,v) (g)->nodes[v].type
+#define CG_LABEL(g,v) (g)->nodes[v].label
+#define CG_DEGREE(g,v) cg_degree(g,v)
+#define CG_DATA(g,v) (g)->nodes[v].data
+#define CG_SCC_ROOT(g,v) (g)->nodes[v].scc_root
+#define CG_NEXT(g,v) (g)->nodes[v].next_on_stack
 
 complexity_graph_t *new_complexity_graph (gc_t *gc_ctx);
 void free_complexity_graph (complexity_graph_t *g);

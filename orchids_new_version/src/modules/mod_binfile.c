@@ -148,6 +148,7 @@ static int binsocket_try_reconnect(orchids_t *ctx, heap_entry_t *he)
       DebugLog(DF_MOD, DS_DEBUG,
 	       "binsocket_try_reconnect: cannot recreate socket, errno=%d.\n",
 	       errno);
+      gettimeofday(&he->date, NULL);
       he->date.tv_sec += 5; // XXX hard-coded: 5 seconds into the future
       register_rtaction(ctx, he);
       return 1;
@@ -163,6 +164,7 @@ static int binsocket_try_reconnect(orchids_t *ctx, heap_entry_t *he)
        DebugLog(DF_MOD, DS_DEBUG,
 		"binsocket_try_reconnect: cannot connect, errno=%d.\n",
 		errno);
+       gettimeofday(&he->date, NULL);
        he->date.tv_sec += 1; // XXX hard-coded: 1 second into the future
        register_rtaction(ctx, he);
        return 2;

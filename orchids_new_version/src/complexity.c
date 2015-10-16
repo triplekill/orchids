@@ -37,6 +37,7 @@ complexity_graph_t *new_complexity_graph (gc_t *gc_ctx)
   g = gc_base_malloc (gc_ctx, sizeof(complexity_graph_t));
   g->n = 0;
   g->nmax = NMAX_INITIAL;
+  g->first_bad = ULONG_MAX;
   g->nodes = nodes;
   return g;
 }
@@ -288,6 +289,8 @@ static void cg_compute_sccs_from_root_rec (complexity_graph_t *g, vertex_t root,
 	    if (cg_bad_vertex (g, w))
 	      {
 		vi->degree = ULONG_MAX; /* exponential behavior */
+		if (g->first_bad==ULONG_MAX)
+		  g->first_bad = w;
 		break;
 	      }
 	    n = wi->n;

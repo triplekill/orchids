@@ -36,6 +36,7 @@
 #include <time.h>
 #include <errno.h>
 #include <ctype.h>
+#include <limits.h>
 
 /* for inet_addr() */
 #include <sys/socket.h>
@@ -50,6 +51,7 @@
 #include "issdl.tab.h"
 #include "ovm.h"
 #include "db.h"
+#include "complexity.h"
 
 static unsigned long bigprime =
   (sizeof(unsigned long)>=8)?5174544934365344191L: /* 63 bit prime */
@@ -1982,9 +1984,7 @@ static node_state_t *trans_dest_state (rule_compiler_t *ctx, node_trans_t *trans
 	{
 	  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
 	  if (trans->file!=NULL)
-	    fprintf (stderr, "%s:", STR(trans->file));
-	  /* printing STR(trans->file) is legal, since it
-	     was created NUL-terminated, on purpose */
+	    fprintf (stderr, "%s:", trans->file);
 	  fprintf (stderr, "%u: error: unresolved state name %s\n",
 		   trans->lineno, trans->dest);
 	  ctx->nerrors++;
@@ -3706,6 +3706,388 @@ monotony m_random_thrash (rule_compiler_t *ctx, node_expr_t *e, monotony m[])
   return MONO_UNKNOWN | MONO_THRASH;
 }
 
+static void mark_no_wait_transitions_state (rule_compiler_t *ctx, node_state_t *state)
+{
+  node_expr_t *l;
+  node_trans_t *trans;
+  node_state_t *s;
+
+  if (state->flags & STATE_EPSILON) /* no transition out of an epsilon state has to wait */
+    for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+      {
+	trans = (node_trans_t *)BIN_LVAL(l);
+	if (trans==NULL)
+	  continue;
+	trans->an_flags |= AN_TRANS_NO_WAIT;
+	s = trans->sub_state_dest;
+	if (s!=NULL)
+	  mark_no_wait_transitions_state (ctx, s);
+      }
+  else for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+      {
+	trans = (node_trans_t *)BIN_LVAL(l);
+	if (trans==NULL)
+	  continue;
+	if (trans_no_wait_needed (ctx, trans))
+	  trans->an_flags |= AN_TRANS_NO_WAIT;
+	s = trans->sub_state_dest;
+	if (s!=NULL)
+	  mark_no_wait_transitions_state (ctx, s);
+      }
+}
+
+static void mark_no_wait_transitions (rule_compiler_t *ctx, node_rule_t *rule)
+{ /* must be called after check_var_usage(), which sets the
+     AN_MUSTSET_REACHABLE flags of each state */
+  node_expr_t *l;
+  node_state_t *state;
+
+  state = (node_state_t *)rule->init;
+  mark_no_wait_transitions_state (ctx, state);
+  for (l=rule->statelist; l!=NULL; l=BIN_RVAL(l))
+    {
+      state = (node_state_t *)BIN_LVAL(l);
+      if ((state->an_flags & AN_MUSTSET_REACHABLE)==0)
+	continue; /* ignore unreachable states */
+      mark_no_wait_transitions_state (ctx, state);
+    }
+}
+
+/* Complexity evaluator */
+
+typedef struct complexity_ctx_s complexity_ctx_t;
+struct complexity_ctx_s {
+  gc_t *gc_ctx;
+  hash_t *nodes;
+  rule_compiler_t *ctx;
+  complexity_graph_t *g;
+  vertex_t one;
+  vertex_t root;
+};
+
+static vertex_t get_state_node (complexity_ctx_t *cc, node_state_t *state)
+{
+  void *data;
+  vertex_t v;
+
+  data = hash_get (cc->nodes, &state, sizeof(node_state_t *));
+  if (data!=NULL)
+    return (vertex_t)data;
+  if (state->flags & STATE_EPSILON)
+    {
+      v = cg_new_node (cc->gc_ctx, cc->g, state, VI_TYPE_MAX, 0);
+      (void) cg_new_edge (cc->gc_ctx, cc->g, v, cc->one, 1);
+      /* All state-related nodes for STATE_EPSILON nodes
+	 are created of the form u_n = max (one_n, ...).
+	 Note that label is 0, i.e.,
+	 equation is u_n = max (...), not u_{n+1} = max (...):
+	 a STATE_EPSILON node does not wait for an event to be read.
+      */
+    }
+  else
+    {
+      v = cg_new_node (cc->gc_ctx, cc->g, state, VI_TYPE_PLUS, 0);
+      /* All other nodes are created of the form
+	 u_n = v_n + w_n + ... */
+    }
+  hash_add (cc->gc_ctx, cc->nodes, (void *)v, &state, sizeof(node_state_t *));
+  return v;
+}
+
+static vertex_t add_complexity_node (complexity_ctx_t *cc, node_state_t *state);
+
+static vertex_t add_max_complexity_node (complexity_ctx_t *cc, node_state_t *state)
+{
+  gc_t *gc_ctx = cc->gc_ctx;
+  complexity_graph_t *g = cc->g;
+  vertex_t u, v;
+  node_expr_t *l;
+  node_trans_t *trans;
+  node_state_t *succ;
+  
+  /* For a node u of the form 
+     {
+       [actions...]
+       case (...) goto v;
+       else case (...) goto w;
+       else ...
+     }
+     the number of threads that can be created from this point when we have read n events
+     is u_n, defined as u_n = max (one_n, v_n, w_n, ...)
+     except that v_n is removed if v is marked as STATE_COMMIT.
+     The edge from u to one is created automatically by get_state_node().
+     (It is probably not needed in the implementation; it is needed for the
+     soundness proof.)
+   */
+  u = get_state_node (cc, state);
+  for (l = state->translist; l!=NULL; l=BIN_RVAL(l))
+    {
+      trans = (node_trans_t *)BIN_LVAL(l);
+      if (trans==NULL)
+	continue;
+      succ = trans->sub_state_dest;
+      if (succ==NULL)
+	{
+	  succ = trans_dest_state (cc->ctx, trans);
+	  if (succ->flags & STATE_COMMIT)
+	    continue; /* ignore those 'commit' states (written with a bang '!'
+			 in the concrete syntax) */
+	  v = get_state_node (cc, succ);
+	}
+      else
+	v = add_complexity_node (cc, succ);
+      (void) cg_new_edge (gc_ctx, g, u, v, 1);
+    }
+  return u;
+}
+
+static vertex_t add_plus_complexity_node (complexity_ctx_t *cc, node_state_t *state)
+{
+  gc_t *gc_ctx = cc->gc_ctx;
+  complexity_graph_t *g = cc->g;
+  vertex_t u, v, vprime;
+  node_expr_t *l;
+  node_trans_t *trans;
+  node_state_t *succ;
+
+  /* For a node u of the form
+     {
+       [actions...]
+       expect (...) goto v;
+       expect (...) goto w;
+       ...
+     }
+     the number of threads that can be created from this point when we have read n events
+     is u_n, defined as u_n = v'_n + w'_n + ...
+     where v'_n is the number of threads that are created from 'expect (...) goto v'
+     (and similarly for w, etc.), and is defined as
+     v'_{n+1} = v'_n + v_n
+     ... except:
+     - if v is marked as STATE_COMMIT, then v'_n = one_n
+     - else, and if the transition is marked as AN_TRANS_NO_WAIT, then v'_n = v_n
+
+     If there is no transition out of this node, then we do not write the sum v'_n+w'_n+...
+     at all, and u_n = one_n
+   */
+  u = get_state_node (cc, state);
+  l = state->translist;
+  if (l==NULL) /* if no transition out of this node, then u_n = one_n */
+    {
+      (void) cg_new_edge (gc_ctx, g, u, cc->one, 1);
+    }
+  else for (; l!=NULL; l=BIN_RVAL(l))
+    {
+      trans = (node_trans_t *)BIN_LVAL(l);
+      if (trans==NULL)
+	continue;
+      succ = trans->sub_state_dest;
+      if (succ==NULL)
+	{
+	  succ = trans_dest_state (cc->ctx, trans);
+	  if (succ->flags & STATE_COMMIT)
+	    vprime = cc->one;
+	  else
+	    {
+	      v = get_state_node (cc, succ);
+	      if (trans->an_flags & AN_TRANS_NO_WAIT)
+		vprime = v;
+	      else
+		{
+		  vprime = cg_new_node (gc_ctx, g, trans, VI_TYPE_PLUS, 1);
+		  (void) cg_new_edge (gc_ctx, g, vprime, vprime, 1);
+		  (void) cg_new_edge (gc_ctx, g, vprime, v, 1);
+		}
+	    }
+	}
+      else
+	{
+	  /* included state (not a named state) */
+	  /* Do as above, except succ cannot have the STATE_COMMIT flag,
+	     we should not call get_state_node(),
+	     and we have to call add_complexity_node() recursively. */
+	  v = add_complexity_node (cc, succ);
+	  if (trans->an_flags & AN_TRANS_NO_WAIT)
+	    vprime = v;
+	  else
+	    {
+	      vprime = cg_new_node (gc_ctx, g, trans, VI_TYPE_PLUS, 1);
+	      (void) cg_new_edge (gc_ctx, g, vprime, vprime, 1);
+	      (void) cg_new_edge (gc_ctx, g, vprime, v, 1);
+	    }
+	}
+      (void) cg_new_edge (gc_ctx, g, u, vprime, 1);
+    }
+  return u;
+}
+
+static vertex_t add_complexity_node (complexity_ctx_t *cc, node_state_t *state)
+{
+  vertex_t u;
+  
+  if (state->flags & STATE_EPSILON)
+    u = add_max_complexity_node (cc, state);
+  else u = add_plus_complexity_node (cc, state);
+  if (state->flags & STATE_COMMIT) /* root_n = max (v_n, w_n, ...)
+				      where v, w, ..., are the STATE_COMMIT states */
+    (void) cg_new_edge (cc->gc_ctx, cc->g, cc->root, u, 1);
+  return u;
+}
+
+static void print_cg_data_where (FILE *f, gc_header_t *data)
+{
+  char *file = NULL;
+  int line = 0;
+  
+  if (data!=NULL)
+    switch (TYPE(data))
+      {
+      case T_NODE_RULE:
+	file = ((node_rule_t *)data)->file; line = ((node_rule_t *)data)->line; break;
+      case T_NODE_STATE:
+	file =  ((node_state_t *)data)->file; line = ((node_state_t *)data)->line; break;
+      case T_NODE_TRANS:
+	file = ((node_trans_t *)data)->file; line = ((node_trans_t *)data)->lineno; break;
+      }
+  if (file!=NULL)
+    fprintf (f, "%s:%u:", file, line);
+  else fprintf (f, "%u:", line);
+}
+
+static void print_cg_data (FILE *f, gc_header_t *data, int vocab)
+{
+  node_state_t *state;
+  node_trans_t *trans;
+  char *name;
+  static char *implicit_state_rendition[2] = { "", "state " };
+  static char *implicit_waiting_trans_rendition[2] = { "waiting at ", "transition waiting at " };
+  static char *implicit_non_waiting_trans_rendition[2] = { "going through ", "transition through " };
+  
+  if (data==NULL)
+    fprintf (f, "(null)");
+  else switch (TYPE(data))
+	 {
+	 case T_NODE_RULE:
+	   fprintf (f, "start of rule %s", ((node_rule_t *)data)->name);
+	   break;
+	 case T_NODE_STATE:
+	   state = (node_state_t *)data;
+	   name = state->name;
+	   if (name==NULL)
+	     {
+	       fprintf (f, "%s", implicit_state_rendition[vocab]);
+	       if (state->file==NULL)
+		 fprintf (f, "at line %u", state->line);
+	       else fprintf (f, "at %s:%u", state->file, state->line);
+	     }
+	   else
+	     fprintf (f, "%s", name);
+	   break;
+	 case T_NODE_TRANS:
+	   trans = (node_trans_t *)data;
+	   if ((trans->an_flags & AN_TRANS_NO_WAIT)==0)
+	     {
+	       fprintf (f, "%s", implicit_waiting_trans_rendition[vocab]);
+	     }
+	   else
+	     {
+	       fprintf (f, "%s", implicit_non_waiting_trans_rendition[vocab]);
+	     }
+	   if (trans->file==NULL)
+	     fprintf (f, "line %u", trans->lineno);
+	   else fprintf (f, "%s:%u", trans->file, trans->lineno);
+	   break;
+	 default:
+	   fprintf (f, "(?)");
+	   break;
+	 }
+}
+
+static void print_scc (FILE *f, complexity_graph_t *g, vertex_t u, char *ifone, char *ifseveral)
+{
+  char *delim = "";
+  
+  u = CG_SCC_ROOT(g,u);
+  if (CG_NEXT(g,u)==ULONG_MAX)
+      fprintf (f, "%s", ifone);
+  else fprintf (f, "%s", ifseveral);
+  while (u!=ULONG_MAX)
+    {
+      fprintf (f, "%s", delim);
+      print_cg_data (f, CG_DATA(g,u), 1);
+      delim = ",\n   ";
+      u = CG_NEXT(g,u);
+    }
+}
+
+static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rule_t *node_rule)
+{
+  complexity_graph_t *g = cc->g;
+  vertex_t root = cc->root;
+  unsigned long degree;
+  vertex_t u;
+  gc_header_t *data;
+
+  degree = CG_DEGREE(g,root);
+  if (degree==0) /* rule will only create a constant number of threads: excellent. */
+    return;
+  if (node_rule->file!=NULL)
+    fprintf (f, "%s:", node_rule->file);
+  switch (degree)
+    {
+    case ULONG_MAX:
+      fprintf (f, "%u: rule %s may exhibit exponential behavior.\n",
+	       node_rule->line, node_rule->name);
+      u = g->first_bad;
+      if (u!=ULONG_MAX)
+	{
+	  data = CG_DATA(g,u);
+	  print_cg_data_where (f, data);
+	  fprintf (f, " ");
+	  print_cg_data (f, data, 1);
+	  fprintf (f, " will fork two threads, while looping ");
+	  print_scc (f, g, u, "on ", "among:\n   ");
+	  fprintf (f, ".\n");
+	}
+      break;
+    case 1:
+      fprintf (f, "%u: rule %s may have worst case linear behavior, i.e., O(#events).\n",
+	       node_rule->line, node_rule->name);
+      goto explain_poly;
+    default:
+      fprintf (f, "%u: rule %s may have worst case behavior O(#events^%lu).\n",
+	       node_rule->line, node_rule->name, degree);
+    explain_poly:
+      break;
+    }
+}
+
+static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  node_expr_t *states;
+  complexity_ctx_t cc;
+  unsigned long index = 0L;
+  vertex_t init;
+
+  cc.gc_ctx = gc_ctx;
+  cc.ctx = ctx;
+  cc.nodes = new_hash (gc_ctx, 100);
+  cc.g = new_complexity_graph (gc_ctx);
+  cc.one = cg_new_node (gc_ctx, cc.g, node_rule, VI_TYPE_MAX, 1);
+  (void) cg_new_edge (gc_ctx, cc.g, cc.one, cc.one, 1);
+  /* sequence one_{n+1} = one_n (and implicitly, one_0=1):
+     defines the constant "one". */
+  cc.root = cg_new_node (gc_ctx, cc.g, NULL, VI_TYPE_MAX, 1);
+  init = add_complexity_node (&cc, node_rule->init);
+  (void) cg_new_edge (gc_ctx, cc.g, cc.root, init, 1);
+  for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
+    (void) add_complexity_node (&cc, (node_state_t *)BIN_LVAL(states));
+  cg_compute_sccs_from_root (cc.g, cc.root, &index);
+  print_complexity_evaluation (stderr, &cc, node_rule);
+  free_complexity_graph (cc.g);
+}
+
+
 /**
  * Lex/yacc parser entry point.
  * @param ctx Orchids context.
@@ -3814,15 +4196,16 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
   state->line = sym->line;
   state->flags |= flags;
   /* add state name in current compiler context */
-  if (strhash_get(ctx->statenames_hash, sym->name)) {
-    if (sym->file!=NULL)
-      fprintf (stderr, "%s:", STR(sym->file));
-    /* printing STR(sym->file) is legal, since it
-       was created NUL-terminated, on purpose */
-    fprintf (stderr, "%u: error: duplicate state name %s\n",
-	     sym->line, sym->name);
-    ctx->nerrors++;
-  }
+  if (strhash_get(ctx->statenames_hash, sym->name)!=NULL)
+    {
+      if (sym->file!=NULL)
+	fprintf (stderr, "%s:", STR(sym->file));
+      /* printing STR(sym->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: error: duplicate state name %s\n",
+	       sym->line, sym->name);
+      ctx->nerrors++;
+    }
   else
     gc_strhash_add(ctx->gc_ctx, ctx->statenames_hash,
 		   (gc_header_t *)state, state->name);
@@ -6940,9 +7323,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
   if (sync_var==NULL)
     {
       if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", STR(node_rule->file));
-      /* printing STR(node_rule->file) is legal, since it
-	 was created NUL-terminated, on purpose */
+	fprintf (stderr, "%s:", node_rule->file);
       fprintf (stderr, "%u: synchronization variable %s not mentioned in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
@@ -6952,9 +7333,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
   if (t==NULL)
     {
       if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", STR(node_rule->file));
-      /* printing STR(node_rule->file) is legal, since it
-	 was created NUL-terminated, on purpose */
+	fprintf (stderr, "%s:", node_rule->file);
       fprintf (stderr, "%u: synchronization variable %s never assigned to in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
@@ -6963,9 +7342,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
   if (!is_basic_type(t))
     {
       if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", STR(node_rule->file));
-      /* printing STR(node_rule->file) is legal, since it
-	 was created NUL-terminated, on purpose */
+	fprintf (stderr, "%s:", node_rule->file);
       fprintf (stderr, "%u: type error: synchronization variable %s:%s does not have a basic type.\n",
 	       node_rule->line, varname, t->name);
       ctx->nerrors++;
@@ -7143,23 +7520,52 @@ static int save_bytecode (save_ctx_t *sctx, bytecode_t *bc, size_t n)
   return 0;
 }
 
+extern unsigned long bitcnt_tbl[]; /* in lang.c */
+
+static unsigned long bitcnt_int32 (int32_t n)
+{
+  return bitcnt_tbl[n & 0xff] + bitcnt_tbl[(n >> 8) & 0xff]
+    + bitcnt_tbl[(n >> 16) & 0xff] + bitcnt_tbl[(n >> 24) & 0xff];
+}
+
+static unsigned long bitcnt_int32_array (size_t n, int32_t *tbl)
+{
+  unsigned long cnt = 0L;
+  size_t i;
+
+  for (i=0; i<n; i++)
+    cnt += bitcnt_int32 (tbl[i]);
+  return cnt;
+}
+
 static int transition_save (save_ctx_t *sctx, state_t *state_array,
 			    transition_t *t)
 {
   size_t stateno;
   size_t i, n;
+  unsigned long nreqfields;
+  size_t shift;
+  int32_t field_num, bitmask;
   int err;
 
   stateno = t->dest - state_array;
   err = save_size_t (sctx, stateno);
   if (err) return err;
   n = t->required_fields_nb;
-  err = save_size_t (sctx, n);
+  nreqfields = bitcnt_int32_array (n, t->required_fields);
+  err = save_ulong (sctx, nreqfields);
   if (err) return err;
-  for (i=0; i<n; i++)
+  for (i=0, field_num=0; i<n; i++, field_num+=32)
     {
-      err = save_int32 (sctx, t->required_fields[i]);
-      if (err) return err;
+      bitmask = t->required_fields[i];
+      if (bitmask==0)
+	continue;
+      for (shift=0; shift<32; shift++)
+	if (bitmask & (1 << shift))
+	  {
+	    err = save_int32 (sctx, field_num+shift);
+	    if (err) return err;
+	  }
     }
   n = t->eval_code_length;
   err = save_size_t (sctx, n);
@@ -7405,25 +7811,50 @@ static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
 {
   size_t stateno;
   size_t i, n;
-  int32_t field_num;
+  unsigned long j, nreqfields;
+  int32_t *reqfields;
+  int32_t field_num, field_num_max = -1;
+  size_t idx, shift;
   int err;
 
   err = restore_size_t (rctx, &stateno);
   if (err) return err;
   if (stateno>=nstates) return -3;
   trans->dest = &state_array[stateno];
-  err = restore_size_t (rctx, &n);
+  err = restore_ulong (rctx, &nreqfields);
   if (err) return err;
-  trans->required_fields_nb = n;
-  trans->required_fields = gc_base_malloc (rctx->gc_ctx, n*sizeof(int32_t));
-  for (i=0; i<n; i++)
+  if (nreqfields!=0)
     {
-      err = restore_int32 (rctx, &field_num);
-      if (err) { err_freeflds: gc_base_free (trans->required_fields);
-	return err; }
-      err = update_field_number (rctx, &field_num);
-      if (err) goto err_freeflds;
-      trans->required_fields[i] = field_num;
+      reqfields = gc_base_malloc (rctx->gc_ctx, nreqfields*sizeof(int32_t));
+      for (j=0; j<nreqfields; j++)
+	{
+	  err = restore_int32 (rctx, &field_num);
+	  if (err) { err_freereqflds: gc_base_free (reqfields);
+	    return err; }
+	  err = update_field_number (rctx, &field_num);
+	  if (err) goto err_freereqflds;
+	  if (field_num>field_num_max)
+	    field_num_max = field_num;
+	  reqfields[j] = field_num;
+	}
+      n = field_num_max / (8 * sizeof(int32_t)) + 1;
+      trans->required_fields_nb = n;
+      trans->required_fields = gc_base_malloc (rctx->gc_ctx, n*sizeof(int32_t));
+      for (i=0; i<n; i++)
+	trans->required_fields[i] = 0;
+      for (j=0; j<nreqfields; j++)
+	{
+	  field_num = reqfields[j];
+	  idx = field_num / (8 * sizeof(int32_t));
+	  shift = field_num % (8 * sizeof(int32_t));
+	  trans->required_fields[idx] |= (1 << shift);
+	}
+      gc_base_free (reqfields);
+    }
+  else
+    {
+      trans->required_fields_nb = 0;
+      trans->required_fields = NULL;
     }
   err = restore_size_t (rctx, &n);
   trans->eval_code_length = n;
@@ -7437,7 +7868,9 @@ static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
 	err_freecode:
 	  if (trans->eval_code!=NULL)
 	    gc_base_free (trans->eval_code);
-	  goto err_freeflds;
+	  if (trans->required_fields!=NULL)
+	    gc_base_free (trans->required_fields);
+	  return err;
 	}
     }
   err = restore_int32 (rctx, &trans->id);
@@ -7490,8 +7923,9 @@ static int state_restore (restore_ctx_t *rctx, state_t *state_array,
 	  if (err)
 	    {
 	    err_freetrans:
-	      while (--i!=0)
-		transition_finalize (&state->trans[i]);
+	      if (i!=0)
+		while (--i!=0)
+		  transition_finalize (&state->trans[i]);
 	      goto err_freebc;
 	    }
 	}
@@ -7851,6 +8285,9 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   check_var_usage (ctx, node_rule);
   check_epsilon_transitions (ctx, node_rule);
   type_check (ctx, node_rule);
+  mark_no_wait_transitions (ctx, node_rule);
+  if (ctx->verbose>=1)
+    evaluate_complexity (ctx, node_rule);
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
@@ -9098,9 +9535,15 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	  rule->trans_nb++; /* update rule stats */
 	  state->trans[i].id = i; /* set trans id */
 	  trans->flags = 0;
-	  if ((state->flags & STATE_EPSILON) || trans_no_wait_needed (ctx, node_trans))
+	  if ((state->flags & STATE_EPSILON) /* not needed, since mark_no_wait_transitions()
+						will set the AN_TRANS_NO_WAIT flags anyway,
+						see next line */
+	      || (node_trans->an_flags & AN_TRANS_NO_WAIT) /* ... and for that, we need
+							      to have called mark_no_wait_transitions()
+							      earlier */
+	      )
 	    {
-	      if (ctx->verbose>=1 && !(state->flags & STATE_EPSILON))
+	      if (ctx->verbose>=2 && !(state->flags & STATE_EPSILON))
 		{
 		  if (node_trans->file!=NULL)
 		    fprintf (stderr, "%s:", node_trans->file);
