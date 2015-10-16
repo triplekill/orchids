@@ -495,7 +495,11 @@ static int rtaction_read_binfiles(orchids_t *ctx, heap_entry_t *he)
 
   eof = binfile_callback(ctx, mod, NULL);
 
-  he->date = ctx->cur_loop_time;
+  gettimeofday(&he->date, NULL);
+  /* It is a bad idea to 'optimize' the above by writing instead:
+     he->date = ctx->cur_loop_time;
+     See heap_merge() in evt_mgr.c to understand why.
+  */
   if (eof)
     he->date.tv_sec += cfg->poll_period;
   register_rtaction(ctx, he);

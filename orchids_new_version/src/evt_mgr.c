@@ -164,7 +164,63 @@ heap_entry_t *register_rtcallback(orchids_t *ctx,
   he->cb = cb;
   he->gc_data = gc_data;
   he->data = data;
-  he->date = ctx->cur_loop_time;
+  /* Instead of using ctx->cur_loop_time (which is fast), we
+     call gettimeofday().
+     The reason is due to sleep modes (mostly on laptops):
+     Imagine we enter event_dispatcher_main_loop(), call gettimeofday()
+     there, and obtain ctx->cur_loop_time.  We shall handle a few
+     rtcallbacks, and this appears to be instantaneous: the time of
+     day should be equal to ctx->cur_loop_time, up to an error of
+     a few clock cycles, right?  In fact, no.  If, in the middle of
+     that, the computer goes to sleep mode, and is reawakened, say,
+     one hour later, then ctx->cur_loop_time will be lagging by 3600 seconds
+     behind the actual time.
+     As a consequence, imagine a task that is scheduled to take place every
+     5 seconds (this once happened with the save mechanism).  When the
+     computer is reawakened, it will then do that task 3600/5 = 720 times...
+
+     So, instead, we call gettimeofday().  This is actually fast, too.
+     I have seen a timing of 54 clock cycles reported on
+     http://stackoverflow.com/questions/6498972/faster-equivalent-of-gettimeofday
+     (16 oct. 2015).  With the code that follows, on the Mac I am using
+     while writing this, the Mac does 100 million calls to gettimeofday()
+     in 5 seconds; in other words, one call takes about 2 ns.
+
+     --- Test code follows ---
+#include <string.h>
+#include <stdio.h>
+#include <sys/time.h>
+
+void printTime(time_t now)
+{
+    struct tm  tstruct;
+    char       buf[80];
+    tstruct = *localtime(&now);
+    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+    printf ("%s\n", buf);
+}
+
+int main(void)
+{
+   struct timeval tv;
+   time_t tm;
+
+   gettimeofday(&tv,NULL);
+   printTime((time_t)tv.tv_sec);
+   for(int i=0; i<100000000; i++)
+        gettimeofday(&tv,NULL);
+   gettimeofday(&tv,NULL);
+   printTime((time_t)tv.tv_sec);
+
+   printTime(time(NULL));
+   for(int i=0; i<100000000; i++)
+        tm=time(NULL);
+   printTime(time(NULL));
+
+   return 0;
+}
+  */
+  gettimeofday(&he->date, NULL);
   he->date.tv_sec += delay;
   he->pri = pri;
   register_rtaction(ctx, he);
