@@ -792,8 +792,10 @@ static void node_rule_finalize (gc_t *gc_ctx, gc_header_t *p)
   node_rule_t *n = (node_rule_t *)p;
   node_syncvarlist_t *sv;
 
-  if (n->file!=NULL)
-    gc_base_free (n->file);
+  if (n->real_file!=NULL)
+    gc_base_free (n->real_file);
+  if (n->filename!=NULL)
+    gc_base_free (n->filename);
   if (n->name!=NULL)
     gc_base_free (n->name);
   sv = n->sync_vars;
@@ -830,7 +832,9 @@ static int node_rule_save (save_ctx_t *sctx, gc_header_t *p)
   size_t i, nvars;
   int err;
 
-  err = save_string (sctx, n->file);
+  err = save_string (sctx, n->real_file);
+  if (err) return err;
+  err = save_string (sctx, n->filename);
   if (err) return err;
   err = save_int (sctx, n->line);
   if (err) return err;
@@ -864,7 +868,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
 {
   gc_t *gc_ctx = rctx->gc_ctx;
   node_rule_t *n;
-  char *file;
+  char *real_file, *filename;
   int line;
   char *name;
   node_state_t *init;
@@ -876,12 +880,16 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
 
   GC_START (gc_ctx, 2);
   n = NULL;
-  err = restore_string (rctx, &file);
+  err = restore_string (rctx, &real_file);
   if (err) { errno = err; goto end; }
+  err = restore_string (rctx, &filename);
+  if (err) { errno = err;
+  err_free_real_file:
+    if (real_file!=NULL) gc_base_free (real_file); goto end; }
   err = restore_int (rctx, &line);
   if (err)
     { err_freefile: errno = err;
-    end_freefile: if (file!=NULL) gc_base_free (file); goto end; }
+    end_freefile: if (filename!=NULL) gc_base_free (filename); goto err_free_real_file; }
   err = restore_string (rctx, &name);
   if (err) goto err_freefile;
   if (name==NULL) { errno = -2; goto end_freefile; }
@@ -922,7 +930,8 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   n = gc_alloc (gc_ctx, sizeof(node_rule_t), &node_rule_class);
   n->gc.type = T_NODE_RULE;
   n->line = line;
-  n->file = file;
+  n->real_file = real_file;
+  n->filename = filename;
   n->name = name;
   GC_TOUCH (gc_ctx, n->init = init);
   GC_TOUCH (gc_ctx, n->statelist = statelist);
@@ -2716,7 +2725,7 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
   GC_UPDATE(gc_ctx, 0, action_res.mayread);
   GC_UPDATE(gc_ctx, 1, action_res.mustset);
   vs = vs_diff (gc_ctx, action_res.mayread, state->mustset);
-  file = rule->file;
+  file = rule->filename;
   line = rule->line;
   if (state->actionlist!=NULL)
     {
@@ -3942,7 +3951,7 @@ static void print_cg_data_where (FILE *f, gc_header_t *data)
     switch (TYPE(data))
       {
       case T_NODE_RULE:
-	file = ((node_rule_t *)data)->file; line = ((node_rule_t *)data)->line; break;
+	file = ((node_rule_t *)data)->filename; line = ((node_rule_t *)data)->line; break;
       case T_NODE_STATE:
 	file =  ((node_state_t *)data)->file; line = ((node_state_t *)data)->line; break;
       case T_NODE_TRANS:
@@ -4014,7 +4023,7 @@ static void print_scc (FILE *f, complexity_graph_t *g, vertex_t u, char *ifone, 
     {
       fprintf (f, "%s", delim);
       print_cg_data (f, CG_DATA(g,u), 1);
-      delim = ",\n   ";
+      delim = ",\n     ";
       u = CG_NEXT(g,u);
     }
 }
@@ -4030,8 +4039,8 @@ static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rul
   degree = CG_DEGREE(g,root);
   if (degree==0) /* rule will only create a constant number of threads: excellent. */
     return;
-  if (node_rule->file!=NULL)
-    fprintf (f, "%s:", node_rule->file);
+  if (node_rule->filename!=NULL)
+    fprintf (f, "%s:", node_rule->filename);
   switch (degree)
     {
     case ULONG_MAX:
@@ -4041,6 +4050,7 @@ static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rul
       if (u!=ULONG_MAX)
 	{
 	  data = CG_DATA(g,u);
+	  fprintf (f, "  ");
 	  print_cg_data_where (f, data);
 	  fprintf (f, " ");
 	  print_cg_data (f, data, 1);
@@ -4179,18 +4189,20 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
 			      symbol_token_t *sym,
 			      unsigned long flags)
 {
+  if (sym->real_file!=NULL)
+    gc_base_free (sym->real_file);
   if (state == NULL)
     {
-      if (sym->file!=NULL)
-	gc_base_free (sym->file);
+      if (sym->filename!=NULL)
+	gc_base_free (sym->filename);
       gc_base_free (sym->name);
       return NULL;
     }
-  if (sym->file!=NULL)
+  if (sym->filename!=NULL)
     {
       if (state->file!=NULL)
 	gc_base_free (state->file);
-      state->file = sym->file;
+      state->file = sym->filename;
     }
   state->name = sym->name;
   state->line = sym->line;
@@ -4198,10 +4210,8 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
   /* add state name in current compiler context */
   if (strhash_get(ctx->statenames_hash, sym->name)!=NULL)
     {
-      if (sym->file!=NULL)
-	fprintf (stderr, "%s:", STR(sym->file));
-      /* printing STR(sym->file) is legal, since it
-	 was created NUL-terminated, on purpose */
+      if (sym->filename!=NULL)
+	fprintf (stderr, "%s:", sym->filename);
       fprintf (stderr, "%u: error: duplicate state name %s\n",
 	       sym->line, sym->name);
       ctx->nerrors++;
@@ -4537,6 +4547,8 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
   char *file;
   unsigned int line;
 
+  if (sym->real_file!=NULL)
+    gc_base_free (sym->real_file);
   if (cond!=NULL)
     {
       file = gc_strdup (ctx->gc_ctx, STR(cond->file));
@@ -4545,7 +4557,7 @@ node_trans_t *build_direct_transition(rule_compiler_t *ctx,
     }
   else
     {
-      file = sym->file;
+      file = sym->filename;
       line = sym->line;
     }
   GC_START(ctx->gc_ctx,1);
@@ -4613,7 +4625,8 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
 		       &node_rule_class);
   new_rule->gc.type = T_NODE_RULE;
   new_rule->name = sym->name;
-  new_rule->file = sym->file;
+  new_rule->real_file = sym->real_file;
+  new_rule->filename = sym->filename;
   new_rule->line = sym->line;
   GC_TOUCH (ctx->gc_ctx, new_rule->init = init_state);
   GC_TOUCH (ctx->gc_ctx, new_rule->statelist = states);
@@ -5888,15 +5901,17 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
 
   GC_START(ctx->gc_ctx, 2);
   currfile = NULL;
-  if (sym->file!=NULL)
+  if (sym->real_file!=NULL)
+    gc_base_free (sym->real_file);
+  if (sym->filename!=NULL)
     {
-      len = strlen(sym->file);
+      len = strlen(sym->filename);
       currfile = ovm_str_new (ctx->gc_ctx, len+1);
-      strcpy (STR(currfile), sym->file); /* include final NUL character, so
-					    as to ease printing */
+      strcpy (STR(currfile), sym->filename); /* include final NUL character, so
+						as to ease printing */
       STRLEN(currfile) = len;
       GC_UPDATE (ctx->gc_ctx, 0, currfile);
-      gc_base_free (sym->file);
+      gc_base_free (sym->filename);
     }
   
   call_node = (node_expr_call_t *)gc_alloc (ctx->gc_ctx,
@@ -7322,8 +7337,8 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
   sync_var = strhash_get (ctx->rule_env, varname);
   if (sync_var==NULL)
     {
-      if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", node_rule->file);
+      if (node_rule->filename!=NULL)
+	fprintf (stderr, "%s:", node_rule->filename);
       fprintf (stderr, "%u: synchronization variable %s not mentioned in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
@@ -7332,8 +7347,8 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
   t = sync_var->stype;
   if (t==NULL)
     {
-      if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", node_rule->file);
+      if (node_rule->filename!=NULL)
+	fprintf (stderr, "%s:", node_rule->filename);
       fprintf (stderr, "%u: synchronization variable %s never assigned to in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
@@ -7341,8 +7356,8 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
     }
   if (!is_basic_type(t))
     {
-      if (node_rule->file!=NULL)
-	fprintf (stderr, "%s:", node_rule->file);
+      if (node_rule->filename!=NULL)
+	fprintf (stderr, "%s:", node_rule->filename);
       fprintf (stderr, "%u: type error: synchronization variable %s:%s does not have a basic type.\n",
 	       node_rule->line, varname, t->name);
       ctx->nerrors++;
@@ -8279,7 +8294,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
     return;
   }
 
-  if (stat(node_rule->file, &filestat))
+  if (stat(node_rule->real_file, &filestat))
     filestat.st_mtime = 0;
 
   check_var_usage (ctx, node_rule);
@@ -8303,7 +8318,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->sync_vars_sz = 0;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
 
-  rule->filename = gc_strdup (ctx->gc_ctx, node_rule->file);
+  rule->filename = gc_strdup (ctx->gc_ctx, node_rule->real_file);
   rule->file_mtime = filestat.st_mtime;
   rule->name = gc_strdup (ctx->gc_ctx, node_rule->name);
   rule->lineno = node_rule->line;

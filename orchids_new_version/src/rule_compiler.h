@@ -434,6 +434,12 @@ struct node_state_s
 /**   @var node_rule_s::line
  **     Line of declaration. (in the current rule file).
  **/
+/**   @var node_rule_s::real_file
+ **     Declaration file, e.g., /usr/local/orchids/rules/gag.pprule
+ **/
+/**   @var node_rule_s::filename
+ **     Source file, e.g., gag.rule
+ **/
 /**   @var node_rule_s::name
  **     Rule name.
  **/
@@ -447,7 +453,8 @@ struct node_rule_s
 {
   gc_header_t         gc;
   int                 line;
-  char               *file;
+  char               *real_file;
+  char               *filename;
   char               *name;
   node_state_t       *init;
   node_expr_t   *statelist;
@@ -512,8 +519,11 @@ struct node_syncvarlist_s
 /**   @var symbol_token_s::name
  **     Symbol name.
  **/
-/**   @var symbol_token_s::file
- **     Declaration file.
+/**   @var symbol_token_s::real_file
+ **     Declaration file, e.g., /usr/local/orchids/rules/gag.pprule
+ **/
+/**   @var symbol_token_s::filename
+ **     Source file, e.g., gag.rule
  **/
 /**   @var symbol_token_s::line
  **     Declaration line.
@@ -521,7 +531,8 @@ struct node_syncvarlist_s
 struct symbol_token_s
 {
   char *name;
-  char *file;
+  char *real_file;
+  char *filename;
   int   line;
 };
 

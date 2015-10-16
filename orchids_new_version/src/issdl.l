@@ -242,16 +242,16 @@ $[A-Za-z_][A-Za-z0-9_\.]* {
 
  /* Symbol names (same as a C declaration) */
 [a-z_][A-Za-z0-9_\.]* {
-  issdllval.sym.file = gc_strdup((ctx)->gc_ctx, (ctx)->issdlcurrentfile);
-  /* file is not currfile, rather issdlcurrentfile---the real file, that is.
-  This will be needed in modules/html_output.c, which needs to find back
-  the file to be printed, which contains the rule. */
+  issdllval.sym.real_file = gc_strdup((ctx)->gc_ctx, (ctx)->issdlcurrentfile);
+  issdllval.sym.filename = gc_strdup((ctx)->gc_ctx, STR((ctx)->currfile));
+  /* STR((ctx)->currfile) is legal since it is always allocated with a final NUL byte, on purpose */
 //fprintf (stderr, "SYMNAME '%s', in file \"%s\"\n", issdltext, issdllval.sym.file);
   issdllval.sym.line = issdllineno_g;
   issdllval.sym.name = gc_strdup((ctx)->gc_ctx, issdltext);
   DebugLog(DF_OLC, DS_DEBUG,
-           "sym file=%s line=%i name=%s\n",
-           issdllval.sym.file,
+           "sym real_file=%s filename=%s line=%i name=%s\n",
+           issdllval.sym.real_file,
+	   issdllval.sym.filename,
            issdllval.sym.line,
            issdllval.sym.name);
   return SYMNAME;
