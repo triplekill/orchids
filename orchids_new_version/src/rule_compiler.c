@@ -3803,6 +3803,15 @@ static vertex_t get_state_node (complexity_ctx_t *cc, node_state_t *state)
   return v;
 }
 
+static vertex_t get_commit_node (complexity_ctx_t *cc, node_state_t *state)
+{
+  vertex_t one;
+
+  one = cg_new_node (cc->gc_ctx, cc->g, state, VI_TYPE_MAX, 1);
+  (void) cg_new_edge (cc->gc_ctx, cc->g, one, one, 1);
+  return one;
+}
+
 static vertex_t add_complexity_node (complexity_ctx_t *cc, node_state_t *state);
 
 static vertex_t add_max_complexity_node (complexity_ctx_t *cc, node_state_t *state)
@@ -3894,7 +3903,11 @@ static vertex_t add_plus_complexity_node (complexity_ctx_t *cc, node_state_t *st
 	{
 	  succ = trans_dest_state (cc->ctx, trans);
 	  if (succ->flags & STATE_COMMIT)
-	    vprime = cc->one;
+	    vprime = get_commit_node (cc, succ);
+	  /* We might just write cc->one here, instead of allocating a fresh
+	     node that will have complexity just one; but cg_critical_path()
+	     would then return one instead of vprime, and printing the critical
+	     path would produce unreadable results. */
 	  else
 	    {
 	      v = get_state_node (cc, succ);
@@ -3942,6 +3955,7 @@ static vertex_t add_complexity_node (complexity_ctx_t *cc, node_state_t *state)
   return u;
 }
 
+#ifdef OBSOLETE
 static void print_cg_data_where (FILE *f, gc_header_t *data)
 {
   char *file = NULL;
@@ -3961,6 +3975,7 @@ static void print_cg_data_where (FILE *f, gc_header_t *data)
     fprintf (f, "%s:%u:", file, line);
   else fprintf (f, "%u:", line);
 }
+#endif
 
 static void print_cg_data (FILE *f, gc_header_t *data, int vocab)
 {
@@ -4023,18 +4038,21 @@ static void print_scc (FILE *f, complexity_graph_t *g, vertex_t u, char *ifone, 
     {
       fprintf (f, "%s", delim);
       print_cg_data (f, CG_DATA(g,u), 1);
-      delim = ",\n     ";
+      delim = ",\n       ";
       u = CG_NEXT(g,u);
     }
 }
 
-static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rule_t *node_rule)
+static void print_complexity_evaluation (gc_t *gc_ctx, FILE *f,
+					 complexity_ctx_t *cc, node_rule_t *node_rule)
 {
   complexity_graph_t *g = cc->g;
   vertex_t root = cc->root;
   unsigned long degree;
   vertex_t u;
   gc_header_t *data;
+  critical_path_t *cp;
+  size_t i, n;
 
   degree = CG_DEGREE(g,root);
   if (degree==0) /* rule will only create a constant number of threads: excellent. */
@@ -4051,10 +4069,12 @@ static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rul
 	{
 	  data = CG_DATA(g,u);
 	  fprintf (f, "  ");
-	  print_cg_data_where (f, data);
-	  fprintf (f, " ");
+	  /*
+	    print_cg_data_where (f, data);
+	    fprintf (f, " ");
+	  */
 	  print_cg_data (f, data, 1);
-	  fprintf (f, " will fork two threads, while looping ");
+	  fprintf (f, " will fork at least two threads,\n    while looping ");
 	  print_scc (f, g, u, "on ", "among:\n   ");
 	  fprintf (f, ".\n");
 	}
@@ -4067,6 +4087,27 @@ static void print_complexity_evaluation (FILE *f, complexity_ctx_t *cc, node_rul
       fprintf (f, "%u: rule %s may have worst case behavior O(#events^%lu).\n",
 	       node_rule->line, node_rule->name, degree);
     explain_poly:
+      cp = cg_critical_path (gc_ctx, g, root);
+      if (cp!=NULL)
+	{
+	  for (n=cp->nedges, i=0; i<n; i++)
+	    {
+	      if (cp->edges[i].flags & CRIT_EXPENSIVE)
+		{
+		  fprintf (f, "  ");
+		  u = cp->edges[i].source;
+		  data = CG_DATA(g, u);
+		  print_cg_data (f, data, 1);
+		  fprintf (f, " will fork a new thread going to ");
+		  data = CG_DATA(g,cp->edges[i].dest);
+		  print_cg_data (f, data, 1);
+		  fprintf (f, ",\n    while looping ");
+		  print_scc (f, g, u, "on ", "among:\n   ");
+		  fprintf (f, ".\n");
+		}
+	    }
+	  gc_base_free (cp);
+	}
       break;
     }
 }
@@ -4093,7 +4134,7 @@ static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
   for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
     (void) add_complexity_node (&cc, (node_state_t *)BIN_LVAL(states));
   cg_compute_sccs_from_root (cc.g, cc.root, &index);
-  print_complexity_evaluation (stderr, &cc, node_rule);
+  print_complexity_evaluation (gc_ctx, stderr, &cc, node_rule);
   free_complexity_graph (cc.g);
 }
 

@@ -50,6 +50,15 @@ struct vertex_info_s {
   /* degree is only computed for the root nodes of sccs,
      i.e., for nodes v such that v==g->nodes[v].scc_root
   */
+  vertex_t critical_source, critical_dest; /* again defined only for the root node of sccs,
+					      and only when degree < ULONG_MAX (polynomial behavior);
+					      contains one among the most expensive edges
+					      critical_source -> critical_dest out of
+					      the scc, if any.  Check the difference in degrees
+					      of their respective scc_root's to see whether
+					      it is really expensive or not.
+					      Those fields are left to ULONG_MAX if undefined.
+					   */
   size_t n; /* number of successors */
   size_t nmax; /* number of allocated successors until now */
   edge_info_t *edges; /* table of nsuccs successors */
@@ -114,6 +123,22 @@ vertex_t cg_new_plus_node (gc_t *gc_ctx, complexity_graph_t *g, void *data, char
 void cg_compute_sccs_from_root (complexity_graph_t *g, vertex_t root, unsigned long *indexp);
 void cg_compute_sccs (complexity_graph_t *g);
 unsigned long cg_degree (complexity_graph_t *g, vertex_t v);
+
+typedef struct critical_edge_s critical_edge_t;
+struct critical_edge_s {
+#define CRIT_EXPENSIVE 0x1
+  int flags;
+  vertex_t source;
+  vertex_t dest;
+};
+
+typedef struct critical_path_s critical_path_t;
+struct critical_path_s {
+  size_t nedges;
+  critical_edge_t edges[1]; /* actually edges[nedges] */
+};
+
+critical_path_t *cg_critical_path (gc_t *gc_ctx, complexity_graph_t *g, vertex_t root);
 
 #endif /* COMPLEXITY */
 

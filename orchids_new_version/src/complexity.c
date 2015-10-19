@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <time.h>
 #include <limits.h>
 
@@ -77,6 +78,7 @@ vertex_t cg_new_node (gc_t *gc_ctx, complexity_graph_t *g, void *data, char type
   vi->next_on_stack = ULONG_MAX; /* empty list */
   vi->scc_root = ULONG_MAX; /* undefined yet */
   vi->degree = ULONG_MAX;
+  vi->critical_source = vi->critical_dest = ULONG_MAX; /* undefined yet */
   vi->n = 0;
   vi->nmax = EDGE_NMAX_INITIAL;
   vi->edges = gc_base_malloc (gc_ctx, EDGE_NMAX_INITIAL*sizeof(edge_info_t));
@@ -163,6 +165,7 @@ static int cg_bad_vertex (complexity_graph_t *g, vertex_t v)
   vertex_t scc_root;
   unsigned long weight;
   size_t i, n;
+  edge_info_t *ei;
 
   vi = &g->nodes[v];
   if (vi->type!=VI_TYPE_PLUS)
@@ -172,9 +175,12 @@ static int cg_bad_vertex (complexity_graph_t *g, vertex_t v)
   n = vi->n;
   for (i=0; i<n; i++)
     {
-      if (vi->edges[i].weight>=2)
+      ei = &vi->edges[i];
+      if (g->nodes[ei->target].scc_root!=scc_root)
+	continue;
+      if (ei->weight>=2)
 	return 1;
-      weight += vi->edges[i].weight;
+      weight += ei->weight;
       if (weight>=2)
 	return 1;
     }
@@ -279,7 +285,15 @@ static void cg_compute_sccs_from_root_rec (complexity_graph_t *g, vertex_t root,
 		dv = g->nodes[succ_vi->scc_root].degree; /* edge w -> succ must go out of
 							    the scc, since it is trivial */
 		if (dv > vi->degree)
-		  vi->degree = dv;
+		  {
+		    vi->degree = dv;
+		    vi->critical_source = ULONG_MAX;
+		  }
+		if (vi->critical_source==ULONG_MAX)
+		  {
+		    vi->critical_source = w;
+		    vi->critical_dest = succ;
+		  }
 	      }
 	  }
       else /* the scc is non-trivial */
@@ -308,7 +322,15 @@ static void cg_compute_sccs_from_root_rec (complexity_graph_t *g, vertex_t root,
 		  dv++;
 		/* Finally, take the max with previous degree value */
 		if (dv > vi->degree)
-		  vi->degree = dv;
+		  {
+		    vi->degree = dv;
+		    vi->critical_source = ULONG_MAX;
+		  }
+		if (vi->critical_source==ULONG_MAX)
+		  {
+		    vi->critical_source = w;
+		    vi->critical_dest = succ;
+		  }
 	      }
 	  }
     }
@@ -337,6 +359,34 @@ unsigned long cg_degree (complexity_graph_t *g, vertex_t v)
   vertex_info_t *vi = &g->nodes[v];
 
   return g->nodes[vi->scc_root].degree;
+}
+
+critical_path_t *cg_critical_path (gc_t *gc_ctx, complexity_graph_t *g, vertex_t root)
+{
+  critical_path_t *path;
+  vertex_t u, scc_u;
+  vertex_info_t *vi;
+  critical_edge_t *ce;
+  size_t i, n;
+
+  if (cg_degree (g, root)==ULONG_MAX) /* exponential behavior: we return no critical path */
+    return NULL;
+  n = g->n; /* upper bound on number of critical edges by number of vertices */
+  path = gc_base_malloc (gc_ctx, offsetof(critical_path_t, edges[n]));
+  for (i=0, u=root, ce=path->edges; u!=ULONG_MAX; i++, ce++)
+    {
+      scc_u = CG_SCC_ROOT(g,u);
+      vi = &g->nodes[scc_u];
+      if (vi->critical_source==ULONG_MAX)
+	break;
+      ce->source = vi->critical_source;
+      ce->dest = u = vi->critical_dest;
+      ce->flags = 0;
+      if (vi->degree > cg_degree(g,vi->critical_dest))
+	ce->flags |= CRIT_EXPENSIVE;
+    }
+  path->nedges = i;
+  return path;
 }
 
 /*
