@@ -27,7 +27,6 @@
 #include <string.h>
 #include <errno.h>
 #include <math.h>
-#include <regex.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -3979,14 +3978,14 @@ char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str)
     {
       len = STRLEN(str);
       s = gc_base_malloc(gc_ctx, len+1);
-      strncpy(s, STR(str), len);
+      memcpy(s, STR(str), len);
       s[len] = '\0';
     }
   else if (str!=NULL && TYPE(str) == T_VSTR)
     {
       len = VSTRLEN(str);
       s = gc_base_malloc(gc_ctx, len+1);
-      strncpy(s, VSTR(str), len);
+      memcpy(s, VSTR(str), len);
       s[len] = '\0';
     }
   else

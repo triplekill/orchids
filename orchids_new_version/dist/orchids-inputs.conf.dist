@@ -40,6 +40,6 @@ DISSECT	syslog	bintotext	514
 #DISSECT	rawsnare	udp		6262
 
 # Auditd events
-INPUT		textfile	/var/run/audispd_events
-DISSECT	auditd	textfile	/var/run/audispd_events
+#INPUT		textfile	/var/run/audispd_events
+#DISSECT	auditd	textfile	/var/run/audispd_events
 

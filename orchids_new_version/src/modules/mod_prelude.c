@@ -148,8 +148,6 @@ static void get_field_from_idmef_value(orchids_t	*ctx,
     }
 }
 
-static char *prelude_description = "prelude";
-
 static void *prelude_copy (gc_t *gc_ctx, void *obj)
 {
   idmef_message_t *msg = (idmef_message_t *)obj;
@@ -198,14 +196,14 @@ static void *prelude_restore (restore_ctx_t *rctx)
   int err;
 
   err = prelude_io_new (&pio);
-  if (err) return err;
+  if (err) { errno=err; return NULL; }
   funlockfile (rctx->f); /* To avoid any problems, we first unlock
 			    the file, so that idmef_message_print()
 			    has access to it */
   prelude_io_set_file_io (pio, rctx->f);
   msg = NULL;
   err = prelude_msg_read (&msg, pio);
-  flockfile (sctx->f); /* and we re-lock it afterwards */
+  flockfile (rctx->f); /* and we re-lock it afterwards */
   if (err) goto end;
   err = idmef_message_new (&idmef);
   if (err) goto end_msg;

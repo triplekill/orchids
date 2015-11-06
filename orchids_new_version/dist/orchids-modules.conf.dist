@@ -32,3 +32,4 @@ LoadModule sharedvars
 LoadModule xml
 LoadModule idmef
 LoadModule iodef
+LoadModule sql

@@ -17,7 +17,8 @@ EXTRA_DIST =                  \
   17_mod_prelude.conf.dist    \
   18_mod_htmlstate.conf.dist  \
   20_mod_idmef.conf.dist \
-  21_mod_iodef.conf.dist
+  21_mod_iodef.conf.dist \
+	23_mod_sql.conf.dist
 
 orchidsconfd_DATA =         \
   01_mod_textfile.conf      \
@@ -36,7 +37,8 @@ orchidsconfd_DATA =         \
   17_mod_prelude.conf	    \
   18_mod_htmlstate.conf     \
   20_mod_idmef.conf \
-  21_mod_iodef.conf
+  21_mod_iodef.conf \
+	23_mod_sql.conf.dist
 
 
 %.conf: $(srcdir)/%.conf.dist $(srcdir)/../../config.log
