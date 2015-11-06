@@ -29,9 +29,12 @@
 #include <ctype.h>
 
 /* sql librairies */
+#ifdef HAVE_SQLITE
 #include <sqlite3.h>
+#endif
+#ifdef HAVE_MYSQL
 #include <mysql/mysql.h>
-
+#endif
 
 input_module_t mod_sql;
 static dlist *internal_dl = NULL;
