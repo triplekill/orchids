@@ -1,0 +1,6 @@
+#
+# Configuration file for metaevent input module
+
+<module sql>
+  MaxDataBases 10
+</module>

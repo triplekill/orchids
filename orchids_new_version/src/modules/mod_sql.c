@@ -43,9 +43,9 @@ extern gc_class_t db_small_table_class;
 extern gc_class_t db_tuples_class;
 
 
-static char *str_from_stack_arg(orchids_t *ctx, ovm_var_t *var, int arg_n,
-				int args_total_n)
+static char *str_from_stack_arg(orchids_t *ctx, int arg_n, int args_total_n)
 {
+  ovm_var_t *var;
   char *ret = NULL;
  
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, arg_n); 
@@ -244,11 +244,6 @@ db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
 
 static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t *str_domain;
-  ovm_var_t *str_user;
-  ovm_var_t *str_pwd;
-  ovm_var_t *str_dbname;
-  ovm_var_t *str_tab;
   char *domain;
   char *user;
   char *pwd;
@@ -256,29 +251,30 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   char *tab;
   char *sql_query;
   node *n;
-  int i;
+  size_t i, n;
 
-  domain = str_from_stack_arg(ctx, str_domain, 5, 5);
+  domain = str_from_stack_arg(ctx_domain, 5, 5);
   if (domain==NULL) goto err_domain;
-  user = str_from_stack_arg(ctx, str_user, 4, 5);
+  user = str_from_stack_arg(ctx, 4, 5);
   if (user==NULL) goto err_user;
-  pwd = str_from_stack_arg(ctx, str_pwd, 3, 5);
+  pwd = str_from_stack_arg(ctx, 3, 5);
   if (pwd==NULL) goto err_pwd;
-  dbname = str_from_stack_arg(ctx, str_dbname, 2, 5);
+  dbname = str_from_stack_arg(ctx, 2, 5);
   if (dbname==NULL) goto err_dbname;
-  tab = str_from_stack_arg(ctx, str_tab, 1, 5);
+  tab = str_from_stack_arg(ctx, 1, 5);
   if (tab==NULL) goto err_tab;
 
-  for (i = 0; i<strlen(tab); i++)
+  n = strlen(tab);
+  for (i = 0; i<n; i++)
   {
-    if (!isalnum(*(tab+i)))
-    {
-      DebugLog(DF_ENG, DS_ERROR, "Database table name must only comprise \
-          alphanumeric characters");
-      STACK_DROP(ctx->ovm_stack, 5);
-      PUSH_VALUE(ctx, NULL);
-      goto err_format;
-    }
+    if (!isalnum(tab[i]))
+      {
+	DebugLog(DF_ENG, DS_ERROR,
+		 "Database table name must only contain alphanumerical characters");
+	STACK_DROP(ctx->ovm_stack, 5);
+	PUSH_VALUE(ctx, NULL);
+	goto err_format;
+      }
   }
 
   sql_query = gc_base_malloc(ctx->gc_ctx, strlen(tab) + 15);
@@ -419,28 +415,27 @@ db_map *db_from_sqlite3(orchids_t *ctx, char *filename, char *sql_query)
 
 static void issdl_load_sqlite3(orchids_t *ctx, state_instance_t *state)
 {
-  ovm_var_t *str_path;
-  ovm_var_t *str_tab;
   node *n;
   char *path;
   char *tab;
   char *sql_query;
-  int i = 0;
+  size_t i, len;
 
-  path = str_from_stack_arg(ctx, str_path, 2, 2);
+  path = str_from_stack_arg(ctx, 2, 2);
   if (path==NULL) goto err_path;
-  tab = str_from_stack_arg(ctx, str_tab, 1,2);
+  tab = str_from_stack_arg(ctx, 1,2);
   if (tab==NULL) goto err_tab;
 
-  for (i = 0; i<strlen(tab); i++)
+  len = strlen (tab);
+  for (i = 0; i<len; i++)
   {
-    if (!isalnum(*(tab+i)))
-    {
-      DebugLog(DF_ENG, DS_ERROR, "Database table name must only contain \
-          alphanumeric characters");
-      STACK_DROP(ctx->ovm_stack, 2);
-      PUSH_VALUE(ctx, NULL);
-      goto err_format;
+    if (!isalnum(tab[i]))
+      {
+	DebugLog(DF_ENG, DS_ERROR,
+		 "Database table name must only contain alphanumerical characters");
+	STACK_DROP(ctx->ovm_stack, 2);
+	PUSH_VALUE(ctx, NULL);
+	goto err_format;
     }
   }
 

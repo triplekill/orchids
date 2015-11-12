@@ -73,8 +73,7 @@ dlist *dlist_remove_last(dlist *dl);
 dlist *dlist_move_into_lead(dlist *dl, node *n);
 
 
-static char 
-*str_from_stack_arg(orchids_t *ctx, ovm_var_t *var, int arg_n, int args_total_n);
+static char *str_from_stack_arg(orchids_t *ctx, int arg_n, int args_total_n);
 
 static void 
 set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
