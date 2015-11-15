@@ -37,8 +37,9 @@
 #endif
 
 input_module_t mod_sql;
-static dlist *internal_dl = NULL;
-static long max_db;
+
+static sql_config_t *mod_sql_cfg;
+
 extern gc_class_t db_small_table_class;
 extern gc_class_t db_tuples_class;
 
@@ -80,15 +81,13 @@ static char *str_from_stack_arg(orchids_t *ctx, int arg_n, int args_total_n)
 
 /* Doubly-linked list manipulation functions */
 
-dlist *dlist_new(void)
+dlist *dlist_new(gc_t *gc_ctx)
 {
-  dlist *dl = malloc(sizeof (*dl));
-  if (dl != NULL)
-  {
-    dl->length = 0;
-    dl->head = NULL;
-    dl->tail = NULL;
-  }
+  dlist *dl = gc_base_malloc(gc_ctx, sizeof (*dl));
+  
+  dl->length = 0;
+  dl->head = NULL;
+  dl->tail = NULL;
   return dl;
 }
 
@@ -103,45 +102,40 @@ size_t dlist_length(dlist *dl)
 node *dlist_find(dlist *dl, char *name)
 {
   node *tmp = NULL;
+
   if (dl != NULL)
-  {
-    int found = 0;
-    tmp = dl->head;
-    while (tmp != NULL && !found)
     {
-      if (tmp->name != name)
-        tmp = tmp->next;
-      else
-        found = 1;
+      for (tmp = dl->head; tmp != NULL; tmp=tmp->next)
+	{
+	  if (tmp->name==name)
+	    break;
+	}
     }
-  }
   return tmp;
 }
 
-dlist *dlist_prepend(dlist *dl, char *name, db_map *db)
+dlist *dlist_prepend(gc_t *gc_ctx, dlist *dl, char *name, db_map *db)
 {
   if (dl != NULL)
   {
-    node *new_node = malloc (sizeof (*new_node));
-    if (new_node != NULL)
-    {
-      new_node->name = name;
-      new_node->db = db;
-      new_node->prev = NULL;      
-      if (dl->tail == NULL)
+    node *new_node = gc_base_malloc (gc_ctx, sizeof (*new_node));
+    
+    new_node->name = name;
+    new_node->db = db;
+    new_node->prev = NULL;      
+    if (dl->tail == NULL)
       {
         new_node->next = NULL;
         dl->head = new_node;
         dl->tail = new_node;
       }
-      else
+    else
       { 
         dl->head->prev = new_node;
         new_node->next = dl->head;
         dl->head = new_node;
       }
-      dl->length++;
-    }
+    dl->length++;
   }
   return dl;
 }
@@ -149,34 +143,38 @@ dlist *dlist_prepend(dlist *dl, char *name, db_map *db)
 dlist *dlist_remove_last(dlist *dl)
 {
   if (dl != NULL)
-  {
-    node *tmp = dl->tail;
-    if (tmp != NULL)
     {
-      dl->tail = tmp->prev;
-      dl->tail->next = NULL;
+      node *tmp = dl->tail;
+      
+      if (tmp != NULL)
+	{
+	  if ((dl->tail = tmp->prev)!=NULL)
+	    dl->tail->next = NULL;
+	  gc_base_free (tmp);
+	  dl->length--;
+	}
     }
-    free(tmp);
-    dl->length--;
-  }
   return dl;
 }
 
 dlist *dlist_move_into_lead(dlist *dl, node *n)
 {
-  if (dl != NULL && n != NULL)
-  {
-    n->prev->next = n->next;
-    if (n != dl->tail)
-      n->next->prev = n->prev;
-    n->prev = NULL;
-    n->next = dl->head;
-    dl->head = n;
-  }
+  if (dl != NULL && n != NULL && dl->head!=NULL && dl->head!=n)
+    {
+      n->prev->next = n->next;
+      if (n == dl->tail)
+	dl->tail = n->prev;
+      else
+	n->next->prev = n->prev;
+      n->prev = NULL;
+      n->next = dl->head;
+      dl->head->prev = n;
+      dl->head = n;
+    }
   return dl;
 }
 
-/* MySQL databases management */
+/* MySQL database management */
 
 #ifdef HAVE_MYSQL
 db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
@@ -281,24 +279,24 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   strncpy(sql_query, "SELECT * FROM ", 15);
   strncat(sql_query, tab, strlen(tab));
 
-  n = dlist_find(internal_dl, dbname);
+  n = dlist_find(mod_sql_cfg->dl, dbname);
   if (n != NULL)
     {
-      internal_dl = dlist_move_into_lead(internal_dl, n);
+      mod_sql_cfg->dl = dlist_move_into_lead(mod_sql_cfg->dl, n);
       STACK_DROP(ctx->ovm_stack, 5);
       PUSH_VALUE(ctx, n->db);
     }
   else
     {
-      if (dlist_length(internal_dl) >= max_db)
-	internal_dl = dlist_remove_last(internal_dl);
+      if (dlist_length(mod_sql_cfg->dl) >= mod_sql_cfg->max_db)
+	mod_sql_cfg->dl = dlist_remove_last(mod_sql_cfg->dl);
         
-      internal_dl = dlist_prepend(internal_dl, dbname,
-				  db_from_mysql(ctx, domain, 
-						user, pwd, dbname,
-						sql_query));
+      mod_sql_cfg->dl = dlist_prepend(ctx->gc_ctx, mod_sql_cfg->dl, dbname,
+				      db_from_mysql(ctx, domain, 
+						    user, pwd, dbname,
+						    sql_query));
       STACK_DROP(ctx->ovm_stack, 5);
-      PUSH_VALUE(ctx, internal_dl->head->db);
+      PUSH_VALUE(ctx, mod_sql_cfg->dl->head->db);
     }
 
   gc_base_free(sql_query);
@@ -443,22 +441,22 @@ static void issdl_load_sqlite3(orchids_t *ctx, state_instance_t *state)
   strncpy(sql_query, "select * from ", 15);
   strncat(sql_query, tab, strlen(tab));
 
-  n = dlist_find(internal_dl, path);
+  n = dlist_find(mod_sql_cfg->dl, path);
   if (n != NULL)
     {
-      internal_dl = dlist_move_into_lead(internal_dl, n);
+      mod_sql_cfg->dl = dlist_move_into_lead(mod_sql_cfg->dl, n);
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_VALUE(ctx, n->db);
     }
   else
     {
-      if (dlist_length(internal_dl) >= max_db)
-        internal_dl = dlist_remove_last(internal_dl);
+      if (dlist_length(mod_sql_cfg->dl) >= mod_sql_cfg->max_db)
+        mod_sql_cfg->dl = dlist_remove_last(mod_sql_cfg->dl);
       
-      internal_dl = dlist_prepend(internal_dl, path,
-				  db_from_sqlite3(ctx, path, sql_query));
+      mod_sql_cfg->dl = dlist_prepend(ctx->gc_ctx, mod_sql_cfg->dl, path,
+				      db_from_sqlite3(ctx, path, sql_query));
       STACK_DROP(ctx->ovm_stack, 2);
-      PUSH_VALUE(ctx, internal_dl->head->db);
+      PUSH_VALUE(ctx, mod_sql_cfg->dl->head->db);
     }
   gc_base_free(sql_query);
   
@@ -483,7 +481,6 @@ static const type_t **load_sqlite3_sigs[] = { load_sqlite3_sig, NULL };
 
 static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  sql_config_t *mod_cfg;
 
   DebugLog(DF_MOD, DS_INFO, "load() sql@%p\n", &mod_sql);
 
@@ -509,21 +506,17 @@ static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod)
      loaded in the orchids virtual machine memory. Databases loading is
      managed in a Least Recently Used style. 
   */
-  dlist *dl = dlist_new();
-  /* issdl_* primitives doesn't have mod_entry_t as argument. Needed to define
-   * a global variable internal_dl for use in primitives. Same for max_db in
-   * set_max_db().
+  dlist *dl = dlist_new(ctx->gc_ctx);
+  /* issdl_* primitives don't have a mod_entry_t as argument. Hence
+     we need to use a global variable mod_sql_cfg.
    */
-  internal_dl = dl;
-  max_db = 10;
-
-  mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (sql_config_t));
-  mod_cfg->max_db = 10;
-  mod_cfg->dl = dl;
-  return (mod_cfg);
+  mod_sql_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (sql_config_t));
+  mod_sql_cfg->max_db = 10;
+  mod_sql_cfg->dl = dl;
+  return mod_sql_cfg;
 }
 
-static void set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+static void sql_set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   long value;
 
@@ -533,13 +526,13 @@ static void set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir
   if (value < 0)
     value = 10;
 
-  max_db = value;
+  // mod_sql_cfg->max_db = value;
   ((sql_config_t *)mod->config)->max_db = value;
 }
 
 static mod_cfg_cmd_t sql_dir[] = 
 {
-  {"MaxDatabases", set_max_db, "set the maximum loading databases number"},
+  {"MaxDatabases", sql_set_max_db, "set the maximum loading databases number"},
   {NULL, NULL, NULL}
 };
 

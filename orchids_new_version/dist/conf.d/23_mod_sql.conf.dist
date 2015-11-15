@@ -2,5 +2,5 @@
 # Configuration file for metaevent input module
 
 <module sql>
-  MaxDataBases 10
+  MaxDatabases 10
 </module>

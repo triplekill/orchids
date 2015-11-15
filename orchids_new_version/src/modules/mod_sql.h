@@ -50,12 +50,12 @@ struct double_list
 typedef struct sql_config_s sql_config_t;
 struct sql_config_s
 {
-  int max_db;
+  long max_db;
   struct double_list *dl;
 };
 
 /* create a new list */
-dlist *dlist_new(void);
+dlist *dlist_new(gc_t *gc_ctx);
 
 /* return the length of the list */
 size_t dlist_length(dlist *dl);
@@ -64,7 +64,7 @@ size_t dlist_length(dlist *dl);
 node *dlist_find(dlist *dl, char *name);
 
 /* add a new node at the beginning of the list */
-dlist *dlist_prepend(dlist *dl, char *name, db_map *db);
+dlist *dlist_prepend(gc_t *gc_ctx, dlist *dl, char *name, db_map *db);
 
 /* remove the last node of the list */
 dlist *dlist_remove_last(dlist *dl);
@@ -75,11 +75,9 @@ dlist *dlist_move_into_lead(dlist *dl, node *n);
 
 static char *str_from_stack_arg(orchids_t *ctx, int arg_n, int args_total_n);
 
-static void 
-set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static void sql_set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
-static void *
-mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 #endif /* MOD_SQL_H */
 
