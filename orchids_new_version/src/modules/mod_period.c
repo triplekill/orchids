@@ -75,7 +75,7 @@ static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
     return -1;
   fprintf_html_header(fp, "Orchids frequencies / phase tables");
 
-  fprintf(fp, "<center><h1>Orchids frequencies / phases tables</h1></center>\n");
+  fprintf(fp, "<center><h1>Orchids frequencies / phase tables</h1></center>\n");
 
   ctx_array = NULL;
   ctx_array_sz = 0;
