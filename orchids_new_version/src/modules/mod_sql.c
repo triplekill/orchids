@@ -223,9 +223,9 @@ db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
       for (i=0; i<ncols; i++)
       {
         if (t->tuple[i]==NULL)
-    	    GC_TOUCH(ctx->gc_ctx, s->what.tuples.hash[i] = 0);
+    	    s->what.tuples.hash[i] = 0;
         else 
-          GC_TOUCH(ctx->gc_ctx, s->what.tuples.hash[i] = issdl_hash(t->tuple[i]));
+          s->what.tuples.hash[i] = issdl_hash(t->tuple[i]);
       } 
       db = db_union (ctx->gc_ctx, ncols, db, s);
     }
@@ -249,9 +249,9 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   char *tab;
   char *sql_query;
   node *n;
-  size_t i, n;
+  size_t i, l;
 
-  domain = str_from_stack_arg(ctx_domain, 5, 5);
+  domain = str_from_stack_arg(ctx, 5, 5);
   if (domain==NULL) goto err_domain;
   user = str_from_stack_arg(ctx, 4, 5);
   if (user==NULL) goto err_user;
@@ -262,8 +262,8 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   tab = str_from_stack_arg(ctx, 1, 5);
   if (tab==NULL) goto err_tab;
 
-  n = strlen(tab);
-  for (i = 0; i<n; i++)
+  l = strlen(tab);
+  for (i = 0; i<l; i++)
   {
     if (!isalnum(tab[i]))
       {

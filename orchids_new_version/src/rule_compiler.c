@@ -8107,7 +8107,8 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
 	  oldrule->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
 	sld.gc_ctx = ctx->gc_ctx;
 	sld.oldrule = oldrule;
-	(void) objhash_walk (rule->sync_lock, do_merge_sync_lock, &sld);
+	if (rule->sync_lock!=NULL)
+	  (void) objhash_walk (rule->sync_lock, do_merge_sync_lock, &sld);
 	return oldrule;
       }
     else
