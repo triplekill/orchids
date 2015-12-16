@@ -38,19 +38,23 @@ rule pidtrack
       goto alert;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_execve)
+        .auditd.syscall == SYS_execve &&
+	.auditd.success = "yes")
       goto update_uid_gid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setresuid)
+        .auditd.syscall == SYS_setresuid &&
+	.auditd.success = "yes")
       goto update_setuid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setreuid)
+        .auditd.syscall == SYS_setreuid &&
+	.auditd.success = "yes")
       goto update_setuid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setgid)
+        .auditd.syscall == SYS_setgid &&
+	.auditd.success = "yes")
       goto update_setgid;
 
     expect (.auditd.pid == $pid &&
