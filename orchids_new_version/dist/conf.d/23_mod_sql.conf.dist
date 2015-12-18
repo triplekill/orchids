@@ -1,0 +1,10 @@
+#
+# Configuration file for textfile input module
+
+<module sql>
+
+# Set the maximum number of databases which can be in memory at the same time.
+# Default is 10.
+MaxDatabases 10
+
+</module>
