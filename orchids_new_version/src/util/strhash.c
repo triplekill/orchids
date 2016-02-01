@@ -384,17 +384,19 @@ int strhash_walk(strhash_t *hash,
 		 int (func)(char *key, void *elmt, void *data),
 		 void *data)
 {
-  int i;
+  size_t i, n;
 
-  for (i = 0; i < hash->size; i++) {
-    strhash_elmt_t *tmp;
-    int status;
+  n = hash->size;
+  for (i = 0; i < n; i++)
+    {
+      strhash_elmt_t *tmp;
+      int status;
 
-    for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
-      if ((status = (*func) (tmp->key, tmp->data, data)) != 0)
-        return (status);
+      for (tmp = hash->htable[i]; tmp; tmp = tmp->next) {
+	if ((status = (*func) (tmp->key, tmp->data, data)) != 0)
+	  return (status);
+      }
     }
-  }
 
   return (0);
 }

@@ -77,30 +77,28 @@ static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
 
   fprintf(fp, "<center><h1>Orchids frequencies / phase tables</h1></center>\n");
 
-  ctx_array = NULL;
-  ctx_array_sz = 0;
-  for (i = 0; i < ctx->temporal->size; i++)
+  ctx_array_sz = ctx->temporal->size;
+  if (ctx_array_sz!=0)
     {
-      for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next)
+      ctx_array = gc_base_malloc (ctx->gc_ctx, ctx_array_sz * sizeof (char *));
+      /* We could use strhash_walk(), instead, but that would be overkill */
+      for (i = 0; i < ctx_array_sz; i++)
 	{
-	  ctx_array_sz++;
-	  ctx_array = gc_base_realloc(ctx->gc_ctx, ctx_array,
-				      ctx_array_sz * sizeof (char *));
-	  ctx_array[ctx_array_sz - 1] = helmt->key;
-	  /*       period_output_gnuplot(); */
+	  for (helmt = ctx->temporal->htable[i]; helmt; helmt = helmt->next)
+	    {
+	      ctx_array[ctx_array_sz++] = helmt->key;
+	      /*       period_output_gnuplot(); */
+	    }
 	}
-    }
-  qsort(ctx_array, ctx_array_sz, sizeof (char *), qsort_strcmp);
+      qsort(ctx_array, ctx_array_sz, sizeof(char *), qsort_strcmp);
 
-  fprintf(fp, "%zd context%s<br/><br/><br/>\n",
-          ctx_array_sz, ctx_array_sz > 1 ? "s" : "");
+      fprintf(fp, "%zd context%s<br/><br/><br/>\n",
+	      ctx_array_sz, ctx_array_sz > 1 ? "s" : "");
 
-  for (i = 0; i < ctx_array_sz; i++)
-    fprintf(fp, "%i: %s<br/>\n", i, ctx_array[i]);
-
-  if (ctx_array!=NULL)
-    gc_base_free(ctx_array);
-
+      for (i = 0; i < ctx_array_sz; i++)
+	fprintf(fp, "%i: %s<br/>\n", i, ctx_array[i]);
+      gc_base_free(ctx_array);
+    }  
   fprintf_html_trailer(fp);
   return fclose(fp);
 }
@@ -152,7 +150,9 @@ static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
   cfg = gc_base_malloc (ctx->gc_ctx, sizeof (period_config_t));
-  cfg->contexts = new_strhash(ctx->gc_ctx, 65537);
+  cfg->contexts = new_strhash(ctx->gc_ctx, 101);
+  // size was 65537 before, but we really need very few temporals,
+  // and period_htmloutput() sweeps through the whole table each time.
 
   register_lang_function(ctx, issdl_temporal, "temporal",
 			 1, temporal_sigs,
