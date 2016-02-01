@@ -125,7 +125,7 @@ __safelib_xfree(const char *file, const int line, void *ptr)
 
   if (ptr == NULL) {
     fprintf(stderr, "%s:%i: Warning: free(NULL)\n", file, line);
-    raise(SIGSTOP);
+    //raise(SIGSTOP);
     return ;
   }
 
