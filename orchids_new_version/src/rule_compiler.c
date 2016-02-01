@@ -8212,7 +8212,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     {
       err = state_restore (rctx, rule->state, &rule->state[i], nstates);
       if (err) { rule = NULL; errno = err; goto end; }
-      GC_TOUCH (gc_ctx, rule->state->rule = rule);
+      GC_TOUCH (gc_ctx, rule->state[i].rule = rule);
       rule->trans_nb += rule->state[i].trans_nb;
       rule->state_nb = ++i;
     }
