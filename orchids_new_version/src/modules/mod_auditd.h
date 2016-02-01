@@ -31,39 +31,42 @@
 #define F_AUDITD_SYSCALL   5
 #define F_AUDITD_SUCCESS   6
 #define F_AUDITD_EXIT      7
-#define F_AUDITD_A0        8
-#define F_AUDITD_A1        9
-#define F_AUDITD_A2        10
-#define F_AUDITD_A3        11
-#define F_AUDITD_ITEMS     12
-#define F_AUDITD_PPID      13
-#define F_AUDITD_PID       14
-#define F_AUDITD_AUID      15
-#define F_AUDITD_UID       16
-#define F_AUDITD_GID       17
-#define F_AUDITD_EUID      18
-#define F_AUDITD_SUID      19
-#define F_AUDITD_FSUID     20
-#define F_AUDITD_EGID      21
-#define F_AUDITD_SGID      22
-#define F_AUDITD_FSGID     23
-#define F_AUDITD_TTY       24
-#define F_AUDITD_SES       25
-#define F_AUDITD_COMM      26
-#define F_AUDITD_EXE       27
-#define F_AUDITD_SUBJ      28
-#define F_AUDITD_KEY       29
-#define F_AUDITD_ITEM      30
-#define F_AUDITD_NAME      31
-#define F_AUDITD_INODE     32
-#define F_AUDITD_MODE      33
-#define F_AUDITD_DEV       34
-#define F_AUDITD_OUID      35
-#define F_AUDITD_OGID      36
-#define F_AUDITD_RDEV      37
-#define F_AUDITD_CWD       38
+#define F_AUDITD_ITEMS     8
+#define F_AUDITD_PPID      9
+#define F_AUDITD_PID       10
+#define F_AUDITD_AUID      11
+#define F_AUDITD_UID       12
+#define F_AUDITD_GID       13
+#define F_AUDITD_EUID      14
+#define F_AUDITD_SUID      15
+#define F_AUDITD_FSUID     16
+#define F_AUDITD_EGID      17
+#define F_AUDITD_SGID      18
+#define F_AUDITD_FSGID     19
+#define F_AUDITD_TTY       20
+#define F_AUDITD_SES       21
+#define F_AUDITD_COMM      22
+#define F_AUDITD_EXE       23
+#define F_AUDITD_SUBJ      24
+#define F_AUDITD_KEY       25
+#define F_AUDITD_ITEM      26
+#define F_AUDITD_NAME      27
+#define F_AUDITD_INODE     28
+#define F_AUDITD_MODE      29
+#define F_AUDITD_DEV       30
+#define F_AUDITD_OUID      31
+#define F_AUDITD_OGID      32
+#define F_AUDITD_RDEV      33
+#define F_AUDITD_NAMETYPE  34
+#define F_AUDITD_CWD       35
+#define F_AUDITD_ARGC      36
+#define F_AUDITD_PROCTITLE 37
+#define F_AUDITD_SIG       38
 
-#define AUDITD_FIELDS 39
+#define F_AUDITD_REGULAR_END 39
+/* F_AUDITD_ARG_END will be defined in fields_auditd.h
+ Do not add any field after F_AUDITD_REGULAR_END! */
+#define AUDITD_FIELDS F_AUDITD_ARG_END
 
 /***********************************************/
 

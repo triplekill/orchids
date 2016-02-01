@@ -82,6 +82,17 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   return t;
 }
 
+static char *action_doer_a0 (action_orchids_ctx_t *octx,
+			     char *s, char *end,
+			     int field_num)
+{ /* a0= fields are sometimes followed by uints in hex (as in type=SYSCALL events)
+     and sometimes by strings, starting with a quote (as in type=EXECVE events)...
+  */
+  if (s < end && *s == '"') /* it's a string */
+    return action_doer_string (octx, s, end, field_num + 1);
+  else return action_doer_uint_hex (octx, s, end, field_num);
+}
+
 static action_t auditd_actions[] = {
   /* Don't put any empty word here, or any word
      that is prefix of another one! */
@@ -93,10 +104,6 @@ static action_t auditd_actions[] = {
   { "syscall=", F_AUDITD_SYSCALL, action_doer_uint },
   { "success=", F_AUDITD_SUCCESS, action_doer_string },
   { "exit=", F_AUDITD_EXIT, action_doer_uint },
-  { "a0=", F_AUDITD_A0, action_doer_uint_hex },
-  { "a1=", F_AUDITD_A1, action_doer_uint_hex },
-  { "a2=", F_AUDITD_A2, action_doer_uint_hex },
-  { "a3=", F_AUDITD_A3, action_doer_uint_hex },
   { "items=", F_AUDITD_ITEMS, action_doer_uint },
   { "ppid=", F_AUDITD_PPID, action_doer_uint },
   { "pid=", F_AUDITD_PID, action_doer_uint },
@@ -123,9 +130,29 @@ static action_t auditd_actions[] = {
   { "ouid=", F_AUDITD_OUID, action_doer_uint },
   { "ogid=", F_AUDITD_OGID, action_doer_uint },
   { "rdev=",  F_AUDITD_RDEV, action_doer_dev },
+  { "nametype=", F_AUDITD_NAMETYPE, action_doer_string },
   { "cwd=", F_AUDITD_CWD, action_doer_string },
+  /* For type=EXECVE: argc= a0= a1= a2= */
+  /* However, a0, a1, a2, ..., are strings here */
+  /* Example:
+     type=EXECVE msg=audit(1454046118.818:17159): argc=3 a0="tail" a1="-f" a2="/var/log/aud\
+it/audit.log"
+     type=CWD msg=audit(1454046118.818:17159):  cwd="/home/lambda/orchids"
+     type=PATH msg=audit(1454046118.818:17159): item=0 name="/usr/bin/tail" inode=10133 dev=00:10 mode=0100755 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL
+     type=PATH msg=audit(1454046118.818:17159): item=1 name=(null) inode=11552 dev=00:10 mode=0100755 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL
+     type=PROCTITLE msg=audit(1454046118.818:17159): proctitle=7461696C002D66002F7661722F6C6F672F61756469742F61756469742E6C6F67
+   */
+  { "argc=", F_AUDITD_ARGC, action_doer_uint },
+  { "proctitle=", F_AUDITD_PROCTITLE, action_doer_string },
+  { "sig=", F_AUDITD_SIG, action_doer_uint },
+#include "fields_auditd.h"
   { NULL, 0 }
 };
+
+/*
+type=PROCTITLE msg=audit(1454046123.718:17160): proctitle=2F62696E2F62617368002D630065786563202F7573722F6C6F63616C2F62696E2F6F72636869647320
+type=ANOM_ABEND msg=audit(1454046123.822:17161): auid=1000 uid=65534 gid=65534 ses=2 pid=9299 comm="orchids" exe="/usr/local/bin/orchids" sig=11
+*/
 
 static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
 			  event_t *event, void *data,
@@ -175,10 +202,6 @@ static field_t auditd_fields[] = {
   {"auditd.syscall",  &t_uint, MONO_UNKNOWN,      "syscall number"                      },
   {"auditd.success",  &t_str, MONO_UNKNOWN,     "syscall success"                     },
   {"auditd.exit",     &t_uint, MONO_UNKNOWN,      "exit value"                          },
-  {"auditd.varzero",  &t_uint, MONO_UNKNOWN,      "syscall argument"                    },
-  {"auditd.varone",   &t_uint, MONO_UNKNOWN,      "syscall argument"                    },	
-  {"auditd.vartwo",   &t_uint, MONO_UNKNOWN,      "syscall argument"                    },	
-  {"auditd.varthree", &t_uint, MONO_UNKNOWN,      "syscall argument"                    },	
   {"auditd.items",    &t_uint, MONO_UNKNOWN,      "number of path records in the event" },
   {"auditd.ppid",     &t_uint, MONO_UNKNOWN,      "parent pid"                          },
   {"auditd.pid",      &t_uint, MONO_UNKNOWN,      "process id"                          },
@@ -205,7 +228,12 @@ static field_t auditd_fields[] = {
   {"auditd.ouid",     &t_uint, MONO_UNKNOWN,      "file path: originator uid"           },
   {"auditd.ogid",     &t_uint, MONO_UNKNOWN,      "file path: originator gid"           },
   {"auditd.rdev",     &t_uint, MONO_UNKNOWN,      "file path: real device (major, minor)" },
+  {"auditd.nametype", &t_str, MONO_UNKNOWN,       "file path: name type" },
   {"auditd.cwd",      &t_str, MONO_UNKNOWN,     "file cwd: the current working directory" },
+  {"auditd.argc",     &t_uint, MONO_UNKNOWN,     "execve: number of arguments" },
+  {"auditd.proctitle", &t_str, MONO_UNKNOWN,     "process title or identifier" },
+  {"auditd.sig",      &t_uint, MONO_UNKNOWN,     "anom abend: signal number" },
+#include "defs_auditd.h"
 };
 
 
