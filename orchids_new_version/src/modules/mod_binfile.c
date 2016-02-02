@@ -240,7 +240,7 @@ static void *binfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
   mod_cfg->flags = 0;
   mod_cfg->process_all_data = 0;
   mod_cfg->exit_process_all_data = 0;
-  mod_cfg->poll_period = 0;
+  mod_cfg->poll_period = DEFAULT_MODBIN_POLL_PERIOD;
   mod_cfg->file_list = NULL;
 
   //add_polled_input_callback(ctx, mod, binfile_callback, NULL);
@@ -253,17 +253,23 @@ static void *binfile_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
 static void binfile_postconfig(orchids_t *ctx, mod_entry_t *mod)
 {
+  binfile_config_t *cfg;
+
   DebugLog(DF_MOD, DS_TRACE,
            "binfile_postconfig() -- registering file polling if needed...\n");
 
   /* register real-time action for file polling, if requested. */
-  DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
-  register_rtcallback(ctx,
-		      rtaction_read_binfiles,
-		      NULL,
-		      mod,
-		      INITIAL_MODBIN_POLL_DELAY,
-		      0);
+  cfg = (binfile_config_t *)mod->config;
+  if (cfg->file_list!=NULL)
+    {
+      DebugLog(DF_MOD, DS_INFO, "Activating file polling\n");
+      register_rtcallback(ctx,
+			  rtaction_read_binfiles,
+			  NULL,
+			  mod,
+			  INITIAL_MODBIN_POLL_DELAY,
+			  0);
+    }
 }
 
 
@@ -487,7 +493,7 @@ static int rtaction_read_binfiles(orchids_t *ctx, heap_entry_t *he)
 {
   mod_entry_t *mod;
   binfile_config_t *cfg;
-  char	      eof;
+  int eof;
 
   /* DebugLog(DF_MOD, DS_TRACE,
 	              "Real-time action: Checking files...\n"); */
