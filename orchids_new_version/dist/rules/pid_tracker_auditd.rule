@@ -54,8 +54,8 @@ rule pidtrack
       goto end;
 
     expect (.auditd.syscall == SYS_kill &&
-        .auditd.varzero == $pid &&
-        .auditd.varone == 9)
+        .auditd.a0 == $pid &&
+        .auditd.a1 == 9)
       goto end;
 
     /* We now catch any other auditd event (at least from those
@@ -89,14 +89,14 @@ rule pidtrack
 
   state update_setuid!
   {
-    $uid = .auditd.varone; /* a1 field contains new euid (a0=new ruid) */
+    $uid = .auditd.a1; /* a1 field contains new euid (a0=new ruid) */
 
     goto wait;
   }
 
   state update_setgid!
   {
-    $gid = .auditd.varzero;
+    $gid = .auditd.a0;
 
     goto wait;
   }

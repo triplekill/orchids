@@ -13,7 +13,7 @@ rule listen_atm_vcc
   state init
   {
     expect (.auditd.syscall == SYS_socketcall &&
-	    .auditd.varzero == SYS_LISTEN)
+	    .auditd.a0 == SYS_LISTEN)
       goto start;
   }
 
@@ -25,7 +25,7 @@ rule listen_atm_vcc
 
     expect (.auditd.pid == $attack_pid &&
 	    .auditd.syscall == SYS_socketcall &&
-	    .auditd.varzero == SYS_LISTEN)
+	    .auditd.a0 == SYS_LISTEN)
       goto listen_loop;
   }
 
@@ -42,7 +42,7 @@ rule listen_atm_vcc
   {
     expect ( .auditd.pid == $attack_pid &&
 	     .auditd.syscall == SYS_socketcall &&
-	     .auditd.varzero == SYS_LISTEN)
+	     .auditd.a0 == SYS_LISTEN)
       goto listen_loop;
   }
 

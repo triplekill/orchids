@@ -14,7 +14,7 @@ rule leak_memory
   state init
   {
     expect (.auditd.syscall == SYS_socketcall &&
-	    .auditd.varzero == SYS_CONNECT)
+	    .auditd.a0 == SYS_CONNECT)
       goto start;
   }
 
@@ -25,7 +25,7 @@ rule leak_memory
 
    expect (.auditd.pid == $attack_pid &&
        .auditd.syscall == SYS_socketcall &&
-       .auditd.varzero == SYS_CONNECT)
+       .auditd.a0 == SYS_CONNECT)
        goto listen_loop;
   }
 
@@ -37,7 +37,7 @@ rule leak_memory
 
     expect ( .auditd.pid == $attack_pid &&
          .auditd.syscall == SYS_socketcall &&
-         .auditd.varzero == SYS_CONNECT &&
+         .auditd.a0 == SYS_CONNECT &&
          $counter < MAX_CALLS)
        goto listen_loop;
   }
