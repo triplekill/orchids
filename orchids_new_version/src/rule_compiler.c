@@ -4181,8 +4181,8 @@ static void compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
   issdllex_init (&ctx->rule_compiler->scanner);
   ret = issdlparse(ctx->rule_compiler);
   if (ret > 0) {
-    DebugLog(DF_OLC, DS_FATAL,
-             "Error while compiling rule file '%s'\n", rulefile);
+    fprintf (stderr, "%s: error while compiling rule file.\n", rulefile);
+    fflush (stderr);
     exit(EXIT_FAILURE);
   }
 
@@ -6089,11 +6089,18 @@ static void compute_stype_fieldname (rule_compiler_t *ctx, node_expr_t *myself)
   field_record_t *f;
 
   f = strhash_get(ctx->fields_hash, n->name);
-  if (f == NULL) {
-    DebugLog(DF_OLC, DS_FATAL, "field %s not registered\n", n->name);
-    exit(EXIT_FAILURE);
-  }
-  set_type (ctx, (node_expr_t *)n, f->type);
+  if (f == NULL)
+    {
+      if (myself->file!=NULL)
+	fprintf (stderr, "%s:", STR(myself->file));
+      /* printing STR(myself->file) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: field %s not registered.\n",
+	       myself->lineno, n->name);
+      ctx->nerrors++;
+    }
+  else
+    set_type (ctx, (node_expr_t *)n, f->type);
 }
 
 node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
@@ -6105,7 +6112,13 @@ node_expr_t *build_fieldname(rule_compiler_t *ctx, char *fieldname)
   /* XXX: resolution can be in the descendant phase (2) */
   f = strhash_get(ctx->fields_hash, fieldname);
   if (f == NULL) {
-    DebugLog(DF_OLC, DS_FATAL, "field %s not registered\n", fieldname);
+    if (ctx->currfile!=NULL)
+      fprintf (stderr, "%s:", STR(ctx->currfile));
+    /* printing STR(ctx->currfile) is legal, since it
+       was created NUL-terminated, on purpose */
+    fprintf (stderr, "%u: field %s not registered.\n",
+	     ctx->issdllineno, fieldname);
+    fflush (stderr);
     exit(EXIT_FAILURE);
   }
   GC_START(ctx->gc_ctx, 1);
@@ -6767,11 +6780,17 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
   GC_START(ctx->gc_ctx, 1);
   addr = ovm_ipv4_new(ctx->gc_ctx);
   hptr = gethostbyname(hostname);
-  if (hptr == NULL) {
-    DebugLog(DF_OLC, DS_FATAL,
-             "hostname %s doesn't exist\n", hostname);
-    exit(EXIT_FAILURE);
-  }
+  if (hptr == NULL)
+    {
+      if (ctx->currfile!=NULL)
+	fprintf (stderr, "%s:", STR(ctx->currfile));
+      /* printing STR(ctx->currfile) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: hostname %s not found.\n",
+	       ctx->issdllineno, hostname);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
   /* resolve host name */
   IPV4(addr).s_addr = *(in_addr_t *)(hptr->h_addr_list[0]);
   GC_UPDATE(ctx->gc_ctx, 0, addr);
@@ -6818,10 +6837,16 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
   GC_START(ctx->gc_ctx, 1);
   addr = ovm_ipv6_new(ctx->gc_ctx);
   if (getaddrinfo(hostname, NULL, NULL, &htpr) != 0)
-  {
-    DebugLog(DF_OLC, DS_FATAL, "hostname %s doesn't exist\n", hostname);
-    exit(EXIT_FAILURE);
-  }
+    {
+      if (ctx->currfile!=NULL)
+	fprintf (stderr, "%s:", STR(ctx->currfile));
+      /* printing STR(ctx->currfile) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: hostname %s not found.\n",
+	       ctx->issdllineno, hostname);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
   /* resolve host name */
   IPV6(addr) = ((struct sockaddr_in6 *)(htpr->ai_addr))->sin6_addr;
   GC_UPDATE(ctx->gc_ctx, 0, addr);
@@ -6873,42 +6898,48 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
   
   /* resolve host name */
   if ((status = getaddrinfo(hostname, NULL, NULL, &sa)) != 0)
-  {
-    DebugLog(DF_OLC, DS_FATAL, "getaddrinfo, %s\n", gai_strerror(status));
-    exit(EXIT_FAILURE);
+    {
+      if (ctx->currfile!=NULL)
+	fprintf (stderr, "%s:", STR(ctx->currfile));
+      /* printing STR(ctx->currfile) is legal, since it
+	 was created NUL-terminated, on purpose */
+      fprintf (stderr, "%u: error connecting to %s, %s.\n",
+	       ctx->issdllineno, hostname, gai_strerror(status));
+      fflush (stderr);
+      exit(EXIT_FAILURE);
   }
 
   if (sa->ai_family == AF_INET)
-  {
-    addr = ovm_ipv4_new(ctx->gc_ctx);
-    IPV4(addr) = ((struct sockaddr_in *)(sa->ai_addr))->sin_addr; 
-    
-    n->hash = h_pair (NODE_CONST,
-		      h_pair (T_IPV4,
-		  	      h_str ((char *)&IPV4(addr),
-				     sizeof(struct in_addr))));
-    /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
-    GC_TOUCH (ctx->gc_ctx, n->data = addr);
-    n->res_id = ctx->statics_nb;
-    GC_UPDATE(ctx->gc_ctx, 0, n);
-    n->compute_stype = CS_IPV4;
-  }
+    {
+      addr = ovm_ipv4_new(ctx->gc_ctx);
+      IPV4(addr) = ((struct sockaddr_in *)(sa->ai_addr))->sin_addr; 
+      
+      n->hash = h_pair (NODE_CONST,
+			h_pair (T_IPV4,
+				h_str ((char *)&IPV4(addr),
+				       sizeof(struct in_addr))));
+      /* hash = '(NODE_CONST T_IPV4 xx yy zz tt)' mod bigprime */
+      GC_TOUCH (ctx->gc_ctx, n->data = addr);
+      n->res_id = ctx->statics_nb;
+      GC_UPDATE(ctx->gc_ctx, 0, n);
+      n->compute_stype = CS_IPV4;
+    }
   else
-  {
-    addr = ovm_ipv6_new(ctx->gc_ctx);
-    IPV6(addr) = ((struct sockaddr_in6 *)(sa->ai_addr))->sin6_addr;
-    
-    n->hash = h_pair (NODE_CONST,
-		      h_pair (T_IPV6,
-			      h_str ((char *)&IPV6(addr),
-				     sizeof(struct in6_addr))));
-    /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
-    GC_TOUCH (ctx->gc_ctx, n->data = addr);
-    n->res_id = ctx->statics_nb;
-    GC_UPDATE(ctx->gc_ctx, 0, n);
-    n->compute_stype = CS_IPV6;
-  }
-   
+    {
+      addr = ovm_ipv6_new(ctx->gc_ctx);
+      IPV6(addr) = ((struct sockaddr_in6 *)(sa->ai_addr))->sin6_addr;
+      
+      n->hash = h_pair (NODE_CONST,
+			h_pair (T_IPV6,
+				h_str ((char *)&IPV6(addr),
+				       sizeof(struct in6_addr))));
+      /* hash = '(NODE_CONST T_IPV6 byte1 ... byte16)' mod bigprime */
+      GC_TOUCH (ctx->gc_ctx, n->data = addr);
+      n->res_id = ctx->statics_nb;
+      GC_UPDATE(ctx->gc_ctx, 0, n);
+      n->compute_stype = CS_IPV6;
+    }
+  
   freeaddrinfo(sa);
   /* free string memory allocated by the lexer */
   gc_base_free(hostname);
@@ -9635,9 +9666,11 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		    }
 		  else
 		    {
-		      DebugLog(DF_OLC, DS_FATAL,
-			       "undefined state reference '%s'\n",
-			       node_trans->dest);
+		      if (node_trans->file!=NULL)
+			fprintf (stderr, "%s:", node_trans->file);
+		      fprintf (stderr, "%u: undefined state '%s'.\n",
+			       node_trans->lineno, node_trans->dest);
+		      fflush (stderr);
 		      exit (EXIT_FAILURE);
 		    }
 		}
@@ -9662,9 +9695,11 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		}
 	      else
 		{
-		  DebugLog(DF_OLC, DS_FATAL,
-			   "undefined state reference '%s'\n",
-			   node_trans->dest);
+		  if (node_trans->file!=NULL)
+		    fprintf (stderr, "%s:", node_trans->file);
+		  fprintf (stderr, "%u: undefined state '%s'.\n",
+			   node_trans->lineno, node_trans->dest);
+		  fflush (stderr);
 		  exit (EXIT_FAILURE);
 		}
 	    }
