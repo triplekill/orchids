@@ -430,7 +430,14 @@ void event_dispatcher_main_loop(orchids_t *ctx)
 
     if (he!=NULL)
       {
-	Timer_Sub (&wait_time, &he->date, &cur_time);
+	gettimeofday(&cur_time, NULL); /* yes, time may have changed between
+					  the start of the for (;;) loop and now,
+					  typically because of suspend/resume events,
+					  or because we are under a debugger... */
+	if (timercmp (&he->date, &cur_time, <=))
+	  wait_time.tv_sec = wait_time.tv_usec = 0;
+	else
+	  Timer_Sub (&wait_time, &he->date, &cur_time);
 	wait_time_ptr = &wait_time;
       }
     else

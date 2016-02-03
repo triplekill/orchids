@@ -755,6 +755,7 @@ char *action_doer_id (action_orchids_ctx_t *octx, char *s, char *end,
   VSTR(v) = s;
   for (t=s; t<end && (c = *t, c!=0 && !isspace (c)); t++);
   VSTRLEN(v) = t-s;
+  GC_UPDATE(gc_ctx, 0, v);
   FILL_EVENT(octx, field_num, 1);
   GC_END(gc_ctx);
   return t;
