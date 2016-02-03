@@ -9,13 +9,9 @@ rule pidtrack
 
   state init
   {
-    expect (.auditd.syscall==SYS_fork)
-      goto newpid;
-
-    expect (.auditd.syscall==SYS_vfork)
-      goto newpid;
-
-    expect (.auditd.syscall==SYS_clone)
+    expect (.auditd.syscall==SYS_clone ||
+	    .auditd.syscall==SYS_fork ||
+	    .auditd.syscall==SYS_vfork)
       goto newpid;
   }
 
@@ -70,7 +66,8 @@ rule pidtrack
        those that preexisted the call.
     */
 
-    expect (.auditd.pid != $pid || .auditd.euid != $uid)
+    expect (.auditd.pid == $pid &&
+	    (.auditd.euid != $uid || .auditd.egid != $gid))
       goto alert;
   }
 
@@ -101,8 +98,16 @@ rule pidtrack
 
     print_string ("Alert report :\n");
 
-    $str = "Attack perpetrated by $uid=" + str_from_uint($uid);
-    print_string ($str);
+    print_string ("Attack perpetrated by uid=");
+    print_string (str_from_uint($uid));
+    print_string (", now ");
+    print_string (str_from_uint(.auditd.euid));
+    print_string (", gid=");
+    print_string (str_from_uint($gid));
+    print_string (", now ");
+    print_string (str_from_uint(.auditd.egid));
+    print_string (", pid=");
+    print_string (str_from_uint($pid));
     print_string ("\n");
     report();
 
