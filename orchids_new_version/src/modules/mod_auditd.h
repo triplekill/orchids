@@ -62,8 +62,13 @@
 #define F_AUDITD_ARGC      36
 #define F_AUDITD_PROCTITLE 37
 #define F_AUDITD_SIG       38
+#define F_AUDITD_OPID      39
+#define F_AUDITD_OAUID     40
+#define F_AUDITD_OSES      41
+#define F_AUDITD_OBJ       42
+#define F_AUDITD_OCOMM     43
 
-#define F_AUDITD_REGULAR_END 39
+#define F_AUDITD_REGULAR_END 44
 /* F_AUDITD_ARG_END will be defined in fields_auditd.h
  Do not add any field after F_AUDITD_REGULAR_END! */
 #define AUDITD_FIELDS F_AUDITD_ARG_END

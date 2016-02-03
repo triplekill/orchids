@@ -70,12 +70,7 @@ rule pidtrack
        those that preexisted the call.
     */
 
-    expect (.auditd.pid == $pid &&
-        .auditd.euid != $uid)
-      goto alert;
-
-    expect (.auditd.pid == $pid &&
-        .auditd.egid != $gid)
+    expect (.auditd.pid != $pid || .auditd.euid != $uid)
       goto alert;
   }
 

@@ -143,16 +143,23 @@ it/audit.log"
      type=PROCTITLE msg=audit(1454046118.818:17159): proctitle=7461696C002D66002F7661722F6C6F672F61756469742F61756469742E6C6F67
    */
   { "argc=", F_AUDITD_ARGC, action_doer_uint },
+  /* for type=PROCTITLE: */
   { "proctitle=", F_AUDITD_PROCTITLE, action_doer_string },
+  /* for type=ANOM_ABEND, example:
+     type=ANOM_ABEND msg=audit(1454046123.822:17161): auid=1000 uid=65534 gid=65534 ses=2 pid=9299 comm="orchids" exe="/usr/local/bin/orchids" sig=11
+   */
   { "sig=", F_AUDITD_SIG, action_doer_uint },
+  /* for type=OBJ_PID, example:
+type=OBJ_PID msg=audit(1454418026.895:379): opid=437 oauid=0 ouid=65534 oses=1 obj=(none) ocomm="orchids"
+   */
+  { "opid=", F_AUDITD_OPID, action_doer_uint },
+  { "oauid=", F_AUDITD_OAUID, action_doer_uint },
+  { "oses=", F_AUDITD_OSES, action_doer_uint },
+  { "obj=", F_AUDITD_OBJ, action_doer_string },
+  { "ocomm=", F_AUDITD_OCOMM, action_doer_string },
 #include "fields_auditd.h"
   { NULL, 0 }
 };
-
-/*
-type=PROCTITLE msg=audit(1454046123.718:17160): proctitle=2F62696E2F62617368002D630065786563202F7573722F6C6F63616C2F62696E2F6F72636869647320
-type=ANOM_ABEND msg=audit(1454046123.822:17161): auid=1000 uid=65534 gid=65534 ses=2 pid=9299 comm="orchids" exe="/usr/local/bin/orchids" sig=11
-*/
 
 static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
 			  event_t *event, void *data,
@@ -225,7 +232,7 @@ static field_t auditd_fields[] = {
   {"auditd.inode",    &t_uint, MONO_UNKNOWN,      "file path: inode"                    },
   {"auditd.mode",     &t_uint, MONO_UNKNOWN,      "file path: mode"                     },
   {"auditd.dev",      &t_uint, MONO_UNKNOWN,      "file path: device (major and minor)" },
-  {"auditd.ouid",     &t_uint, MONO_UNKNOWN,      "file path: originator uid"           },
+  {"auditd.ouid",     &t_uint, MONO_UNKNOWN,      "file path or obj pid: originator uid" },
   {"auditd.ogid",     &t_uint, MONO_UNKNOWN,      "file path: originator gid"           },
   {"auditd.rdev",     &t_uint, MONO_UNKNOWN,      "file path: real device (major, minor)" },
   {"auditd.nametype", &t_str, MONO_UNKNOWN,       "file path: name type" },
@@ -233,6 +240,11 @@ static field_t auditd_fields[] = {
   {"auditd.argc",     &t_uint, MONO_UNKNOWN,     "execve: number of arguments" },
   {"auditd.proctitle", &t_str, MONO_UNKNOWN,     "process title or identifier" },
   {"auditd.sig",      &t_uint, MONO_UNKNOWN,     "anom abend: signal number" },
+  {"auditd.opid",     &t_uint, MONO_UNKNOWN,     "obj pid: pid" },
+  {"auditd.oauid",    &t_uint, MONO_UNKNOWN,     "obj pid: audit id" },
+  {"auditd.oses",     &t_uint, MONO_UNKNOWN,     "obj pid: session number" },
+  {"auditd.obj",      &t_str, MONO_UNKNOWN,      "obj pid: object, or '(none)'" },
+  {"auditd.ocomm",    &t_str, MONO_UNKNOWN,      "obj pid: command" },
 #include "defs_auditd.h"
 };
 

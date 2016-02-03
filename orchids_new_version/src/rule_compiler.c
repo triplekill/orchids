@@ -9621,7 +9621,8 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 	{
 	  node_trans = (node_trans_t *)BIN_LVAL(l);
 	  rule->trans_nb++; /* update rule stats */
-	  state->trans[i].id = i; /* set trans id */
+	  trans = &state->trans[i];
+	  trans->id = i; /* set trans id */
 	  trans->flags = 0;
 	  if ((state->flags & STATE_EPSILON) /* not needed, since mark_no_wait_transitions()
 						will set the AN_TRANS_NO_WAIT flags anyway,
@@ -9662,7 +9663,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		      DebugLog(DF_OLC, DS_TRACE,
 			       "resolve dest %s %i\n",
 			       s->name, s->state_id);
-		      state->trans[i].dest = &rule->state[s->state_id];
+		      trans->dest = &rule->state[s->state_id];
 		    }
 		  else
 		    {
@@ -9674,8 +9675,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		      exit (EXIT_FAILURE);
 		    }
 		}
-	      compile_trans_bytecode(ctx, node_trans->cond,
-				     &state->trans[i]);
+	      compile_trans_bytecode(ctx, node_trans->cond, trans);
 	    }
 	  else
 	    {
@@ -9691,7 +9691,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		{
 		  DebugLog(DF_OLC, DS_TRACE,
 			   "resolve dest %s %i\n", s->name, s->state_id);
-		  state->trans[i].dest = &rule->state[s->state_id];
+		  trans->dest = &rule->state[s->state_id];
 		}
 	      else
 		{
