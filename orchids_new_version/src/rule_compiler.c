@@ -8574,7 +8574,8 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
 
       code.bytecode[0] = '\0';
       code.pos = 0;
-      reset_used_fields (&code);
+      code.used_fields_sz = 0;
+      code.used_fields = NULL;
       code.flags = 0;
       code.ctx = ctx;
       code.stack_level = 0;
@@ -8820,7 +8821,8 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
 
   code.bytecode[0] = '\0';
   code.pos = 0;
-  reset_used_fields (&code);
+  code.used_fields = NULL;
+  code.used_fields = NULL;
   code.flags = 0;
   code.ctx = ctx;
   code.stack_level = 0;
