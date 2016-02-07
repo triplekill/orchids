@@ -7631,7 +7631,7 @@ static int transition_save (save_ctx_t *sctx, state_t *state_array,
   size_t stateno;
   size_t i, n;
   unsigned long nreqfields;
-  size_t shift;
+  int32_t shift;
   int32_t field_num, bitmask;
   int err;
 
@@ -8538,6 +8538,16 @@ static void compile_set_labels(bytecode_buffer_t *code)
   }
 }
 
+static void reset_used_fields (bytecode_buffer_t *code)
+{
+  if (code->used_fields!=NULL)
+    {
+      gc_base_free (code->used_fields);
+      code->used_fields = NULL;
+    }
+  code->used_fields_sz = 0;
+}
+
 /**
  ** Compile an action list node abstract syntax tree.
  ** @param ctx Rule compiler context.
@@ -8564,7 +8574,7 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
 
       code.bytecode[0] = '\0';
       code.pos = 0;
-      code.used_fields_sz = 0;
+      reset_used_fields (&code);
       code.flags = 0;
       code.ctx = ctx;
       code.stack_level = 0;
@@ -8597,6 +8607,7 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
       state->actionlength = code.pos;
       state->action = bytecode;
       FREE_LABELS(code.labels);
+      reset_used_fields (&code); /* save some memory */
     }
   else
     {
@@ -8809,7 +8820,7 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
 
   code.bytecode[0] = '\0';
   code.pos = 0;
-  code.used_fields_sz = 0;
+  reset_used_fields (&code);
   code.flags = 0;
   code.ctx = ctx;
   code.stack_level = 0;
@@ -8831,11 +8842,16 @@ static bytecode_t *compile_trans_bytecode(rule_compiler_t  *ctx,
   trans->required_fields_nb = code.used_fields_sz;
   if (code.used_fields_sz > 0)
     {
+      trans->required_fields = code.used_fields;
+      code.used_fields = NULL;
+      code.used_fields_sz = 0;
+      /*
       trans->required_fields = gc_base_malloc (ctx->gc_ctx,
 					       code.used_fields_sz
 					       * sizeof(int32_t));
       memcpy (trans->required_fields, code.used_fields,
 	      code.used_fields_sz * sizeof(int32_t));
+      */
     }
   FREE_LABELS(code.labels);
   return trans->eval_code;
@@ -9345,15 +9361,21 @@ static void compile_bytecode_expr(node_expr_t *expr, bytecode_buffer_t *code)
 	i = SYM_RES_ID(expr);
 	idx = i / (8 * sizeof(int32_t));
 	shift = i % (8 * sizeof(int32_t));
+	/*
 	if (idx>=MAX_FIELD_SZ)
 	  {
 	    DebugLog (DF_OLC, DS_FATAL,
 		      "Record field id too large (%li)\n", i);
 	    exit (EXIT_FAILURE);
 	  }
+	*/
 	n = idx+1;
 	if (n > code->used_fields_sz)
-	  code->used_fields_sz = n;
+	  {
+	    code->used_fields = gc_base_realloc (code->ctx->gc_ctx, code->used_fields,
+						 n*sizeof(int32_t));
+	    code->used_fields_sz = n;
+	  }
 	code->used_fields[idx] |= (1 << shift);
       }
       // code->flags |= BYTECODE_HAS_PUSHFIELD; // XXX useless (code->flags is never used)

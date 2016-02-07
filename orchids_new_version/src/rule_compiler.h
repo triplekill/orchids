@@ -649,14 +649,13 @@ typedef struct	labels_s {
  **/
 
 #define BYTECODE_BUF_SZ 16384
-#define MAX_FIELD_SZ 256
 typedef struct bytecode_buffer_s bytecode_buffer_t;
 struct bytecode_buffer_s
 {
   size_t pos;
   bytecode_t bytecode[BYTECODE_BUF_SZ];
   size_t used_fields_sz;
-  int32_t used_fields[MAX_FIELD_SZ];
+  int32_t *used_fields;
   unsigned long flags;
   labels_t	labels;
   int stack_level;

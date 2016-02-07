@@ -605,7 +605,7 @@ int restore_int (restore_ctx_t *rctx, int *szp)
 {
   FILE *f = rctx->f;
   int i, c;
-  int sz;
+  unsigned int sz; /* must be unsigned, see comment in restore_int32() */
 
   for (i=0, sz=0; i<sizeof(int); i++)
     {
@@ -613,9 +613,9 @@ int restore_int (restore_ctx_t *rctx, int *szp)
       if (c==EOF)
 	return c;
       sz >>= 8;
-      sz |= (((int)c) << 8*(sizeof(int)-1));
+      sz |= (((unsigned int)c) << 8*(sizeof(int)-1));
     }
-  *szp = sz;
+  *szp = (int)sz;
   return 0;
 }
 
@@ -669,7 +669,7 @@ int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
 {
   FILE *f = rctx->f;
   int i, c;
-  int32_t sz;
+  uint32_t sz; /* must be unsigned; otherwise +132 would get restored as -124 */
 
   for (i=0, sz=0; i<sizeof(int32_t); i++)
     {
@@ -677,9 +677,9 @@ int restore_int32 (restore_ctx_t *rctx, int32_t *szp)
       if (c==EOF)
 	return c;
       sz >>= 8;
-      sz |= (((int32_t)c) << 8*(sizeof(int32_t)-1));
+      sz |= (((uint32_t)c) << 8*(sizeof(uint32_t)-1));
     }
-  *szp = sz;
+  *szp = (int32_t)sz;
   return 0;
 }
 
@@ -733,7 +733,7 @@ int restore_long (restore_ctx_t *rctx, long *szp)
 {
   FILE *f = rctx->f;
   int i, c;
-  long sz;
+  unsigned long sz; /* must be unsigned, see comment in restore_int32() */
 
   for (i=0, sz=0; i<sizeof(long); i++)
     {
@@ -741,9 +741,9 @@ int restore_long (restore_ctx_t *rctx, long *szp)
       if (c==EOF)
 	return c;
       sz >>= 8;
-      sz |= (((long)c) << 8*(sizeof(long)-1));
+      sz |= (((unsigned long)c) << 8*(sizeof(long)-1));
     }
-  *szp = sz;
+  *szp = (long)sz;
   return 0;
 }
 
@@ -797,7 +797,8 @@ int restore_ctime (restore_ctx_t *rctx, time_t *szp)
 {
   FILE *f = rctx->f;
   int i, c;
-  time_t sz;
+  unsigned long sz; /* must be unsigned, see comment in restore_int32() */
+  /* the following code assumes that sizeof(time_t) <= sizeof(unsigned long) */
 
   for (i=0, sz=0; i<sizeof(time_t); i++)
     {
@@ -805,9 +806,9 @@ int restore_ctime (restore_ctx_t *rctx, time_t *szp)
       if (c==EOF)
 	return c;
       sz >>= 8;
-      sz |= (((time_t)c) << 8*(sizeof(time_t)-1));
+      sz |= (((unsigned long)c) << 8*(sizeof(time_t)-1));
     }
-  *szp = sz;
+  *szp = (time_t)sz;
   return 0;
 }
 
