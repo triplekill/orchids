@@ -278,11 +278,13 @@ static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
       si->pid->flags |= THREAD_KILL;
       rctx->errs = 0;
     }
+  GC_UPDATE (gc_ctx, 0, si);
   next = (thread_queue_elt_t *)restore_gc_struct (rctx);
   if (next==NULL && errno!=0)
     goto end;
   if (next!=NULL && TYPE(next)!=T_THREAD_QUEUE_ELT)
     { errno = -2; goto end; }
+  GC_UPDATE (gc_ctx, 1, next);
   qe = gc_alloc (gc_ctx, sizeof(thread_queue_elt_t), &thread_queue_elt_class);
   qe->gc.type = T_THREAD_QUEUE_ELT;
   GC_TOUCH (gc_ctx, qe->next = next);

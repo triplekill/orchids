@@ -369,7 +369,7 @@ static void gc_check_magic(gc_header_t *p)
 {
   if (p->magic[0]!=MAGIC0 || p->magic[1]!=MAGIC1)
     {
-      fprintf (stderr, "gc_check: garbled memory, fake object or magic[] array clobbered.\n");
+      fprintf (stderr, "gc_check: garbled memory, fake object 0x%lx or magic[] array clobbered.\n", (unsigned long)p);
       if (p->magic[0]==MAGIC_FREE0 || p->magic[1]==MAGIC_FREE1)
 	fprintf (stderr, "          magic numbers indicate object has probably recently been freed (not protected against gc?).\n");
       abort ();
@@ -397,7 +397,7 @@ static int gc_check_grey (gc_traverse_ctx_t *gtc, gc_header_t *p,
   else if (parent_new_color && !GC_GREY_OR_BLACK_NEWp(gc_ctx,p))
     { /* parent_new_color is non-zero, and not grey, so it is black;
 	 and p is white: we have found a memory inconsistency. */
-      fprintf (stderr, "gc_check: black object pointing to white, directly.\n");
+      fprintf (stderr, "gc_check: black object pointing to white object 0x%lx, directly.\n", (unsigned long)p);
       abort (); /* so as to fall into debugger */
     }
   if (p->class->traverse==NULL) /* no subfield: stop */
@@ -450,7 +450,7 @@ void gc_check (gc_t *gc_ctx)
     {
       if (!p->flags & GC_FLAGS_GREY_MASK)
 	{
-	  fprintf (stderr, "gc_check: object in grey list, without the grey bit.\n");
+	  fprintf (stderr, "gc_check: object 0x%lx in grey list, without the grey bit.\n", (unsigned long)p);
 	  abort (); /* so as to fall into debugger */
 	}
       p->flags |= GC_FLAGS_IN_GREY_LIST;
@@ -469,7 +469,7 @@ void gc_check (gc_t *gc_ctx)
 	  */
 	  if (!(p->flags & GC_FLAGS_IN_GREY_LIST))
 	    {
-	      fprintf (stderr, "gc_check: object with the grey bit set, yet not in the grey list.\n");
+	      fprintf (stderr, "gc_check: object 0x%lx with grey bit set, yet not in the grey list.\n", (unsigned long)p);
 	      abort (); /* so as to fall into debugger */
 	    }
 	  p->flags &= ~GC_FLAGS_IN_GREY_LIST;
@@ -487,7 +487,7 @@ void gc_check (gc_t *gc_ctx)
 	      */
 	      if (!GC_BLACK_OLDp(gc_ctx,p))
 		{
-		  fprintf (stderr, "gc_check: reachable object that is white in the old generation and to the right of current_sweep, hence will be freed.\n");
+		  fprintf (stderr, "gc_check: reachable object 0x%lx that is white in the old generation and to the right of current_sweep, hence will be freed.\n", (unsigned long)p);
 		  abort (); /* so as to fall into debugger */
 		}
 	    }
@@ -496,7 +496,7 @@ void gc_check (gc_t *gc_ctx)
 	{
 	  if (GC_BLACK_OLDp(gc_ctx,p))
 	    {
-	      fprintf (stderr, "gc_check: object to the left of current_sweep but still black in the old generation (gc bug).\n");
+	      fprintf (stderr, "gc_check: object 0x%lx to the left of current_sweep but still black in the old generation (gc bug).\n", (unsigned long)p);
 	      abort (); /* so as to fall into debugger */
 	    }
 	}

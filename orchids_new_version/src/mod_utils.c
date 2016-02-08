@@ -891,7 +891,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
 
   if ((status = getaddrinfo(t, NULL, NULL, &sa)) != 0)
   {
-    DebugLog(DF_CORE, DS_ERROR, "getaddrinfo, %s\n", gai_strerror(status));
+    DebugLog(DF_CORE, DS_ERROR, "getaddrinfo - %s\n", gai_strerror(status));
     addr = NULL;
   }
   else if (sa->ai_family == AF_INET)

@@ -6796,7 +6796,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found, %s.\n",
+      fprintf (stderr, "%u: hostname %s not found - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
@@ -6855,7 +6855,7 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found, %s.\n",
+      fprintf (stderr, "%u: hostname %s not found - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
@@ -6917,7 +6917,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: error connecting to %s, %s.\n",
+      fprintf (stderr, "%u: error connecting to %s - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);

@@ -162,7 +162,7 @@ static FILE *create_console_socket(const char *host, const int port)
   status = getaddrinfo(host, ports, NULL, &sa);
   if (status != 0)
     {
-      fprintf (stderr, "mod_consoles: error resolving %s, %s.\n",
+      fprintf (stderr, "mod_consoles: error resolving %s - %s.\n",
 	       host, gai_strerror(status));
       fflush (stderr);
       return NULL;
@@ -184,7 +184,7 @@ static FILE *create_console_socket(const char *host, const int port)
   status = connect (sd, sap->ai_addr, sap->ai_addrlen);
   if (status < 0)
     {
-      fprintf (stderr, "mod_consoles: error connecting to %s, %s.\n",
+      fprintf (stderr, "mod_consoles: error connecting to %s - %s.\n",
 	       host, strerror(errno));
       fflush (stderr);
       freeaddrinfo(sa);
@@ -228,8 +228,14 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod,
   con->host = gc_strdup(ctx->gc_ctx, strdup(hostname));
   con->port = port;
   con->fp = create_console_socket(con->host, con->port);
-
-  strhash_add (ctx->gc_ctx, ((conscfg_t *)mod->config)->consoles, con, con->name);
+  if (con->fp==NULL)
+    {
+      gc_base_free (con->name);
+      gc_base_free (con->host);
+      gc_base_free (con);
+    }
+  else
+    strhash_add (ctx->gc_ctx, ((conscfg_t *)mod->config)->consoles, con, con->name);
 }
 
 
