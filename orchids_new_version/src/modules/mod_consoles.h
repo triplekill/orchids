@@ -38,7 +38,7 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state);
 static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
 
-static FILE *create_udp_socket(const char *host, const int port);
+static FILE *create_console_socket(const char *host, const int port);
 
 
 static int output_console_msg(char *console, char *msg, size_t len);

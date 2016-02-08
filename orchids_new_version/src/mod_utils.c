@@ -894,7 +894,7 @@ char *action_doer_ip (action_orchids_ctx_t *octx, char *s, char *end,
     DebugLog(DF_CORE, DS_ERROR, "getaddrinfo, %s\n", gai_strerror(status));
     addr = NULL;
   }
-  else if(sa->ai_family == AF_INET)
+  else if (sa->ai_family == AF_INET)
   { 
     addr = ovm_ipv4_new(gc_ctx);
     IPV4(addr) = ((struct sockaddr_in *)(sa->ai_addr))->sin_addr;

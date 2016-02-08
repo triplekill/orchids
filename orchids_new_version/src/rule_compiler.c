@@ -6773,26 +6773,37 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 {
   ovm_var_t *addr;
   node_expr_term_t *n;
-  struct hostent  *hptr;
+  struct addrinfo *hptr;
+  struct addrinfo hints;
+  int status;
 
   /* XXX Add hash for constant sharing here */
 
   GC_START(ctx->gc_ctx, 1);
   addr = ovm_ipv4_new(ctx->gc_ctx);
-  hptr = gethostbyname(hostname);
-  if (hptr == NULL)
+  hints.ai_flags = 0;
+  hints.ai_family = PF_INET; /* only allow for IPv4 */
+  hints.ai_socktype = 0;
+  hints.ai_protocol = 0;
+  hints.ai_addrlen = 0;
+  hints.ai_addr = NULL;
+  hints.ai_canonname = NULL;
+  hints.ai_next = NULL;
+  status = getaddrinfo (hostname, NULL, &hints, &hptr);
+  if (status != 0)
     {
       if (ctx->currfile!=NULL)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found.\n",
-	       ctx->issdllineno, hostname);
+      fprintf (stderr, "%u: hostname %s not found, %s.\n",
+	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
     }
   /* resolve host name */
-  IPV4(addr).s_addr = *(in_addr_t *)(hptr->h_addr_list[0]);
+  IPV4(addr) = ((struct sockaddr_in *)(hptr->ai_addr))->sin_addr;
+  freeaddrinfo(hptr);
   GC_UPDATE(ctx->gc_ctx, 0, addr);
 
   gc_base_free(hostname); /* free string memory allocated by the lexer */
@@ -6830,29 +6841,31 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 {
   ovm_var_t *addr;
   node_expr_term_t *n;
-  struct addrinfo *htpr;
+  struct addrinfo *hptr;
+  int status;
 
   /* XXX Add hash for constant sharing here */
 
   GC_START(ctx->gc_ctx, 1);
   addr = ovm_ipv6_new(ctx->gc_ctx);
-  if (getaddrinfo(hostname, NULL, NULL, &htpr) != 0)
+  status = getaddrinfo(hostname, NULL, NULL, &hptr);
+  if (status != 0)
     {
       if (ctx->currfile!=NULL)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found.\n",
-	       ctx->issdllineno, hostname);
+      fprintf (stderr, "%u: hostname %s not found, %s.\n",
+	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
     }
   /* resolve host name */
-  IPV6(addr) = ((struct sockaddr_in6 *)(htpr->ai_addr))->sin6_addr;
+  IPV6(addr) = ((struct sockaddr_in6 *)(hptr->ai_addr))->sin6_addr;
   GC_UPDATE(ctx->gc_ctx, 0, addr);
 
   gc_base_free(hostname); /* free string memory allocated by the lexer */
-  freeaddrinfo(htpr);
+  freeaddrinfo(hptr);
 
   n = (node_expr_term_t *) gc_alloc (ctx->gc_ctx, sizeof(node_expr_term_t),
 				     &node_expr_term_class);
@@ -6897,7 +6910,8 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
   n->parents = NULL;
   
   /* resolve host name */
-  if ((status = getaddrinfo(hostname, NULL, NULL, &sa)) != 0)
+  status = getaddrinfo(hostname, NULL, NULL, &sa);
+  if (status != 0)
     {
       if (ctx->currfile!=NULL)
 	fprintf (stderr, "%s:", STR(ctx->currfile));

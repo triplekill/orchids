@@ -57,7 +57,7 @@ void clear_hash(hash_t *hash, void (*elmt_free)(void *e))
     while (tmp!=NULL)
       {
 	tmp_next = tmp->next;
-	if (elmt_free)
+	if (elmt_free!=NULL)
 	  (*elmt_free) (tmp->data);
 	gc_base_free (tmp);
 	tmp = tmp_next;

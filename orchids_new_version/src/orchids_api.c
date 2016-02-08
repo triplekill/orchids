@@ -674,7 +674,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   rctx.rule_compiler = ctx->rule_compiler;
   rctx.new_vm_func_tbl = ctx->vm_func_tbl;
   rctx.new_vm_func_tbl_sz = ctx->vm_func_tbl_sz;
-  rctx.shared_hash = new_hash (ctx->gc_ctx, 1021);
+  rctx.shared_hash = new_inthash (ctx->gc_ctx, 1021);
   rctx.global_fields = (field_record_table_t *)restore_gc_struct (&rctx);
   if (rctx.global_fields==NULL && errno!=0) { err = errno; goto errlab; }
   if (rctx.global_fields==NULL || TYPE(rctx.global_fields)!=T_FIELD_RECORD_TABLE)
@@ -700,7 +700,7 @@ int orchids_restore (orchids_t *ctx, char *name)
 	   since sharing is local to each module (or to whatever
 	   was restored before any module).
 	*/
-	clear_hash (rctx.shared_hash, NULL);
+	clear_inthash (rctx.shared_hash, NULL);
 	err = restore_module (ctx, &rctx);
 	break;
       default: err = -2; break;
@@ -713,7 +713,7 @@ int orchids_restore (orchids_t *ctx, char *name)
       gc_base_free (rctx.vm_func_tbl);
     }
   if (rctx.shared_hash!=NULL)
-    free_hash (rctx.shared_hash, NULL);
+    free_inthash (rctx.shared_hash, NULL);
   funlockfile (rctx.f);
   (void) fclose (rctx.f);
  end:

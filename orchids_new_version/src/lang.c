@@ -5306,7 +5306,7 @@ static gc_header_t *shared_def_restore (restore_ctx_t *rctx)
   if (err) { errno = err; p = NULL; }
   else
     {
-      p = hash_get (rctx->shared_hash, &id, sizeof(unsigned long));
+      p = inthash_get (rctx->shared_hash, id);
       if (p!=NULL) { errno = -2; p = NULL; }
       else
 	{
@@ -5316,7 +5316,7 @@ static gc_header_t *shared_def_restore (restore_ctx_t *rctx)
 	  else
 	    {
 	      GC_UPDATE (rctx->gc_ctx, 0, p);
-	      hash_add (rctx->gc_ctx, rctx->shared_hash, p, &id, sizeof(unsigned long));
+	      inthash_add (rctx->gc_ctx, rctx->shared_hash, p, id);
 	    }
 	}
     }
@@ -5341,7 +5341,7 @@ static gc_header_t *shared_use_restore (restore_ctx_t *rctx)
 
   err = restore_ulong (rctx, &id);
   if (err) { errno = err; return NULL; }
-  p = hash_get (rctx->shared_hash, &id, sizeof(unsigned long));
+  p = inthash_get (rctx->shared_hash, id);
   if (p==NULL) { errno = -2; }
   return p;
 }

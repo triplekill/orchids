@@ -26,6 +26,7 @@ orchids_SOURCES = \
         util/stailq.h              util/dtailq.h          \
         util/hash.c                util/stack.c           \
         util/hash.h                util/stack.h           \
+	util/inthash.c util/inthash.h \
         util/linux_process_info.c  util/strhash.c         \
         util/linux_process_info.h  util/strhash.h         \
                         util/string_util.c     \

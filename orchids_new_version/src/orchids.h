@@ -41,6 +41,7 @@
 #include "hash.h"
 #include "strhash.h"
 #include "objhash.h"
+#include "inthash.h"
 #include "stack.h"
 #include "lang.h"
 #include "queue.h"

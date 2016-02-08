@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -149,27 +150,48 @@ static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
 }
 
 
-static FILE *create_udp_socket(const char *host, const int port)
+static FILE *create_console_socket(const char *host, const int port)
 {
-  struct sockaddr_in srvaddr;
-  struct hostent *he;
+  struct addrinfo *sa, *sap;
   int sd;
   FILE *sp;
+  int status;
+  char ports[32];
 
-  he = gethostbyname(host);
-  if (he == NULL)
+  sprintf (ports, "%d", port);
+  status = getaddrinfo(host, ports, NULL, &sa);
+  if (status != 0)
     {
-      DebugLog(DF_MOD, DS_ERROR, "Unknown hostname '%s'.\n", host);
-      exit(EXIT_FAILURE);
+      fprintf (stderr, "mod_consoles: error resolving %s, %s.\n",
+	       host, gai_strerror(status));
+      fflush (stderr);
+      return NULL;
+  }
+  for (sap=sa; sap!=NULL; sap=sap->ai_next)
+    {
+      sd = socket(sap->ai_family, sap->ai_socktype, sap->ai_protocol);
+      if (sd>=0)
+	break;
     }
-
-  memset(&srvaddr, 0, sizeof (struct sockaddr_in));
-  memcpy(&srvaddr.sin_addr, he->h_addr_list[0], he->h_length);
-  srvaddr.sin_family = he->h_addrtype;
-  srvaddr.sin_port = htons(port);
-
-  sd = Xsocket(PF_INET, SOCK_DGRAM, 0);
-  Xconnect(sd, (struct sockaddr *) &srvaddr, sizeof (struct sockaddr));
+  if (sap==NULL)
+    {
+      fprintf (stderr, "mod_consoles: error creating socket to %s.\n",
+	       host);
+      fflush (stderr);
+      freeaddrinfo(sa);
+      return NULL;
+    }
+  status = connect (sd, sap->ai_addr, sap->ai_addrlen);
+  if (status < 0)
+    {
+      fprintf (stderr, "mod_consoles: error connecting to %s, %s.\n",
+	       host, strerror(errno));
+      fflush (stderr);
+      freeaddrinfo(sa);
+      return NULL;
+    }
+ 
+  freeaddrinfo(sa);
   sp = Xfdopen(sd, "w");
 
   return sp;
@@ -205,7 +227,7 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod,
   con->name = gc_strdup(ctx->gc_ctx, console);
   con->host = gc_strdup(ctx->gc_ctx, strdup(hostname));
   con->port = port;
-  con->fp = create_udp_socket(con->host, con->port);
+  con->fp = create_console_socket(con->host, con->port);
 
   strhash_add (ctx->gc_ctx, ((conscfg_t *)mod->config)->consoles, con, con->name);
 }
