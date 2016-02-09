@@ -35,6 +35,10 @@
 
 #include "engine.h"
 
+/* In lang.c: */
+extern void fprintf_env (FILE *fp, const orchids_t *ctx, rule_t *rule, ovm_var_t *env,
+			 ovm_var_t *oldenv, char *header, char *trailer);
+
 static void thread_group_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 {
   thread_group_t *pid = (thread_group_t *)p;
@@ -705,22 +709,44 @@ static int simulate_state_and_create_threads (orchids_t *ctx,
   if (vmret > 0)
     { /* OK: pass transition */
       si->q = t->dest;
-      if (ctx->verbose>=2)
-	{
-	  fprintf (stderr, "* %s: %s -[%d]->",
-		   si->q->rule->name, si->q->name, t->id);
-	}
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
-      if (ctx->verbose>=2)
- 	{
- 	  if (si->q!=t->dest)
- 	    fprintf (stderr, " %s ->", t->dest->name);
- 	  fprintf (stderr, " %s.\n", si->q->name);
- 	  fflush (stderr);
- 	}
     }
   return vmret;
 }
+
+static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
+						      state_instance_t *si,
+						      thread_queue_t *tq)
+{
+  transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
+  int vmret;
+
+  GC_START (ctx->gc_ctx, 1);
+  t = si->t;
+  vmret = 1;
+  if (t->eval_code!=NULL)
+    vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);
+  if (vmret > 0)
+    { /* OK: pass transition */
+      fprintf (stderr, "* %s: %s -[%d]->",
+	       si->q->rule->name, si->q->name, t->id);
+      GC_UPDATE (ctx->gc_ctx, 0, si->env);
+      si->q = t->dest;
+      enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
+      if (si->q!=t->dest)
+	fprintf (stderr, " %s ~>", t->dest->name);
+      fprintf (stderr, " %s.\n", si->q->name);
+      fprintf_env (stderr, ctx, si->q->rule, si->env, (ovm_var_t *)GC_LOOKUP(0),
+		   "  - ", "\n");
+      fflush (stderr);
+     }
+  GC_END (ctx->gc_ctx);
+  return vmret;
+}
+
+#define SIMULATE_STATE_AND_CREATE_THREADS(ctx,si,tq) (((ctx)->verbose>=2)? \
+						      simulate_state_and_create_threads_verbose(ctx,si,tq): \
+						      simulate_state_and_create_threads(ctx,si,tq))
 
 static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
 {
@@ -758,21 +784,46 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
   GC_END (gc_ctx);
 }
 
-static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si)
+#define MONITOR_MAXBUF 80
+#define MONITOR_EXCESS 4
+
+struct engine_actmon_s {
+  char buf[MONITOR_MAXBUF];
+  char *cur;
+};
+
+static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struct engine_actmon_s *monp)
 {
   thread_group_t *pid;
   unsigned long code;
 
+  if (monp->cur >= monp->buf+MONITOR_MAXBUF)
+    return; /* overflow */
   if (si==NULL)
-    fputc ('|', stderr);
+    *monp->cur++ = '|';
   else
     {
       pid = si->pid;
       code = (unsigned long)pid;
       code >>= 4;
       code %= 26;
-      fputc ('A'+code, stderr);
+      *monp->cur++ = (char) ('A'+code);
     }
+}
+
+static void fprintf_actmon (FILE *f, struct engine_actmon_s *monp)
+{
+  if (monp->cur >= monp->buf+MONITOR_MAXBUF-MONITOR_EXCESS)
+    {
+      monp->buf[MONITOR_MAXBUF-MONITOR_EXCESS] = '\0';
+      fprintf (f, "%s...\n", monp->buf);
+    }
+  else
+    {
+      *monp->cur = '\0';
+      fprintf (f, "%s\n", monp->buf);
+    }
+  fflush (f);
 }
 
 void inject_event(orchids_t *ctx, event_t *event)
@@ -782,10 +833,12 @@ void inject_event(orchids_t *ctx, event_t *event)
   gc_t *gc_ctx = ctx->gc_ctx;
   thread_queue_t *new_queue, *unsorted, *next, *old_queue;
   state_instance_t *si;
+  struct engine_actmon_s actmon;
   int vmret;
 
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
+  actmon.cur = actmon.buf;
   execute_pre_inject_hooks (ctx, event);
   /* Between two calls to inject_event(),
      ctx->global_fields->fields[i].val==NULL
@@ -820,7 +873,7 @@ void inject_event(orchids_t *ctx, event_t *event)
 	  si = thread_dequeue (gc_ctx, old_queue);
 	  GC_UPDATE (gc_ctx, 3, si);
 	  if (ctx->verbose>=3)
-	    engine_activity_monitor (ctx, si);
+	    engine_activity_monitor (ctx, si, &actmon);
 	  if (si==NULL) /* This is a BUMP */
 	    BUMP();
 	  else if (si->pid->flags & THREAD_KILL)
@@ -829,7 +882,7 @@ void inject_event(orchids_t *ctx, event_t *event)
 	    }
 	  else
 	    {
-	      vmret = simulate_state_and_create_threads (ctx, si, unsorted);
+	      vmret = SIMULATE_STATE_AND_CREATE_THREADS (ctx, si, unsorted);
 	      /* If si->t->flags does not have the TRANS_NO_WAIT flag set (normal case):
 		 - if vmret=1, we succeeded, and we must wait (i.e., reenqueue si)
 		 - if vmret=0, we failed, and we must wait (reenqueue si)
@@ -861,7 +914,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   for (e = event; e!=NULL; e = e->next)
     fields[e->field_id].val = NULL;
   if (ctx->verbose>=3)
-    fputc ('\n', stderr);
+    fprintf_actmon (stderr, &actmon);
 }
 
 uint16_t create_fresh_handle (gc_t *gc_ctx, state_instance_t *si, ovm_var_t *val)

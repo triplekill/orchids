@@ -2809,9 +2809,10 @@ void fprintf_ovm_var(FILE *fp, ovm_var_t *val)
 	 }
 }
 
-void fprintf_env (FILE *fp, const orchids_t *ctx, rule_t *rule, ovm_var_t *env)
+void fprintf_env (FILE *fp, const orchids_t *ctx, rule_t *rule, ovm_var_t *env,
+		  ovm_var_t *oldenv, char *header, char *trailer)
 {
-  ovm_var_t *val;
+  ovm_var_t *val, *oldval;
   int i, n;
 
   n = rule->dynamic_env_sz;
@@ -2820,9 +2821,13 @@ void fprintf_env (FILE *fp, const orchids_t *ctx, rule_t *rule, ovm_var_t *env)
       val = ovm_read_value (env, i);
       if (val!=NULL)
 	{
-	  fprintf (fp, "* %s = ", rule->var_name[i]);
-	  fprintf_ovm_var (fp, val);
-	  fprintf (fp, "\n");
+	  oldval = ovm_read_value (oldenv, i);
+	  if (val!=oldval)
+	    {
+	      fprintf (fp, "%s%s=", header, rule->var_name[i]);
+	      fprintf_ovm_var (fp, val);
+	      fputs (trailer, fp);
+	    }
 	}
     }
 }
@@ -4268,7 +4273,7 @@ static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
   /* report */
   fprintf(ftmp, "Report for rule %s, at state %s:\n\n", state->pid->rule->name,
 	  state->q->name);
-  fprintf_env (ftmp, ctx, state->pid->rule, state->env);
+  fprintf_env (ftmp, ctx, state->pid->rule, state->env, NULL, "* ", "\n");
   rewind(ftmp);
   /* Now call sendmail */
   pid = fork();
