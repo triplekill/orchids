@@ -714,11 +714,23 @@ static int simulate_state_and_create_threads (orchids_t *ctx,
   return vmret;
 }
 
+static char pid_codes[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789";
+
+static char pid_code (thread_group_t *pid)
+{
+  unsigned long code;
+
+  code = (unsigned long)pid;
+  code %= 61;
+  return pid_codes[code];
+}
+
 static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 						      state_instance_t *si,
 						      thread_queue_t *tq)
 {
   transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
+  thread_group_t *oldpid;
   int vmret;
 
   GC_START (ctx->gc_ctx, 1);
@@ -728,14 +740,21 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
     vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);
   if (vmret > 0)
     { /* OK: pass transition */
-      fprintf (stderr, "* %s: %s -[%d]->",
+      fprintf (stderr, "* %s", si->q->rule->name);
+      oldpid = si->pid;
+      if (ctx->verbose>=3)
+	fprintf (stderr, "[%c]", pid_code (oldpid));
+      fprintf (stderr, "* %s: %s -#%d->",
 	       si->q->rule->name, si->q->name, t->id);
       GC_UPDATE (ctx->gc_ctx, 0, si->env);
       si->q = t->dest;
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
       if (si->q!=t->dest)
 	fprintf (stderr, " %s ~>", t->dest->name);
-      fprintf (stderr, " %s.\n", si->q->name);
+      fprintf (stderr, " %s", si->q->name);
+      if (ctx->verbose>=3 && si->pid!=oldpid)
+	fprintf (stderr, " ![%c]\n", pid_code(si->pid));
+      else fprintf (stderr, "\n");
       fprintf_env (stderr, ctx, si->q->rule, si->env, (ovm_var_t *)GC_LOOKUP(0),
 		   "  - ", "\n");
       fflush (stderr);
@@ -794,21 +813,12 @@ struct engine_actmon_s {
 
 static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struct engine_actmon_s *monp)
 {
-  thread_group_t *pid;
-  unsigned long code;
-
   if (monp->cur >= monp->buf+MONITOR_MAXBUF)
     return; /* overflow */
   if (si==NULL)
     *monp->cur++ = '|';
   else
-    {
-      pid = si->pid;
-      code = (unsigned long)pid;
-      code >>= 4;
-      code %= 26;
-      *monp->cur++ = (char) ('A'+code);
-    }
+    *monp->cur++ = pid_code (si->pid);
 }
 
 static void fprintf_actmon (FILE *f, struct engine_actmon_s *monp)
