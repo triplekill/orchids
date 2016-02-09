@@ -743,9 +743,8 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
       fprintf (stderr, "* %s", si->q->rule->name);
       oldpid = si->pid;
       if (ctx->verbose>=3)
-	fprintf (stderr, "[%c]", pid_code (oldpid));
-      fprintf (stderr, "* %s: %s -#%d->",
-	       si->q->rule->name, si->q->name, t->id);
+	fprintf (stderr, "[grp=%c]", pid_code (oldpid));
+      fprintf (stderr, ": %s -#%d->", si->q->name, t->id);
       GC_UPDATE (ctx->gc_ctx, 0, si->env);
       si->q = t->dest;
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
@@ -753,7 +752,7 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 	fprintf (stderr, " %s ~>", t->dest->name);
       fprintf (stderr, " %s", si->q->name);
       if (ctx->verbose>=3 && si->pid!=oldpid)
-	fprintf (stderr, " ![%c]\n", pid_code(si->pid));
+	fprintf (stderr, " [grp:=%c]\n", pid_code(si->pid));
       else fprintf (stderr, "\n");
       fprintf_env (stderr, ctx, si->q->rule, si->env, (ovm_var_t *)GC_LOOKUP(0),
 		   "  - ", "\n");
