@@ -8315,11 +8315,15 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
       for (i=0; i<n; i++)
 	{
 	  si = restore_gc_struct (rctx);
+	  if (si==NULL || TYPE(si)!=T_STATE_INSTANCE)
+	    { errno = -2; rule = NULL; goto end; }
 	  if (errno) { rule = NULL; goto end; }
 	  GC_UPDATE (gc_ctx, 1, si);
 	  if (objhash_get (rule->sync_lock, si)!=NULL) /* duplicate entry */
 	    { rule = NULL; errno = -2; goto end; }
 	  pid = restore_gc_struct (rctx);
+	  if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
+	    { errno = -2; rule = NULL; goto end; }
 	  if (errno) { rule = NULL; goto end; }
 	  GC_UPDATE (gc_ctx, 2, pid);
 	  objhash_add (gc_ctx, rule->sync_lock, pid, si);

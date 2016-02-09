@@ -127,6 +127,7 @@ void *objhash_del(objhash_t *hash, void *key)
       else
         *head = elmt->next;
       gc_base_free (elmt);
+      hash->elmts--;
       /* elmt->key and elmt->data will be deallocated, if needed,
 	 by the garbage collector */
       return data;

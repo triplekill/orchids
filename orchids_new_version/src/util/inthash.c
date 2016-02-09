@@ -38,7 +38,7 @@ inthash_t *new_inthash(gc_t *gc_ctx, size_t hsize)
   h->htable = he = gc_base_malloc(gc_ctx, hsize * sizeof (inthash_elmt_t *));
   for (i=0; i<hsize; i++)
     he[i] = NULL;
-  return (h);
+  return h;
 }
 
 

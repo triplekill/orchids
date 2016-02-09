@@ -705,7 +705,19 @@ static int simulate_state_and_create_threads (orchids_t *ctx,
   if (vmret > 0)
     { /* OK: pass transition */
       si->q = t->dest;
+      if (ctx->verbose>=2)
+	{
+	  fprintf (stderr, "* %s: %s -[%d]->",
+		   si->q->rule->name, si->q->name, t->id);
+	}
       enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
+      if (ctx->verbose>=2)
+ 	{
+ 	  if (si->q!=t->dest)
+ 	    fprintf (stderr, " %s ->", t->dest->name);
+ 	  fprintf (stderr, " %s.\n", si->q->name);
+ 	  fflush (stderr);
+ 	}
     }
   return vmret;
 }
@@ -807,7 +819,7 @@ void inject_event(orchids_t *ctx, event_t *event)
 	{
 	  si = thread_dequeue (gc_ctx, old_queue);
 	  GC_UPDATE (gc_ctx, 3, si);
-	  if (ctx->verbose>=2)
+	  if (ctx->verbose>=3)
 	    engine_activity_monitor (ctx, si);
 	  if (si==NULL) /* This is a BUMP */
 	    BUMP();
@@ -848,7 +860,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   /* Set back the entries of the fields[] array to NULL. */
   for (e = event; e!=NULL; e = e->next)
     fields[e->field_id].val = NULL;
-  if (ctx->verbose>=2)
+  if (ctx->verbose>=3)
     fputc ('\n', stderr);
 }
 

@@ -81,12 +81,14 @@ void *hash_to_array(gc_t *gc_ctx, hash_t *hash)
   elmts = hash->elmts;
   array = gc_base_malloc(gc_ctx, elmts * sizeof (void *));
   j = 0;
-  for (i = 0; i < hsize; i++) {
-    for (helmt = hash->htable[i]; helmt!=NULL; helmt = helmt->next) {
-      array[j] = helmt->data;
-      j++;
+  for (i = 0; i < hsize; i++)
+    {
+      for (helmt = hash->htable[i]; helmt!=NULL; helmt = helmt->next)
+	{
+	  array[j] = helmt->data;
+	  j++;
+	}
     }
-  }
   return (array);
 }
 
@@ -151,10 +153,11 @@ void *hash_check_and_add(gc_t *gc_ctx, hash_t *hash, void *data, void *key, size
   hcode_t hcode;
 
   elmt = hash->htable[(*hash->hash) ((hkey_t *)key, keylen) % hash->size];
-  for (; elmt!=NULL; elmt = elmt->next) {
-    if (keylen==elmt->keylen && !memcmp(key, elmt->key, keylen))
-      return elmt->data;
-  }
+  for (; elmt!=NULL; elmt = elmt->next)
+    {
+      if (keylen==elmt->keylen && !memcmp(key, elmt->key, keylen))
+	return elmt->data;
+    }
   elmt = gc_base_malloc(gc_ctx, sizeof (hash_elmt_t));
   elmt->key = (hkey_t *) key;
   elmt->keylen = keylen;
@@ -183,7 +186,7 @@ void *hash_update(hash_t *hash, void *new_data, void *key, size_t keylen)
     }
   }
 
-  return (NULL);
+  return NULL;
 }
 
 
@@ -195,14 +198,15 @@ void *hash_update_or_add(gc_t *gc_ctx, hash_t *hash, void *new_data, void *key, 
 
   hcode = (*hash->hash) (key, keylen) % hash->size;
   elmt = hash->htable[hcode];
-  for (; elmt; elmt = elmt->next) {
-    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
-      old_data = elmt->data;
-      elmt->data = new_data;
-
-      return (old_data);
+  for (; elmt; elmt = elmt->next)
+    {
+      if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
+	{
+	  old_data = elmt->data;
+	  elmt->data = new_data;
+	  return old_data;
+	}
     }
-  }
 
   elmt = gc_base_malloc(gc_ctx, sizeof (hash_elmt_t));
   elmt->key = key;
@@ -226,21 +230,22 @@ void *hash_del(hash_t *hash, void *key, size_t keylen)
 
   prev = NULL;
   head = &hash->htable[(*hash->hash) (key, keylen) % hash->size];
-  for (elmt = *head; elmt; elmt = elmt->next) {
-    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen)) {
-      data = elmt->data;
-      if (prev)
-        prev->next = elmt->next;
-      else
-        *head = elmt->next;
-      gc_base_free(elmt);
-
-      return (data);
+  for (elmt = *head; elmt!=NULL; elmt = elmt->next)
+    {
+      if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
+	{
+	  data = elmt->data;
+	  if (prev)
+	    prev->next = elmt->next;
+	  else
+	    *head = elmt->next;
+	  gc_base_free(elmt);
+	  hash->elmts--;
+	  return data;
+	}
+      prev = elmt;
     }
-    prev = elmt;
-  }
-
-  return (NULL);
+  return NULL;
 }
 
 
@@ -249,12 +254,12 @@ void *hash_get(hash_t *hash, void *key, size_t keylen)
   hash_elmt_t *elmt;
 
   elmt = hash->htable[(*hash->hash)((hkey_t *)key, keylen) % hash->size];
-  for (; elmt!=NULL; elmt = elmt->next) {
-    if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
-      return (elmt->data);
-  }
-
-  return (NULL);
+  for (; elmt!=NULL; elmt = elmt->next)
+    {
+      if (keylen == elmt->keylen && !memcmp(key, elmt->key, keylen))
+	return elmt->data;
+    }
+  return NULL;
 }
 
 
@@ -271,14 +276,15 @@ hash_t *hash_clone(gc_t *gc_ctx, hash_t *hash, void *(*clone)(gc_t *gc_ctx, void
 
   hsize = hash->size;
   h = new_hash(gc_ctx, hsize);
-  for (i = 0; i < hsize; i++) {
-    for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next) {
-      data = (*clone) (gc_ctx, tmp->data);
-      hash_add(gc_ctx, h, data, tmp->key, tmp->keylen);
+  for (i = 0; i < hsize; i++)
+    {
+      for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next)
+	{
+	  data = (*clone) (gc_ctx, tmp->data);
+	  hash_add(gc_ctx, h, data, tmp->key, tmp->keylen);
+	}
     }
-  }
-
-  return (h);
+  return h;
 }
 
 
@@ -286,18 +292,18 @@ int hash_walk(hash_t *hash, hash_walk_func_t func, void *data)
 {
   size_t i;
 
-  for (i = 0; i<hash->size; i++) {
-    hash_elmt_t *tmp;
-    int status;
+  for (i = 0; i<hash->size; i++)
+    {
+      hash_elmt_t *tmp;
+      int status;
 
-    for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next)
-      {
-	if ((status = (*func)(tmp->data, data)) != 0)
-	  return (status);
-      }
-  }
-
-  return (0);
+      for (tmp = hash->htable[i]; tmp!=NULL; tmp = tmp->next)
+	{
+	  if ((status = (*func)(tmp->data, data)) != 0)
+	    return status;
+	}
+    }
+  return 0;
 }
 
 
