@@ -54,6 +54,9 @@ gc_t *gc_init (void)
   gc_ctx->sweep_current = &gc_ctx->alloced;
   gc_ctx->generation = 0;
   gc_ctx->mark_state = GC_MARK_STATE_INIT;
+  gc_ctx->gc_rainy_day_goal = 0;
+  gc_ctx->gc_rainy_day_amount = 0;
+  gc_ctx->gc_rainy_day_fund = NULL;
   return gc_ctx;
 }
 
@@ -78,7 +81,110 @@ void gc_add_root (gc_t *gc_ctx, gc_header_t **root)
 
 #define GC_GREY_OR_BLACK_NEWp(gc_ctx,p) (((gc_ctx)->generation & 1)?((p)->flags & (GC_FLAGS_GREY_MASK | GC_FLAGS_EVEN_COLOR_MASK)):((p)->flags & (GC_FLAGS_GREY_MASK | GC_FLAGS_ODD_COLOR_MASK)))
 
+static size_t gc_rainy_day_increase (gc_t *gc_ctx, size_t delta)
+{
+  struct gc_rainy_day_block_s *blk, *cur;
+  size_t actual;
+  
+  if (delta<=16) /* If delta is too small, prefer not to increase */
+    return 0;
+  blk = malloc (offsetof (struct gc_rainy_day_block_s, filling[delta]));
+  if (blk!=NULL)
+    {
+      cur = gc_ctx->gc_rainy_day_fund;
+      blk->next = cur;
+      blk->size = delta;
+      return delta;
+    }
+  delta >>= 1;
+  if (delta<=16) /* If delta is too small, prefer not to increase */
+    return 0;
+  actual = gc_rainy_day_increase (gc_ctx, delta);
+  if (actual < delta)
+    return actual;
+  actual += gc_rainy_day_increase (gc_ctx, delta);
+  return actual;
+}
 
+static size_t gc_rainy_day_increase_to (gc_t *gc_ctx, size_t amount)
+{
+  if (amount<=gc_ctx->gc_rainy_day_amount)
+    return gc_ctx->gc_rainy_day_amount;
+  gc_ctx->gc_rainy_day_amount += gc_rainy_day_increase (gc_ctx, amount - gc_ctx->gc_rainy_day_amount);
+  return gc_ctx->gc_rainy_day_amount;
+}
+
+size_t gc_set_rainy_day_fund (gc_t *gc_ctx, size_t amount)
+{
+  gc_ctx->gc_rainy_day_goal = gc_rainy_day_increase_to (gc_ctx, amount);
+  return gc_ctx->gc_rainy_day_goal;
+}
+
+size_t gc_critical (gc_t *gc_ctx)
+{
+  return gc_ctx->gc_rainy_day_goal - gc_ctx->gc_rainy_day_amount;
+}
+
+void gc_recuperate (gc_t *gc_ctx)
+{
+  (void) gc_rainy_day_increase_to (gc_ctx, gc_critical (gc_ctx));
+}
+
+static void *malloc_with_rainy_day_fund (gc_t *gc_ctx, size_t n)
+{
+  void *p;
+  struct gc_rainy_day_block_s *blk, **blkp;
+
+  p = malloc (n);
+  if (p!=NULL)
+    return p;
+  for (blkp = &gc_ctx->gc_rainy_day_fund; (blk = *blkp)!=NULL; blkp = &blk->next)
+    {
+      if (offsetof (struct gc_rainy_day_block_s, filling[blk->size])>=n)
+	{
+	  *blkp = blk->next;
+	  gc_ctx->gc_rainy_day_amount -= blk->size; /* munch something from the rainy day fund */
+	  free (blk);
+	  p = malloc (n);
+	  break;
+	}
+    }
+  if (p==NULL)
+    {
+      fprintf (stderr, "Fatal error: tried hard to allocate %lu bytes, but failed.\n", n);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  return p;
+}
+
+static void *realloc_with_rainy_day_fund (gc_t *gc_ctx, void *p0, size_t n)
+{
+  void *p;
+  struct gc_rainy_day_block_s *blk, **blkp;
+
+  p = realloc (p0, n);
+  if (p!=NULL)
+    return p;
+  for (blkp = &gc_ctx->gc_rainy_day_fund; (blk = *blkp)!=NULL; blkp = &blk->next)
+    {
+      if (offsetof (struct gc_rainy_day_block_s, filling[blk->size])>=n)
+	{
+	  *blkp = blk->next;
+	  gc_ctx->gc_rainy_day_amount -= blk->size; /* munch something from the rainy day fund */
+	  free (blk);
+	  p = realloc (p0, n);
+	  break;
+	}
+    }
+  if (p==NULL)
+    {
+      fprintf (stderr, "Fatal error: tried hard to reallocate %lu bytes, but failed.\n", n);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  return p;
+}
 
 void gc_touch (gc_t *gc_ctx, gc_header_t *p)
 {
@@ -279,7 +385,7 @@ void *gc_base_malloc (gc_t *gc_ctx, size_t n)
       if (p==NULL)
 	{
 	  gc_full (gc_ctx);
-	  p = Xmalloc (n);
+	  p = malloc_with_rainy_day_fund (gc_ctx, n);
 	}
     }
   return p;
@@ -308,7 +414,7 @@ void *gc_base_realloc (gc_t *gc_ctx, void *p0, size_t n)
       if (p==NULL)
 	{
 	  gc_full (gc_ctx);
-	  p = Xrealloc (p0, n);
+	  p = realloc_with_rainy_day_fund (gc_ctx, p0, n);
 	}
     }
   return p;

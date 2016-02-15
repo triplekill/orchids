@@ -803,17 +803,20 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
 }
 
 #define MONITOR_MAXBUF 80
-#define MONITOR_EXCESS 4
 
 struct engine_actmon_s {
   char buf[MONITOR_MAXBUF];
   char *cur;
+  unsigned long excess;
 };
 
 static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struct engine_actmon_s *monp)
 {
-  if (monp->cur >= monp->buf+MONITOR_MAXBUF)
-    return; /* overflow */
+  if (monp->cur >= monp->buf+MONITOR_MAXBUF-1)
+    {
+      monp->excess++;
+      return; /* overflow */
+    }
   if (si==NULL)
     *monp->cur++ = '|';
   else
@@ -822,10 +825,41 @@ static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struc
 
 static void fprintf_actmon (FILE *f, struct engine_actmon_s *monp)
 {
-  if (monp->cur >= monp->buf+MONITOR_MAXBUF-MONITOR_EXCESS)
+  unsigned long exc, bound;
+  unsigned long digits;
+  
+  if (monp->cur >= monp->buf+MONITOR_MAXBUF-1)
     {
-      monp->buf[MONITOR_MAXBUF-MONITOR_EXCESS] = '\0';
-      fprintf (f, "%s...\n", monp->buf);
+      exc = monp->excess+4; /* 3 characters for [+ and ], plus at least one for a digit */
+      for (digits=1, bound=9; exc>bound; digits++)
+	bound = 10*bound + 9*digits-1; /* = 10^digits - digits:
+					digits: 1  2   3    4 ...
+					bound:  9 98 997 9996 ...
+				       */
+      /* If exc<=9, digits:=1
+	 If 10<=exc<=98, digits:=2
+	 If 99<=exc<=997, digits:=3
+	 etc.
+	 Now print [+n] where n = excess+digits+3
+	 Examples (with MONITOR_MAXBUF==80; length of line should be at most 79):
+	 - if excess==1 (80 characters total), exc==5, digits=1, print [+5] at position 75
+	 - if excess==2 (81 characters total), exc==6, digits=1, print [+6] at position 75
+	 - if excess==5 (84 characters total), exc==9, digits==1, print [+9] at position 75
+	 - if excess==6 (85 characters total), exc==10, digits==2, print [+11] at position 74
+	 - if excess==94 (173 characters total), exc==98, digits==2, print [+99] at position 74
+	 - if excess==95 (174 characters total), exc==99, digits==3, print [+101] at position 73
+	 - etc.
+      */
+      if (digits<=MONITOR_MAXBUF-4)
+	{
+	  sprintf (&monp->buf[MONITOR_MAXBUF-4-digits], "[+%lu]", exc+digits-1);
+	}
+      else /* even [+n] message is too long: hope MONITOR_MAXBUF>=6 and print [...] */
+	{
+	  strcpy (&monp->buf[MONITOR_MAXBUF-6], "[...]");
+	}
+      //monp->buf[MONITOR_MAXBUF-1] = '\0';
+      fprintf (f, "%s\n", monp->buf);
     }
   else
     {
@@ -848,6 +882,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
   actmon.cur = actmon.buf;
+  actmon.excess = 0;
   execute_pre_inject_hooks (ctx, event);
   /* Between two calls to inject_event(),
      ctx->global_fields->fields[i].val==NULL

@@ -181,6 +181,12 @@ typedef struct gc_stack_data {
 #define GC_LOOKUP(i) __gc.data[i]
 #define GC_DATA() __gc.data
 
+struct gc_rainy_day_block_s {
+  struct gc_rainy_day_block_s *next;
+  size_t size;
+  char filling[1]; /* actually filling[size] */
+};
+  
 #define GC_INC_UNIT (256)
 /* With this value, int's should be at least 2 byte long,
    otherwise we won't be able to specify any interesting
@@ -213,6 +219,9 @@ struct gc_s
 #define GC_MARK_STATE_END 2
   int gc_mark_cnt;
   int gc_sweep_cnt;
+  size_t gc_rainy_day_goal;
+  size_t gc_rainy_day_amount;
+  struct gc_rainy_day_block_s *gc_rainy_day_fund;
 };
 
 gc_t *gc_init (void);
@@ -264,6 +273,23 @@ void gc_full (gc_t *gc_ctx); /* Does a complete round of garbage
 				twice to reclaim all useless memory.
 			     */
 
+size_t gc_set_rainy_day_fund (gc_t *gc_ctx, size_t amount); /* (re)initialize rainy day fund;
+							       will always try to increase rainy
+							       day fund to amount bytes;
+							       return new gc_rainy_day_goal value
+							    */
+size_t gc_critical (gc_t *gc_ctx); /* return 0 if we have enough memory,
+				      and a positive number otherwise;
+				      that positive number is the number of bytes the gc
+				      would like to free, namely
+				      gc_ctx->gc_rainy_day_goal - gc_ctx->gc_rainy_day_amount */
+void gc_recuperate (gc_t *gc_ctx); /* try to exit from critical state, by reallocating
+				      the rainy day fund, until gc_ctx->gc_rainy_day_amount
+				      >= gc_ctx->gc_rainy_day_goal, if possible;
+				      should be called in gc_critical situations, after some memory has
+				      been freed */
+
+  
 void gc_check (gc_t *gc_ctx); /* Looks for inconsistencies in memory.
 				 Works similarly to fsck on Unix
 				 systems.  Used to detect memory
