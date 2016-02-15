@@ -449,6 +449,10 @@ struct node_state_s
 /**   @var node_rule_s::statelist
  **     Other state list.
  **/
+/**   @var node_rule_s::complexity_degree
+ **     Degree of the polynomial representation the complexity of the rule,
+ **     or ULONG_MAX if exponential; filled by evaluate_complexity()
+ **/
 struct node_rule_s
 {
   gc_header_t         gc;
@@ -459,6 +463,7 @@ struct node_rule_s
   node_state_t       *init;
   node_expr_t   *statelist;
   node_syncvarlist_t *sync_vars;
+  unsigned long complexity_degree;
 };
 
 /**

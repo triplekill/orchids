@@ -374,7 +374,11 @@ struct state_s
  **     Number of active instances of this rule.
  **/
 /**   @var rule_s::id
- **     Rule identifier
+ **     Rule identifier.
+ **/
+/**   @var rule_s::complexity_degree
+ **     Degree of the polynomial representation the complexity of the rule,
+ **     or ULONG_MAX if exponential.
  **/
 struct rule_s
 {
@@ -408,6 +412,7 @@ struct rule_s
   objhash_t        *sync_lock;
   int32_t          *sync_vars;
   size_t           sync_vars_sz;
+  unsigned long complexity_degree;
 };
 
 typedef struct env_bind_s env_bind_t;

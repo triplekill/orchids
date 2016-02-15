@@ -13,6 +13,11 @@
 
 MaxMemorySize 134217728
 
+# Allocate a rainy day fund: some preallocated amount of memory
+# that Orchids can dig from in case of low memory situations.
+# 16 MB should be enough (but is otherwise a more or less random number)
+RainyDayFund 16777216
+
 # This is the runtime user id which Orchids will drop root privileges to.
 
 RuntimeUser @@RUNUSER@@

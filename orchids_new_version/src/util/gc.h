@@ -278,11 +278,12 @@ size_t gc_set_rainy_day_fund (gc_t *gc_ctx, size_t amount); /* (re)initialize ra
 							       day fund to amount bytes;
 							       return new gc_rainy_day_goal value
 							    */
-size_t gc_critical (gc_t *gc_ctx); /* return 0 if we have enough memory,
-				      and a positive number otherwise;
-				      that positive number is the number of bytes the gc
-				      would like to free, namely
-				      gc_ctx->gc_rainy_day_goal - gc_ctx->gc_rainy_day_amount */
+#define GC_CRITICAL(gc_ctx) ((gc_ctx)->gc_rainy_day_goal - (gc_ctx)->gc_rainy_day_amount)
+/* return 0 if we have enough memory, and a positive number otherwise;
+   that positive number is the number of bytes the gc
+   would like to free */
+
+
 void gc_recuperate (gc_t *gc_ctx); /* try to exit from critical state, by reallocating
 				      the rainy day fund, until gc_ctx->gc_rainy_day_amount
 				      >= gc_ctx->gc_rainy_day_goal, if possible;

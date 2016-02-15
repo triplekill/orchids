@@ -53,7 +53,7 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
   if (mod_handle == NULL)
     {
       DebugLog(DF_CORE, DS_FATAL,
-	       "dlopen(%s): %s\n", mod_fname, dlerror());
+	       "Cannot load module %s: dlopen failed: %s\n", mod_fname, dlerror());
       return NULL;
     }
 
@@ -70,7 +70,7 @@ input_module_t *load_add_shared_module(orchids_t *ctx, const char *name)
 
   //gc_check(ctx->gc_ctx);
   DebugLog(DF_CORE, DS_NOTICE,
-	   "module '%s' successfully loaded: symbol mod_%s found at %x\n",
+	   "Module '%s' successfully loaded: symbol mod_%s found at %x\n",
 	   name, name, mod);
 
   if (add_module(ctx, mod, mod_handle) < 0)

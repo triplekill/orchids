@@ -481,6 +481,156 @@ static void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t
   all->last = NULL; /* no need to GC_TOUCH() NULL */
 }
 
+struct rule_size_s {
+  size_t occupied;
+  unsigned long occurs;
+  unsigned long allowed;
+  rule_t *rule;
+};
+
+static void cleanup_state_instance (state_instance_t *si);
+
+void emergency_drop_threads (orchids_t *ctx)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  unsigned long needed;
+  thread_queue_t *queue;
+  thread_queue_elt_t *qe, *last;
+  state_instance_t *si;
+  thread_group_t *pid;
+  rule_t *rule;
+  struct rule_size_s *rule_sizes, *rs;
+  size_t total_rule_sizes;
+  int i, n;
+  int drop;
+
+#define SI_SIZE_ESTIMATE (sizeof(thread_queue_elt_t) + sizeof(state_instance_t))
+  
+  needed = GC_CRITICAL (gc_ctx);
+  if (needed==0)
+    return;
+  DebugLog (DF_ENG, DS_CRIT,
+	    "Emergency: need %lu bytes (taken from rainy day fund for now), try to free threads (%lu bytes each).\n",
+	    SI_SIZE_ESTIMATE);
+
+  n = ctx->rule_compiler->rules;
+  rule_sizes = gc_base_malloc (gc_ctx, n * sizeof(struct rule_size_s));
+  for (i=0; i<n; i++)
+    {
+      rs = &rule_sizes[i];
+      rs->occupied = 0;
+      rs->occurs = 0;
+      rs->allowed = ULONG_MAX;
+      rs->rule = NULL;
+    }
+  queue = ctx->thread_queue;
+  /* Now estimate size taken by each rule */
+  for (qe = queue->first; qe!=NULL; qe=qe->next)
+    {
+      si = qe->thread;
+      if (si==NULL)
+	continue;
+      pid = si->pid;
+      rule = pid->rule;
+      if (rule->complexity_degree==0)
+	continue; /* do not count rules with complexity degree 0: they are benign */
+      i = rule->id;
+      if (i>=0 && i<n)
+	{
+	  rs = &rule_sizes[i];
+	  rs->occupied += SI_SIZE_ESTIMATE;
+	  rs->rule = rule;
+	}
+      /* This is conservative (too low): ignores sizes of environments (si->env),
+	 of thread_groups (si->pid), and also of overhead data structures used by
+	 the malloc()/free() algorithm itself */
+    }
+  total_rule_sizes = 0;
+  for (i=0; i<n; i++)
+    total_rule_sizes += rule_sizes[i].occupied;
+  /* We need to free roughly needed/total_rule_sizes threads (this is an upper bound).
+     We divide that evenly among all rules with complexity degree != 0.
+   */
+  if (total_rule_sizes==0) /* If cannot free anything: quit (we are apparently running with
+			      incredibly little memory)
+			   */
+    goto end;
+  for (i=0; i<n; i++)
+    {
+      rs = &rule_sizes[i];
+      /* p = rs->occupied/total_rule_sizes is the relative weight of this rule;
+	 it should free p*needed bytes, hence it can keep rs->occupied - p*needed
+	 = rs->occupied*(total_rule_sizes-needed)/total_rule_sizes bytes.
+       */
+      rs->allowed = rs->occupied*(total_rule_sizes-needed)/total_rule_sizes;
+      if (rs->allowed < 128*SI_SIZE_ESTIMATE) /* keep at least 128 entries min
+						 (128 is pretty random).
+						 This may counter the purpose of
+						 the whole rainy day fund scheme,
+						 but 128 is not much, and I would
+						 like to avoid rs->allowed to drop to
+						 too small a value because of the underestimation of
+						 rule_sizes[i].occupied (see above).
+					       */
+	rs->allowed = 128*SI_SIZE_ESTIMATE;
+      if (rs->occupied > rs->allowed)
+	{
+	  DebugLog(DF_ENG, DS_CRIT, "Emergency: will drop %lu threads running rule %s, %lu remaining.\n",
+		   (rs->occupied - rs->allowed)/SI_SIZE_ESTIMATE, rs->rule->name,
+		   rs->allowed/SI_SIZE_ESTIMATE);
+	}
+    }
+  last = NULL;
+  for (qe = queue->first; qe!=NULL; qe=qe->next)
+    {
+      si = qe->thread;
+      if (si==NULL)
+	{
+	  if (last!=NULL && last->thread==NULL)
+	    { /* If both last and si are BUMPs, remove the second one. */
+	      GC_TOUCH (gc_ctx, last->next = qe->next);
+	      // queue->nelts--;  No, only non-BUMP threads are counted
+	    }
+	  else
+	    last = qe; /* keep BUMP threads, unless previous one
+			  was already a BUMP */
+	  continue;
+	}
+      pid = si->pid;
+      rule = pid->rule;
+      i = rule->id;
+      drop = 0;
+      if (i>=0 && i<n)
+	{
+	  rs = &rule_sizes[i];
+	  rs->occurs += SI_SIZE_ESTIMATE;
+	  if (rs->occurs>=rs->allowed)
+	    drop = 1;
+	}
+      if (drop)
+	{
+	  if (last==NULL)
+	    {
+	      GC_TOUCH (gc_ctx, queue->first = qe->next);
+	    }
+	  else
+	    {
+	      GC_TOUCH (gc_ctx, last->next = qe->next);
+	    }
+	  rule->instances--;
+	  queue->nelts--;
+	  cleanup_state_instance (si);
+	}
+      else last = qe;
+    }
+  GC_TOUCH (gc_ctx, queue->last = last);
+  gc_full (gc_ctx);
+  gc_full (gc_ctx);
+  gc_recuperate (gc_ctx);
+ end:
+  gc_base_free (rule_sizes);
+}
+
 static int sync_var_env_is_defined(state_instance_t *state)
 { /*!!! should be optimized, by maintaining a count of assigned variables, say */
   size_t i;
@@ -959,6 +1109,16 @@ void inject_event(orchids_t *ctx, event_t *event)
     fields[e->field_id].val = NULL;
   if (ctx->verbose>=3)
     fprintf_actmon (stderr, &actmon);
+  if ((GC_CRITICAL(gc_ctx)<<2) > gc_ctx->gc_rainy_day_goal)
+    emergency_drop_threads (ctx);
+    /* Drop threads to get back some memory, in critically low memory situations.
+       We will try to get back at least needed = GC_CRITICAL(gc_ctx) bytes.
+       We only try to do so provided needed<<2 > rainy_day_goal,
+       i.e., provided we needed at least 1/4 of the rainy_day_goal.
+       E.g., if rainy_day_goal = 16Mb, we shall start to drop threads only when
+       we have consumed at least 4Mb of the rainy day fund (and 12Mb are still remaining).
+       The constant 1/4 is essentially random.
+    */
 }
 
 uint16_t create_fresh_handle (gc_t *gc_ctx, state_instance_t *si, ovm_var_t *val)

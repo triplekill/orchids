@@ -94,6 +94,7 @@ static size_t gc_rainy_day_increase (gc_t *gc_ctx, size_t delta)
       cur = gc_ctx->gc_rainy_day_fund;
       blk->next = cur;
       blk->size = delta;
+      gc_ctx->gc_rainy_day_fund = blk;
       return delta;
     }
   delta >>= 1;
@@ -120,14 +121,9 @@ size_t gc_set_rainy_day_fund (gc_t *gc_ctx, size_t amount)
   return gc_ctx->gc_rainy_day_goal;
 }
 
-size_t gc_critical (gc_t *gc_ctx)
-{
-  return gc_ctx->gc_rainy_day_goal - gc_ctx->gc_rainy_day_amount;
-}
-
 void gc_recuperate (gc_t *gc_ctx)
 {
-  (void) gc_rainy_day_increase_to (gc_ctx, gc_critical (gc_ctx));
+  (void) gc_rainy_day_increase_to (gc_ctx, GC_CRITICAL (gc_ctx));
 }
 
 static void *malloc_with_rainy_day_fund (gc_t *gc_ctx, size_t n)

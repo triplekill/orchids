@@ -473,7 +473,7 @@ int orchids_save (orchids_t *ctx, char *name)
   size_t len;
   char *tmpname;
   int err = 0;
-  size_t version = 3;
+  size_t version = 4;
 
   errno = 0;
   len = strlen (name);
@@ -668,7 +668,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   /* Now check version number */
   err = restore_size_t (&rctx, &version);
   if (err) goto errlab;
-  if (version!=3) { errno = -6; goto errlab; }
+  if (version!=4) { errno = -6; goto errlab; }
   rctx.version = version;
   rctx.externs = ctx->xclasses;
   rctx.rule_compiler = ctx->rule_compiler;

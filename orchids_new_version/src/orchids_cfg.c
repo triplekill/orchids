@@ -363,7 +363,7 @@ void proceed_pre_config(orchids_t *ctx)
 #endif
   struct timeval diff_time;
 
-  DebugLog(DF_CORE, DS_NOTICE, "*** beginning ORCHIDS configuration ***\n");
+  DebugLog(DF_CORE, DS_NOTICE, "*** Beginning ORCHIDS configuration ***\n");
 
 //gc_check(ctx->gc_ctx);
   if (ctx->off_line_mode == MODE_ONLINE)
@@ -411,7 +411,7 @@ void proceed_pre_config(orchids_t *ctx)
 
   gettimeofday(&ctx->preconfig_time, NULL);
   Timer_Sub(&diff_time, &ctx->preconfig_time, &ctx->start_time);
-  DebugLog(DF_CORE, DS_NOTICE, "pre-config (real) time: %li ms\n",
+  DebugLog(DF_CORE, DS_NOTICE, "Pre-config (real) time: %li ms\n",
            (diff_time.tv_sec * 1000) + (diff_time.tv_usec) / 1000);
 }
 
@@ -769,7 +769,7 @@ static void add_rule_file(orchids_t *ctx, mod_entry_t *mod,
 {
   rulefile_t *rulefile;
 
-  DebugLog(DF_CORE, DS_INFO, "adding rule file %s\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Adding rule file %s\n", dir->args);
 
   rulefile = Xmalloc(sizeof (rulefile_t));
   rulefile->name = dir->args;
@@ -795,7 +795,7 @@ static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
   int i;
   glob_t globbuf;
 
-  DebugLog(DF_CORE, DS_INFO, "adding rule files '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Adding rule files '%s'\n", dir->args);
 
   ret = glob(dir->args, 0, NULL, &globbuf);
   if (ret)
@@ -808,7 +808,7 @@ static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
       else
 	{
 	  DebugLog(DF_CORE, DS_ERROR,
-		   "glob() error..\n");
+		   "Could not glob file name: error %i: %s\n", errno, strerror (errno));
 	}
     }
 
@@ -857,13 +857,13 @@ static void module_config(orchids_t *ctx, mod_entry_t *mod,
   m = find_module_entry(ctx, mod_name);
   if (m==NULL)
     {
-      DebugLog(DF_CORE, DS_WARN, "module '%s' not loaded, configuration skipped\n", mod_name);
+      DebugLog(DF_CORE, DS_WARN, "Module '%s' not loaded, configuration skipped\n", mod_name);
       return;
     }
   c = m->mod->cfg_cmds;
   if (c == NULL)
     {
-      DebugLog(DF_CORE, DS_INFO, "module '%s' has no directive table.\n",
+      DebugLog(DF_CORE, DS_INFO, "Module '%s' has no directive table.\n",
 	       m->mod->name);
       return;
     }
@@ -879,7 +879,7 @@ static void module_config(orchids_t *ctx, mod_entry_t *mod,
       else
 	{
 	  DebugLog(DF_CORE, DS_WARN,
-		   "no handler defined in module '%s' for directive '%s'\n",
+		   "Module %s: no handler defined for directive '%s'\n",
 		   m->mod->name, d->directive);
 	}
     }
@@ -916,7 +916,7 @@ config_add_module(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
     ;
   else
     {
-      DebugLog(DF_CORE, DS_FATAL, "module %s not found.\n", dir->args);
+      DebugLog(DF_CORE, DS_FATAL, "Module %s not found.\n", dir->args);
       exit(EXIT_FAILURE);
     }
 }
@@ -931,7 +931,7 @@ static void config_load_module(orchids_t *ctx, mod_entry_t *mod,
   input_mod = load_add_shared_module(ctx, dir->args);
   if (input_mod == NULL)
     {
-      DebugLog(DF_CORE, DS_FATAL, "module %s not loaded.\n", dir->args);
+      DebugLog(DF_CORE, DS_FATAL, "Module %s not loaded.\n", dir->args);
       return;
     }
 }
@@ -940,7 +940,7 @@ static void set_runtime_user(orchids_t *ctx, mod_entry_t *mod,
 			     config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO,
-           "setting RuntimeUser to '%s'\n", dir->args);
+           "Setting RuntimeUser to '%s'\n", dir->args);
   ctx->runtime_user = dir->args;
 }
 
@@ -949,7 +949,7 @@ static void set_default_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 				    config_directive_t *dir)
 {
   DebugLog(DF_CORE, DS_INFO,
-	   "setting default pre-processor command to '%s'\n", dir->args);
+	   "Setting default pre-processor command to '%s'\n", dir->args);
   ctx->default_preproc_cmd = dir->args;
 }
 #endif
@@ -985,14 +985,14 @@ static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
 			    config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting modules directory to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting module directory to '%s'\n", dir->args);
   ctx->modules_dir = dir->args;
 }
 
 static void set_lock_file(orchids_t *ctx, mod_entry_t *mod,
 			  config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting lock file to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting lock file to '%s'\n", dir->args);
 
   ctx->lockfile = dir->args;
 }
@@ -1004,25 +1004,25 @@ static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
   int l;
   struct rlimit rl;
 
-  DebugLog(DF_CORE, DS_INFO, "setting max memory limit '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting max memory limit '%s'\n", dir->args);
 
   l = strtol(dir->args, (char **)NULL, 10);
   ret = getrlimit(RLIMIT_AS, &rl);
   if (ret)
     {
       DebugLog(DF_CORE, DS_ERROR,
-	       "getrlimit(): error %i: %s\n",
-	       errno, strerror(errno));
+	       "Cannot get memory limit for MaxMemorySize %s: error %i: %s\n",
+	       dir->args, errno, strerror(errno));
       return;
     }
 
-  DebugLog(DF_CORE, DS_INFO, "current memory limit is %i %i\n",
+  DebugLog(DF_CORE, DS_INFO, "Current memory limit is %i %i\n",
            rl.rlim_cur, rl.rlim_max);
 
   if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < l)
     {
       DebugLog(DF_CORE, DS_ERROR,
-	       "can't set memory limit: hard limit already set to %i "
+	       "Cannot set memory limit: hard limit already set to %i "
              "(requesting %i)\n",
 	       rl.rlim_max, l);
       return;
@@ -1034,7 +1034,7 @@ static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
   if (ret)
     {
       DebugLog(DF_CORE, DS_ERROR,
-	       "setrlimit(): error %i: %s\n",
+	       "MaxMemorySize %s: error %i: %s\n",
 	       errno, strerror(errno));
       return;
     }
@@ -1043,7 +1043,7 @@ static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
 static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
 			   config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting ResolveIP to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting ResolveIP to '%s'\n", dir->args);
 
   if (    !strcasecmp("on",      dir->args)
        || !strcasecmp("1",       dir->args)
@@ -1062,7 +1062,7 @@ static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
 static void set_save_file (orchids_t *ctx, mod_entry_t *mod,
 			   config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "setting save file to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting save file to '%s'\n", dir->args);
   ctx->save_file = dir->args;
 }
 
@@ -1071,7 +1071,7 @@ static void set_save_interval (orchids_t *ctx, mod_entry_t *mod,
 {
   long sec;
 
-  DebugLog(DF_CORE, DS_INFO, "setting save interval to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting save interval to '%s'\n", dir->args);
 
   sec = strtol(dir->args, (char **)NULL, 10);
   if (sec <= 0)
@@ -1091,7 +1091,7 @@ static void set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   int nice_value;
   int ret;
 
-  DebugLog(DF_CORE, DS_INFO, "setting nice priority to '%s'\n", dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting nice priority to '%s'\n", dir->args);
 
   nice_value = strtol(dir->args, (char **)NULL, 10);
   if (nice_value < -20 || nice_value > 19)
@@ -1107,10 +1107,30 @@ static void set_nice(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
   if (ret != 0)
     {
       DebugLog(DF_CORE, DS_ERROR,
-	       "setpriority(prio=%i): error %i: %s\n",
+	       "Cannot set nice priority to %i: error %i: %s\n",
 	       nice_value, errno, strerror(errno));
       return;
     }
+}
+
+static void set_rainy_day_fund (orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
+{
+  unsigned long amount;
+  
+  errno = 0;
+  amount = strtoul (dir->args, (char **)NULL, 10);
+  if (amount > LONG_MAX) /* A negative number was given */
+    {
+      DebugLog (DF_CORE, DS_ERROR, "Ignored negative rainy day fund\n");
+      return;
+    }
+  if (amount==0 && errno!=0)
+    {
+      DebugLog (DF_CORE, DS_ERROR, "Illegal rainy day fund: error %i: %s\n", errno, strerror (errno));
+      return;
+    }
+  amount = gc_set_rainy_day_fund (ctx->gc_ctx, amount);
+  DebugLog(DF_CORE, DS_INFO, "Allocated rainy day fund: %lu bytes\n", amount);
 }
 
 static void add_input_source(orchids_t *ctx, mod_entry_t *mod,
@@ -1154,7 +1174,7 @@ static void add_input_source(orchids_t *ctx, mod_entry_t *mod,
   else
     {
       DebugLog(DF_CORE, DS_WARN,
-	       "no handler defined in module [%s] for [%s] directive\n",
+	       "Module %s: no handler defined for directive %s\n",
 	       m->mod->name, dir->directive);
     }
 }
@@ -1343,6 +1363,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "Nice", set_nice, "Set the priority of the Orchids process"},
   { "SaveFile", set_save_file, "Set save file, for saving and restoring" },
   { "SaveInterval", set_save_interval, "Set interval between saves" },
+  { "RainyDayFund", set_rainy_day_fund, "Set rainy day fund, in bytes, as needed to handle low memory situations" },
   { "INPUT", add_input_source, "Add an input source module"},
   { "DISSECT", add_cond_dissector, "Add a conditionnal dissector"},
   { NULL, NULL, NULL }
@@ -1354,7 +1375,7 @@ static void proceed_config_tree(orchids_t *ctx)
   config_directive_t *d;
   int i;
 
-  DebugLog(DF_CORE, DS_INFO, "*** pre-config (tree interpretation) ***\n");
+  DebugLog(DF_CORE, DS_INFO, "*** Pre-config (tree interpretation) ***\n");
 
   //gc_check(ctx->gc_ctx);
   for (d = ctx->cfg_tree; d; d = d->next)
@@ -1375,7 +1396,7 @@ static void proceed_config_tree(orchids_t *ctx)
 		   d->file, d->line, d->directive);
 	  fflush (stderr);
 	  DebugLog(DF_CORE, DS_WARN,
-		   "No handler defined for [%s] directive\n", d->directive);
+		   "No handler defined for directive %s\n", d->directive);
 	}
       //gc_check(ctx->gc_ctx);
     }
@@ -1466,7 +1487,7 @@ void proceed_post_config(orchids_t *ctx)
   input_module_t *mod;
   struct timeval diff_time;
 
-  DebugLog(DF_CORE, DS_NOTICE, "*** proceeding to post configuration... ***\n");
+  DebugLog(DF_CORE, DS_NOTICE, "*** Proceeding to post configuration... ***\n");
 
   for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++)
     {
@@ -1478,7 +1499,7 @@ void proceed_post_config(orchids_t *ctx)
   gettimeofday(&ctx->postconfig_time, NULL);
   Timer_Sub(&diff_time, &ctx->postconfig_time, &ctx->preconfig_time);
   /* move this into orchids stats */
-  DebugLog(DF_CORE, DS_NOTICE, "post-config (real) time: %li.%03li ms\n",
+  DebugLog(DF_CORE, DS_NOTICE, "Post-config (real) time: %li.%03li ms\n",
            (diff_time.tv_sec) * 1000 + (diff_time.tv_usec) / 1000,
            (diff_time.tv_usec) % 1000);
 }
@@ -1490,7 +1511,7 @@ void proceed_post_compil(orchids_t *ctx)
   input_module_t *mod;
   struct timeval diff_time;
 
-  DebugLog(DF_CORE, DS_NOTICE, "*** proceeding to post rule compilation configuration... ***\n");
+  DebugLog(DF_CORE, DS_NOTICE, "*** Proceeding to post rule compilation configuration... ***\n");
 
   for (mod_id = 0; mod_id < ctx->loaded_modules; mod_id++)
     {
@@ -1502,7 +1523,7 @@ void proceed_post_compil(orchids_t *ctx)
   gettimeofday(&ctx->postcompil_time, NULL);
   Timer_Sub(&diff_time, &ctx->postcompil_time, &ctx->compil_time);
   /* move this into orchids stats */
-  DebugLog(DF_CORE, DS_NOTICE, "post-compilation (real) time: %li.%03li ms\n",
+  DebugLog(DF_CORE, DS_NOTICE, "Post-compilation (real) time: %li.%03li ms\n",
            (diff_time.tv_sec) * 1000 +
            (diff_time.tv_usec) / 1000,
            (diff_time.tv_usec) % 1000);

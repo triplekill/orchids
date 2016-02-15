@@ -859,6 +859,7 @@ static int node_rule_save (save_ctx_t *sctx, gc_header_t *p)
 	}
       err = 0;
     }
+  err = save_ulong (sctx, n->complexity_degree);
   return err;
 }
 
@@ -876,6 +877,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   size_t i, nvars;
   char **vars;
   node_syncvarlist_t *sv;
+  unsigned long degree;
   int err;
 
   GC_START (gc_ctx, 2);
@@ -927,6 +929,8 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
       sv->grow = 8;
       sv->vars = vars;
     }
+  err = restore_ulong (rctx, &degree);
+  if (err) goto end_freevars;
   n = gc_alloc (gc_ctx, sizeof(node_rule_t), &node_rule_class);
   n->gc.type = T_NODE_RULE;
   n->line = line;
@@ -936,6 +940,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   GC_TOUCH (gc_ctx, n->init = init);
   GC_TOUCH (gc_ctx, n->statelist = statelist);
   n->sync_vars = sv;
+  n->complexity_degree = degree;
  end:
   GC_END (gc_ctx);
   return (gc_header_t *)n;
@@ -4134,7 +4139,9 @@ static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
   for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
     (void) add_complexity_node (&cc, (node_state_t *)BIN_LVAL(states));
   cg_compute_sccs_from_root (cc.g, cc.root, &index);
-  print_complexity_evaluation (gc_ctx, stderr, &cc, node_rule);
+  if (ctx->verbose>=1)
+    print_complexity_evaluation (gc_ctx, stderr, &cc, node_rule);
+  node_rule->complexity_degree = CG_DEGREE (cc.g, cc.root);
   free_complexity_graph (cc.g);
 }
 
@@ -4672,6 +4679,7 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
   GC_TOUCH (ctx->gc_ctx, new_rule->init = init_state);
   GC_TOUCH (ctx->gc_ctx, new_rule->statelist = states);
   new_rule->sync_vars = sync_vars;
+  new_rule->complexity_degree = ULONG_MAX; /* by default, at worst exponential */
   return new_rule;
 }
 
@@ -7764,7 +7772,8 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
     }
   err = save_size_t (sctx, rule->instances);
   if (err) return err;
-  err = save_int32 (sctx, rule->id);
+  err = save_int32 (sctx, rule->id); /* saved, but useless (will be restored, but then
+					recomputed by install_rule()) */
   if (err) return err;
   err = save_int (sctx, rule->flags);
   if (err) return err;
@@ -7787,6 +7796,7 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
       err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
 			  (void *)sctx);
     }
+  err = save_ulong (sctx, rule->complexity_degree);
   /*
     if (err) return err;
     err = save_gc_struct (sctx, (gc_header_t *)rule->next);
@@ -8049,7 +8059,7 @@ static void install_rule (rule_compiler_t *ctx, rule_t *rule)
   else
     GC_TOUCH (ctx->gc_ctx, ctx->first_rule = rule);
   GC_TOUCH (ctx->gc_ctx, ctx->last_rule = rule);
-  ctx->rules++;
+  rule->id = ctx->rules++;
 }
 
 static int equal_trans (transition_t *t1, transition_t *t2,
@@ -8251,6 +8261,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
   rule->sync_vars_sz = 0; /* will be set below */
+  rule->complexity_degree = ULONG_MAX; /* will be set below */
   GC_UPDATE (gc_ctx, 0, rule);
   rule->state = gc_base_malloc (gc_ctx, nstates*sizeof(state_t));
   for (i=0; i<nstates; )
@@ -8285,7 +8296,9 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     }
   err = restore_size_t (rctx, &rule->instances);
   if (err) { rule = NULL; errno = err; goto end; }
-  err = restore_int32 (rctx, &rule->id);
+  err = restore_int32 (rctx, &rule->id); /* restored, but this is useless: it will be
+					    recomputed by install_rule(), as called by
+					    install_restored_rule() */
   if (err) { rule = NULL; errno = err; goto end; }
   err = restore_int (rctx, &rule->flags);
   if (err) { rule = NULL; errno = err; goto end; }
@@ -8329,6 +8342,8 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	  objhash_add (gc_ctx, rule->sync_lock, pid, si);
 	}
     }
+  err = restore_ulong (rctx, &rule->complexity_degree);
+  if (err) { rule = NULL; errno = err; goto end; }
   /*
     p = restore_gc_struct (rctx);
     if (p==NULL && errno!=0) { rule = NULL; goto end; }
@@ -8392,8 +8407,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   check_epsilon_transitions (ctx, node_rule);
   type_check (ctx, node_rule);
   mark_no_wait_transitions (ctx, node_rule);
-  if (ctx->verbose>=1)
-    evaluate_complexity (ctx, node_rule);
+  evaluate_complexity (ctx, node_rule);
 
   GC_START(ctx->gc_ctx, 1);
   rule = gc_alloc (ctx->gc_ctx, sizeof (rule_t), &rule_class);
@@ -8408,6 +8422,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->sync_vars = NULL;
   rule->sync_vars_sz = 0;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
+  rule->complexity_degree = node_rule->complexity_degree;
 
   rule->filename = gc_strdup (ctx->gc_ctx, node_rule->real_file);
   rule->file_mtime = filestat.st_mtime;
@@ -8415,7 +8430,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->lineno = node_rule->line;
   rule->static_env_sz = ctx->statics_nb;
   rule->dynamic_env_sz = ctx->rule_env->elmts;
-  rule->id = ctx->rules;
+  // rule->id = ctx->rules;   will be set by install_rule() below
   rule->flags = 0;
 
   /* Allocate static env */
