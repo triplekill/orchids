@@ -279,6 +279,19 @@ static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
       !=0)
     { /* Kill those threads (and rules) that cannot be run under the current
 	 configuration */
+      si->pid->flags &= ~THREAD_LOCK; /* One invariant we have is that no pid
+					 should have both the THREAD_KILL and THREAD_LOCK
+					 flags set.  Hence we bluntly remove the latter.
+					 There is another invariant that any entry in
+					 the rule's lock_table should be a pid with
+					 the THREAD_LOCK flag set.  But this only
+					 applies to valid rules, without the
+					 RULE_RESTORE_UNKNOWN_FIELD_NAME and
+					 the RULE_RESTORE_UNKNOWN_PRIMITIVE flags set.
+					 Practically, once all state_instances with
+					 a pid linked to an invalid rule are killed,
+					 the rule itself will be garbage collected away.
+				      */
       si->pid->flags |= THREAD_KILL;
       rctx->errs = 0;
     }
@@ -710,7 +723,13 @@ static void cleanup_state_instance (state_instance_t *si)
 
   pid = si->pid;
   --pid->nsi;
-  if (pid->nsi==0 && pid->rule->sync_lock!=NULL && sync_var_env_is_defined (si))
+  if (pid->nsi==0 && (pid->flags & THREAD_LOCK))
+    /* && pid->rule->sync_lock!=NULL && sync_var_env_is_defined (si)
+       normally should be true.
+       However beware that we might be called here because thread_queue_elt_restore()
+       loaded an si with an invalid rule (RULE_RESTORE_UNKNOWN_FIELD_NAME | RULE_RESTORE_UNKNOWN_PRIMITIVE).
+       In that case, pid->rule is not installed, but that should not cause any problem.
+    */
     {
       (void) objhash_del (pid->rule->sync_lock, si);
     }
@@ -719,6 +738,7 @@ static void cleanup_state_instance (state_instance_t *si)
 static void detach_state_instance (gc_t *gc_ctx, state_instance_t *si)
 {
   thread_group_t *pid, *newpid;
+  objhash_t *lock_table;
 
   pid = si->pid;
   cleanup_state_instance (si);
@@ -728,12 +748,25 @@ static void detach_state_instance (gc_t *gc_ctx, state_instance_t *si)
   newpid->nsi = 1;
   newpid->flags = 0;
   GC_TOUCH (gc_ctx, si->pid = newpid);
+  /* Ah, another thing: if si->pid->flags contains THREAD_LOCK, then we should move
+     the lock from the old pid to the new pid. */
+  if (pid->flags & THREAD_LOCK)
+    {
+      pid->flags &= ~THREAD_LOCK;
+      newpid->flags |= THREAD_LOCK;
+      lock_table = pid->rule->sync_lock;
+      (void) objhash_replace (gc_ctx, lock_table, newpid, si);
+    }
 }
 
 static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 							state_instance_t *si,
 							thread_queue_t *tq,
 							int only_once)
+/* Here si->q is the (new) state we just moved to;
+   si->t is temporarily meaningless;
+   as an invariant, we shall need to thread_enqueue(si) or to cleanup_instance(si),
+   and this not only for the given si, but also for every si we create. */
 {
   size_t i, trans_nb;
   state_instance_t *newsi;
@@ -749,10 +782,16 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   if (q->flags & STATE_COMMIT)
     {
       if (si->pid->nsi!=1)
-	{ /* optimization: if only one state instance has this pid (namely, ourselves: si),
+	{ /* Optimization: if only one state instance has this pid (namely, ourselves: si),
 	     then no need to kill the other state instances with the same pid
-	     and to detach. */
+	     and to detach.
+	     Otherwise, we kill all threads in our group, and detach ourselves to form a
+	     new group.
+	  */
 	  si->pid->flags |= THREAD_KILL;
+	  /* That might momentarily violate the invariant that we cannot have both
+	     the THREAD_KILL and the THREAD_LOCK flag; if that happens, this will be
+	     repaired by the following call to detach_state_instance(). */
 	  detach_state_instance (gc_ctx, si);
 	}
     }
@@ -764,51 +803,38 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	 executing code inside states.  Indeed, synchronization can only
 	 happen when variables change.  The call to ovm_exec_expr() done
 	 when evaluating 'expect' clauses cannot change any variable. */
-      lock_table = si->pid->rule->sync_lock;
-      if (si->env!=oldenv /* Also, we need to check for synchronization
-			     only if the environment actually changed, */
-	  && lock_table!=NULL /* and if the rule is actually synchronized, */
-	  && sync_var_env_is_defined (si) /* and if all the synchronization variables
-					     are defined. */
-	  )
+      if (si->pid->flags & THREAD_LOCK)
+	; /* already locked */
+      else
 	{
-	  sync_lock = objhash_get (lock_table, si);
-	  if (sync_lock!=NULL)
-	    { /* some pid sync_lock (with the same rule) already holds the lock;
-		 then we redirect our pid to be sync_lock;
-		 this is rule (7), p.22 in the spec */
-	      if (sync_lock==si->pid) /* Oh, it might just be us; in that case,
-					 don't do anything */
-		;
-	      /* As an exception, it may be that sync_lock is a group
-		 of threads that have been killed (typically because we
-		 just entered a STATE_COMMIT state), in which case we do
-		 not join that group, instead we declare the synchronization
-		 group to be our own group---with should not be killed. */
-	      else if (sync_lock->flags & THREAD_KILL)
-		{ /* declare si->pid to be the new synchronization group */
-		  objhash_del (lock_table, si);
-		  GC_TOUCH (gc_ctx, si->pid);
-		  objhash_add (gc_ctx, lock_table, si->pid, si);
+	  lock_table = si->pid->rule->sync_lock;
+	  if (si->env!=oldenv /* Also, we need to check for synchronization
+				 only if the environment actually changed, */
+	      && lock_table!=NULL /* and if the rule is actually synchronized, */
+	      && sync_var_env_is_defined (si) /* and if all the synchronization variables
+						 are defined. */
+	      )
+	    {
+	      sync_lock = objhash_get (lock_table, si);
+	      if (sync_lock!=NULL)
+		{ /* kill ourselves: somebody already holds the lock */
+		  cleanup_state_instance (si);
+		  goto end; /* and that's all */
 		}
 	      else
-		{ /* join the synchronization group */
-		  sync_lock->nsi += si->pid->nsi;
-		  GC_TOUCH (gc_ctx, si->pid = sync_lock);
-		  /* there is no 'anchored' rule in Orchids (the boolean represented
-		     by the lightning-shaped down arrow in the spec is always false),
-		     so we never kill a thread directly because of synchronization. */
+		{ /* create a lock. */
+		  si->pid->flags |= THREAD_LOCK;
+		  // GC_TOUCH (gc_ctx, si->pid); /* useless: objhash_add() will do it */
+		  objhash_add (gc_ctx, lock_table, si->pid, si);
 		}
-	    }
-	  else
-	    { /* create a lock. */
-	      GC_TOUCH (gc_ctx, si->pid);
-	      objhash_add (gc_ctx, lock_table, si->pid, si);
 	    }
 	}
     }
   trans_nb = q->trans_nb;
-  if (q->flags & STATE_EPSILON) /* follow the first epsilon transition that matches */
+  if (q->flags & STATE_EPSILON) /* follow the first epsilon transition that matches;
+				 there must be at least one, as guaranteed by syntax
+				 (and in state_restore()).
+				*/
     for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
       {
 	if (trans->eval_code==NULL ||
@@ -822,8 +848,10 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   else if (only_once)
     for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
       { /* ordinary transition ('expect (<cond>) goto <state>'),
-	   and flag only_once is set: create temporary fresh state_instance and try to match
-	   transition; then cleanup the fresh state_instance, since it is not enqueued */
+	   and flag only_once is set: try to match transition; if
+	   there is a match, create a fresh state_instance newsi (i.e., fork
+	   a new thread);
+	   finally cleanup_state_instance(si) since si is not reenqueued. */
 	if (trans->eval_code==NULL ||
 	    ovm_exec_trans_cond (ctx, si, trans->eval_code)>0)
 	  {
@@ -831,36 +859,84 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	    GC_UPDATE (gc_ctx, 0, newsi);
 	    /* now we call ourselves back with only_once false */
 	    enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
-	    cleanup_state_instance (newsi);
 	  }
+	cleanup_state_instance (si);
       }
   else
-    for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
-      { /* ordinary transition ('expect (<cond>) goto <state>')
-	   then we place ourselves on the queue */
-	newsi = create_state_instance (ctx, si->pid, q, trans, si->env, si->nhandles);
-	GC_UPDATE (gc_ctx, 0, newsi);
-	thread_enqueue (gc_ctx, tq, newsi);
-      }
+    {
+      for (i=0, trans=q->trans; i<trans_nb; i++, trans++)
+	{ /* ordinary transition ('expect (<cond>) goto <state>'):
+	     fork a new thread on the queue, for each outgoing transition;
+	     then cleanup_state_instance(si) since si is not reenqueued. */
+	  newsi = create_state_instance (ctx, si->pid, q, trans, si->env, si->nhandles);
+	  GC_UPDATE (gc_ctx, 0, newsi);
+	  thread_enqueue (gc_ctx, tq, newsi);
+	}
+      cleanup_state_instance (si);
+    }
+ end:
   GC_END (gc_ctx);
 }
+
+static void enter_state_and_follow_epsilon_transitions_then_reenqueue (orchids_t *ctx,
+								       state_instance_t *si,
+								       thread_queue_t *tq,
+								       int only_once)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  state_instance_t *newsi;
+
+  GC_START (gc_ctx, 1);
+  newsi = create_state_instance (ctx, si->pid, si->t->dest /* go to successor state */,
+				 si->t /* temporarily wrong */,
+				 si->env, si->nhandles);
+  GC_UPDATE (gc_ctx, 0, newsi);
+  enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
+  thread_enqueue (gc_ctx, tq, si); /* and enqueue old si, which remains there waiting */
+  GC_END (gc_ctx);
+}
+
+#define SSCT_DECL							\
+  transition_t *t; /* t should not be NULL, and should not be an epsilon transition */ \
+  int vmret;								\
+  int reenqueue
+  	      /* Computing reenqueue:
+		 If si->t->flags does not have the TRANS_NO_WAIT flag set (normal case):
+		 - if vmret=1, we succeeded, and we must wait (i.e., reenqueue si)
+		 - if vmret=0, we failed, and we must wait (reenqueue si)
+		 - if vmret=-1, we failed and will fail forever (don't reenqueue; hence cleanup si)
+		 If si->t->flags has the TRANS_NO_WAIT flag set:
+		 - if vmret=1, we succeeded, hence we don't have to wait (cleanup si)
+		 - if vmret=0, we failed, and we must wait (reenqueue si)
+		 - if vmret=-1, we failed and will fail forever (cleanup si).
+		 In other words, we reenqueue if vmret=0, or if vmret=1 and the TRANS_NO_WAIT
+		 flag is not set.  Equivalently, if:
+		 - the TRANS_NO_WAIT flags is set and vmret==0
+		 - or it is not set and vmret>=0
+	      */
+#define SSCT_IF_TRANS_COND					\
+  t = si->t;							\
+  vmret = 1;							\
+  if (t->eval_code!=NULL)					\
+    vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);	\
+  if (vmret > 0)
+#define SSCT_GO	do {	 /* OK: pass transition */			\
+  reenqueue = (si->t->flags & TRANS_NO_WAIT)?(vmret==0):(vmret>=0);	\
+  if (reenqueue)							\
+    enter_state_and_follow_epsilon_transitions_then_reenqueue (ctx, si, tq, 0); \
+  else {								\
+  si->q = t->dest; /* move to successor directly */			\
+  enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);		\
+  }									\
+  } while (0)
 
 static int simulate_state_and_create_threads (orchids_t *ctx,
 					      state_instance_t *si,
 					      thread_queue_t *tq)
 {
-  transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
-  int vmret;
+  SSCT_DECL;
 
-  t = si->t;
-  vmret = 1;
-  if (t->eval_code!=NULL)
-    vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);
-  if (vmret > 0)
-    { /* OK: pass transition */
-      si->q = t->dest;
-      enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
-    }
+  SSCT_IF_TRANS_COND  SSCT_GO;
   return vmret;
 }
 
@@ -879,16 +955,11 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 						      state_instance_t *si,
 						      thread_queue_t *tq)
 {
-  transition_t *t; /* t should not be NULL, and should not be an epsilon transition */
+  SSCT_DECL;
   thread_group_t *oldpid;
-  int vmret;
 
   GC_START (ctx->gc_ctx, 1);
-  t = si->t;
-  vmret = 1;
-  if (t->eval_code!=NULL)
-    vmret = ovm_exec_trans_cond (ctx, si, t->eval_code);
-  if (vmret > 0)
+  SSCT_IF_TRANS_COND
     { /* OK: pass transition */
       fprintf (stderr, "* %s", si->q->rule->name);
       oldpid = si->pid;
@@ -896,8 +967,9 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 	fprintf (stderr, "[grp=%c]", pid_code (oldpid));
       fprintf (stderr, ": %s -#%d->", si->q->name, t->id);
       GC_UPDATE (ctx->gc_ctx, 0, si->env);
-      si->q = t->dest;
-      enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);
+      
+      SSCT_GO;
+      
       if (si->q!=t->dest)
 	fprintf (stderr, " %s ~>", t->dest->name);
       fprintf (stderr, " %s", si->q->name);
@@ -973,6 +1045,14 @@ static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struc
     *monp->cur++ = pid_code (si->pid);
 }
 
+static void collect_actmon (orchids_t *ctx, struct engine_actmon_s *monp)
+{
+  thread_queue_elt_t *qe = ctx->thread_queue->first;
+
+  for (; qe!=NULL; qe=qe->next)
+    engine_activity_monitor (ctx, qe->thread, monp);
+}
+
 static void fprintf_actmon (FILE *f, struct engine_actmon_s *monp)
 {
   unsigned long exc, bound;
@@ -1027,7 +1107,6 @@ void inject_event(orchids_t *ctx, event_t *event)
   thread_queue_t *new_queue, *unsorted, *next, *old_queue;
   state_instance_t *si;
   struct engine_actmon_s actmon;
-  int vmret;
 
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
@@ -1066,34 +1145,12 @@ void inject_event(orchids_t *ctx, event_t *event)
 	{
 	  si = thread_dequeue (gc_ctx, old_queue);
 	  GC_UPDATE (gc_ctx, 3, si);
-	  if (ctx->verbose>=3)
-	    engine_activity_monitor (ctx, si, &actmon);
 	  if (si==NULL) /* This is a BUMP */
 	    BUMP();
 	  else if (si->pid->flags & THREAD_KILL)
-	    { /* kill thread */
-	      cleanup_state_instance (si);
-	    }
+	    cleanup_state_instance (si);
 	  else
-	    {
-	      vmret = SIMULATE_STATE_AND_CREATE_THREADS (ctx, si, unsorted);
-	      /* If si->t->flags does not have the TRANS_NO_WAIT flag set (normal case):
-		 - if vmret=1, we succeeded, and we must wait (i.e., reenqueue si)
-		 - if vmret=0, we failed, and we must wait (reenqueue si)
-		 - if vmret=-1, we failed and will fail forever (don't reenqueue; hence cleanup si)
-		 If si->t->flags has the TRANS_NO_WAIT flag set:
-		 - if vmret=1, we succeeded, hence we don't have to wait (cleanup si)
-		 - if vmret=0, we failed, and we must wait (reenqueue si)
-		 - if vmret=-1, we failed and will fail forever (cleanup si).
-		 In other words, we reenqueue if vmret=0, or if vmret=1 and the TRANS_NO_WAIT
-		 flag is not set.  Equivalently, if:
-		 - the TRANS_NO_WAIT flags is set and vmret==0
-		 - or it is not set and vmret>=0
-	      */
-	      if ((si->t->flags & TRANS_NO_WAIT)?(vmret==0):(vmret>=0))
-		thread_enqueue (gc_ctx, next, si);
-	      else cleanup_state_instance (si); /* We succeeded: no need to wait. */
-	    }
+	    (void) SIMULATE_STATE_AND_CREATE_THREADS (ctx, si, unsorted);
 	}
     }
   BUMP();
@@ -1108,7 +1165,10 @@ void inject_event(orchids_t *ctx, event_t *event)
   for (e = event; e!=NULL; e = e->next)
     fields[e->field_id].val = NULL;
   if (ctx->verbose>=3)
-    fprintf_actmon (stderr, &actmon);
+    {
+      collect_actmon (ctx, &actmon);
+      fprintf_actmon (stderr, &actmon);
+    }
   if ((GC_CRITICAL(gc_ctx)<<2) > gc_ctx->gc_rainy_day_goal)
     emergency_drop_threads (ctx);
     /* Drop threads to get back some memory, in critically low memory situations.

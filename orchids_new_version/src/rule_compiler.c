@@ -8046,6 +8046,8 @@ static int state_restore (restore_ctx_t *rctx, state_t *state_array,
   if (err) goto err_freetrans;
   err = restore_int32 (rctx, &state->id);
   if (err) goto err_freetrans;
+  if ((state->flags & STATE_EPSILON) && n==0)
+    { err = -2; goto err_freetrans; } /* every epsilon state should have at least one outgoing transition */
   return 0;
 }
 

@@ -459,6 +459,7 @@ struct thread_group_s {
   size_t nsi; /* number of state instances that have this pid */
   uint32_t flags;
 #define THREAD_KILL 0x1
+#define THREAD_LOCK 0x2
 };
 typedef struct thread_group_s thread_group_t;
 
