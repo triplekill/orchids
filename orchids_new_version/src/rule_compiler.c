@@ -906,6 +906,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   GC_UPDATE (gc_ctx, 1, statelist);
   err = restore_size_t (rctx, &nvars);
   i=0;
+  vars = NULL;
   if (nvars==0)
     sv = NULL;
   else
@@ -918,7 +919,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
 	    {
 	    end_freevars:
 	      while (i!=0) { --i; gc_base_free (vars[i]); }
-	      gc_base_free (vars);
+	      if (vars!=NULL) gc_base_free (vars);
 	      errno = err;
 	      goto end_freefilename;
 	    }
