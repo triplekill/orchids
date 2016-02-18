@@ -141,10 +141,8 @@ int objhash_replace(gc_t *ctx, objhash_t *hash, void *data, void *key)
 {
   objhash_elmt_t **head;
   objhash_elmt_t  *elmt;
-  objhash_elmt_t  *prev;
   unsigned long hcode;
 
-  prev = NULL;
   hcode = (*hash->hash) (key) % hash->size;
   head = &hash->htable[hcode];
   for (elmt = *head; elmt; elmt = elmt->next)
@@ -154,7 +152,6 @@ int objhash_replace(gc_t *ctx, objhash_t *hash, void *data, void *key)
 	  GC_TOUCH (ctx, elmt->data = data);
 	  return 0;
 	}
-      prev = elmt;
     }
   elmt = gc_base_malloc (ctx, sizeof (objhash_elmt_t));
   GC_TOUCH (ctx, elmt->key = key);

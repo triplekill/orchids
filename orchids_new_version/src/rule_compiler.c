@@ -905,12 +905,13 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
   if (statelist==NULL && errno!=0) goto end_freefilename;
   GC_UPDATE (gc_ctx, 1, statelist);
   err = restore_size_t (rctx, &nvars);
+  i=0;
   if (nvars==0)
     sv = NULL;
   else
     {
       vars = gc_base_malloc (gc_ctx, nvars*sizeof(char *));
-      for (i=0; i<nvars; i++)
+      for (; i<nvars; i++)
 	{
 	  err = restore_string (rctx, &vars[i]);
 	  if (err)
