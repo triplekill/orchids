@@ -83,6 +83,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
     print_string (str_from_ipv4($source));
     print_string (". Burst started at ");
     print_string (str_from_ctime($begin));
+    print_string ("\n");
 
     $total = $total + $count;
     $nb_burst = $nb_burst + 1;
@@ -101,6 +102,7 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
       print_string (str_from_ctime($total_begin));
       print_string (" Source : ");
       print_string (str_from_ipv4($source));
+      print_string ("\n");
     }
 
     // Here we start a new burst detection by going back to the first state.
