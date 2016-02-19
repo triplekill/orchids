@@ -27,6 +27,7 @@ rule pidtrack
   {
     expect (.auditd.pid == $pid &&
         .auditd.syscall == SYS_execve &&
+	.auditd.uid != .auditd.euid && /* hack */
 	.auditd.success == "yes")
       goto update_uid_gid;
 
