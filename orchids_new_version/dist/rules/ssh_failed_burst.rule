@@ -4,7 +4,7 @@
 #define THRESH 100
 
 #define TIME_FIELD .syslog.time
-#define AGGR_INIT $source = .sshd.src_ip;
+#define AGGR_INIT $source = .sshd.src_ip
 #define AGGR_VARS $source
 #define AGGR_COND .sshd.src_ip == $source
 #define CONDITION .sshd.action == "Failed"
@@ -34,12 +34,12 @@ rule ssh_failed_burst synchronize (AGGR_VARS)
   state start! {
     $total = 0;
     $nb_burst = 0;
+    AGGR_INIT;
     goto first;
   }
 
   state first!
   {
-    AGGR_INIT
     $total_begin = TIME_FIELD;
     $count = 0;
     $begin = TIME_FIELD;

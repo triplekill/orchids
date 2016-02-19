@@ -2001,7 +2001,7 @@ static node_state_t *trans_dest_state (rule_compiler_t *ctx, node_trans_t *trans
 	  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
 	  if (trans->file!=NULL)
 	    fprintf (stderr, "%s:", trans->file);
-	  fprintf (stderr, "%u: error: unresolved state name %s\n",
+	  fprintf (stderr, "%u: error: unresolved state name '%s'.\n",
 		   trans->lineno, trans->dest);
 	  ctx->nerrors++;
 	}
@@ -2744,8 +2744,11 @@ static void check_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
     {
       if (file!=NULL)
 	fprintf (stderr, "%s:", file);
-      fprintf (stderr, "%u: error: variable %s may be used uninitialized in action list of state '%s'.\n",
-	       line, ctx->dyn_var_name[vs->n], state->name);
+      fprintf (stderr, "%u: error: variable %s may be used uninitialized in action list",
+	       line, ctx->dyn_var_name[vs->n]);
+      if (state->name!=NULL)
+	fprintf (stderr, " of state '%s'", state->name);
+      fprintf (stderr, ".\n");
       ctx->nerrors++;
     }
   action_res.mustset = vs_union (gc_ctx, state->mustset, action_res.mustset);
@@ -2788,8 +2791,12 @@ static void check_rule_state_mustset (rule_compiler_t *ctx, node_rule_t *rule,
     {
       if (file!=NULL)
 	fprintf (stderr, "%s:", file);
-      fprintf (stderr, "%u: Warning: state %s is unreachable, hence useless\n",
-	       line, state->name);
+      if (state->name!=NULL)
+	fprintf (stderr, "%u: warning: state %s is unreachable, hence useless.\n",
+		 line, state->name);
+      else fprintf (stderr, "%u: warning: inner state is unreachable (I am confused).\n", line);
+      /* state->name cannot be NULL, normally, since if an inner state is unreachable,
+	 then its encasing state would be, too. */
     }
   else check_state_mustset (ctx, rule, state);
 }
@@ -2862,7 +2869,7 @@ static void check_var_usage (rule_compiler_t *ctx, node_rule_t *rule)
 		  trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
 		  if (trans->file!=NULL)
 		    fprintf (stderr, "%s:", trans->file);
-		  fprintf (stderr, "%u: nonexistent target state %s\n",
+		  fprintf (stderr, "%u: error: nonexistent target state '%s'.\n",
 			   trans->lineno, trans->dest);
 		  ctx->nerrors++;
 		}
@@ -2906,6 +2913,457 @@ static void check_var_usage (rule_compiler_t *ctx, node_rule_t *rule)
   check_rule_mustset (ctx, rule);
 }
 
+varset_t *node_expr_vars_mayset (gc_t *gc_ctx, node_expr_t *e)
+{
+  varset_t *vs, *newvs;
+
+  vs = VS_EMPTY;
+  GC_START(gc_ctx, 2);
+ again:
+  if (e==NULL)
+    ;
+  else switch (e->type)
+    {
+    case NODE_FIELD:
+    case NODE_CONST:
+    case NODE_BREAK:
+    case NODE_VARIABLE:
+      break;
+    case NODE_CALL:
+      /* For NODE_CALL, NODE_BINOP, and general sequence evaluation, we have:
+	 mayset(e1; e2) = mayset(e1) U mayset(e2)
+      */
+      {
+	node_expr_t *l;
+
+	for (l=CALL_PARAMS(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    newvs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(l));
+	    GC_UPDATE(gc_ctx, 1, newvs);
+	    vs = vs_union (gc_ctx, vs, newvs);
+	    GC_UPDATE (gc_ctx, 0, vs);
+	  }
+	break;
+      }
+    case NODE_RETURN:
+      vs = node_expr_vars_mayset (gc_ctx, MON_VAL(e));
+      break;
+    case NODE_BINOP:
+    case NODE_CONS:
+    case NODE_EVENT:
+    case NODE_COND:
+      vs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(e));
+      GC_UPDATE(gc_ctx, 0, vs);
+      newvs = node_expr_vars_mayset (gc_ctx, BIN_RVAL(e));
+      GC_UPDATE(gc_ctx, 1, newvs);
+      vs = vs_union (gc_ctx, vs, newvs);
+      break;
+    case NODE_DB_PATTERN:
+      /* e is db_pattern(db, pat1, ..., patn)
+	 mayset(e) = mayset(db) U union {mayset(pati) | pati not a logical variable}
+	             U {pati | pati a logical variable}
+       */
+      vs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(e));
+      GC_UPDATE(gc_ctx, 0, vs);
+      {
+	node_expr_t *l;
+
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    if (is_logical_variable(BIN_LVAL(l)))
+	      {
+		newvs = vs_one_element (gc_ctx, SYM_RES_ID(BIN_LVAL(l)));
+		GC_UPDATE(gc_ctx, 1, newvs);
+		vs = vs_union (gc_ctx, vs, newvs);
+		GC_UPDATE(gc_ctx, 0, vs);
+	      }
+	    else
+	      {
+		newvs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(l));
+		GC_UPDATE(gc_ctx, 1, newvs);
+		vs = vs_union (gc_ctx, vs, newvs);
+		GC_UPDATE(gc_ctx, 0, vs);
+	      }
+	  }
+      }
+      break;
+    case NODE_DB_COLLECT:
+      /* e is db_collect(returns, (actions . expr), pat1, pat2, ..., patn)
+	 mayset(e) = mayset(actions.expr) U union {mayset (pati) | i=1...n}
+       */
+      {
+	node_expr_t *l;
+
+	e = BIN_RVAL(e); /* skip 'returns' part */
+	vs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(e));
+	GC_UPDATE(gc_ctx, 0, vs);
+	for (l=BIN_RVAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    newvs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(l));
+	    GC_UPDATE(gc_ctx, 1, newvs);
+	    vs = vs_union (gc_ctx, vs, newvs);
+	    GC_UPDATE(gc_ctx, 0, vs);
+	  }
+      }
+      break;
+    case NODE_DB_SINGLETON:
+      /* e is db_singleton(e1, ..., em)
+	 mayset(e) = union {mayset (ei) | i=1...m}
+       */
+      {
+	node_expr_t *l;
+
+	for (l=MON_VAL(e); l!=NULL; l=BIN_RVAL(l))
+	  {
+	    newvs = node_expr_vars_mayset (gc_ctx, BIN_LVAL(l));
+	    GC_UPDATE(gc_ctx, 1, newvs);
+	    vs = vs_union (gc_ctx, vs, newvs);
+	    GC_UPDATE(gc_ctx, 0, vs);
+	  }
+      }
+      break;
+    case NODE_MONOP:
+      e = MON_VAL(e);
+      goto again;
+    case NODE_REGSPLIT:
+      /* split "regex" /x1, ..., xn/ e1  (former syntax: /e1/"regex"/x1/x2/.../xn)
+	 where e1 == REGSPLIT_STRING(e),
+	 "regex" == REGSPLIT_PAT(e),
+	 [x1, x2, ..., xn] == REGSPLIT_DEST_VARS(e)
+	 Its mayset is mayset(e1) union {x1, x2, ..., xn}.
+      */
+      vs = node_expr_vars_mayset (gc_ctx, REGSPLIT_STRING(e));
+      GC_UPDATE(gc_ctx, 0, vs);
+      if (REGSPLIT_DEST_VARS(e)!=NULL)
+	{
+	  newvs = varlist_varset(gc_ctx, 0,
+				 REGSPLIT_DEST_VARS(e)->vars_nb,
+				 REGSPLIT_DEST_VARS(e)->vars);
+	  GC_UPDATE(gc_ctx, 1, newvs);
+	  vs = vs_union (gc_ctx, vs, newvs);
+	}
+      break;
+    case NODE_IFSTMT:
+      /*
+	e == if (e1) e2 else e3
+	mayset(e) = mayset(e1) U mayset(e2) U mayset(e3)
+       */
+      vs = node_expr_vars_mayset (gc_ctx, IF_THEN(e));
+      GC_UPDATE(gc_ctx, 0, vs);
+      newvs = node_expr_vars_mayset (gc_ctx, IF_ELSE(e));
+      GC_UPDATE(gc_ctx, 1, newvs);
+      vs = vs_union (gc_ctx, vs, newvs);
+      GC_UPDATE(gc_ctx, 0, vs);
+      newvs = node_expr_vars_mayset (gc_ctx, IF_COND(e));
+      GC_UPDATE(gc_ctx, 1, newvs);
+      vs = vs_union (gc_ctx, vs, newvs);
+      break;
+    case NODE_ASSOC:
+      /* e is x = e2
+	 mayset(e) = mayset(e2) U {x}
+	 where x == BIN_LVAL(e), e2 == BIN_RVAL(e)
+       */
+      vs = node_expr_vars_mayset (gc_ctx, BIN_RVAL(e));
+      GC_UPDATE(gc_ctx, 0, vs);
+      newvs = vs_one_element (gc_ctx, SYM_RES_ID(BIN_LVAL(e)));
+      GC_UPDATE(gc_ctx, 1, newvs);
+      vs = vs_union (gc_ctx, vs, newvs);
+      break;
+    default:
+      DebugLog(DF_OLC, DS_FATAL,
+	       "unrecognized node type %d\n", e->type);
+      exit(EXIT_FAILURE);
+      break;
+    }
+  GC_END(gc_ctx);
+  return vs;
+}
+
+static varset_t *single_state_sync_vars_set (rule_compiler_t *ctx, node_state_t *state, varset_t *syncvars)
+{ /* For each state, let A be the set of sync vars that it may set,
+     B be the set of sync vars that it must set: we first check that
+     A==B (there should be no ambiguity whether this state will assign
+     to each synchronization variable or not; e.g., 'if (...) $x=1;'
+     is forbidden if $x is synchronized, since there will be cases
+     where it will be assigned, and cases where it will not).
+   */
+  gc_t *gc_ctx = ctx->gc_ctx;
+  varset_t *mayset, *vs;
+  node_expr_vars_t action_res;
+
+  GC_START (gc_ctx, 2);
+  action_res = node_expr_vars (gc_ctx, state->actionlist);
+  GC_UPDATE (gc_ctx, 0, action_res.mustset);
+  mayset = node_expr_vars_mayset (gc_ctx, state->actionlist);
+  GC_UPDATE (gc_ctx, 1, mayset);
+  mayset = vs_inter (gc_ctx, mayset, syncvars);
+  GC_UPDATE (gc_ctx, 1, mayset);
+  vs = vs_diff (gc_ctx, mayset, action_res.mustset); /* set of synchronized variables
+							that may be assigned to,
+							but we are not sure they are. */
+  for (; vs!=VS_EMPTY; vs=vs->next)
+    {
+      if (state->file!=NULL)
+	fprintf (stderr, "%s:", state->file);
+      fprintf (stderr, "%u: error: synchronized variable %s may be set, may also be left untouched",
+	       state->line, ctx->dyn_var_name[vs->n]);
+      if (state->name!=NULL)
+	fprintf (stderr, ", in state '%s'", state->name);
+      fprintf (stderr, " - this is forbidden.\n");
+      ctx->nerrors++;
+    }
+  GC_END (gc_ctx);
+  return mayset;
+}
+
+struct node_state_array {
+  size_t n;
+  size_t size;
+  node_state_t **state; /* state[size], actually */
+};
+
+static void add_node_state (gc_t *gc_ctx, struct node_state_array *nsa, node_state_t *state)
+{
+  if (nsa->n >= nsa->size)
+    nsa->state = gc_base_realloc (gc_ctx, nsa->state, nsa->size = nsa->n+16);
+  nsa->state[nsa->n++] = state;
+}
+
+static void state_sync_vars_set (rule_compiler_t *ctx, node_rule_t *rule,
+				 node_state_t *state,
+				 varset_t *syncvars,
+				 varset_t *already_set,
+				 node_state_t *pred,
+				 int all_sync,
+				 struct node_state_array *nsa)
+/* Check that synchronization variables are rigid, i.e.: once they are set,
+   they cannot be changed.  Also do the checks in single_state_sync_vars_set().
+   Return number of states reachable from state where all synchronized variables
+   will have been set.
+*/
+{
+  /* We assume that check_var_usage() has already been called, so state->mustset
+     contains the set of variables that are set on entry to this state for sure.
+  */
+  gc_t *gc_ctx = ctx->gc_ctx;
+  varset_t *vs, *conflict;
+  node_expr_t *l;
+  node_trans_t *trans;
+  node_state_t *target;
+
+  GC_START (gc_ctx, 2);
+  /* already_set is a set of synchronized variables that may be set on entry to
+     this state: we must first check that they are all set *for sure*.
+  */
+  vs = vs_diff (gc_ctx, already_set, state->mustset);
+  /* No need to test (state->an_flags & AN_MUSTSET_REACHABLE): state is always reachable here. */
+  GC_UPDATE (gc_ctx, 0, vs);
+  for (; vs!=VS_EMPTY; vs=vs->next)
+    {
+      /* in that case, pred cannot be NULL */
+      if (state->file!=NULL)
+	fprintf (stderr, "%s:", state->file);
+      fprintf (stderr, "%u: error: on arriving ", state->line);
+      if (state->name!=NULL)
+	fprintf (stderr, "at state '%s', ", state->name);
+      else fprintf (stderr, "here, ");
+      fprintf (stderr, "synchronized variable %s may have been set already",
+	       ctx->dyn_var_name[vs->n]);
+      if (pred!=NULL && pred->name!=NULL)
+	fprintf (stderr, " (e.g., at state '%s'),", pred->name);
+      fprintf (stderr, " or not");
+#ifdef OBSOLETE
+      if (pred!=NULL && pred->name!=NULL)
+	fprintf (stderr, " (coming from another state)");
+#endif
+      fprintf (stderr, " - this is forbidden.\n");
+      ctx->nerrors++;
+    }
+  if (state->an_flags & AN_SYNCVARS_DONE)
+    goto end;
+  vs = single_state_sync_vars_set (ctx, state, syncvars);
+  GC_UPDATE (gc_ctx, 0, vs);
+  /* Now check that no synchronization variable that is set in the current state
+     was in already_set: we cannot reassign a synchronization variable (they are 'rigid').
+  */
+  conflict = vs_inter (gc_ctx, vs, already_set);
+  GC_UPDATE (gc_ctx, 1, conflict);
+  for (; conflict!=VS_EMPTY; conflict=conflict->next)
+    {
+      if (state->file!=NULL)
+	fprintf (stderr, "%s:", state->file);
+      fprintf (stderr, "%u: error: state ", state->line);
+      if (state->name!=NULL)
+	fprintf (stderr, "'%s' ", state->name);
+      fprintf (stderr, "reassigns synchronized variable %s - this is forbidden.\n",
+	       ctx->dyn_var_name[conflict->n]);
+      ctx->nerrors++;
+    }
+  if (!all_sync)
+    {
+      already_set = vs_union (gc_ctx, already_set, vs);
+      GC_UPDATE (gc_ctx, 1, already_set);
+      if (vs_subset (gc_ctx, syncvars, already_set))
+	{ /* This state is one state where the engine will have to check synchronization:
+	     this is the (rather, a) first state where all synchronization variables are defined. */
+	  state->flags |= STATE_SYNCVARS_ALL_SYNC;
+	  all_sync = 1;
+	  add_node_state (gc_ctx, nsa, state);
+	  if (ctx->verbose>=2)
+	    {
+	      if (state->file!=NULL)
+		fprintf (stderr, "%s:", state->file);
+	      fprintf (stderr, "%u: info: synchronization will occur ", state->line);
+	      if (state->name!=NULL)
+		fprintf (stderr, "at state '%s'.\n", state->name);
+	      else fprintf (stderr, "here.\n");
+	    }
+	  if ((state->flags & STATE_COMMIT)==0)
+	    {
+	      if (state->file!=NULL)
+		fprintf (stderr, "%s:", state->file);
+	      fprintf (stderr, "%u: error: cannot synchronize in a non-commit state:  will occur ", state->line);
+	      if (state->name!=NULL)
+		fprintf (stderr, "at state '%s'.\n", state->name);
+	      else fprintf (stderr, "here.\n");
+	    }
+	}
+    }
+  state->an_flags |= AN_SYNCVARS_DONE;
+  for (l=state->translist; l!=NULL; l=BIN_RVAL(l))
+    {
+      trans = (node_trans_t *)BIN_LVAL(l);
+      /* In principle, transitions should not be able to set any variable,
+	 as checked by check_expect_condition (), so there is no need
+	 to update already_set for each transition */
+      target = trans->sub_state_dest;
+      if (target==NULL)
+	{
+	  target = find_state_by_name (rule, trans->dest);
+	  if (target==NULL &&
+	      (trans->an_flags & AN_NONEXISTENT_TARGET_ALREADY_SAID)==0)
+	    {
+	      trans->an_flags |= AN_NONEXISTENT_TARGET_ALREADY_SAID;
+	      if (trans->file!=NULL)
+		fprintf (stderr, "%s:", trans->file);
+	      fprintf (stderr, "%u: error: nonexistent target state %s.\n",
+		       trans->lineno, trans->dest);
+	      ctx->nerrors++;
+	    }
+	}
+      state_sync_vars_set (ctx, rule, target, syncvars, already_set, state, all_sync, nsa);
+    }
+ end:
+  GC_END (gc_ctx);
+}
+
+
+static varset_t *rule_sync_vars (rule_compiler_t *ctx, node_rule_t *rule)
+{
+  node_syncvarlist_t *sync_vars;
+  size_t i, n;
+  node_expr_t *sync_var;
+  node_expr_t **vars;
+  varset_t *vs;
+
+  sync_vars = rule->sync_vars;
+  if (sync_vars==NULL)
+    return VS_EMPTY;
+  n = sync_vars->vars_nb;
+  vars = gc_base_malloc (ctx->gc_ctx, n*sizeof(node_expr_t *));
+  for (i=0; i<n; )
+    {
+      sync_var = strhash_get (ctx->rule_env, sync_vars->vars[i]);
+      if (sync_var==NULL)
+	{ /* ignore that (non-existent) synchronization variable;
+	     an error message will be printed later, when we call get_and_check_syncvar(),
+	     in compile_and_add_rule_ast(). */
+	  continue;
+	}
+      vars[i++] = sync_var;
+    }
+  n = i;
+  vs = varlist_varset (ctx->gc_ctx, 0, n, vars);
+  gc_base_free (vars);
+  return vs;
+}
+
+static void print_cg_data (FILE *f, gc_header_t *data, int vocab);
+
+static void check_sync_same_commit (rule_compiler_t *ctx, node_rule_t *rule, struct node_state_array *nsa)
+{ /* nsa is the list of states where synchronization will occur.
+     They must all be commit states (with a '!'), or none should be. */
+  size_t i, n;
+  unsigned long flags;
+
+  n=nsa->n;
+  if (n==0)
+    return;
+  flags = nsa->state[0]->flags & STATE_COMMIT;
+  for (i=1; i<n; i++)
+    {
+      if ((nsa->state[i]->flags & STATE_COMMIT) != flags)
+	{
+	  if (rule->filename!=NULL)
+	    fprintf (stderr, "%s:", rule->filename);
+	  fprintf (stderr, "%u: error: in rule %s, all states at which synchronization occurs should commit, or none should, but",
+		   rule->line, rule->filename);
+	  for (i=0; i<n; i++) /* find commit state; preferrably one with a printable name */
+	    {
+	      if ((nsa->state[i]->flags & STATE_COMMIT) && nsa->state[i]->name!=NULL)
+		break;
+	    }
+	  if (i>=n)
+	    for (i=0; i<n; i++)
+	      {
+		if (nsa->state[i]->flags & STATE_COMMIT)
+		  break;
+	      }
+	  print_cg_data (stderr, (gc_header_t *)nsa->state[i], 1);
+	  fprintf (stderr, " commits (has a '!'), while ");
+	  for (i=0; i<n; i++) /* find non-commit state; preferrably one with a printable name */
+	    {
+	      if (((nsa->state[i]->flags & STATE_COMMIT)==0) && nsa->state[i]->name!=NULL)
+		break;
+	    }
+	  if (i>=n)
+	    for (i=0; i<n; i++)
+	      {
+		if ((nsa->state[i]->flags & STATE_COMMIT)==0)
+		  break;
+	      }
+	  print_cg_data (stderr, (gc_header_t *)nsa->state[i], 1);
+	  fprintf (stderr, " does not.\n");
+	  ctx->nerrors++;
+	  break;
+	}
+    }
+}
+
+static void check_sync_vars (rule_compiler_t *ctx, node_rule_t *rule)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  varset_t *syncvars;
+  struct node_state_array nsa = { 0, 0, NULL };
+
+  GC_START (gc_ctx, 1);
+  syncvars = rule_sync_vars (ctx, rule);
+  if (syncvars!=VS_EMPTY)
+    {
+      GC_UPDATE (gc_ctx, 0, syncvars);
+      state_sync_vars_set (ctx, rule, rule->init, syncvars, VS_EMPTY, NULL, 0, &nsa);
+      if (nsa.n==0)
+	{
+	  if (rule->filename!=NULL)
+	    fprintf (stderr, "%s:", rule->filename);
+	  fprintf (stderr, "%u: warning: synchronization variables are never all set, rule '%s' will never synchronize.\n",
+		   rule->line, rule->name);
+	}
+      check_sync_same_commit (ctx, rule, &nsa);
+    }
+  GC_END (gc_ctx);
+}
+
 static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
 {
   node_expr_t *l;
@@ -2919,8 +3377,10 @@ static void mark_epsilon_reachable (rule_compiler_t *ctx, node_state_t *state)
     { /* cycle */
       if (state->file!=NULL)
 	fprintf (stderr, "%s:", state->file);
-      fprintf (stderr, "%u: Error: state %s is part of a cycle of gotos\n",
-	       state->line, state->name);
+      fprintf (stderr, "%u: error: state ", state->line);
+      if (state->name!=NULL)
+	fprintf (stderr, "'%s' ", state->name);
+      fprintf (stderr, "is part of a cycle of gotos.\n");
       ctx->nerrors++;
       return;
     }
@@ -4011,7 +4471,7 @@ static void print_cg_data (FILE *f, gc_header_t *data, int vocab)
 	       else fprintf (f, "at %s:%u", state->file, state->line);
 	     }
 	   else
-	     fprintf (f, "%s", name);
+	     fprintf (f, "'%s'", name);
 	   break;
 	 case T_NODE_TRANS:
 	   trans = (node_trans_t *)data;
@@ -4069,7 +4529,7 @@ static void print_complexity_evaluation (gc_t *gc_ctx, FILE *f,
   switch (degree)
     {
     case ULONG_MAX:
-      fprintf (f, "%u: rule %s may exhibit exponential behavior.\n",
+      fprintf (f, "%u: info: rule %s may exhibit exponential behavior.\n",
 	       node_rule->line, node_rule->name);
       u = g->first_bad;
       if (u!=ULONG_MAX)
@@ -4087,11 +4547,11 @@ static void print_complexity_evaluation (gc_t *gc_ctx, FILE *f,
 	}
       break;
     case 1:
-      fprintf (f, "%u: rule %s may have worst case linear behavior, i.e., O(#events).\n",
+      fprintf (f, "%u: info: rule %s may have worst case linear behavior, i.e., O(#events).\n",
 	       node_rule->line, node_rule->name);
       goto explain_poly;
     default:
-      fprintf (f, "%u: rule %s may have worst case behavior O(#events^%lu).\n",
+      fprintf (f, "%u: info: rule %s may have worst case behavior O(#events^%lu).\n",
 	       node_rule->line, node_rule->name, degree);
     explain_poly:
       cp = cg_critical_path (gc_ctx, g, root);
@@ -4190,7 +4650,7 @@ static void compile_and_add_rulefile(orchids_t *ctx, char *rulefile)
   issdllex_init (&ctx->rule_compiler->scanner);
   ret = issdlparse(ctx->rule_compiler);
   if (ret > 0) {
-    fprintf (stderr, "%s: error while compiling rule file.\n", rulefile);
+    fprintf (stderr, "%s: error: cannot compile rule file.\n", rulefile);
     fflush (stderr);
     exit(EXIT_FAILURE);
   }
@@ -4262,7 +4722,7 @@ node_state_t *set_state_label(rule_compiler_t *ctx,
     {
       if (sym->filename!=NULL)
 	fprintf (stderr, "%s:", sym->filename);
-      fprintf (stderr, "%u: error: duplicate state name %s\n",
+      fprintf (stderr, "%u: error: duplicate state name '%s'.\n",
 	       sym->line, sym->name);
       ctx->nerrors++;
     }
@@ -4388,7 +4848,7 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
 	      fprintf (stderr, "%s:", STR(e->file));
 	    /* printing STR(e->file) is legal, since it
 	       was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: error: cannot call side-effecting function %s inside 'expect' clause\n",
+	  fprintf (stderr, "%u: error: cannot call side-effecting function '%s' inside 'expect' clause.\n",
 		   e->lineno, CALL_SYM(e));
 	  ctx->nerrors++;
 	  }
@@ -4438,7 +4898,7 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
 	    fprintf (stderr, "%s:", STR(e->file));
 	  /* printing STR(e->file) is legal, since it
 	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: error: cannot assign to variable%s inside 'expect' clause\n",
+	  fprintf (stderr, "%u: error: cannot assign to variable%s inside 'expect' clause.\n",
 		   e->lineno, REGSPLIT_DEST_VARS(e)->vars_nb==1?"":"s");
 	  ctx->nerrors++;
 	}
@@ -4454,7 +4914,7 @@ static void check_expect_condition(rule_compiler_t *ctx, node_expr_t *e)
 	fprintf (stderr, "%s:", STR(e->file));
       /* printing STR(e->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: error: cannot assign to variable inside 'expect' clause\n",
+      fprintf (stderr, "%u: error: cannot assign to variable inside 'expect' clause.\n",
 	       e->lineno);
       ctx->nerrors++;
       break;
@@ -4667,7 +5127,7 @@ node_rule_t *build_rule(rule_compiler_t *ctx,
 			symbol_token_t   *sym,
 			node_state_t     *init_state,
 			node_expr_t *states,
-			node_syncvarlist_t   *sync_vars)
+			node_syncvarlist_t *sync_vars)
 {
   node_rule_t *new_rule;
 
@@ -5058,7 +5518,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 	fprintf (stderr, "%s:", STR(str->file));
       /* printing STR(str->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: type error: expected str, got %s\n",
+      fprintf (stderr, "%u: type error: expected str, got %s.\n",
 	       str->lineno,
 	       str->stype->name);
       ctx->nerrors++;
@@ -5082,7 +5542,7 @@ static void compute_stype_string_split (rule_compiler_t *ctx, node_expr_t *mysel
 		    fprintf (stderr, "%s:", STR(varj->file));
 		  /* printing STR(varj->file) is legal, since it
 		     was created NUL-terminated, on purpose */
-		  fprintf (stderr, "%u: duplicate variable %s in split regex.\n",
+		  fprintf (stderr, "%u: error: duplicate variable %s in split regex.\n",
 			   varj->lineno,
 			   var->stype->name);
 		  ctx->nerrors++;
@@ -5166,7 +5626,7 @@ node_expr_t *build_string_split(rule_compiler_t *ctx,
 	fprintf (stderr, "%s:", STR(n->file));
       /* printing STR(n->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: split regex produces %zd substrings, bound to %d variables.\n",
+      fprintf (stderr, "%u: error: split regex produces %zd substrings, bound to %d variables.\n",
 	       n->lineno,
 	       REGEX(TERM_DATA(pattern)).re_nsub,
 	       REGEXNUM(TERM_DATA(pattern)));
@@ -5290,7 +5750,7 @@ static void compute_stype_binop (rule_compiler_t *ctx, node_expr_t *myself)
 	    fprintf (stderr, "%s:", STR(n->file));
 	  /* printing STR(n->file) is legal, since it
 	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: type error: field .%s expects type %s, got %s .\n",
+	  fprintf (stderr, "%u: type error: field .%s expects type %s, got %s.\n",
 		   BIN_LVAL(n)->lineno,
 		   ((node_expr_symbol_t *)BIN_LVAL(n))->name,
 		   ltype->name,
@@ -5493,7 +5953,7 @@ node_expr_t *build_expr_return(rule_compiler_t *ctx,
       if (arg_node->file!=NULL)
 	fprintf (stderr, "%s:", STR(arg_node->file));
       /* STR() is NUL-terminated by construction */
-      fprintf (stderr, "%u: Error: return not in scope of a database collect expression\n",
+      fprintf (stderr, "%u: error: return not in scope of a database collect expression.\n",
 	       arg_node->lineno);
       ctx->nerrors++;
     }
@@ -5538,7 +5998,7 @@ node_expr_t *build_expr_break(rule_compiler_t *ctx)
       if (ctx->currfile!=NULL)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* STR() is NUL-terminated by construction */
-      fprintf (stderr, "%u: Error: break not in scope of a database collect expression\n",
+      fprintf (stderr, "%u: error: break not in scope of a database collect expression.\n",
 	       ctx->issdllineno);
       ctx->nerrors++;
     }
@@ -5790,7 +6250,7 @@ static void compute_stype_assoc (rule_compiler_t *ctx, node_expr_t *myself)
 	fprintf (stderr, "%s:", STR(n->file));
       /* printing STR(n->file) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s",
+      fprintf (stderr, "%u: type error: assigning value of type %s to variable %s of type %s.",
 	       n->lineno,
 	       type->name, ((node_expr_symbol_t *)n->lval)->name,
 	       vartype->name);
@@ -5994,7 +6454,7 @@ node_expr_t *build_function_call(rule_compiler_t  *ctx,
       if (currfile!=NULL)
 	fprintf (stderr, "%s:", STR(currfile));
       /* NUL-terminated, see above */
-      fprintf (stderr, "%u: error: unknown function %s.\n",
+      fprintf (stderr, "%u: error: unknown function '%s'.\n",
 	       sym->line, sym->name);
       ctx->nerrors++;
     }
@@ -6525,7 +6985,7 @@ static void compute_stype_db_pattern (rule_compiler_t *ctx, node_expr_t *myself)
 	    fprintf (stderr, "%s:", STR(myself->file));
 	  /* printing STR(myself->file) is legal, since it
 	     was created NUL-terminated, on purpose */
-	  fprintf (stderr, "%u: too few arguments, expected %zd.\n",
+	  fprintf (stderr, "%u: error: too few arguments, expected %zd.\n",
 		   myself->lineno,
 		   nargs);
 	  set_type (ctx, myself, &t_any);
@@ -6806,7 +7266,7 @@ node_expr_t *build_ipv4(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found - %s.\n",
+      fprintf (stderr, "%u: fatal error: hostname %s not found - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
@@ -6865,7 +7325,7 @@ node_expr_t *build_ipv6(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: hostname %s not found - %s.\n",
+      fprintf (stderr, "%u: fatal error: hostname %s not found - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
@@ -6927,7 +7387,7 @@ node_expr_t *build_ip(rule_compiler_t *ctx, char *hostname)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: error connecting to %s - %s.\n",
+      fprintf (stderr, "%u: fatal error: cannot connect to %s - %s.\n",
 	       ctx->issdllineno, hostname, gai_strerror(status));
       fflush (stderr);
       exit(EXIT_FAILURE);
@@ -7051,7 +7511,7 @@ node_expr_t *build_ctime_from_string(rule_compiler_t *ctx, char *date)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: unrecognized time format.\n",
+      fprintf (stderr, "%u: error: unrecognized time format.\n",
 	       ctx->issdllineno);
       ctx->nerrors++;
     }
@@ -7135,7 +7595,7 @@ node_expr_t *build_timeval_from_string(rule_compiler_t *ctx, char *date, long us
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: unrecognized time format.\n",
+      fprintf (stderr, "%u: error: unrecognized time format.\n",
 	       ctx->issdllineno);
       ctx->nerrors++;
   }
@@ -7197,8 +7657,7 @@ node_expr_t *build_split_regex(rule_compiler_t *ctx, char *regex_str)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: regex compilation error:",
-	       ctx->issdllineno);
+      fprintf (stderr, "%u: error: ", ctx->issdllineno);
       regerror(ret, &REGEX(regex), err_buf, sizeof (err_buf));
       fprintf (stderr, "%s.\n", err_buf);
       ctx->nerrors++;
@@ -7239,7 +7698,7 @@ node_expr_t *build_regex(rule_compiler_t *ctx, char *regex_str)
 	fprintf (stderr, "%s:", STR(ctx->currfile));
       /* printing STR(ctx->currfile) is legal, since it
 	 was created NUL-terminated, on purpose */
-      fprintf (stderr, "%u: regex compilation error:",
+      fprintf (stderr, "%u: error:",
 	       ctx->issdllineno);
       regerror(ret, &REGEX(regex), err_buf, sizeof (err_buf));
       fprintf (stderr, "%s.\n", err_buf);
@@ -7435,7 +7894,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
     {
       if (node_rule->filename!=NULL)
 	fprintf (stderr, "%s:", node_rule->filename);
-      fprintf (stderr, "%u: synchronization variable %s not mentioned in rule %s.\n",
+      fprintf (stderr, "%u: error: synchronization variable %s not mentioned in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
       return -1;
@@ -7445,7 +7904,7 @@ static int get_and_check_syncvar (rule_compiler_t *ctx,
     {
       if (node_rule->filename!=NULL)
 	fprintf (stderr, "%s:", node_rule->filename);
-      fprintf (stderr, "%u: synchronization variable %s never assigned to in rule %s.\n",
+      fprintf (stderr, "%u: error: synchronization variable %s never assigned to in rule %s.\n",
 	       node_rule->line, varname, node_rule->name);
       ctx->nerrors++;
       return SYM_RES_ID(sync_var);
@@ -8397,7 +8856,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   if ((rule = strhash_get(ctx->rulenames_hash, node_rule->name))) {
     if (ctx->currfile!=NULL)
       fprintf (stderr, "%s:", STR(ctx->currfile));
-    fprintf (stderr, "%u: rule %s already defined in %s:%i\n",
+    fprintf (stderr, "%u: error: rule '%s' already defined in %s:%i\n",
 	     ctx->issdllineno,
              node_rule->name, rule->filename, rule->lineno);
     ctx->nerrors++;
@@ -8410,6 +8869,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   check_var_usage (ctx, node_rule);
   check_epsilon_transitions (ctx, node_rule);
   type_check (ctx, node_rule);
+  check_sync_vars (ctx, node_rule);
   mark_no_wait_transitions (ctx, node_rule);
   evaluate_complexity (ctx, node_rule);
 
@@ -8549,7 +9009,7 @@ static void compile_state_ast(rule_compiler_t *ctx,
 			      node_state_t    *node_state)
 {
   DebugLog(DF_OLC, DS_INFO,
-           "compiling state \"%s\" in rule \"%s\"\n",
+           "compiling state '%s' in rule '%s'.\n",
            node_state->name, rule->name);
 
   state->name  = gc_strdup (ctx->gc_ctx, node_state->name);
@@ -8602,7 +9062,7 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
 
 
   DebugLog(DF_OLC, DS_DEBUG,
-           "compiling actions in state \"%s\" in rule \"%s\"\n",
+           "compiling actions in state '%s' in rule '%s'.\n",
            state->name, rule->name);
 
   if (actionlist!=NULL)
@@ -8651,7 +9111,7 @@ static void compile_actions_ast(rule_compiler_t   *ctx,
     {
       state->actionlength = 0;
       state->action = NULL;
-      DebugLog(DF_OLC, DS_INFO, "state \"%s\" has no action\n", state->name);
+      DebugLog(DF_OLC, DS_INFO, "state '%s' has no action.\n", state->name);
     }
 }
 
@@ -9649,7 +10109,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
   size_t i;
 
   DebugLog(DF_OLC, DS_INFO,
-           "compiling transitions in state \"%s\" in rule \"%s\"\n",
+           "compiling transitions in state '%s' in rule '%s'.\n",
            state->name, rule->name);
 
   if (translist!=NULL)
@@ -9699,7 +10159,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		    fprintf (stderr, "%s:", node_trans->file);
 		  fprintf (stderr, "%u: info: transition #%zi of state '%s', if triggered, will not wait, good!\n",
 			   node_trans->lineno, i+1,
-			   state->name?state->name:"(null)");
+			   state->name?state->name:"(inner state)");
 		}
 	      trans->flags |= TRANS_NO_WAIT;
 	    }
@@ -9730,7 +10190,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		    {
 		      if (node_trans->file!=NULL)
 			fprintf (stderr, "%s:", node_trans->file);
-		      fprintf (stderr, "%u: undefined state '%s'.\n",
+		      fprintf (stderr, "%u: fatal error: undefined state '%s'.\n",
 			       node_trans->lineno, node_trans->dest);
 		      fflush (stderr);
 		      exit (EXIT_FAILURE);
@@ -9758,7 +10218,7 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
 		{
 		  if (node_trans->file!=NULL)
 		    fprintf (stderr, "%s:", node_trans->file);
-		  fprintf (stderr, "%u: undefined state '%s'.\n",
+		  fprintf (stderr, "%u: fatal error: undefined state '%s'.\n",
 			   node_trans->lineno, node_trans->dest);
 		  fflush (stderr);
 		  exit (EXIT_FAILURE);
@@ -9772,8 +10232,8 @@ static void compile_transitions_ast(rule_compiler_t  *ctx,
       state->trans_nb = 0;
       state->trans = NULL;
       DebugLog(DF_OLC, DS_TRACE,
-	       "state \"%s\" has no transition (TERMINAL STATE)\n",
-	       state->name);
+	       "state '%s' has no transition.\n",
+	       state->name?state->name:"(inner state)");
     }
 }
 

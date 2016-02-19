@@ -805,28 +805,43 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	 when evaluating 'expect' clauses cannot change any variable. */
       if (si->pid->flags & THREAD_LOCK)
 	; /* already locked */
-      else
+      else if (q->flags & STATE_SYNCVARS_ALL_SYNC) /* we are in a state where synchronization
+						      can occur */
 	{
+	  /* Before Feb 19, 2016, we checked whether the environment actually changed
+	     (si->env!=oldenv), but that is not needed: by definition of AN_SYNCVARS_ALL_SYNC,
+	     we have just entered the (rather, a) first state where all the synchronization
+	     variables are defined.
+	     We were also checking whether all the synchronization variables
+	     are defined (sync_var_env_is_defined (si)), but that is useless as well.
+	     Finally, we were also checking whether the rule is actually synchronized
+	     (lock_table!=NULL), but again this will always be the case.
+	  */
 	  lock_table = si->pid->rule->sync_lock;
-	  if (si->env!=oldenv /* Also, we need to check for synchronization
-				 only if the environment actually changed, */
-	      && lock_table!=NULL /* and if the rule is actually synchronized, */
-	      && sync_var_env_is_defined (si) /* and if all the synchronization variables
-						 are defined. */
-	      )
-	    {
-	      sync_lock = objhash_get (lock_table, si);
-	      if (sync_lock!=NULL)
-		{ /* kill ourselves: somebody already holds the lock */
+	  sync_lock = objhash_get (lock_table, si);
+	  if (sync_lock!=NULL)
+	    { /* somebody already holds the lock */
+	      if (q->flags & STATE_COMMIT)
+		{ /* if so, and we are a commit state (hence all synchronization states
+		     are commit states), then kill ourselves: some other thread is already
+		     doing the job. */
 		  cleanup_state_instance (si);
 		  goto end; /* and that's all */
 		}
 	      else
-		{ /* create a lock. */
-		  si->pid->flags |= THREAD_LOCK;
-		  // GC_TOUCH (gc_ctx, si->pid); /* useless: objhash_add() will do it */
-		  objhash_add (gc_ctx, lock_table, si->pid, si);
+		{ /* otherwise, no synchronization state is a commit state, then we
+		     join the synchronization group */
+		  sync_lock->nsi += si->pid->nsi;
+		  GC_TOUCH (gc_ctx, si->pid = sync_lock);
+		  /* and we proceed, following epsilon transitions until we enqueue it
+		     (or clean it up) */
 		}
+	    }
+	  else
+	    { /* create a lock. */
+	      si->pid->flags |= THREAD_LOCK;
+	      // GC_TOUCH (gc_ctx, si->pid); /* useless: objhash_add() will do it */
+	      objhash_add (gc_ctx, lock_table, si->pid, si);
 	    }
 	}
     }

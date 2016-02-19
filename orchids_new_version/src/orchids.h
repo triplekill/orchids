@@ -330,6 +330,9 @@ struct state_s
      are epsilon transitions; otherwise, all outgoing transitions
      are 'expect' transitions, which wait on a future event. */
 #define STATE_EPSILON 0x2
+  /* STATE_SYNCVARS_ALL_SYNC is set exactly of those states
+     where one should check whether to synchronize. */
+#define STATE_SYNCVARS_ALL_SYNC 0x4
   int32_t       id;
 };
 
