@@ -3125,8 +3125,18 @@ struct node_state_array {
 static void add_node_state (gc_t *gc_ctx, struct node_state_array *nsa, node_state_t *state)
 {
   if (nsa->n >= nsa->size)
-    nsa->state = gc_base_realloc (gc_ctx, nsa->state, nsa->size = nsa->n+16);
+    nsa->state = gc_base_realloc (gc_ctx, nsa->state, (nsa->size = nsa->n+16)*sizeof(node_state_t *));
   nsa->state[nsa->n++] = state;
+}
+
+static void free_node_state_array (struct node_state_array *nsa)
+{
+  if (nsa->state!=NULL)
+    {
+      gc_base_free (nsa->state);
+      nsa->n = nsa->size = 0;
+      nsa->state = NULL;
+    }
 }
 
 static void state_sync_vars_set (rule_compiler_t *ctx, node_rule_t *rule,
@@ -3294,20 +3304,26 @@ static void check_sync_same_commit (rule_compiler_t *ctx, node_rule_t *rule, str
 { /* nsa is the list of states where synchronization will occur.
      They must all be commit states (with a '!'), or none should be. */
   size_t i, n;
+#ifdef OBSOLETE
   unsigned long flags;
+#endif
 
   n=nsa->n;
   if (n==0)
     return;
+#ifdef OBSOLETE
   flags = nsa->state[0]->flags & STATE_COMMIT;
-  for (i=1; i<n; i++)
+  for (i=1 ...)
+#endif
+  for (i=0; i<n; i++)
     {
-      if ((nsa->state[i]->flags & STATE_COMMIT) != flags)
+      if ((nsa->state[i]->flags & STATE_COMMIT) == 0) /* != flags) */
 	{
 	  if (rule->filename!=NULL)
 	    fprintf (stderr, "%s:", rule->filename);
-	  fprintf (stderr, "%u: error: in rule %s, all states at which synchronization occurs should commit, or none should, but",
+	  fprintf (stderr, "%u: error: in rule %s, all states at which synchronization occurs should commit,  but ",
 		   rule->line, rule->filename);
+#ifdef OBSOLETE
 	  for (i=0; i<n; i++) /* find commit state; preferrably one with a printable name */
 	    {
 	      if ((nsa->state[i]->flags & STATE_COMMIT) && nsa->state[i]->name!=NULL)
@@ -3332,6 +3348,7 @@ static void check_sync_same_commit (rule_compiler_t *ctx, node_rule_t *rule, str
 		if ((nsa->state[i]->flags & STATE_COMMIT)==0)
 		  break;
 	      }
+#endif
 	  print_cg_data (stderr, (gc_header_t *)nsa->state[i], 1);
 	  fprintf (stderr, " does not.\n");
 	  ctx->nerrors++;
@@ -3361,6 +3378,7 @@ static void check_sync_vars (rule_compiler_t *ctx, node_rule_t *rule)
 	}
       check_sync_same_commit (ctx, rule, &nsa);
     }
+  free_node_state_array (&nsa);
   GC_END (gc_ctx);
 }
 

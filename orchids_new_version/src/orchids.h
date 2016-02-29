@@ -459,10 +459,17 @@ struct heap_s {
 struct thread_group_s {
   gc_header_t gc;
   rule_t *rule; /* the 'formula F' in the spec */
-  size_t nsi; /* number of state instances that have this pid */
-  uint32_t flags;
-#define THREAD_KILL 0x1
-#define THREAD_LOCK 0x2
+  size_t nsi; /* number of live state instances that have this pid;
+	       The state instances (having this pid) that are live are defined as
+	       those whose age is equal to the thread group's age.
+	      */
+  union {
+    uint32_t i;
+    unsigned char c[4];
+#define THREAD_AGE(pid) (pid)->flags.c[0]
+#define THREAD_FLAGS(pid) (pid)->flags.c[1]
+#define THREAD_LOCK 0x1
+  } flags;
 };
 typedef struct thread_group_s thread_group_t;
 
@@ -488,6 +495,9 @@ struct state_instance_s {
   uint16_t nhandles; /* between 0 and MAX_HANDLES-1: copied lazily;
 		      above MAX_HANDLES: copied at each creation of a state_instance_t
 		      (costly, but is not meant to happen) */
+  unsigned char age;
+#define SI_AGE(si) (si)->age
+  unsigned char dummy;
   /* The 'lock' component of the spec will be found in rule->sync_lock,
      rule->sync_vars, rule->sync_vars_sz
   */
