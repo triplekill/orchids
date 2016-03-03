@@ -4,7 +4,11 @@ The pid tracker.
 
 #include "linux64syscall.h"
 
-rule pidtrack
+/*** Needed configuration:
+ *** auditctl -a always,exit -F arch=x86_64 -S clone,execve,exit,kill,setuid,setgid,setreuid,setregid,setresuid,setresgid
+ ***/
+
+rule pidtrack synchronize($pid)
 {
 
   state init
@@ -26,33 +30,32 @@ rule pidtrack
   state wait!
   {
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_execve &&
-	.auditd.uid != .auditd.euid && /* hack */
-	.auditd.success == "yes")
+	    .auditd.syscall == SYS_execve &&
+	    (.auditd.uid != .auditd.euid || .auditd.gid != .auditd.egid) && /* hack */
+	    .auditd.success == "yes")
       goto update_uid_gid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setresuid &&
-	.auditd.success == "yes")
+	    (.auditd.syscall == SYS_setresuid ||
+	     .auditd.syscall == SYS_setreuid ||
+	     .auditd.syscall == SYS_setuid) &&
+	    .auditd.success == "yes")
       goto update_setuid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setreuid &&
-	.auditd.success == "yes")
-      goto update_setuid;
-
-    expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_setgid &&
-	.auditd.success == "yes")
+	    (.auditd.syscall == SYS_setresgid ||
+	     .auditd.syscall == SYS_setregid ||
+	     .auditd.syscall == SYS_setgid) &&
+	    .auditd.success == "yes")
       goto update_setgid;
 
     expect (.auditd.pid == $pid &&
-        .auditd.syscall == SYS_exit)
+	    .auditd.syscall == SYS_exit)
       goto end;
 
     expect (.auditd.syscall == SYS_kill &&
-        .auditd.a0 == $pid &&
-        .auditd.a1 == 9)
+	    .auditd.a0 == $pid &&
+	    .auditd.a1 == 9)
       goto end;
 
     /* We now catch any other auditd event (at least from those
@@ -82,16 +85,14 @@ rule pidtrack
 
   state update_setuid!
   {
-    $uid = .auditd.a1; /* a1 field contains new euid (a0=new ruid) */
-
-    goto wait;
+  case (.auditd.egid != $gid) goto alert;
+  else goto update_uid_gid;
   }
 
   state update_setgid!
   {
-    $gid = .auditd.a0;
-
-    goto wait;
+  case (.auditd.euid != $uid) goto alert;
+  else goto update_uid_gid;
   }
 
   state alert!

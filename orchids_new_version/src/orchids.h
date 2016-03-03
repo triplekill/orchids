@@ -458,7 +458,8 @@ struct heap_s {
 
 struct thread_group_s {
   gc_header_t gc;
-  rule_t *rule; /* the 'formula F' in the spec */
+  rule_t *rule; /* the 'formula F' in the spec, except it is not a formula,
+		   it is a rule */
   size_t nsi; /* number of live state instances that have this pid;
 	       The state instances (having this pid) that are live are defined as
 	       those whose age is equal to the thread group's age.

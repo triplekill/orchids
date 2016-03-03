@@ -652,7 +652,7 @@ char *orchids_atoui_hex (char *s, char *end, unsigned long *ip)
     {
       if (isdigit (c))
 	j = ((int)c) - '0';
-      else j = (((int)c) - 'A' + 10) & 0x1f;
+      else j = ((((int)c) - 'A') & 0x1f) + 10;
       i = 16*i + j;
       s++;
     }

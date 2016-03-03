@@ -47,6 +47,25 @@ input_module_t mod_auditd;
 
 #define FILL_EVENT(octx,n,len) add_fields_to_event_stride(octx->ctx, octx->mod, octx->out_event, (ovm_var_t **)GC_DATA(), n, n+len)
 
+/* We use the parsing functions from mod_utils (action_doer_*).
+   Instead of passing an action_orchids_ctx_t, we pass
+   a slightly enriched struct.
+   This allows us, for example, to deal with the following problem.
+   In type=SYSCALL events, a0, a1, a2, a3 are unsigned ints in hex.
+   In type=EXECVE events, a0, a1, ... (no limit) are strings (with
+   a strange format in case of nonprintable chars).
+   To decide how to parse it, depending on the type, we clear or set
+   the AUDITD_FLAG_A0_IS_STRING bit, and this is kept in the extended
+   auditd_action_orchids_ctx_t data structure.
+   Going back and forth to standard action_orchids_ctx_t structures
+   is done by casting.
+ */
+typedef struct auditd_action_orchids_ctx_s {
+  action_orchids_ctx_t base;
+  unsigned long flags;
+#define AUDITD_FLAG_A0_IS_STRING 0x1
+} auditd_action_orchids_ctx_t;
+
 static char *action_doer_audit (action_orchids_ctx_t *octx,
 				char *s, char *end,
 				int field_num)
@@ -82,14 +101,76 @@ static char *action_doer_audit (action_orchids_ctx_t *octx,
   return t;
 }
 
+static char *action_doer_type (action_orchids_ctx_t *octx,
+			       char *s, char *end,
+			       int field_num)
+{
+  char *t;
+
+  t = action_doer_string (octx, s, end, field_num);
+  if (s[0]=='E' && s[1]=='X' && s[2]=='E' && s[3]=='C' && s[4]=='V' && s[5]=='E')
+    ((auditd_action_orchids_ctx_t *)octx)->flags |= AUDITD_FLAG_A0_IS_STRING;
+  return t;
+}
+
+static char *action_doer_hex_string (action_orchids_ctx_t *octx,
+				     char *s, char *end,
+				     int field_num)
+{
+  ovm_var_t *v;
+  char *dest;
+  char c, dest_c, j;
+  int parity;
+  gc_t *gc_ctx = octx->ctx->gc_ctx;
+  GC_START(gc_ctx, 1);
+
+  v = ovm_str_new (gc_ctx, (end-s+1)>>1); /* allocate more than needed */
+  dest = STR(v);
+  parity = 0;
+  dest_c = 0;
+  while (s<end && (c = *s, isxdigit (c)))
+    {
+      if (isdigit (c))
+	j = c - '0';
+      else j = ((c - 'A') & 0x1f) + 10;
+      dest_c = 16*dest_c + j;
+      if (parity) /* output one char every two chars in the input */
+	{
+	  parity = 0;
+	  *dest++ = dest_c;
+	  dest_c = 0;
+	}
+      else parity = 1;
+      s++;
+    }
+    STRLEN(v) = dest - STR(v);
+    GC_UPDATE(gc_ctx, 0, v);
+    FILL_EVENT(octx, field_num, 1);
+    GC_END(gc_ctx);
+    return s;
+}
+
+static char *action_doer_s0 (action_orchids_ctx_t *octx,
+			     char *s, char *end,
+			     int field_num)
+{ /* The fields a0, a1, ... of type=EXECVE events can be of the form (for a0, say)
+     a0="abc"  (a bona fide string), or
+     a0=9DFE346E6A (a string, encoded in hex).
+     We have to deal with the second case with a special parser.
+  */
+  if (s < end && *s == '"') /* it is a bona fide string */
+    return action_doer_string (octx, s, end, field_num);
+  else return action_doer_hex_string (octx, s, end, field_num);
+}
+
 static char *action_doer_a0 (action_orchids_ctx_t *octx,
 			     char *s, char *end,
 			     int field_num)
 { /* a0= fields are sometimes followed by uints in hex (as in type=SYSCALL events)
      and sometimes by strings, starting with a quote (as in type=EXECVE events)...
   */
-  if (s < end && *s == '"') /* it's a string */
-    return action_doer_string (octx, s, end, field_num + 1);
+  if (((auditd_action_orchids_ctx_t *)octx)->flags & AUDITD_FLAG_A0_IS_STRING)
+    return action_doer_s0 (octx, s, end, field_num + 1);
   else return action_doer_uint_hex (octx, s, end, field_num);
 }
 
@@ -97,11 +178,12 @@ static action_t auditd_actions[] = {
   /* Don't put any empty word here, or any word
      that is prefix of another one! */
   { "node=", F_AUDITD_NODE, action_doer_string },
-  { "type=", F_AUDITD_TYPE, action_doer_string },
+  { "type=", F_AUDITD_TYPE, action_doer_type },
   { "audit(", 0 /*unused*/, action_doer_audit }, // this is what we get in 'binary' format
   { "msg=audit(", 0 /*unused*/, action_doer_audit }, // this is what we get in 'string' format
   { "arch=", F_AUDITD_ARCH, action_doer_uint },
   { "syscall=", F_AUDITD_SYSCALL, action_doer_uint },
+  { "per=", F_AUDITD_PER, action_doer_uint_hex },
   { "success=", F_AUDITD_SUCCESS, action_doer_string },
   { "exit=", F_AUDITD_EXIT, action_doer_uint },
   { "items=", F_AUDITD_ITEMS, action_doer_uint },
@@ -167,12 +249,13 @@ static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
 {
   char *txt_line;
   int txt_len;
-  action_orchids_ctx_t *octx = mod->config; // data
+  auditd_action_orchids_ctx_t *octx = mod->config; // data
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START(gc_ctx, 1);
-  octx->in_event = event;
-  octx->out_event = (event_t **)&GC_LOOKUP(0);
+  octx->base.in_event = event;
+  octx->base.out_event = (event_t **)&GC_LOOKUP(0);
+  octx->flags = 0;
   GC_UPDATE(gc_ctx, 0, event);
 
   DebugLog(DF_MOD, DS_TRACE, "auditd_callback()\n");
@@ -192,22 +275,23 @@ static int dissect_auditd(orchids_t *ctx, mod_entry_t *mod,
       return -1;
     }
 
-  action_parse_event (octx, txt_line, txt_line+txt_len);
+  action_parse_event (&octx->base, txt_line, txt_line+txt_len);
 
   /* then, post the Orchids event */
-  post_event(ctx, mod, *octx->out_event, dissection_level);
+  post_event(ctx, mod, *octx->base.out_event, dissection_level);
   GC_END(gc_ctx);
   return (0);
 }
 
 static field_t auditd_fields[] = {
-  {"auditd.node",     &t_str, MONO_UNKNOWN,    "auditd node"                         },
-  {"auditd.type",     &t_str, MONO_UNKNOWN,    "type of auditd event"                },
-  {"auditd.time",     &t_timeval, MONO_MONO, "auditd event time"                   },
-  {"auditd.serial",   &t_uint, MONO_MONO,     "event serial number"                 },
-  {"auditd.arch",     &t_uint, MONO_UNKNOWN,     "Elf architecture flags"          },
+  {"auditd.node",     &t_str, MONO_UNKNOWN,    "auditd node"                            },
+  {"auditd.type",     &t_str, MONO_UNKNOWN,    "type of auditd event"                   },
+  {"auditd.time",     &t_timeval, MONO_MONO, "auditd event time"                        },
+  {"auditd.serial",   &t_uint, MONO_MONO,     "event serial number"                     },
+  {"auditd.arch",     &t_uint, MONO_UNKNOWN,     "Elf architecture flags"               },
   {"auditd.syscall",  &t_uint, MONO_UNKNOWN,      "syscall number"                      },
-  {"auditd.success",  &t_str, MONO_UNKNOWN,     "syscall success"                     },
+  {"auditd.per",      &t_uint, MONO_UNKNOWN,      "personality"                         },
+  {"auditd.success",  &t_str, MONO_UNKNOWN,     "syscall success"                       },
   {"auditd.exit",     &t_uint, MONO_UNKNOWN,      "exit value"                          },
   {"auditd.items",    &t_uint, MONO_UNKNOWN,      "number of path records in the event" },
   {"auditd.ppid",     &t_uint, MONO_UNKNOWN,      "parent pid"                          },
@@ -221,14 +305,14 @@ static field_t auditd_fields[] = {
   {"auditd.egid",     &t_uint, MONO_UNKNOWN,      "effective group id"                  },	
   {"auditd.sgid",     &t_uint, MONO_UNKNOWN,      "set group id"                        },	
   {"auditd.fsgid",    &t_uint, MONO_UNKNOWN,      "file system group id"                },	
-  {"auditd.tty",      &t_str, MONO_UNKNOWN,     "tty interface"                       },
+  {"auditd.tty",      &t_str, MONO_UNKNOWN,     "tty interface"                         },
   {"auditd.ses",      &t_uint, MONO_UNKNOWN,      "user's SE Linux user account"        },
-  {"auditd.comm",     &t_str, MONO_UNKNOWN,     "command line program name"           },
-  {"auditd.exe",      &t_str, MONO_UNKNOWN,     "executable name"                     },
-  {"auditd.subj",     &t_str, MONO_UNKNOWN,     "lspp subject's context string"       },
-  {"auditd.key",      &t_str, MONO_UNKNOWN,     "tty interface"                       },
+  {"auditd.comm",     &t_str, MONO_UNKNOWN,     "command line program name"             },
+  {"auditd.exe",      &t_str, MONO_UNKNOWN,     "executable name"                       },
+  {"auditd.subj",     &t_str, MONO_UNKNOWN,     "lspp subject's context string"         },
+  {"auditd.key",      &t_str, MONO_UNKNOWN,     "tty interface"                         },
   {"auditd.item",     &t_uint, MONO_UNKNOWN,      "file path: item"                     },
-  {"auditd.name",     &t_str, MONO_UNKNOWN,      "file path: name"                     },
+  {"auditd.name",     &t_str, MONO_UNKNOWN,      "file path: name"                      },
   {"auditd.inode",    &t_uint, MONO_UNKNOWN,      "file path: inode"                    },
   {"auditd.mode",     &t_uint, MONO_UNKNOWN,      "file path: mode"                     },
   {"auditd.dev",      &t_uint, MONO_UNKNOWN,      "file path: device (major and minor)" },
@@ -252,18 +336,18 @@ static field_t auditd_fields[] = {
 
 static void *auditd_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-  action_orchids_ctx_t *octx;
+  auditd_action_orchids_ctx_t *octx;
 
   DebugLog(DF_MOD, DS_INFO, "load() auditd@%p\n", &mod_auditd);
  
   register_fields(ctx, mod, auditd_fields, AUDITD_FIELDS);
 
-  octx = gc_base_malloc(ctx->gc_ctx, sizeof(action_orchids_ctx_t));
-  octx->ctx = ctx;
-  octx->mod = mod;
-  octx->atree = compile_actions(ctx->gc_ctx, auditd_actions);
-  octx->in_event = NULL;
-  octx->out_event = NULL;
+  octx = gc_base_malloc(ctx->gc_ctx, sizeof(auditd_action_orchids_ctx_t));
+  octx->base.ctx = ctx;
+  octx->base.mod = mod;
+  octx->base.atree = compile_actions(ctx->gc_ctx, auditd_actions);
+  octx->base.in_event = NULL;
+  octx->base.out_event = NULL;
   return octx;
 }
 

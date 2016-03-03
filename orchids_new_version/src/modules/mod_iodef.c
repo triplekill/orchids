@@ -99,11 +99,15 @@ static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, char *fname, size_t len
 
 
   /* parse the file and get the DOM */
-  doc = xmlReadFile(file_path, NULL, 0);
+  doc = xmlReadFile(file_path, NULL, XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
+  /* The flags given avoid seeing messages such as:
+     I/O warning : failed to load external entity "/tmp/orchids/etc/orchids/iodef/pidtrack (2).iodef"
+     Error reporting is done through DebugLog() below.
+  */
 
   if (doc == NULL)
   {
-    DebugLog(DF_MOD, DS_ERROR, "error parsing the iodef template file\n");
+    DebugLog(DF_MOD, DS_ERROR, "error parsing the iodef template file '%s'\n", file_path);
     return NULL;
   }
 
@@ -449,6 +453,7 @@ static void generate_and_write_report (orchids_t	*ctx,
   unsigned long ntph;
   unsigned long ntpl;
   FILE*		fp;
+  char *rulename, *s;
 
   cfg = (iodef_cfg_t *)mod->config;
   if (cfg->report_dir == NULL) {
@@ -456,8 +461,11 @@ static void generate_and_write_report (orchids_t	*ctx,
     return ;
   }
 
-  xpath_ctx = iodef_generate_report(ctx, mod, state, state->pid->rule->name,
-				    strlen(state->pid->rule->name));
+  rulename = state->pid->rule->name;
+  /* rulename may be of the form 'name' or 'name$n' (see rule_restore());
+     in the latter case, we remove everything after and including the '$' */
+  for (s=rulename; *s!=0 && *s!='$'; s++);
+  xpath_ctx = iodef_generate_report(ctx, mod, state, rulename, s-rulename);
   if (xpath_ctx!=NULL)
     {
       doc = xpath_ctx->doc;

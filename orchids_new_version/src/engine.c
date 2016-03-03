@@ -729,10 +729,10 @@ static state_instance_t *create_state_instance (orchids_t *ctx,
   return newsi;
 }
 
-static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
-							state_instance_t *si,
-							thread_queue_t *tq,
-							int only_once)
+static int enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
+						       state_instance_t *si,
+						       thread_queue_t *tq,
+						       int only_once)
 /* Here si->q is the (new) state we just moved to;
    si->t is temporarily meaningless;
    as an invariant, we shall need to thread_enqueue(si) or to cleanup_instance(si),
@@ -744,9 +744,11 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
   objhash_t *lock_table;
   struct thread_group_s *sync_lock;
   state_t *q;
+  int ret;
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START (gc_ctx, 1);
+  ret = 0;
  again:
   q = si->q;
   if (q->flags & STATE_COMMIT)
@@ -854,7 +856,7 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 					       si->env, si->nhandles, SI_AGE(si));
 		GC_UPDATE (gc_ctx, 0, newsi);
 		/* now we call ourselves back with only_once false */
-		enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
+		ret |= enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
 	      }
 	  }
 	cleanup_state_instance (si);
@@ -871,9 +873,11 @@ static void enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	  thread_enqueue (gc_ctx, tq, newsi);
 	}
       cleanup_state_instance (si);
+      ret = 1;
     }
  end:
   GC_END (gc_ctx);
+  return ret;
 }
 
 static void enter_state_and_follow_epsilon_transitions_then_reenqueue (orchids_t *ctx,
@@ -889,7 +893,7 @@ static void enter_state_and_follow_epsilon_transitions_then_reenqueue (orchids_t
 				 si->t /* temporarily wrong */,
 				 si->env, si->nhandles, SI_AGE(si));
   GC_UPDATE (gc_ctx, 0, newsi);
-  enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
+  (void) enter_state_and_follow_epsilon_transitions (ctx, newsi, tq, 0);
   thread_enqueue (gc_ctx, tq, si); /* and enqueue old si, which remains there waiting */
   GC_END (gc_ctx);
 }
@@ -923,7 +927,7 @@ static void enter_state_and_follow_epsilon_transitions_then_reenqueue (orchids_t
       enter_state_and_follow_epsilon_transitions_then_reenqueue (ctx, si, tq, 0); \
     else {								\
       si->q = t->dest; /* move to successor directly */			\
-      enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0);	\
+      (void) enter_state_and_follow_epsilon_transitions (ctx, si, tq, 0); \
     }									\
   } while (0)
 
@@ -964,23 +968,38 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 {
   SSCT_DECL;
   thread_group_t *oldpid;
+  char *rulename;
+  state_t *q;
+  uint32_t tid;
 
   GC_START (ctx->gc_ctx, 1);
   SSCT_TRANS_COND;
   if (vmret > 0)
     { /* OK: pass transition */
-      fprintf (stderr, "* %s", si->q->rule->name);
+      rulename = si->q->rule->name;
       oldpid = si->pid;
-      if (ctx->verbose>=3)
-	fprintf (stderr, "[grp=%c]", pid_code (oldpid));
-      fprintf (stderr, ": %s -#%d->", si->q->name, t->id);
+      q = si->q;
+      tid = t->id;
       GC_UPDATE (ctx->gc_ctx, 0, si->env);
       
       SSCT_GO;
       
+      fprintf (stderr, "* %s", rulename);
+      if (ctx->verbose>=3)
+	fprintf (stderr, "[grp=%c]", pid_code (oldpid));
+      if (q->name!=NULL)
+	fprintf (stderr, ": %s -#%d->", q->name, tid);
+      else fprintf (stderr, ": (line %d) -#%d->", q->line, tid);
+
       if (si->q!=t->dest)
-	fprintf (stderr, " %s ~>", t->dest->name);
-      fprintf (stderr, " %s", si->q->name);
+	{
+	  if (t->dest->name!=NULL)
+	    fprintf (stderr, " %s ~>", t->dest->name);
+	  else fprintf (stderr, " (line %d) ~>", t->dest->line);
+	}
+      if (si->q->name!=NULL)
+	fprintf (stderr, " %s", si->q->name);
+      else fprintf (stderr, " (line %d)", si->q->line);
       if (ctx->verbose>=3 && si->pid!=oldpid)
 	fprintf (stderr, " [grp:=%c]\n", pid_code(si->pid));
       else fprintf (stderr, "\n");
@@ -1004,6 +1023,7 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
   thread_group_t *pid;
   state_instance_t *init;
   state_t *q;
+  int ret;
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START (gc_ctx, 1);
@@ -1026,7 +1046,18 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
       /* create state instance, in state q, waiting for no transition yet (NULL),
 	 and with empty environment (NULL) */
       GC_UPDATE (gc_ctx, 0, init);
-      enter_state_and_follow_epsilon_transitions (ctx, init, tq, 1);
+      ret = enter_state_and_follow_epsilon_transitions (ctx, init, tq, 1);
+      if (ctx->verbose>=2 && ret!=0)
+	{
+	  fprintf (stderr, "+ %s: %c> ", r->name, (init->q==q)?'-':'~');
+	  if (init->q->name!=NULL)
+	    fprintf (stderr, "%s", init->q->name);
+	  else fprintf (stderr, "(line %d)", init->q->line);
+	  if (ctx->verbose>=3)
+	    fprintf (stderr, " [grp=%c]", pid_code (pid));
+	  fprintf (stderr, "\n");
+	  fprintf_env (stderr, ctx, init->q->rule, init->env, NULL, "  - ", "\n");
+	}
     }
   GC_END (gc_ctx);
 }

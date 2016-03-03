@@ -8622,9 +8622,8 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
 {
   rule_t *oldrule;
   size_t number = 1;
-  char *s, *start, *send, *newname;
+  char *s, *start, *newname;
   struct merge_sync_lock_data sld;
-  int found;
 
  again:
   oldrule = strhash_get (ctx->rulenames_hash, rule->name);
@@ -8649,30 +8648,15 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
       }
     else
       { /* We insert the new rule with a slightly different name, namely:
-	   - assume the initial rule name is "name"
-	   - we try "name (2)", then if this is also taken, "name (3)", and so on.
+	   - assume the initial rule name is "name" (followed by "$whatever", possibly)
+	   - we try "name$2", then if this is also taken, "name$3", and so on.
 	*/
 	++number;
-	found = 0;
 	start = rule->name;
-	s = send = start + strlen(start);
-	--s;
-	if (s>=start && *s==')')
-	  for (; --s>start; )
-	    {
-	      if (*s=='(')
-		{
-		  found = 1;
-		  break;
-		}
-	      else if (!isdigit(*s))
-		break;
-	    }
-	if (!found)
-	  s = send;
-	newname = gc_base_malloc (ctx->gc_ctx, s-start + 3 + 16);
+	for (s=start; *s!=0 && *s!='$'; s++);
+	newname = gc_base_malloc (ctx->gc_ctx, s-start + 1 + 16);
 	memcpy (newname, start, s-start);
-	sprintf (newname + (s-start), " (%zi)", number);
+	sprintf (newname + (s-start), "$%zi", number);
 	gc_base_free (rule->name);
 	rule->name = newname;
 	goto again;
