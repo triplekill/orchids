@@ -4582,13 +4582,23 @@ static void print_complexity_evaluation (gc_t *gc_ctx, FILE *f,
 		  fprintf (f, "  ");
 		  u = cp->edges[i].source;
 		  data = CG_DATA(g, u);
-		  print_cg_data (f, data, 1);
-		  fprintf (f, " will fork a new thread going to ");
-		  data = CG_DATA(g,cp->edges[i].dest);
-		  print_cg_data (f, data, 1);
-		  fprintf (f, ",\n    while looping ");
-		  print_scc (f, g, u, "on ", "among:\n   ");
-		  fprintf (f, ".\n");
+		  if (data==NULL)
+		    {
+	              fprintf (f, "each event will fork a new thread going to ");
+	              data = CG_DATA(g,cp->edges[i].dest);
+	              print_cg_data (f, data, 1);
+	              fprintf (f, ".\n");
+		    }
+		  else
+		    {
+	              print_cg_data (f, data, 1);
+	              fprintf (f, " will fork a new thread going to ");
+	              data = CG_DATA(g,cp->edges[i].dest);
+	              print_cg_data (f, data, 1);
+	              fprintf (f, ",\n    while looping ");
+	              print_scc (f, g, u, "on ", "among:\n   ");
+	              fprintf (f, ".\n");
+		    }
 		}
 	    }
 	  gc_base_free (cp);
@@ -4603,7 +4613,7 @@ static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
   node_expr_t *states;
   complexity_ctx_t cc;
   unsigned long index = 0L;
-  vertex_t init;
+  vertex_t init, iprime;
 
   cc.gc_ctx = gc_ctx;
   cc.ctx = ctx;
@@ -4615,7 +4625,15 @@ static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
      defines the constant "one". */
   cc.root = cg_new_node (gc_ctx, cc.g, NULL, VI_TYPE_MAX, 1);
   init = add_complexity_node (&cc, node_rule->init);
-  (void) cg_new_edge (gc_ctx, cc.g, cc.root, init, 1);
+  if (node_rule->init->flags & STATE_COMMIT)
+    (void) cg_new_edge (gc_ctx, cc.g, cc.root, init, 1);
+  else
+    {
+      iprime = cg_new_node (gc_ctx, cc.g, NULL, VI_TYPE_PLUS, 1);
+      (void) cg_new_edge (gc_ctx, cc.g, iprime, iprime, 1);
+      (void) cg_new_edge (gc_ctx, cc.g, iprime, init, 1);
+      (void) cg_new_edge (gc_ctx, cc.g, cc.root, iprime, 1);
+    }
   for (states=node_rule->statelist; states!=NULL; states=BIN_RVAL(states))
     (void) add_complexity_node (&cc, (node_state_t *)BIN_LVAL(states));
   cg_compute_sccs_from_root (cc.g, cc.root, &index);

@@ -58,7 +58,7 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
   unsigned char type;
   /* long version; */
   int ret;
-  int var;
+  /* int var; */
   gc_t *gc_ctx = ctx->gc_ctx;
   ovm_var_t *val;
 
@@ -169,7 +169,7 @@ static int snmptrap_dissect(orchids_t *ctx, mod_entry_t *mod, event_t *e, void *
 
 /*   for (var = 0, vars = pdu.variables; vars; vars = vars->next_variable) { */
   vars = pdu.variables;
-  var = 0;
+  /*  var = 0;*/
   if (vars!=NULL)
     {
       DebugLog(DF_MOD, DS_DEBUG, "Process variables\n");

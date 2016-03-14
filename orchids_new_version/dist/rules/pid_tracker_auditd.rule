@@ -5,7 +5,9 @@ The pid tracker.
 #include "linux64syscall.h"
 
 /*** Needed configuration:
- *** auditctl -a always,exit -F arch=x86_64 -S clone,execve,exit,kill,setuid,setgid,setreuid,setregid,setresuid,setresgid
+ *** auditctl should audit all the syscalls in this file, and this will be
+ *** handled automatically by 
+ *** [local:auditctl]
  ***/
 
 rule pidtrack synchronize($pid)
@@ -55,7 +57,7 @@ rule pidtrack synchronize($pid)
 
     expect (.auditd.syscall == SYS_kill &&
 	    .auditd.a0 == $pid &&
-	    .auditd.a1 == 9)
+	    .auditd.a1 == 9) /* We should be a bit subtler than that... */
       goto end;
 
     /* We now catch any other auditd event (at least from those
