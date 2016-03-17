@@ -186,7 +186,9 @@ db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
   OBJTYPE obj;
   MYSQL mysql;
 
-  GC_START(ctx->gc_ctx, 2);
+  GC_START(ctx->gc_ctx, 3);
+  db = db_empty(ctx->gc_ctx);
+  GC_UPDATE(ctx->gc_ctx, 2, db);
   mysql_init(&mysql);
   mysql_options(&mysql, MYSQL_READ_DEFAULT_GROUP, "option");
   
@@ -202,32 +204,37 @@ db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
     ncols = mysql_num_fields(res);
     t = gc_alloc(ctx->gc_ctx, DBST_SIZE(ncols), &db_small_table_class);   
     t->gc.type = T_DB_SMALL_TABLE;
-    t->nfields = ncols;
+    t->nfields = 0;
     t->next = NULL;
     GC_UPDATE(ctx->gc_ctx, 0, t);
 
     while((row = mysql_fetch_row(res)))
     {  
       unsigned long *len = NULL;
+      
       len = mysql_fetch_lengths(res);
-      for (i=0; i<ncols; i++)
-      {
-        obj = ovm_str_new(ctx->gc_ctx, len[i]);
-        memcpy(STR(obj), row[i] ? row[i] : "NULL", STRLEN(obj));
+      for (i=0; i<ncols; )
+	{
+	  if (row[i]==NULL)
+	    t->tuple[i] = NULL;
+	  else
+	    {
+	      obj = ovm_str_new(ctx->gc_ctx, len[i]);
+	      memcpy(STR(obj), row[i], STRLEN(obj));
 	      GC_TOUCH(ctx->gc_ctx, t->tuple[i] = obj);
-      }
+	    }
+	  t->nfields = ++i;
+	}
       
       s = gc_alloc(ctx->gc_ctx, DB_TUPLE_SIZE(ncols), &db_tuples_class);
       GC_TOUCH(ctx->gc_ctx, s->what.tuples.table = t);
       GC_UPDATE(ctx->gc_ctx, 1, s); 
       for (i=0; i<ncols; i++)
-      {
-        if (t->tuple[i]==NULL)
-    	    s->what.tuples.hash[i] = 0;
-        else 
-          s->what.tuples.hash[i] = issdl_hash(t->tuple[i]);
-      } 
+	{
+	  s->what.tuples.hash[i] = issdl_hash(t->tuple[i]);
+	} 
       db = db_union (ctx->gc_ctx, ncols, db, s);
+      GC_UPDATE(ctx->gc_ctx, 2, db);
     }
 
     mysql_free_result(res);
@@ -365,10 +372,7 @@ int db_from_sqlite_3_callback (void *data, int ncols,
   for (i=0; i<ncols; i++)
     {
       obj = t->tuple[i];
-      if (obj==NULL)
-    	s->what.tuples.hash[i] = 0; /* NULL has hash code 0 */
-      else 
-	s->what.tuples.hash[i] = issdl_hash (obj);
+      s->what.tuples.hash[i] = issdl_hash (obj);
     }
   
   GC_TOUCH(gc_ctx, *sqdata->db = db_union (gc_ctx, ncols, *sqdata->db, s));
@@ -385,6 +389,8 @@ db_map *db_from_sqlite3(orchids_t *ctx, char *filename, char *sql_query)
   char *errmsg;
 
   GC_START(ctx->gc_ctx, 1);
+  dbm = db_empty(ctx->gc_ctx);
+  GC_UPDATE(ctx->gc_ctx, 0, dbm);
   err = sqlite3_open_v2(filename, &db3, SQLITE_OPEN_READONLY, NULL);  
   if (err == SQLITE_OK)
   {
