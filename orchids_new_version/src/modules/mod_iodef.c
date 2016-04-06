@@ -68,6 +68,11 @@ static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, char *fname, size_t len
   xmlDocPtr doc;
   char *s;
 
+  if (cfg->iodef_conf_dir==NULL)
+    {
+      DebugLog(DF_MOD, DS_ERROR, "IODEFTemplatesDir not set");
+      return NULL;
+    }
   if (stat(cfg->iodef_conf_dir, &st)!=0)
     {
       DebugLog(DF_MOD, DS_ERROR, strerror(errno));
@@ -114,236 +119,245 @@ static xmlDocPtr parse_iodef_template (iodef_cfg_t* cfg, char *fname, size_t len
   return doc;
 }
 
-size_t snprint_xml_s_len (char *buf, size_t buflen, char *s, size_t len)
+typedef struct xml_buf_s xml_buf_t;
+struct xml_buf_s {
+  gc_t *gc_ctx;
+  char *txt;
+  size_t end, sz;
+} xml_buf_s;
+
+void snprint_xml_verbatim (xml_buf_t *buf, char *s, size_t len)
+{
+  size_t newsz;
+
+  newsz = buf->end+len;
+  if (newsz > buf->sz)
+    {
+      if ((buf->sz <<= 1) < newsz)
+	buf->sz = newsz;
+      buf->txt = gc_base_realloc (buf->gc_ctx, buf->txt, buf->sz);
+    }
+  memcpy (buf->txt+buf->end, s, len);
+  buf->end = newsz;
+}
+
+void snprint_xml_s_len (xml_buf_t *buf, char *s, size_t len)
 {
   size_t i;
   int c;
-  char *start, *bufend;
+  char *from;
+  char escaped[8];
 
-  start = buf;
-  bufend = buf+buflen-1;
-  for (i=0; i<len; i++)
+  for (i=0, from=s; i<len; i++)
     {
-      if (buf>=bufend)
-	break;
       c = s[i];
-      if (isprint (c))
-	*buf++ = c;
-      else *buf++ = '.';
+      if (isprint(c))
+	switch (c)
+	  {
+	  case '<':
+	    snprint_xml_verbatim (buf, from, s+i-from);
+	    snprint_xml_verbatim (buf, "&lt;", 4);
+	    from = s+1;
+	    break;
+	  case '>':
+	    snprint_xml_verbatim (buf, from, s+i-from);
+	    snprint_xml_verbatim (buf, "&gt;", 4);
+	    from = s+1;
+	    break;
+	  case '&':
+	    snprint_xml_verbatim (buf, from, s+i-from);
+	    snprint_xml_verbatim (buf, "&amp;", 5);
+	    from = s+1;
+	    break;
+	  case '"':
+	    snprint_xml_verbatim (buf, from, s+i-from);
+	    snprint_xml_verbatim (buf, "&quot;", 6);
+	    from = s+1;
+	    break;
+	  case '\'':
+	    snprint_xml_verbatim (buf, from, s+i-from);
+	    snprint_xml_verbatim (buf, "&apos;", 6);
+	    from = s+1;
+	    break;
+	  default:
+	    break;
+	  }
+      else
+	{
+	  snprint_xml_verbatim (buf, from, s+i-from);
+	  sprintf (escaped, "&#%d;", (int)c);
+	  snprint_xml_verbatim (buf, escaped, strlen(escaped));
+	  from = s+1;
+	}
     }
-  *buf = '\0';
-  return buf-start;
+  snprint_xml_verbatim (buf, from, s+len-from);
 }
 
-size_t snprint_xml_s (char *buf, size_t buflen, char *s)
+void snprint_xml_s (xml_buf_t *buf, char *s)
 {
-  return snprint_xml_s_len (buf, buflen, s, strlen(s));
+  snprint_xml_s_len (buf, s, strlen(s));
 }
 
-size_t snprintf_ovm_var (char *buff, size_t buff_length, ovm_var_t *val)
+void snprint_ovm_var (xml_buf_t *buf, ovm_var_t *val)
 /* imitated from fprintf_html_var() in html_output.c */
 {
   char asc_time[32]; /* for date conversions; also integers, floats, ipv4 and ipv6,
 			and unknown types */
-  struct hostent *hptr; /* for IPV4ADDR */
-  char **pptr; /* for IPV4ADDR */
   char dst[INET6_ADDRSTRLEN];
-  size_t offset;
 
   if (val==NULL)
-    return snprint_xml_s(buff, buff_length, "(null)\n");
+    {
+      snprint_xml_s(buf, "(null)\n");
+    }
   /* display data */
   else switch (val->gc.type)
 	 {
 	 case T_INT:
 	   sprintf (asc_time, "%li", INT(val));
-	   return snprint_xml_s (buff, buff_length, asc_time);
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 case T_UINT:
 	   sprintf (asc_time, "%lu", UINT(val));
-	   return snprint_xml_s (buff, buff_length, asc_time);
-	 case T_BSTR:
-	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
-	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
-					 (char *)BSTR(val), BSTRLEN(val));
-	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
-	   return offset;
+	   snprint_xml_s (buf, asc_time);
+	   break;
+	 case T_BSTR: /* Do not print enclosing quotes */
+	   snprint_xml_s_len (buf, (char *)BSTR(val), BSTRLEN(val));
+	   break;
 	 case T_VBSTR:
-	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
-	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
-					 (char *)VBSTR(val), VBSTRLEN(val));
-	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
-	   return offset;
+	   snprint_xml_s_len (buf, (char *)VBSTR(val), VBSTRLEN(val));
+	   break;
 	 case T_STR:
-	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
-	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
-					 STR(val), STRLEN(val));
-	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
-	   return offset;
+	   snprint_xml_s_len (buf, (char *)STR(val), STRLEN(val));
+	   break;
 	 case T_VSTR:
-	   offset = 0; //snprint_xml_s (buff, buff_length, "\"");
-	   offset += snprint_xml_s_len (buff+offset, buff_length-offset,
-					 VSTR(val), VSTRLEN(val));
-	   //offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
-	   return offset;
+	   snprint_xml_s_len (buf, (char *)VSTR(val), VSTRLEN(val));
+	   break;
 	 case T_CTIME:
 	   strftime(asc_time, 32,
 		    "%a %b %d %H:%M:%S %Y", gmtime(&CTIME(val)));
-	   return snprint_xml_s(buff, buff_length, asc_time);
+	   snprint_xml_s(buf, asc_time);
+	   break;
 	 case T_IPV4:
 	   sprintf(asc_time, "%s", inet_ntoa(IPV4(val)));
-	   offset = snprint_xml_s (buff, buff_length, asc_time);
-	   hptr = gethostbyaddr((char *) &IPV4(val),
-				sizeof (struct in_addr), AF_INET);
-	   if (hptr == NULL) {
-	     return offset;
-	   } else if (hptr->h_name != NULL) {
-	     offset += snprint_xml_s (buff+offset, buff_length-offset, " (");
-	     offset += snprint_xml_s (buff+offset, buff_length-offset, hptr->h_name);
-	   } else {
-	     return offset;
-	   }
-	   for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
-	     {
-	       offset += snprint_xml_s (buff+offset, buff_length-offset, ", ");
-	       offset += snprint_xml_s (buff+offset, buff_length-offset, *pptr);
-	     }
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, ")");
-	   return offset;
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 case T_IPV6:
 	   inet_ntop (AF_INET6, &IPV6(val), dst, sizeof(dst));
 	   sprintf(asc_time, "%s", dst);
-	   offset = snprint_xml_s (buff, buff_length, asc_time);
-	   hptr = gethostbyaddr((char *) &IPV6(val),
-				sizeof (struct in6_addr), AF_INET6);
-	   if (hptr == NULL) {
-	     return offset;
-	   } else if (hptr->h_name != NULL) {
-	     offset += snprint_xml_s (buff+offset, buff_length-offset, " (");
-	     offset += snprint_xml_s (buff+offset, buff_length-offset, hptr->h_name);
-	   } else {
-	     return offset;
-	   }
-	   for (pptr = hptr->h_aliases; *pptr != NULL; pptr++)
-	     {
-	       offset += snprint_xml_s (buff+offset, buff_length-offset, ", ");
-	       offset += snprint_xml_s (buff+offset, buff_length-offset, *pptr);
-	     }
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, ")");
-	   return offset;
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 case T_TIMEVAL:
 	   strftime(asc_time, 32, "%a %b %d %H:%M:%S %Y",
 		    gmtime(&TIMEVAL(val).tv_sec));
-	   offset = snprint_xml_s (buff, buff_length, asc_time);
+	   snprint_xml_s (buf, asc_time);
 	   sprintf(asc_time, " +%li us", (long)TIMEVAL(val).tv_usec);
-	   offset += snprint_xml_s (buff+offset, buff_length-offset, asc_time);
-	   return offset;
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 case T_REGEX:
 	   if (REGEXSTR(val)!=NULL)
 	     {
-	       offset = snprint_xml_s (buff, buff_length, "\"");
-	       offset += snprint_xml_s (buff+offset, buff_length-offset,
-					REGEXSTR(val));
-	       offset += snprint_xml_s (buff+offset, buff_length-offset, "\"");
-	       return offset;
-	     }	       
-	   return 0;
+	       snprint_xml_s (buf, "\"");
+	       snprint_xml_s (buf, REGEXSTR(val));
+	       snprint_xml_s (buf, "\"");
+	     }
+	   else snprint_xml_s (buf, "<regex>");
+	   break;
 	 case T_FLOAT:
 	   sprintf(asc_time, "%f", FLOAT(val));
-	   return snprint_xml_s (buff, buff_length, asc_time);
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 default:
 	   sprintf(asc_time, "<type %i>", val->gc.type);
-	   return snprint_xml_s (buff, buff_length, asc_time);
+	   snprint_xml_s (buf, asc_time);
+	   break;
 	 }
 }
 
-static char expand_var (orchids_t		*ctx,
-			char		*text,
-			state_instance_t	*state,
-			char		*buff,
-			unsigned int	buff_size)
-{
-  unsigned int	i;
-  unsigned int	v;
-  unsigned int	buff_offset = 0;
-  unsigned int	text_offset = 0;
-  char		c;
-
-  if (text=='\0' || strchr(text, '$')==NULL)
-    return 0;
-
-  memset(buff, 0, buff_size);
-
-  while (text[text_offset] != 0)
+static void xml_expand_var (xml_buf_t *buf, state_instance_t *state, char *name, size_t namelen)
+{ /* Variable name is given in name (length=namelen), with initial dollar sign included,
+     e.g., $pid
+  */
+  int32_t v;
+  char *vname;
+  ovm_var_t *val;
+  rule_t *rule = state->pid->rule;
+  
+  for (v = 0; v < rule->dynamic_env_sz; v++)
     {
-      if (buff_offset >= buff_size)
-	return (1);
-      if (text[text_offset] != '$')
-	buff[buff_offset++] = text[text_offset++];
-      else
+      vname = rule->var_name[v];
+      if (strncmp(name, vname, namelen)==0
+	  && vname[namelen]=='\0')
 	{
-	  // Get the full variable name
-	  for (i = 1;
-	       ((text[text_offset] != 0)
-		&& ((text[text_offset + i] == '.')
-		    || (text[text_offset + i] == '_')
-		    || (isalnum(text[text_offset + i]))));
-	       i++)
-	    continue ;
-	  
-	  c = text[text_offset + i];
-	  text[text_offset + i] = '\0';
-      
-	  // Retrieve the last variable value and add it to the buffer
-	  for (v = 0; v < state->pid->rule->dynamic_env_sz; ++v)
-	    {
-	      if (!strcmp(text + text_offset,
-			  state->pid->rule->var_name[v]))
-		{
-		  ovm_var_t *val;
-
-		  val = ovm_read_value (state->env, v);
-		  if (val!=NULL)
-		    buff_offset += snprintf_ovm_var(buff + buff_offset,
-						    buff_size - buff_offset,
-						    val);
-		}
-	    }
-
-	  if (buff_offset >= buff_size)
-	    return (1);
-
-	  text_offset += i;
-	  buff[buff_offset++] = c;
-	  if (c)
-	    text_offset++;
+	  val = ovm_read_value (state->env, v);
+	  if (val!=NULL)
+	    snprint_ovm_var(buf, val);
+	  break;
 	}
     }
+}
 
-  return (1);
+static char *xml_expand_vars (gc_t *gc_ctx, char *text, state_instance_t *state)
+{
+  char *var, *vp, c;
+  xml_buf_t buf;
+
+  if (text==NULL)
+    return NULL;
+  var = strchr (text, '$');
+  if (var==NULL)
+    return NULL;
+  buf.gc_ctx = gc_ctx;
+  buf.txt = gc_base_malloc (gc_ctx, buf.sz = 128);
+  buf.end = 0;
+  do {
+    snprint_xml_verbatim (&buf, text, var-text);
+    /* Here var[0]=='$', and we start a variable name */
+    vp = var+1;
+    while (1)
+      {
+	c = *vp;
+	if (isalnum(c) || c=='_' || c=='.')
+	  vp++;
+	else break;
+      }
+    xml_expand_var (&buf, state, var, vp-var);
+    text = vp;
+    var = strchr (text, '$');
+  } while (var!=NULL);
+  snprint_xml_verbatim (&buf, text, strlen(text));
+  snprint_xml_verbatim (&buf, "", 1); /* print final NUL byte */
+  return buf.txt;
 }
 
 static void expand_iodef_template (orchids_t *ctx,
 				   xmlNodePtr cur_node,
 				   state_instance_t *state)
 {
-  xmlAttrPtr	cur_attr = NULL;
-  char		buff[BUFF_SIZE];
+  xmlAttrPtr cur_attr = NULL;
+  char *expanded;
 
   if (!xmlFirstElementChild(cur_node))
-  {
-    if (expand_var(ctx, (char*)xmlNodeGetContent(cur_node),
-		   state, buff, BUFF_SIZE))
-      xmlNodeSetContent(cur_node,
-			xmlEncodeEntitiesReentrant (cur_node->doc, BAD_CAST buff));
+    {
+      expanded = xml_expand_vars (ctx->gc_ctx, (char*)xmlNodeGetContent(cur_node), state);
+      if (expanded!=NULL)
+	{
+	  xmlNodeSetContent(cur_node,
+			    xmlEncodeEntitiesReentrant (cur_node->doc, BAD_CAST expanded));
+	  gc_base_free (expanded);
+	}
   }
   for (cur_attr = cur_node->properties; cur_attr; cur_attr = cur_attr->next)
-    if (expand_var(ctx, (char*)xmlGetProp(cur_node, cur_attr->name),
-		  state, buff, BUFF_SIZE))
-      xmlSetProp(cur_node, cur_attr->name,
-		 xmlEncodeEntitiesReentrant (cur_node->doc, BAD_CAST buff));
-
+    {
+      expanded = xml_expand_vars (ctx->gc_ctx, (char*)xmlGetProp(cur_node, cur_attr->name), state);
+      if (expanded!=NULL)
+	{
+	  xmlSetProp(cur_node, cur_attr->name,
+		     xmlEncodeEntitiesReentrant (cur_node->doc, BAD_CAST expanded));
+	  gc_base_free (expanded);
+	}
+    }
   // For each state node in the .iodef file
-  for (cur_node = xmlFirstElementChild(cur_node); cur_node;
+  for (cur_node = xmlFirstElementChild(cur_node); cur_node!=NULL;
        cur_node = xmlNextElementSibling(cur_node))
     expand_iodef_template(ctx, cur_node, state);
 }
@@ -580,30 +594,35 @@ xmlXPathContextPtr iodef_generate_report(orchids_t	*ctx,
   return report_ctx;
 }
 
-static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_generate_report(orchids_t *ctx, state_instance_t *state, void *data)
 {
   xmlXPathContextPtr xpath_ctx;
   ovm_var_t *res, *arg;
   uint16_t handle;
   char *fname;
   size_t len;
-  static mod_entry_t *mod_entry = NULL;
+  mod_entry_t *mod_entry = (mod_entry_t *)data;
 
+#ifdef OBSOLETE
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
+#endif
   arg = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
-  switch (TYPE(arg))
-    {
-    case T_STR: fname = STR(arg); len = STRLEN(arg);
-      break;
-    case T_VSTR: fname = VSTR(arg); len = VSTRLEN(arg);
-      break;
-    default:
-      DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
-      STACK_DROP(ctx->ovm_stack, 1);
-      PUSH_RETURN_FALSE(ctx);
-      return;
-    }
+  fname = NULL;
+  len = 0;
+  if (arg!=NULL)
+    switch (TYPE(arg))
+      {
+      case T_STR: fname = STR(arg); len = STRLEN(arg);
+	break;
+      case T_VSTR: fname = VSTR(arg); len = VSTRLEN(arg);
+	break;
+      default:
+	DebugLog(DF_MOD, DS_DEBUG, "event value not a string\n");
+	STACK_DROP(ctx->ovm_stack, 1);
+	PUSH_RETURN_FALSE(ctx);
+	return;
+      }
 
   xpath_ctx = iodef_generate_report (ctx, mod_entry, state, fname, len);
   handle = ovm_xml_new (ctx->gc_ctx, state, xpath_ctx, iodef_description);
@@ -613,12 +632,12 @@ static void issdl_generate_report(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var, *doc1;
   xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
-  static mod_entry_t	*mod_entry = NULL;
+  mod_entry_t *mod_entry = (mod_entry_t *)data;
   iodef_cfg_t*	cfg;
   char		buff[PATH_MAX];
   struct timeval tv;
@@ -626,9 +645,10 @@ static void issdl_iodef_write_report(orchids_t *ctx, state_instance_t *state)
   unsigned long ntpl;
   FILE*		fp;
 
+#ifdef OBSOLETE
   if (!mod_entry)
     mod_entry = find_module_entry(ctx, "iodef");
-
+#endif
   cfg = (iodef_cfg_t *)mod_entry->config;
 
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
@@ -803,18 +823,20 @@ static void *iodef_preconfig(orchids_t *ctx, mod_entry_t *mod)
   html_output_add_menu_entry(ctx, mod, iodef_htmloutput);
 
   register_lang_function(ctx,
-			issdl_generate_report,
-			"iodef_new_report",
+			 issdl_generate_report,
+			 "iodef_new_report",
 			 1, iodef_new_report_sigs,
 			 m_random,
-			"generate a report using the iodef template");
+			 "generate a report using the iodef template",
+			 mod);
 
   register_lang_function(ctx,
-			issdl_iodef_write_report,
-			"iodef_write_report",
+			 issdl_iodef_write_report,
+			 "iodef_write_report",
 			 1, iodef_write_report_sigs,
 			 m_random_thrash,
-			"write iodef report into the report folder");
+			 "write iodef report into the report folder",
+			 mod);
 
 
   mod_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (iodef_cfg_t));
@@ -857,7 +879,7 @@ static mod_cfg_cmd_t iodef_dir[] =
   { NULL, NULL }
 };
 
-char *iodef_deps[] = { "xml", NULL };
+char *iodef_deps[] = { "htmlstate", "xml", NULL };
 
 input_module_t mod_iodef = {
   MOD_MAGIC,
@@ -881,7 +903,7 @@ input_module_t mod_iodef = {
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

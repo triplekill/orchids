@@ -39,10 +39,7 @@
 
 input_module_t mod_consoles;
 
-static conscfg_t *conscfg_g;
-
-
-static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
+static void issdl_console_msg(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *con;
@@ -50,6 +47,7 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   size_t len;
   char *c;
   int ok;
+  conscfg_t *config = (conscfg_t *)data;
 
   con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   if (con==NULL)
@@ -82,7 +80,7 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
     }
 
   c = ovm_strdup(ctx->gc_ctx, con);
-  ok = output_console_msg(c, s, len);
+  ok = output_console_msg(c, s, len, config);
   gc_base_free (c);
   STACK_DROP(ctx->ovm_stack, 2);
   if (ok)
@@ -90,13 +88,13 @@ static void issdl_console_msg(orchids_t *ctx, state_instance_t *state)
   else PUSH_RETURN_FALSE(ctx);
 }
 
-
-static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
+static void issdl_console_evt(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *con;
   char *c;
   int ok;
   event_t *evt;
+  conscfg_t *config = (conscfg_t *)data;
 
   con = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   if (con==NULL)
@@ -115,7 +113,7 @@ static void issdl_console_evt(orchids_t *ctx, state_instance_t *state)
     }
   c = ovm_strdup(ctx->gc_ctx, con);
   evt = (event_t *)STACK_ELT(ctx->ovm_stack, 1);
-  ok = output_console_evt(ctx, c, evt);
+  ok = output_console_evt(ctx, c, evt, config);
   gc_base_free (c);
   STACK_DROP(ctx->ovm_stack, 2);
   if (ok)
@@ -135,17 +133,18 @@ static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod)
 
   DebugLog(DF_MOD, DS_INFO,
            "loading consoles module @ %p\n", (void *) &mod_consoles);
+  mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
+  mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);
   register_lang_function(ctx, issdl_console_msg, "console_msg",
 			 2, console_msg_sigs,
 			 m_unknown_2_thrash,
-			 "Console message output");
+			 "Console message output",
+			 mod_cfg);
   register_lang_function(ctx, issdl_console_evt, "console_evt",
 			 1, console_evt_sigs,
 			 m_unknown_2_thrash,
-			 "Console event output");
-  mod_cfg = gc_base_malloc (ctx->gc_ctx, sizeof (conscfg_t));
-  mod_cfg->consoles = new_strhash(ctx->gc_ctx, 1021);
-  conscfg_g = mod_cfg;
+			 "Console event output",
+			 mod_cfg);
   return mod_cfg;
 }
 
@@ -239,7 +238,7 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod,
 }
 
 
-static int output_console_msg(char *console, char *msg, size_t len)
+static int output_console_msg(char *console, char *msg, size_t len, conscfg_t *config)
 {
   console_t *con;
   size_t i;
@@ -249,7 +248,7 @@ static int output_console_msg(char *console, char *msg, size_t len)
   DebugLog(DF_MOD, DS_INFO, "Output msg '%s' to console '%s'\n",
            msg, console);
 
-  con = strhash_get(conscfg_g->consoles, console);
+  con = strhash_get(config->consoles, console);
   if (con == NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
@@ -270,13 +269,13 @@ static int output_console_msg(char *console, char *msg, size_t len)
 
 
 static int output_console_evt(orchids_t *ctx, char *console,
-			      event_t *evt)
+			      event_t *evt, conscfg_t *config)
 {
   console_t *con;
 
   DebugLog(DF_MOD, DS_INFO, "Output msg event to console '%s'\n", console);
 
-  con = strhash_get(conscfg_g->consoles, console);
+  con = strhash_get(config->consoles, console);
   if (con == NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "console '%s' not defined\n", console);
@@ -319,7 +318,7 @@ input_module_t mod_consoles = {
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

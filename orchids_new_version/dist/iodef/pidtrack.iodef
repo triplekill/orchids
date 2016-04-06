@@ -2,7 +2,7 @@
 <IODEF-Template>
   <insert path="/*/iodef:Incident">
     <Description>PID Tracker alert</Description>
-    <Description>$str</Description>
+    <Description>Privilege escalation uid:$uid->$newuid gid:$gid->$newgid pid=$pid</Description>
     <Assessment>
       <Impact type="policy" completion="succeeded"/>
     </Assessment>

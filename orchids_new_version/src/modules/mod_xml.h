@@ -24,29 +24,18 @@ uint16_t ovm_xml_new(gc_t *gc_ctx, state_instance_t *si,
 
 xmlXPathContextPtr xmlGetContextRd(gc_t *gc_ctx, state_instance_t *si, ovm_var_t *var);
 
-char *xml_get_string(xmlXPathContextPtr xpath_ctx,
-		     char	*path);
-
-xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
-				xmlChar	*path);
-
-char validate_xml_with_schema(xmlSchemaPtr	schema,
-			      char		*doc);
-
-xmlNode *new_xs_datetime_node(xmlNode *parent,
-			      const char *name,
-			      struct tm *time);
-
-xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx,
-				xmlChar	*path);
-
+char *xml_get_string(xmlXPathContextPtr xpath_ctx, char *path);
+xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx, xmlChar	*path);
+char validate_xml_with_schema(xmlSchemaPtr schema, char *doc);
+xmlNode *new_xs_datetime_node(xmlNode *parent, const char *name, struct tm *time);
+xmlNodePtr xml_walk_and_create (xmlXPathContextPtr ctx, xmlChar	*path);
 
 #endif /* !MOD_XML_H_ */
 
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

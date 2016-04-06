@@ -552,11 +552,13 @@ static int ovm_call(isn_param_t *param)
   orchids_t *ctx = param->ctx;
   state_instance_t *state = param->state;
   bytecode_t op = param->ip[1];
+  issdl_function_t *f;
 
+  f = &ctx->vm_func_tbl[op];
   DebugLog(DF_OVM, DS_DEBUG, "OP_CALL [%02lx] (%s)\n", param->ip[1],
-	   ctx->vm_func_tbl[op].name);
+	   f->name);
   /* Check call table boundary */
-  (*ctx->vm_func_tbl[op].func) (ctx, state);
+  (*f->func) (ctx, state, f->data);
   param->ip += 2;
   return (0);
 }
@@ -1952,7 +1954,7 @@ const char *get_opcode_name(bytecode_t opcode)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

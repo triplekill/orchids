@@ -12,6 +12,12 @@
 
 #define MAX_CALLS 4
 
+/*** Needed configuration:
+ *** auditctl should audit all the syscalls in this file, and this will be
+ *** handled automatically by the following line:
+ *** [local:auditctl]
+ ***/
+
 rule lock_lease_dos
 {
   state init

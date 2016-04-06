@@ -2988,8 +2988,7 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val)
 ** Built-in functions
 */
 
-static void
-issdl_print(orchids_t *ctx, state_instance_t *state)
+static void issdl_print(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *param;
 
@@ -3000,7 +2999,7 @@ issdl_print(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
-static void issdl_print_string (orchids_t *ctx, state_instance_t *state)
+static void issdl_print_string (orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *param;
   char *s;
@@ -3036,7 +3035,7 @@ static void issdl_print_string (orchids_t *ctx, state_instance_t *state)
 
 
 #ifdef OBSOLETE
-static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
+static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumpstack()\n");
 
@@ -3064,7 +3063,7 @@ static void issdl_dumpstack(orchids_t *ctx, state_instance_t *state)
 #endif
 
 #if 0
-static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
+static void issdl_printevent(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_printevent()\n");
   PUSH_RETURN_TRUE(ctx);
@@ -3077,7 +3076,7 @@ static void issdl_printevent(orchids_t *ctx, state_instance_t *state)
 }
 #endif
 
-static void issdl_shutdown(orchids_t *ctx, state_instance_t *state)
+static void issdl_shutdown(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_shutdown()\n");
   fprintf(stdout, "explicit shutdown on '%s:%s' request\n",
@@ -3086,7 +3085,7 @@ static void issdl_shutdown(orchids_t *ctx, state_instance_t *state)
 }
 
 #ifdef OBSOLETE
-static void issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
+static void issdl_dumppathtree(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_dumppathtree()\n");
   fprintf_rule_instance_dot(stdout, state->rule_instance,
@@ -3096,7 +3095,7 @@ static void issdl_dumppathtree(orchids_t *ctx, state_instance_t *state)
 }
 #endif
 
-static void issdl_random(orchids_t *ctx, state_instance_t *state)
+static void issdl_random(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *random;
 
@@ -3105,7 +3104,7 @@ static void issdl_random(orchids_t *ctx, state_instance_t *state)
   PUSH_VALUE (ctx, random);
 }
 
-static void issdl_system(orchids_t *ctx, state_instance_t *state)
+static void issdl_system(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t  *param;
   char       *cmd_line;
@@ -3139,14 +3138,14 @@ static void issdl_system(orchids_t *ctx, state_instance_t *state)
 }
 
 #ifdef OBSOLETE
-static void issdl_stats(orchids_t *ctx, state_instance_t *state)
+static void issdl_stats(orchids_t *ctx, state_instance_t *state, void *data)
 {
   fprintf_orchids_stats(stdout, ctx);
   PUSH_RETURN_TRUE(ctx);
 }
 #endif
 
-static void issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_int(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[64];
   ovm_var_t *str;
@@ -3169,7 +3168,7 @@ static void issdl_str_from_int(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_str_from_uint(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_uint(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[64];
   ovm_var_t *str;
@@ -3192,7 +3191,7 @@ static void issdl_str_from_uint(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_str_from_float(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_float(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[64];
   ovm_var_t *str;
@@ -3215,7 +3214,7 @@ static void issdl_str_from_float(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_str_from_ipv4(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_ipv4(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[32];
   ovm_var_t *str;
@@ -3236,7 +3235,7 @@ static void issdl_str_from_ipv4(orchids_t *ctx, state_instance_t *state)
   }
 }
 
-static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[INET6_ADDRSTRLEN];
   ovm_var_t *str;
@@ -3257,7 +3256,7 @@ static void issdl_str_from_ipv6(orchids_t *ctx, state_instance_t *state)
   }
 }
 
-static void issdl_ipv4_from_ipv6(orchids_t *ctx, state_instance_t *state)
+static void issdl_ipv4_from_ipv6(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *addr4;
   ovm_var_t *addr6;
@@ -3288,7 +3287,7 @@ static void issdl_ipv4_from_ipv6(orchids_t *ctx, state_instance_t *state)
 
 
 
-static void issdl_ipv6_from_ipv4(orchids_t *ctx, state_instance_t *state)
+static void issdl_ipv6_from_ipv4(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *addr4;
   ovm_var_t *addr6;
@@ -3379,7 +3378,7 @@ char *orchids_atoi (char *str, size_t len, long *result)
   return s;
 }
 
-static void issdl_int_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_int_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *i;
@@ -3408,7 +3407,7 @@ static void issdl_int_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_uint_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_uint_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *i;
@@ -3437,7 +3436,7 @@ static void issdl_uint_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state)
+static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *ui;
   ovm_var_t *i;
@@ -3460,7 +3459,7 @@ static void issdl_int_from_uint(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
+static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *i;
   ovm_var_t *ui;
@@ -3483,7 +3482,7 @@ static void issdl_uint_from_int(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
+static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *x;
   ovm_var_t *i;
@@ -3508,7 +3507,7 @@ static void issdl_int_from_float(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
+static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *x;
   ovm_var_t *ui;
@@ -3533,7 +3532,7 @@ static void issdl_uint_from_float(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state)
+static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *i;
   ovm_var_t *x;
@@ -3551,7 +3550,7 @@ static void issdl_float_from_int(orchids_t *ctx, state_instance_t *state)
     } 
 }
 
-static void issdl_float_from_uint(orchids_t *ctx, state_instance_t *state)
+static void issdl_float_from_uint(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *ui;
   ovm_var_t *x;
@@ -3688,7 +3687,7 @@ char *time_convert(char *str, char *end, struct timeval *tv)
   return str;
 }
 
-static void issdl_timeval_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_timeval_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *i;
@@ -3719,7 +3718,7 @@ static void issdl_timeval_from_str(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_time_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_time_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *i;
@@ -3842,7 +3841,7 @@ char *orchids_atof(char *str, size_t str_sz, double *result)
 }
 
 
-static void issdl_float_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_float_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *i;
@@ -3872,7 +3871,7 @@ static void issdl_float_from_str(orchids_t *ctx, state_instance_t *state)
 }
 
 #ifdef OBSOLETE
-static void issdl_kill_threads(orchids_t *ctx, state_instance_t *state)
+static void issdl_kill_threads(orchids_t *ctx, state_instance_t *state, void *data)
 {
   wait_thread_t *t;
 
@@ -3889,7 +3888,7 @@ static void issdl_kill_threads(orchids_t *ctx, state_instance_t *state)
 #endif
 
 #ifdef OBSOLETE
-static void do_recursive_cut(state_instance_t *state)
+static void do_recursive_cut(state_instance_t *state, void *data)
 {
   wait_thread_t *t;
 
@@ -3929,7 +3928,7 @@ static int hybrid_strcmp (char *s, char *t, size_t slen)
   return (*t == '\0');
 }
 
-static void issdl_cut(orchids_t *ctx, state_instance_t *state)
+static void issdl_cut(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   state_instance_t *si;
@@ -4001,7 +4000,7 @@ char *ovm_strdup(gc_t *gc_ctx, ovm_var_t *str)
   return s;
 }
 
-static void issdl_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_report(orchids_t *ctx, state_instance_t *state, void *data)
 {
   reportmod_t* r;
 
@@ -4014,14 +4013,13 @@ static void issdl_report(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void issdl_noop(orchids_t *ctx, state_instance_t *state)
+static void issdl_noop(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_ENG, DS_INFO, "No-Operation called\n");
   PUSH_VALUE(ctx, NULL);
 }
 
-static void
-issdl_sendmail(orchids_t *ctx, state_instance_t *state)
+static void issdl_sendmail(orchids_t *ctx, state_instance_t *state, void *data)
 {
   int pid;
   int tmp_fd;
@@ -4161,7 +4159,7 @@ issdl_sendmail(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
+static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state, void *data)
 {
   int pid;
   int tmp_fd;
@@ -4307,7 +4305,7 @@ static void issdl_sendmail_report(orchids_t *ctx, state_instance_t *state)
 }
 
 #if 0
-static void issdl_drop_event(orchids_t *ctx, state_instance_t *state)
+static void issdl_drop_event(orchids_t *ctx, state_instance_t *state, void *data)
 {
   if (state->event == NULL)
     {
@@ -4319,7 +4317,7 @@ static void issdl_drop_event(orchids_t *ctx, state_instance_t *state)
   PUSH_RETURN_TRUE(ctx);
 }
 
-static void issdl_set_event_level(orchids_t *ctx, state_instance_t *state)
+static void issdl_set_event_level(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *level;
 
@@ -4361,8 +4359,7 @@ unsigned long bitcnt_tbl[] = { /* Precomputed table of 1-bit in each bytes */
 
 /* Compute the number of different bits between two variables of
    the same type and size (binary distance). */
-static void
-issdl_bindist(orchids_t *ctx, state_instance_t *state)
+static void issdl_bindist(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *param1;
   unsigned char *data1;
@@ -4410,7 +4407,7 @@ issdl_bindist(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_bytedist(orchids_t *ctx, state_instance_t *state)
+static void issdl_bytedist(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *param1;
   unsigned char *data1;
@@ -4458,7 +4455,7 @@ static void issdl_bytedist(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_vstr_from_regex(orchids_t *ctx, state_instance_t *state)
+static void issdl_vstr_from_regex(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *vstr;
   ovm_var_t *regex;
@@ -4488,7 +4485,7 @@ static void issdl_vstr_from_regex(orchids_t *ctx, state_instance_t *state)
     }
 }
 
-static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
+static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   ovm_var_t *regex;
@@ -4527,7 +4524,7 @@ static void issdl_regex_from_str(orchids_t *ctx, state_instance_t *state)
   PUSH_VALUE(ctx, regex);
 }
 
-static void issdl_defined(orchids_t *ctx, state_instance_t *state)
+static void issdl_defined(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *val;
 
@@ -4540,7 +4537,7 @@ static void issdl_defined(orchids_t *ctx, state_instance_t *state)
 
 #ifdef OBSOLETE
 // superseded by plain old '-'
-static void issdl_difftime(orchids_t *ctx, state_instance_t *state)
+static void issdl_difftime(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *t1, *t2, *res;
 
@@ -4556,7 +4553,7 @@ static void issdl_difftime(orchids_t *ctx, state_instance_t *state)
 }
 #endif
 
-static void issdl_str_from_time(orchids_t *ctx, state_instance_t *state)
+static void issdl_str_from_time(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[256];
   ovm_var_t *str;
@@ -4579,7 +4576,115 @@ static void issdl_str_from_time(orchids_t *ctx, state_instance_t *state)
   }
 }
 
-static void issdl_str_from_timeval(orchids_t *ctx, state_instance_t *state)
+size_t add_slashes_compute_length (char *s, size_t len)
+{
+  size_t i, newlen;
+  char c;
+
+  for (i=0, newlen=0; i<len; i++)
+    {
+      c = *s++;
+      switch ((int)(unsigned char)c) /* The following case analysis
+					should mimick the case analysis
+					done in add_slashes() below. */
+	{
+	case '\'': case '"': case '\\': case 7: case 8:
+	case 9: case 10: case 11: case 12: case 13:
+	  newlen += 2;
+	  break;
+	default:
+	  if (c<0x20 || c>0x78)
+	    newlen += 4;
+	  else newlen++;
+	  break;
+	}
+    }
+  return newlen;
+}
+
+void add_slashes (char *s, size_t len, char *t)
+{ /* t should be allocated with enough bytes to hold the result;
+     consider calling add_slashes_compute_length (s, len) before
+     allocating t. */
+  size_t i;
+  char c;
+  char *block, octal[4];
+  size_t blocklen;
+
+  /* similar to PHP's addslashes().
+     From http://docstore.mik.ua/orelly/webprog/php/ch04_05.htm
+     The addcslashes( ) function escapes arbitrary characters by placing backslashes
+     before them. With the exception of the characters in Table 4-4 (note: characters
+     7-13), characters with ASCII values less than 32 or above 126 are encoded with
+     their octal values (e.g., "\002")
+   */
+  for (i=0; i<len; i++)
+    {
+      c = *s++;
+      switch ((int)(unsigned char)c)
+	{
+	case '\'': block = "\\'"; blocklen = 2;
+	write_block:
+	  memcpy (t, block, blocklen);
+	  t += blocklen;
+	  break;
+	case '"': block = "\\\""; blocklen = 2; goto write_block;
+	case '\\': block = "\\\\"; blocklen = 2; goto write_block;
+	case 7: block = "\\a"; blocklen = 2; goto write_block;
+	case 8: block = "\\b"; blocklen = 2; goto write_block;
+	case 9: block = "\\t"; blocklen = 2; goto write_block;
+	case 10: block = "\\n"; blocklen = 2; goto write_block;
+	case 11: block = "\\v"; blocklen = 2; goto write_block;
+	case 12: block = "\\f"; blocklen = 2; goto write_block;
+	case 13: block = "\\r"; blocklen = 2; goto write_block;
+	default:
+	  if (c<0x20 || c>0x78)
+	    {
+	      octal[0] = '\\';
+	      octal[1] = ((c >> 6) & 7) + '0';
+	      octal[2] = ((c >> 3) & 7) + '0';
+	      octal[3] = (c & 7) + '0';
+	      blocklen = 4;
+	      goto write_block;
+	    }
+	  block = &c;
+	  blocklen = 1;
+	  goto write_block;
+	}
+    }
+}
+
+static void issdl_addslashes (orchids_t *ctx, state_instance_t *state, void *data)
+{
+  ovm_var_t *param;
+  char *s;
+  size_t len, newlen;
+  ovm_var_t *res;
+
+  DebugLog(DF_OVM, DS_DEBUG, "issdl_stringify()\n");
+  param = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
+  s = NULL;
+  len = 0;
+  if (param!=NULL)
+    switch (TYPE(param))
+      {
+      case T_STR:
+	s = STR(param); len = STRLEN(param); break;
+      case T_VSTR:
+	s = VSTR(param); len = VSTRLEN(param); break;
+      default:
+	DebugLog(DF_OVM, DS_DEBUG, "parameter error\n");
+	break;
+      }
+  newlen = add_slashes_compute_length (s, len);
+  res = ovm_str_new (ctx->gc_ctx, newlen);
+  add_slashes (s, len, STR(res));
+  STACK_DROP(ctx->ovm_stack, 1);
+  PUSH_VALUE(ctx, res);
+}
+
+
+static void issdl_str_from_timeval(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char buff[256];
   ovm_var_t *str;
@@ -4961,6 +5066,9 @@ static type_t **regex_of_str_sigs[] = { regex_of_str_sig, NULL };
 static type_t *str_of_regex_sig[] = { &t_str, &t_regex };
 static type_t **str_of_regex_sigs[] = { str_of_regex_sig, NULL };
 
+static type_t *str_of_str_sig[] = { &t_str, &t_str };
+static type_t **str_of_str_sigs[] = { str_of_str_sig, NULL };
+
 #ifdef OBSOLETE
 static type_t *difftime_sig[] = { &t_int, &t_ctime, &t_ctime };
 static type_t **difftime_sigs[] = { difftime_sig, NULL };
@@ -5006,187 +5114,277 @@ static issdl_function_t issdl_function_g[] = {
   { issdl_noop, 0, "null",
     0, null_sigs,
     m_const,
-    "returns null (the undefined object)" },
+    "returns null (the undefined object)",
+    NULL
+  },
   { issdl_print, 1, "print",
     1, int_of_any_sigs, /* always returns true, in fact */
     m_const_thrash,
-    "display a string (TEST FUNCTION)" },
+    "display a string (TEST FUNCTION)",
+    NULL
+  },
 #ifdef OBSOLETE
   { issdl_dumpstack, 2, "dump_stack",
     0, int_sigs, /* returns 0 or 1, in fact */
     m_random_thrash,
-    "dump the stack of the current rule" },
+    "dump the stack of the current rule",
+    NULL
+  },
 #endif
   { issdl_print_string, 3, "print_string",
     1, int_of_str_sigs,  /* always returns true, in fact */
     m_const_thrash,
-    "print a string verbatim" },
+    "print a string verbatim",
+    NULL
+  },
 #ifdef OBSOLETE
   { issdl_dumppathtree, 4, "dump_dot_pathtree",
     0, int_sigs, /* always returns true, in fact */
     m_const_thrash,
-    "dump the rule instance path tree in the GraphViz Dot format"},
+    "dump the rule instance path tree in the GraphViz Dot format",
+    NULL
+  },
 #endif
 #if 0
   { issdl_drop_event, 5, "drop_event",
     0, int_sigs, /* returns 0 or 1, in fact */
     m_random_thrash,
-    "Drop event" },
+    "Drop event",
+    NULL
+  },
   { issdl_set_event_level, 6, "set_event_level",
     1, int_of_int_sigs, /* returns 0 or 1, in fact */
     m_random_thrash,
-    "Set event level" },
+    "Set event level",
+    NULL
+  },
 #endif
   { issdl_report, 7, "report",
     0, int_sigs, /* returns 0 or 1, in fact */
     m_random_thrash,
-    "generate report" },
+    "generate report",
+    NULL
+  },
   { issdl_shutdown, 8, "shutdown",
     0, int_sigs, /* does not return */
     m_const_thrash,
-    "shutdown orchids" },
+    "shutdown orchids",
+    NULL
+  },
   { issdl_random, 9, "random",
     0, int_sigs,
     m_random,
-    "return a random number" },
+    "return a random number",
+    NULL
+  },
   { issdl_system, 10, "system",
     1, int_of_str_sigs,
     m_random_thrash,
-    "execute a system command" },
+    "execute a system command",
+    NULL
+  },
 #ifdef OBSOLETE
   { issdl_statsx, 11, "show_stats",
     0, int_sigs, /* always returns true, in fact */
     m_const_thrash,
-    "show orchids internal statistics" },
+    "show orchids internal statistics",
+    NULL
+  },
 #endif
   { issdl_str_from_int, 12, "str_from_int",
     1, str_of_int_sigs,
     m_unknown_1,
-    "convert an integer to a string" },
+    "convert an integer to a string",
+    NULL
+  },
   { issdl_int_from_str, 13, "int_from_str",
     1, int_of_str_sigs,
     m_unknown_1,
-    "convert a string to an integer" },
+    "convert a string to an integer",
+    NULL
+  },
   { issdl_float_from_str, 14, "float_from_str",
     1, float_of_str_sigs,
     m_unknown_1,
-    "convert a string to a float" },
+    "convert a string to a float",
+    NULL
+  },
   { issdl_str_from_float, 15, "str_from_float",
     1, str_of_float_sigs,
     m_unknown_1,
-    "convert a float to a string" },
+    "convert a float to a string",
+    NULL
+  },
   { issdl_str_from_ipv4, 16, "str_from_ipv4",
     1, str_of_ipv4_sigs,
     m_unknown_1,
-    "convert an ipv4 address to a string" },
+    "convert an ipv4 address to a string",
+    NULL
+  },
 #ifdef OBSOLETE
   { issdl_kill_threads, 17, "kill_threads",
     0, int_sigs, /* always returns true, in fact */
     m_const_thrash,
-    "kill threads of a rule instance" },
+    "kill threads of a rule instance",
+    NULL
+  },
 #endif
 #ifdef OBSOLETE
   { issdl_cut, 18, "cut",
     1, int_of_str_sigs, /* returns 0 or 1, in fact */
     m_unknown_1_thrash,
-    "special cut" },
+    "special cut",
+    NULL
+  },
 #endif
   { issdl_sendmail, 19, "sendmail",
     4, sendmail_sigs,
     /* sendmail (from, to, subject, body), returns 0 or 1, in fact */
     m_random_thrash,
-    "Send an email" },
+    "Send an email",
+    NULL
+  },
   { issdl_sendmail_report, 20, "sendmail_report",
     4, sendmail_sigs,
     m_random_thrash,
     /* sendmail_report (from, to, subject, body), returns 0 or 1, in fact */
-    "Send a report by email" },
+    "Send a report by email",
+    NULL
+  },
   { issdl_bindist, 21, "bitdist",
     2, cmp_sigs,
     m_unknown_2,
-    "Number of different bits" },
+    "Number of different bits",
+    NULL
+  },
   { issdl_bytedist, 22, "bytedist",
     2, cmp_sigs,
     m_unknown_2,
-    "Number of different bytes" },
+    "Number of different bytes",
+    NULL
+  },
   { issdl_vstr_from_regex, 23, "str_from_regex",
     1, str_of_regex_sigs,
     m_unknown_1,
-    "Return the source string of a compiled regex" },
+    "Return the source string of a compiled regex",
+    NULL
+  },
   { issdl_regex_from_str, 24, "regex_from_str",
     1, regex_of_str_sigs,
     m_unknown_1,
-    "Compile a regex from a string" },
+    "Compile a regex from a string",
+    NULL
+  },
   { issdl_defined, 25, "defined",
     1, int_of_any_sigs, /* returns 0 or 1, in fact */
     m_unknown_1,
-    "Return whether a value is defined, i.e., different from NULL" },
+    "Return whether a value is defined, i.e., different from NULL",
+    NULL
+  },
 #ifdef OBSOLETE
   { issdl_difftime, 26, "difftime",
     2, difftime_sigs,
-    "difference expressed in seconds as an int"},
+    "difference expressed in seconds as an int",
+    NULL
+  },
 #endif
   { issdl_str_from_time, 27, "str_from_ctime",
     1, str_of_ctime_sigs,
     m_unknown_1,
-    "convert a time to a string" },
+    "convert a time to a string",
+    NULL
+  },
   { issdl_str_from_timeval, 28, "str_from_timeval",
     1, str_of_timeval_sigs,
     m_unknown_1,
-    "convert a timeval to a string" },
+    "convert a timeval to a string",
+    NULL
+  },
   { issdl_time_from_str, 29, "ctime_from_str",
     1, ctime_of_str_sigs,
     m_unknown_1,
-    "convert a string to a time" },
+    "convert a string to a time",
+    NULL
+  },
   { issdl_timeval_from_str, 30, "timeval_from_str",
     1, timeval_of_str_sigs,
     m_unknown_1,
-    "convert a string to a timeval" },
+    "convert a string to a timeval",
+    NULL
+  },
   { issdl_str_from_ipv6, 31, "str_from_ipv6",
     1, str_of_ipv6_sigs,
     m_unknown_1,
-    "convert an ipv6 address to a string" },
+    "convert an ipv6 address to a string",
+    NULL
+  },
   { issdl_ipv4_from_ipv6, 32, "ipv4_from_ipv6",
     1, ipv4_of_ipv6_sigs,
     m_unknown_1,
-    "convert an ipv6 address to an ipv4 address" },
+    "convert an ipv6 address to an ipv4 address",
+    NULL
+  },
   { issdl_ipv6_from_ipv4, 33, "ipv6_from_ipv4",
     1, ipv6_of_ipv4_sigs,
     m_unknown_1,
-    "convert an ipv4 address to an ipv6 address" },
+    "convert an ipv4 address to an ipv6 address",
+    NULL
+  },
   { issdl_str_from_uint, 34, "str_from_uint",
     1, str_of_uint_sigs,
     m_unknown_1,
-    "convert an unsigned integer to a string" },
+    "convert an unsigned integer to a string",
+    NULL
+  },
   { issdl_uint_from_str, 35, "uint_from_str",
     1, uint_of_str_sigs,
     m_unknown_1,
-    "convert a string to an unsigned integer" },
+    "convert a string to an unsigned integer",
+    NULL
+  },
   { issdl_int_from_uint, 36, "int_from_uint",
     1, int_of_uint_sigs,
     m_unknown_1,
-    "convert an unsigned integer to an integer"},
+    "convert an unsigned integer to an integer",
+    NULL
+  },
   { issdl_uint_from_int, 37, "uint_from_int",
     1, uint_of_int_sigs,
     m_unknown_1,
-    "convert an integer to an unsigned integer"},
+    "convert an integer to an unsigned integer",
+    NULL
+  },
   { issdl_int_from_float, 38, "int_from_float",
     1, int_of_float_sigs,
     m_unknown_1,
-    "convert a float to an integer"},
+    "convert a float to an integer",
+    NULL
+  },
   { issdl_uint_from_float, 39, "uint_from_float",
     1, uint_of_float_sigs,
     m_unknown_1,
-    "convert a float to an unsigned integer"},
+    "convert a float to an unsigned integer",
+    NULL
+  },
   { issdl_float_from_int, 40, "float_from_int",
     1, float_of_int_sigs,
     m_unknown_1,
-    "convert an integer to a float"},
+    "convert an integer to a float",
+    NULL
+  },
   { issdl_float_from_uint, 41, "float_from_uint",
     1, float_of_uint_sigs,
     m_unknown_1,
-    "convert an unsigned integer to a float"},
-  { NULL, 0, NULL, 0, NULL, NULL }
+    "convert an unsigned integer to a float",
+    NULL
+  },
+  { issdl_addslashes, 42, "addslashes",
+    1, str_of_str_sigs,
+    m_unknown_1,
+    "escape special characters by adding slashes in front of them",
+    NULL
+  },
+  { NULL, 0, NULL, 0, NULL, NULL, NULL },
 };
 
 void register_core_functions(orchids_t *ctx)
@@ -5196,7 +5394,7 @@ void register_core_functions(orchids_t *ctx)
   for (f = issdl_function_g + 1; f->func!=NULL; f++) /* +1: do not register "null" */
     register_lang_function(ctx, f->func, f->name,
 			   f->args_nb, (const type_t ***)f->sigs,
-			   f->cm, f->desc);
+			   f->cm, f->desc, f->data);
 }
 
 void register_lang_function(orchids_t *ctx,
@@ -5205,7 +5403,8 @@ void register_lang_function(orchids_t *ctx,
 			    int arity,
 			    const type_t ***sigs,
 			    monotony_apply cm,
-			    const char *desc)
+			    const char *desc,
+			    void *data)
 {
   issdl_function_t *f;
   size_t array_size;
@@ -5224,6 +5423,7 @@ void register_lang_function(orchids_t *ctx,
   f->sigs = (type_t ***)sigs;
   f->cm = cm;
   f->desc = (char *)desc;
+  f->data = data;
   ctx->vm_func_tbl_sz++;
 }
 
@@ -5500,7 +5700,7 @@ gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

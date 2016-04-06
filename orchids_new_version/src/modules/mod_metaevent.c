@@ -34,13 +34,15 @@
 
 input_module_t mod_metaevent;
 
-static void issdl_inject_event(orchids_t *ctx, state_instance_t *state)
+static void issdl_inject_event(orchids_t *ctx, state_instance_t *state, void *data)
 {
-  static mod_entry_t	*mod = NULL;
-  ovm_var_t		*ptr;
+  mod_entry_t *mod = (mod_entry_t *)data;
+  ovm_var_t *ptr;
 
+#ifdef OBSOLETE
   if (mod==NULL)
     mod = find_module_entry(ctx, "metaevent");
+#endif
   ptr = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (ptr!=NULL && TYPE(ptr)==T_EVENT) /* don't inject an empty event */
     {
@@ -70,7 +72,7 @@ static int rtaction_inject_event(orchids_t *ctx, heap_entry_t *he)
 }
 
 
-static void issdl_current_event(orchids_t *ctx, state_instance_t *state)
+static void issdl_current_event(orchids_t *ctx, state_instance_t *state, void *data)
 {
   DebugLog(DF_OVM, DS_DEBUG, "issdl_current_event()\n");
   PUSH_VALUE (ctx, ctx->current_event);
@@ -98,13 +100,15 @@ static void *metaevent_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 "inject_event",
 			 1, inject_event_sigs,
 			 m_const_thrash,
-			 "inject the event into the orchids engine");
+			 "inject the event into the orchids engine",
+			 mod);
   register_lang_function(ctx,
 			 issdl_current_event,
 			 "current_event",
 			 1, current_event_sigs,
 			 m_unknown_1,
-			 "get the current event");
+			 "get the current event",
+			 NULL);
   return cfg;
 }
 
@@ -332,7 +336,7 @@ input_module_t mod_metaevent = {
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

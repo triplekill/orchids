@@ -9,6 +9,12 @@
 
 #define MAX_CALLS 5
 
+/*** Needed configuration:
+ *** auditctl should audit all the syscalls in this file, and this will be
+ *** handled automatically by the following line:
+ *** [local:auditctl]
+ ***/
+
 rule leak_memory
 {
   state init

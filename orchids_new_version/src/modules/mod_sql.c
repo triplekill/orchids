@@ -3,8 +3,9 @@
  ** SQL database load module.
  **
  ** @author Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Wed Apr  1 16:59:54 CEST 2015
@@ -37,8 +38,6 @@
 #endif
 
 input_module_t mod_sql;
-
-static sql_config_t *mod_sql_cfg;
 
 extern gc_class_t db_small_table_class;
 extern gc_class_t db_tuples_class;
@@ -247,7 +246,7 @@ db_map *db_from_mysql(orchids_t *ctx, char *domain, char *user, char *pwd,
   return db;
 }
 
-static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
+static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state, void *data)
 {
   char *domain;
   char *user;
@@ -257,6 +256,7 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   char *sql_query;
   node *n;
   size_t i, l;
+  sql_config_t *config = (sql_config_t *)data;
 
   domain = str_from_stack_arg(ctx, 5, 5);
   if (domain==NULL) goto err_domain;
@@ -286,24 +286,24 @@ static void issdl_load_mysql(orchids_t *ctx, state_instance_t *state)
   strncpy(sql_query, "SELECT * FROM ", 15);
   strncat(sql_query, tab, strlen(tab));
 
-  n = dlist_find(mod_sql_cfg->dl, dbname);
+  n = dlist_find(config->dl, dbname);
   if (n != NULL)
     {
-      mod_sql_cfg->dl = dlist_move_into_lead(mod_sql_cfg->dl, n);
+      config->dl = dlist_move_into_lead(config->dl, n);
       STACK_DROP(ctx->ovm_stack, 5);
       PUSH_VALUE(ctx, n->db);
     }
   else
     {
-      if (dlist_length(mod_sql_cfg->dl) >= mod_sql_cfg->max_db)
-	mod_sql_cfg->dl = dlist_remove_last(mod_sql_cfg->dl);
+      if (dlist_length(config->dl) >= config->max_db)
+	config->dl = dlist_remove_last(config->dl);
         
-      mod_sql_cfg->dl = dlist_prepend(ctx->gc_ctx, mod_sql_cfg->dl, dbname,
+      config->dl = dlist_prepend(ctx->gc_ctx, config->dl, dbname,
 				      db_from_mysql(ctx, domain, 
 						    user, pwd, dbname,
 						    sql_query));
       STACK_DROP(ctx->ovm_stack, 5);
-      PUSH_VALUE(ctx, mod_sql_cfg->dl->head->db);
+      PUSH_VALUE(ctx, config->dl->head->db);
     }
 
   gc_base_free(sql_query);
@@ -417,13 +417,14 @@ db_map *db_from_sqlite3(orchids_t *ctx, char *filename, char *sql_query)
   return dbm;
 }
 
-static void issdl_load_sqlite3(orchids_t *ctx, state_instance_t *state)
+static void issdl_load_sqlite3(orchids_t *ctx, state_instance_t *state, void *data)
 {
   node *n;
   char *path;
   char *tab;
   char *sql_query;
   size_t i, len;
+  sql_config_t *config = (sql_config_t *)data;
 
   path = str_from_stack_arg(ctx, 2, 2);
   if (path==NULL) goto err_path;
@@ -447,22 +448,22 @@ static void issdl_load_sqlite3(orchids_t *ctx, state_instance_t *state)
   strncpy(sql_query, "select * from ", 15);
   strncat(sql_query, tab, strlen(tab));
 
-  n = dlist_find(mod_sql_cfg->dl, path);
+  n = dlist_find(config->dl, path);
   if (n != NULL)
     {
-      mod_sql_cfg->dl = dlist_move_into_lead(mod_sql_cfg->dl, n);
+      config->dl = dlist_move_into_lead(config->dl, n);
       STACK_DROP(ctx->ovm_stack, 2);
       PUSH_VALUE(ctx, n->db);
     }
   else
     {
-      if (dlist_length(mod_sql_cfg->dl) >= mod_sql_cfg->max_db)
-        mod_sql_cfg->dl = dlist_remove_last(mod_sql_cfg->dl);
+      if (dlist_length(config->dl) >= config->max_db)
+        config->dl = dlist_remove_last(config->dl);
       
-      mod_sql_cfg->dl = dlist_prepend(ctx->gc_ctx, mod_sql_cfg->dl, path,
+      config->dl = dlist_prepend(ctx->gc_ctx, config->dl, path,
 				      db_from_sqlite3(ctx, path, sql_query));
       STACK_DROP(ctx->ovm_stack, 2);
-      PUSH_VALUE(ctx, mod_sql_cfg->dl->head->db);
+      PUSH_VALUE(ctx, config->dl->head->db);
     }
   gc_base_free(sql_query);
   
@@ -487,8 +488,17 @@ static const type_t **load_sqlite3_sigs[] = { load_sqlite3_sig, NULL };
 
 static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
-
+  sql_config_t *config;
+  /* this doubly-linked list will allow us to know if a database is already 
+     loaded in the orchids virtual machine memory. Databases loading is
+     managed in a Least Recently Used style. 
+  */
+  dlist *dl = dlist_new(ctx->gc_ctx);
+  
   DebugLog(DF_MOD, DS_INFO, "load() sql@%p\n", &mod_sql);
+  config = gc_base_malloc(ctx->gc_ctx, sizeof (sql_config_t));
+  config->max_db = 10;
+  config->dl = dl;
 
 #ifdef HAVE_MYSQL
   register_lang_function(ctx,
@@ -496,7 +506,8 @@ static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 "load_mysql",
 			 5, load_mysql_sigs,
 			 m_random,
-			 "load a MySQL database");
+			 "load a MySQL database",
+			 config);
 #endif
 
 #ifdef HAVE_SQLITE
@@ -505,35 +516,23 @@ static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 "load_sqlite3",
 			 2, load_sqlite3_sigs,
 			 m_random,
-			 "load a SQLite3 database");
+			 "load a SQLite3 database",
+			 config);
 #endif
 
-  /* this doubly-linked list will allow us to know if a database is already 
-     loaded in the orchids virtual machine memory. Databases loading is
-     managed in a Least Recently Used style. 
-  */
-  dlist *dl = dlist_new(ctx->gc_ctx);
-  /* issdl_* primitives don't have a mod_entry_t as argument. Hence
-     we need to use a global variable mod_sql_cfg.
-   */
-  mod_sql_cfg = gc_base_malloc(ctx->gc_ctx, sizeof (sql_config_t));
-  mod_sql_cfg->max_db = 10;
-  mod_sql_cfg->dl = dl;
-  return mod_sql_cfg;
+  return config;
 }
 
 static void sql_set_max_db(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   long value;
+  sql_config_t *config = (sql_config_t *)mod->config;  
 
   DebugLog(DF_MOD, DS_INFO, "setting MaxDatabases to %s\n", dir->args);
-
   value = strtol(dir->args, (char**)NULL, 10);
   if (value < 0)
     value = 10;
-
-  // mod_sql_cfg->max_db = value;
-  ((sql_config_t *)mod->config)->max_db = value;
+  config->max_db = value;
 }
 
 static mod_cfg_cmd_t sql_dir[] = 
@@ -561,10 +560,13 @@ input_module_t mod_sql = {
 };
 
 /*
-** Copyright (c) 2015 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** Copyright (c) 2015,2016 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

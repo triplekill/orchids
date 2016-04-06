@@ -6,7 +6,7 @@ The pid tracker.
 
 /*** Needed configuration:
  *** auditctl should audit all the syscalls in this file, and this will be
- *** handled automatically by 
+ *** handled automatically by the following line:
  *** [local:auditctl]
  ***/
 
@@ -99,17 +99,18 @@ rule pidtrack synchronize($pid)
 
   state alert!
   {
-
+    $newuid = .auditd.euid;
+    $newgid = .auditd.egid;
     print_string ("Alert report :\n");
 
-    print_string ("Attack perpetrated by uid=");
+    print_string ("Privilege escalation by uid=");
     print_string (str_from_uint($uid));
     print_string (", now ");
-    print_string (str_from_uint(.auditd.euid));
+    print_string (str_from_uint($newuid));
     print_string (", gid=");
     print_string (str_from_uint($gid));
     print_string (", now ");
-    print_string (str_from_uint(.auditd.egid));
+    print_string (str_from_uint($newgid));
     print_string (", pid=");
     print_string (str_from_uint($pid));
     print_string ("\n");

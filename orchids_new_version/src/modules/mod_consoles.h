@@ -3,8 +3,9 @@
  ** Definitions for mod_consoles.c
  **
  ** @author Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Mon Jan 27 17:32:49 2003
@@ -31,19 +32,16 @@ struct conscfg_s
   strhash_t *consoles;
 };
 
-static void issdl_console_msg(orchids_t *ctx, state_instance_t *state);
-static void issdl_console_evt(orchids_t *ctx, state_instance_t *state);
-
+static void issdl_console_msg(orchids_t *ctx, state_instance_t *state, void *data);
+static void issdl_console_evt(orchids_t *ctx, state_instance_t *state, void *data);
 
 static void *cons_preconfig(orchids_t *ctx, mod_entry_t *mod);
 
-
 static FILE *create_console_socket(const char *host, const int port);
 
-
-static int output_console_msg(char *console, char *msg, size_t len);
+static int output_console_msg(char *console, char *msg, size_t len, conscfg_t *config);
 static int output_console_evt(orchids_t *ctx, char *console,
-			      event_t *evt);
+			      event_t *evt, conscfg_t *config);
 
 
 static void add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
@@ -54,8 +52,11 @@ static void add_console(orchids_t *ctx, mod_entry_t *mod, config_directive_t *di
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

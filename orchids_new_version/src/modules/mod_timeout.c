@@ -30,18 +30,11 @@
 
 #include "mod_timeout.h"
 
-
 input_module_t mod_timeout;
 
 static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he);
-
-static void issdl_timeout(orchids_t *ctx, state_instance_t *state);
-
+static void issdl_timeout(orchids_t *ctx, state_instance_t *state, void *data);
 static void *timeout_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-/* XXX: small hack to retrieve the mod entry
-   in language function and/or rtcallback */
-static mod_entry_t *mod_entry_g = NULL;
 
 
 static field_t timeout_fields[] = {
@@ -60,6 +53,7 @@ static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he)
   field_table_t *fields;
   ovm_var_t *val;
   gc_t *gc_ctx = ctx->gc_ctx;
+  mod_entry_t *mod = (mod_entry_t *)he->data;
 
   fields = (field_table_t *)he->gc_data;
   GC_START(gc_ctx, 1); /* To store the event list.
@@ -70,9 +64,9 @@ static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he)
   TIMEVAL(val) = ctx->cur_loop_time;
   GC_TOUCH (gc_ctx, fields->field_values[F_DATE] = val);
 
-  add_fields_to_event(ctx, mod_entry_g, (event_t **)GC_LOOKUP(0),
+  add_fields_to_event(ctx, mod, (event_t **)GC_LOOKUP(0),
 		      fields->field_values, TIMEOUT_FIELDS);
-  post_event (ctx, mod_entry_g, (event_t *)GC_LOOKUP(0), 0);
+  post_event (ctx, mod, (event_t *)GC_LOOKUP(0), 0);
 
   gc_base_free (he);
   GC_END(gc_ctx);
@@ -80,7 +74,7 @@ static int timeout_rtcallback(orchids_t *ctx, heap_entry_t *he)
 }
 
 
-static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
+static void issdl_timeout(orchids_t *ctx, state_instance_t *state, void *data)
 {
   gc_t *gc_ctx = ctx->gc_ctx;
   ovm_var_t *toname;
@@ -91,6 +85,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
   char *str;
 #endif
   field_table_t *fields;
+  mod_entry_t *mod = (mod_entry_t *)data;
 
   toname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   if (toname==NULL || (TYPE(toname) != T_STR && TYPE(toname) != T_VSTR))
@@ -140,7 +135,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
 #endif
 
   register_rtcallback(ctx, timeout_rtcallback,
-		      (gc_header_t *)fields, NULL, INT(todelay), 0);
+		      (gc_header_t *)fields, mod, INT(todelay), 0);
   GC_END(gc_ctx);
   STACK_DROP(ctx->ovm_stack, 2);
   PUSH_RETURN_TRUE(ctx);
@@ -149,7 +144,7 @@ static void issdl_timeout(orchids_t *ctx, state_instance_t *state)
 static const type_t *timeout_sig[] = { &t_int, &t_str, &t_int };
 static const type_t **timeout_sigs[] = { timeout_sig, NULL };
 
-static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
+static void *timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   DebugLog(DF_MOD, DS_DEBUG, "load() timeout@%p\n", (void *) &mod_timeout);
 
@@ -160,9 +155,8 @@ static void * timeout_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "timeout",
 			 2, timeout_sigs,
 			 m_unknown_2_thrash,
-                         "Register a real-time timeout.");
-
-  mod_entry_g = mod;
+                         "Register a real-time timeout.",
+			 mod);
   return NULL;
 }
 
@@ -189,7 +183,7 @@ input_module_t mod_timeout = {
 /*
 ** Copyright (c) 2007 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

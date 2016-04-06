@@ -4584,7 +4584,7 @@ static void print_complexity_evaluation (gc_t *gc_ctx, FILE *f,
 		  data = CG_DATA(g, u);
 		  if (data==NULL)
 		    {
-	              fprintf (f, "each event will fork a new thread going to ");
+	              fprintf (f, "each event may fork a new thread going to ");
 	              data = CG_DATA(g,cp->edges[i].dest);
 	              print_cg_data (f, data, 1);
 	              fprintf (f, ".\n");
@@ -4643,6 +4643,169 @@ static void evaluate_complexity (rule_compiler_t *ctx, node_rule_t *node_rule)
   free_complexity_graph (cc.g);
 }
 
+/* Yet another static analyzer.
+   This one tries to identify a conjunction of tests of the form <field>==<value>
+   where each <value> does not depend on any field value, and which
+   would be implied by a given Boolean expression, as encounted in an 'expect' clause.
+ */
+
+static int tests_compare (node_expr_t *eq1, node_expr_t *eq2)
+{ /* eq1, eq2 are of the form (fld . e) where fld is a NODE_FIELD, and e is a node_expr_t */
+  node_expr_t *fld1, *fld2;
+
+  fld1 = BIN_LVAL(eq1);
+  fld2 = BIN_LVAL(eq2);
+  if (SYM_RES_ID(fld1) < SYM_RES_ID(fld2))
+    return -1;
+  if (SYM_RES_ID(fld1) > SYM_RES_ID(fld2))
+    return 1;
+  if (node_expr_equal (BIN_RVAL(eq1), BIN_RVAL(eq2)))
+    return 0;
+  if (BIN_RVAL (eq1) < BIN_RVAL (eq2))
+    return -1;
+  return 1;
+}
+
+static node_expr_t *expr_cons(gc_t *gc_ctx,
+			      node_expr_t *left_node,
+			      node_expr_t *right_node);
+
+static node_expr_t *tests_and (gc_t *gc_ctx, node_expr_t *l1, node_expr_t *l2)
+{ /* compute the union of the two lists */
+  node_expr_t *l;
+
+  if (l1==NULL)
+    return l2;
+  if (l2==NULL)
+    return l1;
+  GC_START(gc_ctx, 1);
+  switch (tests_compare (BIN_LVAL(l1), BIN_LVAL(l2)))
+    {
+    case -1:
+      l = tests_and (gc_ctx, BIN_RVAL(l1), l2);
+      GC_UPDATE (gc_ctx, 0, l);
+      l = expr_cons (gc_ctx, BIN_LVAL(l1), l);
+      break;
+    case 1:
+      l = tests_and (gc_ctx, l1, BIN_RVAL(l2));
+      GC_UPDATE (gc_ctx, 0, l);
+      l = expr_cons (gc_ctx, BIN_LVAL(l2), l);
+      break;
+    default: /* case 0 */
+      l = tests_and (gc_ctx, BIN_RVAL(l1), BIN_RVAL(l2));
+      GC_UPDATE (gc_ctx, 0, l);
+      l = expr_cons (gc_ctx, BIN_LVAL(l1), l);
+      break;      
+    }
+  GC_END(gc_ctx);
+  return l;
+}
+
+static node_expr_t *tests_or (gc_t *gc_ctx, node_expr_t *l1, node_expr_t *l2)
+{ /* compute the intersection of the two lists */
+  node_expr_t *l;
+
+  GC_START(gc_ctx, 1);
+ again:
+  if (l1==NULL)
+    l = NULL;
+  else if (l2==NULL)
+    l = NULL;
+  else
+    switch (tests_compare (BIN_LVAL(l1), BIN_LVAL(l2)))
+      {
+      case -1:
+	l1 = BIN_RVAL (l1);
+	goto again;
+      case 1:
+	l2 = BIN_RVAL (l2);
+	goto again;
+      default: /* case 0 */
+	l = tests_or (gc_ctx, BIN_RVAL(l1), BIN_RVAL(l2));
+	GC_UPDATE (gc_ctx, 0, l);
+	l = expr_cons (gc_ctx, BIN_LVAL(l1), l);
+	break;      
+      }
+  GC_END(gc_ctx);
+  return l;
+}
+
+static node_expr_t *implied_tests (rule_compiler_t *ctx, node_expr_t *test, int neg)
+{
+  gc_t *gc_ctx = ctx->gc_ctx;
+  node_expr_t *res, *left, *right, *eq;
+  node_expr_t *l, *r;
+  
+  GC_START(gc_ctx, 2);
+ again:
+  res = NULL;
+  if (test!=NULL)
+    switch (test->type)
+      {
+      case NODE_COND:
+	switch (BIN_OP(test))
+	  {
+	  case ANDAND:
+	  case OROR:
+	    left = implied_tests (ctx, BIN_LVAL(test), neg);
+	    GC_UPDATE (gc_ctx, 0, left);
+	    right = implied_tests (ctx, BIN_RVAL(test), neg);
+	    GC_UPDATE (gc_ctx, 1, right);
+	    if (neg && BIN_OP(test)==ANDAND)
+	      res = tests_or (gc_ctx, left, right);
+	    else
+	      res = tests_and (gc_ctx, left, right);
+	    break;
+	  case BANG:
+	    neg = !neg;
+	    test = BIN_RVAL(test);
+	    goto again;
+	  case OP_CEQ:
+	    if (!neg)
+	      {
+	      found_one_perhaps:
+		l = BIN_LVAL (test);
+		r = BIN_RVAL (test);
+		if (l!=NULL && l->type==NODE_FIELD && compute_monotony_simple (ctx, r)==MONO_CONST)
+		  {
+		  found_one:
+		    eq = build_expr_cons (ctx, l, r);
+		    GC_UPDATE (gc_ctx, 0, eq);
+		    res = build_expr_cons (ctx, eq, NULL);
+		    break;
+		  }
+		else if (r!=NULL && r->type==NODE_FIELD && compute_monotony_simple (ctx, l)==MONO_CONST)
+		  {
+		    l = BIN_RVAL (test);
+		    r = BIN_LVAL (test);
+		    goto found_one;
+		  }
+		/* else we haven't found any */
+	      }
+	    break;
+	  case OP_CNEQ:
+	    if (neg)
+	      goto found_one_perhaps;
+	    break;
+	  default: /* We haven't found any equality to test */
+	    break;
+	  }
+	break;
+      default:
+	/* do as though we had written test!=0 */
+	if (neg && test!=NULL && test->type==NODE_FIELD)
+	  {
+	    l = test;
+	    r = build_integer (ctx, 0);
+	    GC_UPDATE (gc_ctx, 1, r);
+	    goto found_one;
+	  }
+	break;
+	;
+      }
+  GC_END(gc_ctx);
+  return res;
+}
 
 /**
  * Lex/yacc parser entry point.
@@ -6049,13 +6212,13 @@ node_expr_t *build_expr_break(rule_compiler_t *ctx)
   return (node_expr_t *)n;
 }
 
-node_expr_t *build_expr_cons(rule_compiler_t *ctx,
-			     node_expr_t *left_node,
-			     node_expr_t *right_node)
+static node_expr_t *expr_cons(gc_t *gc_ctx,
+			      node_expr_t *left_node,
+			      node_expr_t *right_node)
 {
   node_expr_bin_t *n;
 
-  n = gc_alloc (ctx->gc_ctx, sizeof(node_expr_bin_t),
+  n = gc_alloc (gc_ctx, sizeof(node_expr_bin_t),
 		&node_expr_bin_class);
   n->gc.type = T_NODE_CONS;
   n->type = NODE_CONS;
@@ -6066,9 +6229,16 @@ node_expr_t *build_expr_cons(rule_compiler_t *ctx,
   n->compute_stype = CS_NULL;
   n->parents = NULL;
   n->op = 0;
-  GC_TOUCH (ctx->gc_ctx, n->lval = left_node);
-  GC_TOUCH (ctx->gc_ctx, n->rval = right_node);
+  GC_TOUCH (gc_ctx, n->lval = left_node);
+  GC_TOUCH (gc_ctx, n->rval = right_node);
   return (node_expr_t *)n;
+}
+
+node_expr_t *build_expr_cons(rule_compiler_t *ctx,
+			     node_expr_t *left_node,
+			     node_expr_t *right_node)
+{
+  return expr_cons (ctx->gc_ctx, left_node, right_node);
 }
 
 node_expr_t *expr_cons_reverse(rule_compiler_t *ctx, node_expr_t *l)

@@ -407,23 +407,25 @@ ovm_var_t *idmef_generate_alert(orchids_t	*ctx,
 }
 
 
-static void issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_new_alert(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*res;
-  static mod_entry_t	*mod_entry = NULL;
+  mod_entry_t *mod_entry = (mod_entry_t *)data;
 
+#ifdef OBSOLETE
   if (mod_entry==NULL)
     mod_entry = find_module_entry(ctx, "idmef");
+#endif
   res = idmef_generate_alert (ctx, mod_entry, state);
   PUSH_VALUE(ctx, res);
 }
 
-static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var, *doc1;
   xmlXPathContextPtr xpath_ctx;
   xmlDocPtr doc;
-  static mod_entry_t	*mod_entry = NULL;
+  mod_entry_t *mod_entry = (mod_entry_t *)data;
   idmef_cfg_t*	cfg;
   char		buff[PATH_MAX];
   struct timeval tv;
@@ -431,9 +433,10 @@ static void issdl_idmef_write_alert(orchids_t *ctx, state_instance_t *state)
   unsigned long ntpl;
   FILE*		fp;
 
-  if (!mod_entry)
+#ifdef OBSOLETE
+  if (mod_entry==NULL)
     mod_entry = find_module_entry(ctx, "idmef");
-
+#endif
   cfg = (idmef_cfg_t *)mod_entry->config;
   var = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (var==NULL || TYPE(var)!=T_UINT) /* an uint handle to an xmlXPathContextPtr */
@@ -522,14 +525,16 @@ static void *idmef_preconfig(orchids_t *ctx, mod_entry_t *mod)
 			 "idmef_new_alert",
 			 0, idmef_new_alert_sigs,
 			 m_random,
-			 "generate an idmef alert");
+			 "generate an idmef alert",
+			 mod);
 
   register_lang_function(ctx,
 			 issdl_idmef_write_alert,
 			 "idmef_write_alert",
 			 1, idmef_write_alert_sigs,
 			 m_random_thrash,
-			 "write idmef alert into the report folder");
+			 "write idmef alert into the report folder",
+			 mod);
 
   return cfg;
 }
@@ -668,7 +673,7 @@ input_module_t mod_idmef = {
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

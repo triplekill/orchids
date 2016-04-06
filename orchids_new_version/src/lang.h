@@ -898,6 +898,13 @@ ovm_var_t *ovm_extern_new(gc_t *gc_ctx, void *ptr, ovm_extern_class_t *xclass);
 
 void ovm_uint_fprintf (FILE *fp, ovm_uint_t *val);
 
+
+size_t add_slashes_compute_length (char *s, size_t len);
+void add_slashes (char *s, size_t len, char *t);
+/* implement addslashes(), a la PHP; t should contain enough bytes to hold the result:
+   consider calling add_slashes_compute_length (s, len) before
+   allocating t. */
+
 /**
  ** Print a variable on a stream.
  ** @param fp  The stream on which the variable will be printed.

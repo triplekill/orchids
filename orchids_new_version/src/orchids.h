@@ -683,7 +683,7 @@ struct rule_compiler_s
  ** @typedef ovm_func_t
  ** ISSDL built-in function type declaration
  **/
-typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
+typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state, void *data);
 
 
 /**
@@ -719,6 +719,9 @@ typedef void (*ovm_func_t)(orchids_t *ctx, state_instance_t *state);
 /**   @var issdl_function_s::desc
  **     Function description (for a little help).
  **/
+/**   @var issdl_function_s::data
+ **     Closure data.
+ **/
 struct node_expr_s;
 
 typedef monotony (*monotony_apply) (rule_compiler_t *ctx,
@@ -734,6 +737,7 @@ struct issdl_function_s
   type_t  ***sigs;
   monotony_apply cm;
   char      *desc;
+  void      *data;
 };
 
 /* Possible values for compute_monotony field
@@ -1666,6 +1670,7 @@ void fprintf_issdl_val(FILE *fp, const orchids_t *ctx, ovm_var_t *val);
  ** @param name  The name of the function in the Orchids language.
  ** @param arity The number of arguments of the function.
  ** @param desc  A short description of the function.
+ ** @param data  Closure data.
  **/
 void register_lang_function(orchids_t *ctx,
 			    ovm_func_t func,
@@ -1673,7 +1678,8 @@ void register_lang_function(orchids_t *ctx,
 			    int arity,
 			    const type_t ***sigs,
 			    monotony_apply cm,
-			    const char *desc);
+			    const char *desc,
+			    void *data);
 
 /**
  ** Print the table of all registered functions on a stream.

@@ -63,7 +63,7 @@ struct modprelude_s
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

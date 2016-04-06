@@ -323,8 +323,9 @@ char *xml_get_string(xmlXPathContextPtr xpath_ctx,
  *
  * @param ctx	Orchids context
  * @param state Current state instance
+ * @param data  Closure data (=NULL)
  */
-static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
+static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var1, *var2, *var3, *doc1;
   char *str2, *str3;
@@ -398,8 +399,9 @@ static void issdl_xml_set_string(orchids_t *ctx, state_instance_t *state)
  *
  * @param ctx	Orchids context
  * @param state Current state instance
+ * @param data  Closure data (=NULL)
  */
-static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
+static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var1, *var2, *var3, *var4, *doc1;
   char *str2, *str3, *str4;
@@ -487,8 +489,9 @@ static void issdl_xml_set_attr_string(orchids_t *ctx, state_instance_t *state)
  *
  * @param ctx	Orchids context
  * @param state Current state instance
+ * @param data  Closure data (=NULL)
  */
-static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
+static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var1;
   ovm_var_t	*var2;
@@ -568,9 +571,9 @@ static void issdl_xml_get_string(orchids_t *ctx, state_instance_t *state)
  *
  * @param ctx	Orchids context
  * @param state Current state instance
+ * @param data  Closure data (=NULL)
  */
-static void
-issdl_dump_xml(orchids_t *ctx, state_instance_t *state)
+static void issdl_dump_xml(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*var1;
 
@@ -616,7 +619,8 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "xml_dump",
 			 1, xml_dump_sigs,
 			 m_random_thrash,
-                         "dump xml doc on stderr");
+                         "dump xml doc on stderr",
+			 NULL);
 #endif
 
   register_lang_function(ctx,
@@ -624,21 +628,24 @@ static void *mod_xml_preconfig(orchids_t *ctx, mod_entry_t *mod)
                          "xml_get_str",
 			 2, xml_get_str_sigs,
 			 m_unknown_2,
-                         "get a node content following an xpath request");
+                         "get a node content following an xpath request",
+			 NULL);
 
   register_lang_function(ctx,
                          issdl_xml_set_string,
                          "xml_set_str",
 			 3, xml_set_str_sigs,
 			 m_xml_set,
-                         "set a node content following an xpath request");
+                         "set a node content following an xpath request",
+			 NULL);
 
   register_lang_function(ctx,
                          issdl_xml_set_attr_string,
                          "xml_set_prop",
 			 4, xml_set_prop_sigs,
 			 m_xml_set,
-                         "set a node property following an xpath request");
+                         "set a node property following an xpath request",
+			 NULL);
 
   return NULL;
 }
@@ -664,7 +671,7 @@ input_module_t mod_xml = {
 /*
 ** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>

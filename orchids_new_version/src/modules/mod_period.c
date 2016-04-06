@@ -36,20 +36,10 @@
 input_module_t mod_period;
 
 static int qsort_strcmp(const void *a, const void *b);
-
-
 static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp, html_output_cfg_t *htmlcfg);
-
-
-static void issdl_temporal(orchids_t *ctx, state_instance_t *state);
-
-
+static void issdl_temporal(orchids_t *ctx, state_instance_t *state, void *data);
 static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
 static void period_postconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
 static void period_postcompil(orchids_t *ctx, mod_entry_t *mod);
 
 static int qsort_strcmp(const void *a, const void *b)
@@ -104,7 +94,7 @@ static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
 }
 
 
-static void issdl_temporal(orchids_t *ctx, state_instance_t *state)
+static void issdl_temporal(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *str;
   void *temp_ctx;
@@ -157,7 +147,8 @@ static void *period_preconfig(orchids_t *ctx, mod_entry_t *mod)
   register_lang_function(ctx, issdl_temporal, "temporal",
 			 1, temporal_sigs,
 			 m_unknown_1_thrash,
-			 "update a temporal context");
+			 "update a temporal context",
+			 NULL);
 
   html_output_add_menu_entry(ctx, mod, period_htmloutput);
   /* return config structure, for module manager */
@@ -193,13 +184,15 @@ static mod_cfg_cmd_t period_config_commands[] =
   { NULL, NULL, NULL }
 };
 
+char *period_deps[] = { "htmlstate", NULL };
+
 input_module_t mod_period = {
   MOD_MAGIC,                /* Magic number */
   ORCHIDS_VERSION,          /* Module version */
   0,			    /* flags */
   "period",                 /* module name */
   "CeCILL2",                /* module license */
-  NULL               ,      /* module dependencies */
+  period_deps,              /* module dependencies */
   period_config_commands,   /* module configuration commands,
                                for core config parser */
   period_preconfig,         /* called just after module registration */
@@ -217,7 +210,7 @@ input_module_t mod_period = {
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2014-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

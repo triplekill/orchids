@@ -25,7 +25,6 @@
 #include "ovm.h"
 #include "mod_prelude.h"
 
-modprelude_t	*prelude_data;
 input_module_t mod_prelude;
 
 #define RETURN_OVM_INT(x) return ovm_int_new(gc_ctx, x)
@@ -228,7 +227,8 @@ static ovm_extern_class_t prelude_xclass = {
 static void process_idmef_alert(orchids_t *ctx,
 				mod_entry_t	*mod,
 				idmef_message_t	*message,
-				int dissection_level)
+				int dissection_level,
+				mod_prelude_t *config)
 {
   size_t c;
 #ifdef OBSOLETE
@@ -242,14 +242,14 @@ static void process_idmef_alert(orchids_t *ctx,
   GC_UPDATE(gc_ctx, F_PTR, val);
 #endif
 
-  for (c = 0 /* OBSOLETE: 1*/; c < prelude_data->nb_fields; c++)
+  for (c = 0 /* OBSOLETE: 1*/; c < config->nb_fields; c++)
   {
     get_field_from_idmef_value(ctx, (ovm_var_t **)GC_DATA(), message,
-			       prelude_data->field_xpath[c],
+			       config->field_xpath[c],
 			       c, T_STR);
   }
   add_fields_to_event(ctx, mod, (event_t **)&GC_LOOKUP(MAX_PRELUDE_FIELDS),
-		      (ovm_var_t **)GC_DATA(), prelude_data->nb_fields);
+		      (ovm_var_t **)GC_DATA(), config->nb_fields);
   post_event(ctx, mod, (event_t *)GC_LOOKUP(MAX_PRELUDE_FIELDS), dissection_level);
   GC_END(gc_ctx);
 }
@@ -258,11 +258,13 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
 {
   int ret;
   idmef_message_t *idmef_message = NULL;
+  mod_entry_t *mod = (mod_entry_t *)he->data;
+  modprelude_t *config = (modprelude_t *)mod->config;
 
   DebugLog(DF_MOD, DS_INFO,
            "Real-time action: Checking prelude alert...\n");
 
-  ret = prelude_client_recv_idmef(prelude_data->client, 0, &idmef_message);
+  ret = prelude_client_recv_idmef(config->client, 0, &idmef_message);
   if ( ret < 0 )
     {
       DebugLog (DF_MOD, DS_ERROR, prelude_strerror(ret));
@@ -275,8 +277,8 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
       switch (idmef_message_get_type(idmef_message))
 	{
 	case IDMEF_MESSAGE_TYPE_ALERT:
-	  //idmef_message_print(idmef_message, prelude_data->prelude_io);
-	  process_idmef_alert(ctx, he->data, idmef_message, he->pri);
+	  //idmef_message_print(idmef_message, config->prelude_io);
+	  process_idmef_alert(ctx, he->data, idmef_message, he->pri, config);
 	  break;
 	case IDMEF_MESSAGE_TYPE_ERROR :
 	case IDMEF_MESSAGE_TYPE_HEARTBEAT :
@@ -286,7 +288,7 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
 	}
     }
   gettimeofday(&he->date, NULL);
-  he->date.tv_sec += prelude_data->poll_period;
+  he->date.tv_sec += config->poll_period;
   register_rtaction(ctx, he);
   return 0;
 }
@@ -413,12 +415,13 @@ static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
     PUSH_RETURN_TRUE(ctx);
 }
 
-static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *idmef;
   ovm_var_t *doc1;
   idmef_message_t *message;
   int ret = 0;
+  modprelude_t *config = (modprelude_t *)data;
 
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
@@ -430,9 +433,9 @@ static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
     {
       doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(idmef));
       message = EXTPTR(doc1);
-      if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
+      if (config->mode == PRELUDE_MODE_PREWIKKA)
 	{
-	  ret = preludedb_insert_message(prelude_data->db, message);
+	  ret = preludedb_insert_message(config->db, message);
 	  if ( ret < 0 )
 	    {
 	      DebugLog(DF_MOD, DS_ERROR,
@@ -442,7 +445,7 @@ static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
 	}
       else
 	{
-	  prelude_client_send_idmef(prelude_data->client, message);
+	  prelude_client_send_idmef(config->client, message);
 	}
     }
   STACK_DROP(ctx->ovm_stack, 1);
@@ -452,11 +455,12 @@ static void issdl_idmef_message_send(orchids_t *ctx, state_instance_t *state)
     PUSH_RETURN_TRUE(ctx);
 }
 
-static void issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *idmef;
   ovm_var_t *doc1;
   idmef_message_t *message;
+  modprelude_t *config = (modprelude_t *)data;
 
   idmef = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (idmef==NULL || TYPE(idmef)!=T_UINT) /* an uint handle to an idmef_message_t * */
@@ -468,7 +472,7 @@ static void issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state)
     }
   doc1 = handle_get_rd (ctx->gc_ctx, state, UINT(idmef));
   message = EXTPTR(doc1);
-  idmef_message_print(message, prelude_data->prelude_io);
+  idmef_message_print(message, config->prelude_io);
   PUSH_RETURN_TRUE(ctx);
 }
 
@@ -524,6 +528,7 @@ static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *sta
 static void *mod_prelude_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   int i;
+  modprelude_t *prelude_data;
 
   DebugLog(DF_MOD, DS_INFO, "load() mod_prelude@%p\n", (void *) &mod_prelude);
 
@@ -579,8 +584,9 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
   char*			argv[2] = {"orchids", NULL};
   int			ret;
   prelude_client_t	*client;
+  modprelude_t *config = (modprelude_t *)mod->config;
 
-  register_fields(ctx, mod, prelude_fields, prelude_data->nb_fields);
+  register_fields(ctx, mod, prelude_fields, config->nb_fields);
 
   ret = prelude_init(&argc, argv);
   if ( ret < 0 )
@@ -590,7 +596,7 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
       exit(EXIT_FAILURE);;
     }
 
-  if (prelude_data->mode == PRELUDE_MODE_PREWIKKA)
+  if (config->mode == PRELUDE_MODE_PREWIKKA)
     {
       // configure database
       preludedb_sql_t *sql;
@@ -604,7 +610,7 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 	}
 
       ret = preludedb_sql_settings_new_from_string(&sql_settings,
-						   prelude_data->prelude_db_settings);
+						   config->prelude_db_settings);
       if ( ret < 0 )
 	{
 	  DebugLog(DF_MOD, DS_FATAL,
@@ -623,12 +629,12 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 	  exit(EXIT_FAILURE);
 	}
 
-      ret = preludedb_new(&prelude_data->db, sql, NULL, NULL, 0);
+      ret = preludedb_new(&config->db, sql, NULL, NULL, 0);
       if ( ret < 0 )
 	{
 	  DebugLog(DF_MOD, DS_FATAL,
 		   "could not initialize database '%s': %s\n",
-		   prelude_data->prelude_db_settings,
+		   config->prelude_db_settings,
 		   preludedb_strerror(ret));
 	  preludedb_sql_destroy(sql);
 	  exit(EXIT_FAILURE);
@@ -638,7 +644,7 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
     {
       // configure prelude client
 
-      ret = prelude_client_new(&client, prelude_data->profile);
+      ret = prelude_client_new(&client, config->profile);
       if (client==NULL)
 	{
 	  DebugLog(DF_MOD, DS_FATAL,
@@ -648,7 +654,7 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 
       // May need to call prelude_client_set_config_filename()
 
-      if (prelude_data->mode == PRELUDE_MODE_SENSOR)
+      if (config->mode == PRELUDE_MODE_SENSOR)
 	prelude_client_set_required_permission(client,
 					       PRELUDE_CONNECTION_PERMISSION_IDMEF_WRITE);
       else
@@ -670,20 +676,20 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 	DebugLog(DF_MOD, DS_FATAL, "Unable to set asynchronous send and timer.\n");
 	exit(EXIT_FAILURE);
       }
-    prelude_data->client = client;
-    prelude_data->poll_period = DEFAULT_MODPRELUDE_POLL_PERIOD;
+    config->client = client;
+    config->poll_period = DEFAULT_MODPRELUDE_POLL_PERIOD;
   }
 
-  ret = prelude_io_new(&(prelude_data->prelude_io));
+  ret = prelude_io_new(&config->prelude_io);
   if ( ret < 0 )
     {
       prelude_perror(ret, "no prelude_io");
       DebugLog(DF_MOD, DS_FATAL,  "prelude Unable to prelude_io");
       exit(EXIT_FAILURE);
     }
-  prelude_io_set_file_io(prelude_data->prelude_io, stdout);
+  prelude_io_set_file_io(config->prelude_io, stdout);
 
-  if (prelude_data->mode == PRELUDE_MODE_ANALYZER)
+  if (config->mode == PRELUDE_MODE_ANALYZER)
     {
       register_rtcallback(ctx,
 			  rtaction_recv_idmef,
@@ -734,20 +740,22 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
 static void dir_set_prelude_mode(orchids_t *ctx, mod_entry_t *mod,
 				 config_directive_t *dir)
 {
+  modprelude_t *config = (modprelude_t *)mod->config;
+  
   if (!strcmp(dir->args, "sensor"))
     {
       DebugLog(DF_MOD, DS_INFO, "setting prelude mode to sensor\n");
-      prelude_data->mode = PRELUDE_MODE_SENSOR;
+      config->mode = PRELUDE_MODE_SENSOR;
     }
   else if (!strcmp(dir->args, "analyzer"))
     {
       DebugLog(DF_MOD, DS_INFO, "setting prelude mode to analyzer\n");
-      prelude_data->mode = PRELUDE_MODE_ANALYZER;
+      config->mode = PRELUDE_MODE_ANALYZER;
     }
   else if (!strcmp(dir->args, "prewikka"))
     {
       DebugLog(DF_MOD, DS_INFO, "setting prelude mode to prewikka\n");
-      prelude_data->mode = PRELUDE_MODE_PREWIKKA;
+      config->mode = PRELUDE_MODE_PREWIKKA;
     }
   else
     DebugLog(DF_MOD, DS_ERROR, "unknown prelude mode, setting sensor \n");
@@ -757,26 +765,29 @@ static void dir_set_prelude_mode(orchids_t *ctx, mod_entry_t *mod,
 static void dir_set_prelude_profile(orchids_t *ctx, mod_entry_t *mod,
 				    config_directive_t *dir)
 {
+  modprelude_t *config = (modprelude_t *)mod->config;
+
   DebugLog(DF_MOD, DS_INFO, "setting prelude profile to %s\n", dir->args);
-  prelude_data->profile = dir->args;
+  config->profile = dir->args;
 }
 
 static void dir_set_prelude_poll_period(orchids_t *ctx, mod_entry_t *mod,
 					config_directive_t *dir)
 {
   int value;
+  modprelude_t *config = (modprelude_t *)mod->config;
 
   DebugLog(DF_MOD, DS_INFO, "setting PollPeriod to %s\n", dir->args);
   value = strtol(dir->args, (char **)NULL, 10);
   if (value < 0)
     value = 0;
-  prelude_data->poll_period = value;
+  config->poll_period = value;
 }
 
 
-static void add_field(orchids_t *ctx, char* field_name, char* xpath)
+static void add_field(orchids_t *ctx, char* field_name, char* xpath, modprelude_t *config)
 {
-  if (prelude_data->nb_fields == MAX_PRELUDE_FIELDS)
+  if (config->nb_fields == MAX_PRELUDE_FIELDS)
     {
       DebugLog(DF_MOD, DS_WARN,
 	       "Max number of prelude fields reached, cannot add %s %s\n",
@@ -788,16 +799,16 @@ static void add_field(orchids_t *ctx, char* field_name, char* xpath)
     char *s;
 
     s = gc_base_malloc (ctx->gc_ctx, 9 + strlen(field_name));
-    prelude_fields[prelude_data->nb_fields].name = s;
+    prelude_fields[config->nb_fields].name = s;
     memcpy (s, "prelude.", 8);
     strcpy (s+8, field_name);
   }
-  prelude_fields[prelude_data->nb_fields].type = &t_str;
-  prelude_fields[prelude_data->nb_fields].desc = xpath;
+  prelude_fields[config->nb_fields].type = &t_str;
+  prelude_fields[config->nb_fields].desc = xpath;
 
   DebugLog(DF_MOD, DS_INFO, "add new field %s : %s\n",
-	   prelude_fields[prelude_data->nb_fields].name , xpath);
-  prelude_data->field_xpath[prelude_data->nb_fields++] = xpath;
+	   prelude_fields[config->nb_fields].name , xpath);
+  config->field_xpath[config->nb_fields++] = xpath;
 }
 
 static void dir_add_prelude_field(orchids_t *ctx, mod_entry_t *mod,
@@ -812,15 +823,17 @@ static void dir_add_prelude_field(orchids_t *ctx, mod_entry_t *mod,
     return;
   }
   *pos = '\0';
-  add_field(ctx, dir->args, pos + 1);
+  add_field(ctx, dir->args, pos + 1, (modprelude_t *)mod->config);
 }
 
 
 static void dir_set_prelude_db_settings(orchids_t *ctx, mod_entry_t *mod,
 					config_directive_t *dir)
 {
+  modprelude_t *config = (modprelude_t *)mod->config;
+
   DebugLog(DF_MOD, DS_INFO, "setting PreludeDBSettings to %s\n", dir->args);
-  prelude_data->prelude_db_settings = dir->args;
+  config->prelude_db_settings = dir->args;
 }
 
 
@@ -853,10 +866,13 @@ input_module_t mod_prelude = {
 };
 
 /*
-** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
+** Copyright (c) 2011 by Baptiste GOURDIN, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
-** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>
+** Baptiste GOURDIN <gourdin@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

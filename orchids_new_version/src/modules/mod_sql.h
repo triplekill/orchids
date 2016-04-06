@@ -1,10 +1,11 @@
 /**
  ** @file mod_sql.h
- ** SQL database load module.
+ ** SQL database load module headers.
  **
- ** @author Pierre-Arnaud SENTUCQ <peirre-arnaud.sentucq@lsv.ens-cachan.fr>
+ ** @author Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>
+ ** @author Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
  **
- ** @version 0.1
+ ** @version 0.2
  ** @ingroup modules
  **
  ** @date  Started on: Wed Apr  1 17:04:27 CEST 2015
@@ -82,10 +83,13 @@ static void *mod_sql_preconfig(orchids_t *ctx, mod_entry_t *mod);
 #endif /* MOD_SQL_H */
 
 /*
-** Copyright (c) 2015 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** Copyright (c) 2015,2016 by Pierre-Arnaud SENTUCQ, Laboratoire Spécification
+** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
+** Copyright (c) 2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Pierre-Arnaud SENTUCQ <pierre-arnaud.sentucq@lsv.ens-cachan.fr>
+** Jean GOUBAULT-LARRECQ <goubault@lsv.ens-cachan.fr>
 **
 ** This software is a computer program whose purpose is to detect intrusions
 ** in a computer network.

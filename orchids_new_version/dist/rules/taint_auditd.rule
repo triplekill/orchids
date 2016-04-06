@@ -2,6 +2,12 @@
 #include "linux64syscall.h"
 #include "fcntl.h"
 
+/*** Needed configuration:
+ *** auditctl should audit all the syscalls in this file, and this will be
+ *** handled automatically by the following line:
+ *** [local:auditctl]
+ ***/
+
 rule taint
 {
   state init! /* rule will be launched once, at the beginning */

@@ -31,30 +31,23 @@
 
 #include "mod_sharedvars.h"
 
-
 input_module_t mod_sharedvars;
 
-static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state);
-
-static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state);
-
-static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state);
-
+static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state, void *data);
+static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state, void *data);
+static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state, void *data);
 static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
 static void sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod);
 
 static void set_hash_size(orchids_t *ctx, mod_entry_t *mod,
 			  config_directive_t *dir);
 
-static sharedvars_config_t *mod_sharedvars_cfg_g = NULL;
-
-
-static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
+static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *varname;
   char *key;
   ovm_var_t *value;
+  sharedvars_config_t *config = (sharedvars_config_t *)data;
 
   varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
@@ -67,7 +60,7 @@ static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
 
   key = ovm_strdup(ctx->gc_ctx, varname);
 
-  value = strhash_get(mod_sharedvars_cfg_g->vars_hash, key);
+  value = strhash_get(config->vars_hash, key);
   /* XXX should really implement a strnhash_get, taking a char * and
      its len, and eliminate the call to ovm_strdup(). */
   STACK_DROP(ctx->ovm_stack, 1);
@@ -76,11 +69,12 @@ static void issdl_get_shared_var(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
+static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *varname;
   char *key;
   ovm_var_t *value;
+  sharedvars_config_t *config = (sharedvars_config_t *)data;
 
   varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 1);
   if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
@@ -93,8 +87,8 @@ static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
 
   key = ovm_strdup(ctx->gc_ctx, varname);
 
-  value = gc_strhash_del(mod_sharedvars_cfg_g->vars_hash, key);
-  //GC_TOUCH (ctx->gc_ctx, mod_sharedvars_cfg_g);
+  value = gc_strhash_del(config->vars_hash, key);
+  //GC_TOUCH (ctx->gc_ctx, config);
 
   if (value!=NULL)
     {
@@ -113,11 +107,12 @@ static void issdl_del_shared_var(orchids_t *ctx, state_instance_t *state)
 }
 
 
-static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
+static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *varname;
   ovm_var_t *value;
   char *key;
+  sharedvars_config_t * config = (sharedvars_config_t *)data;
 
   varname = (ovm_var_t *)STACK_ELT(ctx->ovm_stack, 2);
   if (varname==NULL || (TYPE(varname)!=T_STR && TYPE(varname)!=T_VSTR))
@@ -139,10 +134,8 @@ static void issdl_set_shared_var(orchids_t *ctx, state_instance_t *state)
   key = ovm_strdup(ctx->gc_ctx, varname);
   DebugLog(DF_MOD, DS_INFO, "Setting shared var '%s'\n", key);
 
-  (void) gc_strhash_update_or_add(ctx->gc_ctx,
-				  mod_sharedvars_cfg_g->vars_hash,
-				  value, key);
-  GC_TOUCH (ctx->gc_ctx, mod_sharedvars_cfg_g);
+  (void) gc_strhash_update_or_add(ctx->gc_ctx, config->vars_hash, value, key);
+  GC_TOUCH (ctx->gc_ctx, config);
   PUSH_RETURN_TRUE(ctx);
 }
 
@@ -241,39 +234,44 @@ monotony m_shset (rule_compiler_t *ctx, struct node_expr_s *e, monotony m[])
 static void *sharedvars_preconfig(orchids_t *ctx, mod_entry_t *mod)
 {
   sharedvars_config_t *cfg;
+  sharedvars_config_t **cfg_holder;
 
   DebugLog(DF_MOD, DS_INFO, "load() sharedvars@%p\n", &mod_sharedvars);
 
   /* allocate some memory for module configuration
   ** and initialize default configuration. */
+  cfg_holder = gc_base_malloc (ctx->gc_ctx, sizeof (sharedvars_config_t *));
   cfg = gc_alloc(ctx->gc_ctx, sizeof (sharedvars_config_t),
 		 &sharedvars_config_class);
   cfg->gc.type = T_NULL;
   cfg->hash_size = DEFAULT_SHAREDVARS_HASH_SZ;
   cfg->vars_hash = NULL;
-  mod_sharedvars_cfg_g = cfg;
-  gc_add_root(ctx->gc_ctx, (gc_header_t **)&mod_sharedvars_cfg_g);
+  *cfg_holder = cfg;
+  gc_add_root(ctx->gc_ctx, (gc_header_t **)cfg_holder);
 
   register_lang_function(ctx,
                          issdl_set_shared_var,
                          "set_shared_var",
 			 2, shset_sigs,
 			 m_shset,
-                         "Set or update a shared variable");
+                         "Set or update a shared variable",
+			 cfg);
 
   register_lang_function(ctx,
                          issdl_get_shared_var,
                          "get_shared_var",
 			 1, shget_sigs,
 			 m_unknown_1,
-                         "Get a shared variable");
+                         "Get a shared variable",
+			 cfg);
 
   register_lang_function(ctx,
                          issdl_del_shared_var,
                          "del_shared_var",
 			 1, shdel_sigs,
 			 m_shset,
-                         "Delete a shared variable");
+                         "Delete a shared variable",
+			 cfg);
 
   /* return config structure, for module manager */
   return cfg;
@@ -292,10 +290,12 @@ static void sharedvars_postconfig(orchids_t *ctx, mod_entry_t *mod)
 
 static void set_hash_size(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
-  mod_sharedvars_cfg_g->hash_size = strtol(dir->args, (char **)NULL, 10);
+  sharedvars_config_t *config = (sharedvars_config_t *)mod->config;
+  
+  config->hash_size = strtol(dir->args, (char **)NULL, 10);
   DebugLog(DF_MOD, DS_INFO,
-           "setting some_option to %i\n",
-           mod_sharedvars_cfg_g->hash_size);
+           "setting HashSize to %i\n",
+           config->hash_size);
 }
 
 static int sharedvars_save (save_ctx_t *sctx, mod_entry_t *mod, void *data)
@@ -396,7 +396,7 @@ input_module_t mod_sharedvars = {
 /*
 ** Copyright (c) 2002-2005 by Julien OLIVAIN, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
-** Copyright (c) 2013-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
+** Copyright (c) 2013-2016 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.
 **
 ** Julien OLIVAIN <julien.olivain@lsv.ens-cachan.fr>

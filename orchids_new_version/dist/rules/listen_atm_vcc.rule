@@ -8,6 +8,12 @@
 
 #define MAX_CALLS 2
 
+/*** Needed configuration:
+ *** auditctl should audit all the syscalls in this file, and this will be
+ *** handled automatically by the following line:
+ *** [local:auditctl]
+ ***/
+
 rule listen_atm_vcc
 {
   state init
