@@ -37,10 +37,9 @@ dnl
 dnl Libtool
 dnl
 AC_DISABLE_STATIC
-AC_LIBTOOL_DLOPEN
-AM_PROG_LIBTOOL
+LT_INIT([dlopen])
 AC_SEARCH_LIBS(dlopen,c dl,,)
-AC_LIB_LTDL
+LTDL_INIT([])
 AC_CHECK_HEADERS(dlfcn.h)
 AC_CHECK_HEADERS(ltdl.h)
 
@@ -48,7 +47,6 @@ dnl AM_MAINTAINER_MODE
 
 dnl Checks for programs
 AC_PROG_CC
-AM_PROG_CC_STDC
 AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
@@ -58,7 +56,7 @@ AC_PROG_MAKE_SET
 AC_C_BIGENDIAN
 
 dnl Obsolete
-dnl AC_ISC_POSIX
+dnl AC_SEARCH_LIBS([strerror],[cposix])
 
 AC_PROG_LEX
 if test "$LEX" != flex ; then
