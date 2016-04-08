@@ -838,7 +838,6 @@ static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
 
 
 
-#define MODNAME_MAX 32
 /* Black cpp magic: */
 #define XSTR(s) XXSTR(s)
 #define XXSTR(s) #s
@@ -846,13 +845,18 @@ static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
 static void module_config(orchids_t *ctx, mod_entry_t *mod,
 			  config_directive_t *dir)
 {
-  char mod_name[MODNAME_MAX];
+  char mod_name[MODNAME_MAX+1];
   mod_entry_t *m;
   mod_cfg_cmd_t *c;
   config_directive_t *d;
   int i;
 
-  i = sscanf(dir->args, "%" XSTR(MODNAME_MAX) "[a-zA-Z]>", mod_name);
+  i = sscanf(dir->args, "%" XSTR(MODNAME_MAX) "[a-zA-Z0-9_]>", mod_name);
+  if (i!=1)
+    {
+      DebugLog(DF_CORE, DS_INFO, "Illegal module name (at '%s'), configuration skipped\n", mod_name);
+      return;
+    }
   DebugLog(DF_CORE, DS_INFO, "Doing module configuration for %s\n", mod_name);
   m = find_module_entry(ctx, mod_name);
   if (m==NULL)
