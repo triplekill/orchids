@@ -342,7 +342,7 @@ static int sharedvars_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data
   cfg = (sharedvars_config_t *)data;
   err = getc_unlocked (rctx->f);
   if (err<0) goto end;
-  if (err!=T_NULL) { err = -2; goto end; }
+  if (err!=T_NULL) { err = restore_badly_formatted_data (); goto end; }
   err = restore_size_t (rctx, &n);
   if (err) goto end;
   if (n==0) goto end;
@@ -352,7 +352,7 @@ static int sharedvars_restore (restore_ctx_t *rctx, mod_entry_t *mod, void *data
     {
       err = restore_string (rctx, &key);
       if (err) goto end;
-      if (key==NULL) { err = -2; goto end; }
+      if (key==NULL) { err = restore_badly_formatted_data (); goto end; }
       value = (ovm_var_t *)restore_gc_struct (rctx);
       if (value==NULL && errno!=0)
 	{ err = errno; gc_base_free (key); goto end; }

@@ -638,7 +638,7 @@ static gc_header_t *node_state_restore (restore_ctx_t *rctx)
   if (mustset==NULL && errno!=0)
     goto err_freefilename;
   if (mustset!=NULL && TYPE(mustset)!=T_VARSET)
-    { errno = -2; goto err_freefilename; }
+    { errno = restore_badly_formatted_data (); goto err_freefilename; }
   n = gc_alloc (gc_ctx, sizeof(node_state_t), &node_state_class);
   n->gc.type = T_NODE_STATE;
   n->state_id = id;
@@ -752,7 +752,7 @@ static gc_header_t *node_trans_restore (restore_ctx_t *rctx)
     { if (file!=NULL) gc_base_free (file);
       if (dest!=NULL) gc_base_free (dest); goto end; }
   if (sub_state_dest!=NULL && TYPE(sub_state_dest)!=T_NODE_STATE)
-    { err = -2; goto err_freedestfile; }
+    { err = restore_badly_formatted_data (); goto err_freedestfile; }
   GC_UPDATE (gc_ctx, 1, sub_state_dest);
   err = restore_ulong (rctx, &an_flags);
   if (err) goto err_freedestfile;
@@ -894,12 +894,12 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
     end_freefile: if (filename!=NULL) gc_base_free (filename); goto err_free_real_file; }
   err = restore_string (rctx, &name);
   if (err) goto err_freefile;
-  if (name==NULL) { errno = -2; goto end_freefile; }
+  if (name==NULL) { errno = restore_badly_formatted_data (); goto end_freefile; }
   init = (node_state_t *)restore_gc_struct (rctx);
   if (init==NULL && errno!=0)
     { end_freefilename: if (name!=NULL) gc_base_free (name); goto end_freefile; }
   if (init==NULL || TYPE(init)!=T_NODE_STATE)
-    { errno = -2; goto end_freefilename; }
+    { errno = restore_badly_formatted_data (); goto end_freefilename; }
   GC_UPDATE (gc_ctx, 0, init);
   statelist = (node_expr_t *)restore_gc_struct (rctx);
   if (statelist==NULL && errno!=0) goto end_freefilename;
@@ -923,7 +923,7 @@ static gc_header_t *node_rule_restore (restore_ctx_t *rctx)
 	      errno = err;
 	      goto end_freefilename;
 	    }
-	  if (vars[i]==NULL) { err = -2; goto end_freevars; }
+	  if (vars[i]==NULL) { err = restore_badly_formatted_data (); goto end_freevars; }
 	}
       sv = gc_base_malloc (gc_ctx, sizeof(node_syncvarlist_t));
       sv->vars_nb = nvars;
@@ -1045,14 +1045,14 @@ static int node_expr_restore (restore_ctx_t *rctx, node_expr_t *n)
     }
   else
     {
-      if (name==NULL) { err = -2; goto end; }
+      if (name==NULL) { err = restore_badly_formatted_data (); goto end; }
       n->stype = stype_from_string (gc_ctx, name, 1, tag);
       gc_base_free (name);
     }
   err = restore_int (rctx, &n->compute_stype);
   if (err) goto end;
   if (n->compute_stype<0 || n->compute_stype>=CS_NUM)
-    { err = -2; goto end; }
+    { err = restore_badly_formatted_data (); goto end; }
   GC_TOUCH (gc_ctx, n->parents = (node_expr_t *)restore_gc_struct (rctx));
  end:
   GC_END (gc_ctx);
@@ -1217,7 +1217,7 @@ static gc_header_t *node_expr_sym_restore (restore_ctx_t *rctx, gc_class_t *clas
   if (err) { errno = err; goto end; }
   err = restore_string (rctx, &name);
   if (err) { errno = err; goto end; }
-  if (name==NULL) { errno = -2; goto end; }
+  if (name==NULL) { errno = restore_badly_formatted_data (); goto end; }
   def = (node_expr_t *)restore_gc_struct (rctx);
   if (def==NULL && errno!=0) { err_freename: gc_base_free(name); goto end; }
   err = restore_int (rctx, &mono);
@@ -1477,9 +1477,9 @@ static gc_header_t *node_expr_call_restore (restore_ctx_t *rctx)
   if (err) { errno = err; goto end; }
   err = restore_string (rctx, &name);
   if (err) { errno = err; goto end; }
-  if (name==NULL) { errno = -2; goto end; }
+  if (name==NULL) { errno = restore_badly_formatted_data (); goto end; }
   func = strhash_get(rctx->rule_compiler->functions_hash, name);
-  if (func==NULL) { gc_base_free (name); errno = -8; goto end; }
+  if (func==NULL) { gc_base_free (name); errno = restore_unknown_primitive (); goto end; }
   params = (node_expr_t *)restore_gc_struct (rctx);
   if (params==NULL && errno!=0) { gc_base_free (name); goto end; }
   GC_UPDATE (gc_ctx, 2, params);
@@ -1564,7 +1564,7 @@ static gc_header_t *node_expr_ifstmt_restore (restore_ctx_t *rctx)
   if (err) { errno = err; goto end; }
   cond = (node_expr_t *)restore_gc_struct (rctx);
   if (cond==NULL && errno!=0) goto end;
-  if (cond==NULL) { errno = -2; goto end; }
+  if (cond==NULL) { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 2, cond);
   then = (node_expr_t *)restore_gc_struct (rctx);
   if (then==NULL && errno!=0) goto end;
@@ -1699,11 +1699,11 @@ static gc_header_t *node_expr_regsplit_restore (restore_ctx_t *rctx)
   if (err) { errno = err; goto end; }
   string = (node_expr_t *)restore_gc_struct (rctx);
   if (string==NULL && errno!=0) goto end;
-  if (string==NULL) { errno = -2; goto end; }
+  if (string==NULL) { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 2, string);
   split_pat = (node_expr_t *)restore_gc_struct (rctx);
   if (split_pat==NULL && errno!=0) goto end;
-  if (split_pat==NULL) { errno = -2; goto end; }
+  if (split_pat==NULL) { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 3, split_pat);
   n = gc_alloc (gc_ctx, sizeof(node_expr_regsplit_t), &node_expr_regsplit_class);
   n->gc.type = T_NODE_REGSPLIT;
@@ -1726,7 +1726,7 @@ static gc_header_t *node_expr_regsplit_restore (restore_ctx_t *rctx)
 	{
 	  e = (node_expr_t *)restore_gc_struct (rctx);
 	  if (e==NULL && errno!=0) { n = NULL; goto end; }
-	  if (e==NULL) { errno = -2; n = NULL; goto end; }
+	  if (e==NULL) { errno = restore_badly_formatted_data (); n = NULL; goto end; }
 	  GC_TOUCH (gc_ctx, vars[i] = e);
 	  dv->vars_nb = ++i;
 	}
@@ -5469,7 +5469,7 @@ static gc_header_t *type_heap_restore (restore_ctx_t *rctx)
 	}
       else
 	{
-	  if (typename==NULL) { errno = -2; h = NULL; goto end; }
+	  if (typename==NULL) { errno = restore_badly_formatted_data (); h = NULL; goto end; }
 	  stype = stype_from_string (gc_ctx, typename, 1, tag);
 	  gc_base_free (typename);
 	}
@@ -8482,7 +8482,7 @@ int update_field_number (restore_ctx_t *rctx, int32_t *fld)
   field_record_t *f;
 
   if (field<0 || field>=rctx->global_fields->num_fields)
-    return -3;
+    return restore_bad_size ();
   name = rctx->global_fields->fields[field].name;
   f = strhash_get (rctx->rule_compiler->fields_hash, name);
   if (f==NULL)
@@ -8597,7 +8597,7 @@ static int transition_restore (restore_ctx_t *rctx, state_t *state_array,
 
   err = restore_size_t (rctx, &stateno);
   if (err) return err;
-  if (stateno>=nstates) return -3;
+  if (stateno>=nstates) return restore_bad_size ();
   trans->dest = &state_array[stateno];
   err = restore_ulong (rctx, &nreqfields);
   if (err) return err;
@@ -8668,7 +8668,7 @@ static int state_restore (restore_ctx_t *rctx, state_t *state_array,
 
   err = restore_string (rctx, &state->name);
   if (err) return err;
-  if (state->name==NULL) return -2;
+  if (state->name==NULL) return restore_badly_formatted_data ();
   err = restore_int32 (rctx, &state->line);
   if (err) { err_freename: gc_base_free (state->name); return err; }
   err = restore_size_t (rctx, &n);
@@ -8714,7 +8714,7 @@ static int state_restore (restore_ctx_t *rctx, state_t *state_array,
   err = restore_int32 (rctx, &state->id);
   if (err) goto err_freetrans;
   if ((state->flags & STATE_EPSILON) && n==0)
-    { err = -2; goto err_freetrans; } /* every epsilon state should have at least one outgoing transition */
+    { err = restore_badly_formatted_data (); goto err_freetrans; } /* every epsilon state should have at least one outgoing transition */
   return 0;
 }
 
@@ -8885,7 +8885,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   if (err) { errno = err; goto err_freefilename; }
   err = restore_string (rctx, &name);
   if (err) { errno = err; goto err_freefilename; }
-  if (name==NULL) { errno = -2; goto err_freefilename; }
+  if (name==NULL) { errno = restore_badly_formatted_data (); goto err_freefilename; }
   err = restore_size_t (rctx, &nstates);
   if (err)
     {
@@ -8937,13 +8937,13 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     }
   err = restore_int32 (rctx, &nvars);
   if (err) { rule = NULL; errno = err; goto end; }
-  if (nvars<0) { rule = NULL; errno = -2; goto end; }
+  if (nvars<0) { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
   rule->var_name = gc_base_malloc (gc_ctx, nvars*sizeof(char *));
   for (var=0; var<nvars; )
     {
       err = restore_string (rctx, &s);
       if (err) { rule = NULL; errno = err; goto end; }
-      if (s==NULL) { rule = NULL; errno = -2; goto end; }
+      if (s==NULL) { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
       rule->var_name[var] = s;
       rule->dynamic_env_sz = ++var;
     }
@@ -8959,7 +8959,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   if (err) { rule = NULL; errno = err; goto end; }
   nvars = n;
   if (nvars<0 || nvars>=rule->dynamic_env_sz)
-    { rule = NULL; errno = -2; goto end; }
+    { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
   rule->sync_vars_sz = n;
   if (nvars!=0)
     {
@@ -8972,7 +8972,7 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     }
   err = restore_size_t (rctx, &n);
   if (err) { rule = NULL; errno = err; goto end; }
-  if (n!=0 && rule->sync_vars==0) { rule = NULL; errno = -2; goto end; }
+  if (n!=0 && rule->sync_vars==0) { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
   if (rule->sync_vars!=NULL)
     {
       rule->sync_lock = new_objhash (gc_ctx, 1021);
@@ -8982,14 +8982,14 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	{
 	  si = restore_gc_struct (rctx);
 	  if (si==NULL || TYPE(si)!=T_STATE_INSTANCE)
-	    { errno = -2; rule = NULL; goto end; }
+	    { errno = restore_badly_formatted_data (); rule = NULL; goto end; }
 	  if (errno) { rule = NULL; goto end; }
 	  GC_UPDATE (gc_ctx, 1, si);
 	  if (objhash_get (rule->sync_lock, si)!=NULL) /* duplicate entry */
-	    { rule = NULL; errno = -2; goto end; }
+	    { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
 	  pid = restore_gc_struct (rctx);
 	  if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
-	    { errno = -2; rule = NULL; goto end; }
+	    { errno = restore_badly_formatted_data (); rule = NULL; goto end; }
 	  if (errno) { rule = NULL; goto end; }
 	  GC_UPDATE (gc_ctx, 2, pid);
 	  objhash_add (gc_ctx, rule->sync_lock, pid, si);

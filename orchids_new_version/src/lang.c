@@ -2119,7 +2119,7 @@ static gc_header_t *regex_restore (restore_ctx_t *rctx)
   regex->regex_str = str;
   //regex->regex.re_magic = 0;
   regex->splits = 0;
-  if (str==NULL) { errno = -2; goto errlab2; }
+  if (str==NULL) { errno = restore_badly_formatted_data (); goto errlab2; }
   err = regcomp(&REGEX(regex), str, REG_EXTENDED);
   if (err) goto errlab;
   REGEXNUM(regex) = REGEX(regex).re_nsub;
@@ -2474,10 +2474,10 @@ static gc_header_t *extern_restore (restore_ctx_t *rctx)
   a = NULL;
   err = restore_string (rctx, &desc);
   if (err) { errno = err; goto end; }
-  if (desc==NULL) { errno = -2; goto end; }
+  if (desc==NULL) { errno = restore_badly_formatted_data (); goto end; }
   class = strhash_get (rctx->externs, desc);
   if (class==NULL)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   ptr = (*class->restore) (rctx);
   if (ptr==NULL && errno!=0)
     goto end;
@@ -5512,7 +5512,7 @@ static gc_header_t *shared_def_restore (restore_ctx_t *rctx)
   else
     {
       p = inthash_get (rctx->shared_hash, id);
-      if (p!=NULL) { errno = -2; p = NULL; }
+      if (p!=NULL) { errno = restore_badly_formatted_data (); p = NULL; }
       else
 	{
 	  p = restore_gc_struct (rctx);
@@ -5547,7 +5547,7 @@ static gc_header_t *shared_use_restore (restore_ctx_t *rctx)
   err = restore_ulong (rctx, &id);
   if (err) { errno = err; return NULL; }
   p = inthash_get (rctx->shared_hash, id);
-  if (p==NULL) { errno = -2; }
+  if (p==NULL) { errno = restore_badly_formatted_data (); }
   return p;
 }
 
@@ -5664,7 +5664,7 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
       c = TYPE(p);
       if (putc_unlocked (c, sctx->f) < 0) { err = errno; goto end; }
       gccl = gc_classes[c];
-      if (gccl==NULL) { err = -2; goto end; }
+      if (gccl==NULL) { err = restore_badly_formatted_data (); goto end; }
       err = (*gccl->save) (sctx, p);
       break;
     case GC_FLAGS_EST_SHARED: /* this one is shared, but we have already saved
@@ -5675,7 +5675,7 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
       break;
     default: /* namely, 0: we are trying to save an unreachable object...
 		something's gone wrong. */
-      err = -2;
+      err = restore_badly_formatted_data ();
       break;
     }
  end:
@@ -5693,7 +5693,7 @@ gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
   c = getc_unlocked (rctx->f);
   if (c==EOF) { errno = c; return NULL; }
   if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL || gccl->restore==NULL)
-    { errno = -2; return NULL; }
+    { errno = restore_badly_formatted_data (); return NULL; }
   return (*gccl->restore) (rctx);
 }
 

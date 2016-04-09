@@ -232,13 +232,13 @@ static gc_header_t *field_record_table_restore (restore_ctx_t *rctx)
       /* allocates rec->name but will never free it, unless an
 	 error occurs; who cares. */
       if (err) goto errlab_freeentries;
-      if (rec->name==NULL) { err = -2; goto errlab_freeentries; }
+      if (rec->name==NULL) { err = restore_badly_formatted_data (); goto errlab_freeentries; }
       c = getc_unlocked (f);
       if (c==EOF) { err = c; goto errlab_freename; }
       tag = (unsigned char)c;
       err = restore_string (rctx, &s);
       if (err) goto errlab_freename;
-      if (s==NULL) { err = -2; goto errlab_freename; }
+      if (s==NULL) { err = restore_badly_formatted_data (); goto errlab_freename; }
       rec->type = stype_from_string (gc_ctx, s, 1, tag);
       gc_base_free (s);
       err = restore_string (rctx, &rec->desc);
@@ -428,6 +428,51 @@ orchids_t *new_orchids_context(void)
   return ctx;
 }
 
+int restore_end_of_file (void)
+{
+  return -1;
+}
+
+int restore_badly_formatted_data (void)
+{
+  return -2;
+}
+
+int restore_bad_size (void)
+{
+  return -3;
+}
+
+int restore_bad_number_of_columns (void)
+{
+  return -4;
+}
+
+int restore_bad_magic (void)
+{
+  return -5;
+}
+
+int restore_bad_version (void)
+{
+  return -6;
+}
+
+int restore_unknown_record_field_name (void)
+{
+  return -7;
+}
+
+int restore_unknown_primitive (void)
+{
+  return -8;
+}
+
+int restore_bad_integer_size (void)
+{
+  return -9;
+}
+
 char *orchids_strerror (int err)
 {
   switch (err)
@@ -557,7 +602,7 @@ issdl_function_t *restore_func_tbl (restore_ctx_t *rctx, int32_t *nfuncs_sz)
 
   err = restore_int32 (rctx, &nfuncs);
   if (err) { errno = err; return NULL; }
-  if (nfuncs<0) { errno = -2; return NULL; }
+  if (nfuncs<0) { errno = restore_badly_formatted_data (); return NULL; }
   functbl = gc_base_malloc (rctx->gc_ctx, nfuncs*sizeof(issdl_function_t));
   for (i=0; i<nfuncs; i++)
     {
@@ -573,7 +618,7 @@ issdl_function_t *restore_func_tbl (restore_ctx_t *rctx, int32_t *nfuncs_sz)
 	  gc_base_free (functbl);
 	  return NULL;
 	}
-      if (functbl[i].name==NULL) { errno = -2; goto errlab2; }
+      if (functbl[i].name==NULL) { errno = restore_badly_formatted_data (); goto errlab2; }
       err = restore_int32 (rctx, &functbl[i].args_nb);
       if (err) { i++; goto errlab1; }
       err = restore_int32 (rctx, &functbl[i].id);
@@ -594,7 +639,7 @@ int restore_module (orchids_t *ctx, restore_ctx_t *rctx)
 
   err = restore_string (rctx, &modname);
   if (err) return err;
-  if (modname==NULL) return -2;
+  if (modname==NULL) return restore_badly_formatted_data ();
   err = restore_size_t (rctx, &offset);
   if (err) goto errlab;
   for (m=0; m<ctx->loaded_modules; m++)
@@ -642,34 +687,34 @@ int orchids_restore (orchids_t *ctx, char *name)
       c = getc_unlocked (rctx.f);
       if (c==EOF) { err = c; goto errlab; }
       if (c!=(int)(unsigned int)save_magic[i])
-	{ errno = -5; goto errlab; }
+	{ errno = restore_bad_magic (); goto errlab; }
     }
   /* Check integer sizes */
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(size_t)) { errno = -9; goto errlab; }
+  if (c!=sizeof(size_t)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(int)) { errno = -9; goto errlab; }
+  if (c!=sizeof(int)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(unsigned int)) { errno = -9; goto errlab; }
+  if (c!=sizeof(unsigned int)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(long)) { errno = -9; goto errlab; }
+  if (c!=sizeof(long)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(unsigned long)) { errno = -9; goto errlab; }
+  if (c!=sizeof(unsigned long)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(time_t)) { errno = -9; goto errlab; }
+  if (c!=sizeof(time_t)) { errno = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(double)) { errno = -9; goto errlab; }
+  if (c!=sizeof(double)) { errno = restore_bad_integer_size (); goto errlab; }
   /* Now check version number */
   err = restore_size_t (&rctx, &version);
   if (err) goto errlab;
-  if (version!=ORCHIDS_SAVE_VERSION) { errno = -6; goto errlab; }
+  if (version!=ORCHIDS_SAVE_VERSION) { errno = restore_bad_version (); goto errlab; }
   rctx.version = version;
   rctx.externs = ctx->xclasses;
   rctx.rule_compiler = ctx->rule_compiler;
@@ -679,18 +724,18 @@ int orchids_restore (orchids_t *ctx, char *name)
   rctx.global_fields = (field_record_table_t *)restore_gc_struct (&rctx);
   if (rctx.global_fields==NULL && errno!=0) { err = errno; goto errlab; }
   if (rctx.global_fields==NULL || TYPE(rctx.global_fields)!=T_FIELD_RECORD_TABLE)
-    { err = -2; goto errlab; }
+    { err = restore_badly_formatted_data (); goto errlab; }
   GC_UPDATE (ctx->gc_ctx, 0, rctx.global_fields);
   rctx.vm_func_tbl = restore_func_tbl (&rctx, &rctx.vm_func_tbl_sz);
   if (rctx.vm_func_tbl==NULL && errno!=0) goto errlab;
   GC_TOUCH (ctx->gc_ctx, ctx->thread_queue = (thread_queue_t *)restore_gc_struct (&rctx));
   if (ctx->thread_queue==NULL && errno!=0) { err = errno; goto errlab; }
   if (ctx->thread_queue!=NULL && TYPE(ctx->thread_queue)!=T_THREAD_QUEUE)
-    { err = -2; ctx->thread_queue = NULL; goto errlab; }
+    { err = restore_badly_formatted_data (); ctx->thread_queue = NULL; goto errlab; }
   if (rctx.errs & RESTORE_UNKNOWN_FIELD_NAME)
-    { err = -7; ctx->thread_queue = NULL; goto errlab; }
+    { err = restore_unknown_record_field_name (); ctx->thread_queue = NULL; goto errlab; }
   if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
-    { err = -8; ctx->thread_queue = NULL; goto errlab; }
+    { err = restore_unknown_primitive (); ctx->thread_queue = NULL; goto errlab; }
   /* Now we look for modules requiring to be restored. */
   while (err==0)
     switch (getc_unlocked (rctx.f))
@@ -704,7 +749,7 @@ int orchids_restore (orchids_t *ctx, char *name)
 	clear_inthash (rctx.shared_hash, NULL);
 	err = restore_module (ctx, &rctx);
 	break;
-      default: err = -2; break;
+      default: err = restore_badly_formatted_data (); break;
       }
  errlab:
   if (rctx.vm_func_tbl!=NULL)
@@ -1101,7 +1146,7 @@ static gc_header_t *event_restore (restore_ctx_t *rctx)
   next = (event_t *)restore_gc_struct (rctx);
   if (next==NULL && errno!=0) goto end;
   if (next!=NULL && TYPE(next)!=T_EVENT)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   if ((errs & RESTORE_UNKNOWN_FIELD_NAME) != 0)
     e = next; /* ignore event value val: it uses unknown field names */
   else

@@ -154,12 +154,12 @@ static void *xml_restore (restore_ctx_t *rctx)
   if (baseurl!=NULL)
     gc_base_free (baseurl);
   if (doc==NULL)
-    { errno = -1; return NULL; }
+    { errno = restore_end_of_file(); return NULL; }
   xpath_ctx = xmlXPathNewContext(doc);
   if (xpath_ctx==NULL)
     {
       xmlFreeDoc(doc);
-      errno = -1; return NULL;
+      errno = restore_end_of_file(); return NULL;
     }
   err = restore_size_t (rctx, &ns_n); /* get number of registered namespaces */
   if (err) { err_freexpath:
@@ -168,10 +168,10 @@ static void *xml_restore (restore_ctx_t *rctx)
     {
       err = restore_string (rctx, &name);
       if (err) goto err_freexpath;
-      if (name==NULL) { err = -2; goto err_freexpath; }
+      if (name==NULL) { err = restore_badly_formatted_data (); goto err_freexpath; }
       err = restore_string (rctx, &url);
       if (err) { gc_base_free (name); goto err_freexpath; }
-      if (url==NULL) { err = -2; goto err_freexpath; }
+      if (url==NULL) { err = restore_badly_formatted_data (); goto err_freexpath; }
       xmlXPathRegisterNs (xpath_ctx, BAD_CAST(name), BAD_CAST(url));
       gc_base_free (name);
     }

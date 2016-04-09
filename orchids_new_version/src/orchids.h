@@ -1786,6 +1786,18 @@ void remove_thread_local_entries (state_instance_t *state);
 int begin_save_module (save_ctx_t *sctx, char *modname, off_t *startpos);
 int end_save_module (save_ctx_t *sctx, off_t startpos);
 
+/* In orchids_api.c */
+/* return error codes when restore()ing. */
+int restore_end_of_file (void);
+int restore_badly_formatted_data (void);
+int restore_bad_size (void);
+int restore_bad_number_of_columns (void);
+int restore_bad_magic (void);
+int restore_bad_version (void);
+int restore_unknown_record_field_name (void);
+int restore_unknown_primitive (void);
+int restore_bad_integer_size (void);
+
 #endif /* ORCHID_H */
 
 

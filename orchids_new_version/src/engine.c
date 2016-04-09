@@ -182,24 +182,24 @@ gc_header_t *state_instance_restore (restore_ctx_t *rctx)
   if (pid==NULL && errno!=0)
     goto end;
   if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 0, pid);
   err = restore_long (rctx, &stateno);
   if (err) { errno = err; goto end; }
   if (stateno<0 || stateno>=pid->rule->state_nb)
-    { errno = -3; goto end; }
+    { errno = restore_bad_size (); goto end; }
   q = &pid->rule->state[stateno];
   err = restore_long (rctx, &transno);
   if (err) { errno = err; goto end; }
   if (transno==-1)
     t = NULL;
   else if (transno<0 || transno>=q->trans_nb)
-    { errno = -3; goto end; }
+    { errno = restore_bad_size (); goto end; }
   else t = &q->trans[transno];
   env = (ovm_var_t *)restore_gc_struct (rctx);
   if (errno) goto end;
   if (env!=NULL && TYPE(env)!=T_BIND && TYPE(env)!=T_SPLIT)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 1, env);
   err = restore_uint32 (rctx, &owned_handles);
   if (err) { errno = err; goto end; }
@@ -296,7 +296,7 @@ static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
   if (si==NULL && errno!=0)
     goto end;
   if (si!=NULL && TYPE(si)!=T_STATE_INSTANCE)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   if (si!=NULL &&
       (si->pid->rule->flags &
        (RULE_RESTORE_UNKNOWN_FIELD_NAME | RULE_RESTORE_UNKNOWN_PRIMITIVE))
@@ -311,7 +311,7 @@ static gc_header_t *thread_queue_elt_restore (restore_ctx_t *rctx)
   if (next==NULL && errno!=0)
     goto end;
   if (next!=NULL && TYPE(next)!=T_THREAD_QUEUE_ELT)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 1, next);
   qe = gc_alloc (gc_ctx, sizeof(thread_queue_elt_t), &thread_queue_elt_class);
   qe->gc.type = T_THREAD_QUEUE_ELT;
@@ -379,7 +379,7 @@ static gc_header_t *thread_queue_restore (restore_ctx_t *rctx)
   if (qe==NULL && errno!=0)
     goto end;
   if (qe!=NULL && TYPE(qe)!=T_THREAD_QUEUE_ELT)
-    { errno = -2; goto end; }
+    { errno = restore_badly_formatted_data (); goto end; }
   GC_UPDATE (gc_ctx, 0, qe);
   if (qe==NULL)
     {

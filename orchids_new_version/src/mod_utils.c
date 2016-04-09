@@ -488,11 +488,11 @@ int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
       if (remaining==NULL && errno!=0) { err = errno; goto err_freetag; }
       if (remaining!=NULL &&
 	  (TYPE(remaining)!=T_BSTR && TYPE(remaining)!=T_VBSTR))
-	{ err = -2; goto err_freetag; }
+	{ err = restore_badly_formatted_data (); goto err_freetag; }
       GC_UPDATE (rctx->gc_ctx, 0, remaining);
       event = (event_t *)restore_gc_struct (rctx);
       if (event==NULL && errno!=0) { err = errno; goto err_freetag; }
-      if (event!=NULL && TYPE(event)!=T_EVENT) { err = -2; goto err_freetag; }
+      if (event!=NULL && TYPE(event)!=T_EVENT) { err = restore_badly_formatted_data (); goto err_freetag; }
       GC_UPDATE (rctx->gc_ctx, 1, event);
       for (hook=bcfg->hooks; hook!=NULL; hook=hook->next)
 	{ /* linear search through all hooks: this is inefficient,

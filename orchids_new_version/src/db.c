@@ -302,9 +302,9 @@ static gc_header_t *db_small_table_restore (restore_ctx_t *rctx)
   if (p==NULL && errno!=0)
     goto err;
   if (p!=NULL && TYPE(p)!=T_DB_SMALL_TABLE)
-    { errno = -3; goto errlab; }
+    { errno = restore_badly_formatted_data (); goto errlab; }
   if (p!=NULL && ((db_small_table *)p)->nfields!=n)
-    { errno = -4; goto errlab; }
+    { errno = restore_bad_number_of_columns (); goto errlab; }
   GC_TOUCH (gc_ctx, t->next = (db_small_table *)p);
   GC_END (gc_ctx);
   goto normal;
@@ -377,7 +377,7 @@ static gc_header_t *db_tuples_restore (restore_ctx_t *rctx)
     m = empty_db;
   else if (TYPE(t)!=T_DB_SMALL_TABLE)
     {
-      errno = -3;
+      errno = restore_badly_formatted_data ();
       m = NULL;
     }
   else
@@ -456,17 +456,17 @@ static gc_header_t *db_branch_restore (restore_ctx_t *rctx)
   m1 = (db_map *)restore_gc_struct (rctx);
   if (m1==NULL || (TYPE(m1)!=T_DB_EMPTY && TYPE(m1)!=T_DB_MAP &&
 		   TYPE(m1)!=T_DB_SINGLETON))
-    { errno = -3; m = NULL; goto end; }
+    { errno = restore_badly_formatted_data (); m = NULL; goto end; }
   GC_UPDATE (gc_ctx, 0, m1);
   nfields1 = db_nfields (m1);
   m2 = (db_map *)restore_gc_struct (rctx);
   if (m2==NULL || (TYPE(m2)!=T_DB_EMPTY && TYPE(m2)!=T_DB_MAP &&
 		   TYPE(m2)!=T_DB_SINGLETON))
-    { errno = -3; m = NULL; goto end; }
+    { errno = restore_badly_formatted_data (); m = NULL; goto end; }
   GC_UPDATE (gc_ctx, 1, m2);
   nfields2 = db_nfields (m2);
   if (nfields1!=nfields2)
-    { errno = -4; m = NULL; goto end; }
+    { errno = restore_bad_number_of_columns (); m = NULL; goto end; }
   m = db_union (gc_ctx, nfields1, m1, m2);
  end:
   GC_END (gc_ctx);
