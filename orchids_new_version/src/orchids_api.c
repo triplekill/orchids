@@ -511,7 +511,7 @@ static int save_func_tbl (save_ctx_t *sctx, issdl_function_t *functbl, int32_t n
 }
 
 static char save_magic[] = "0RXZ";
-#define ORCHIDS_SAVE_VERSION 5
+#define ORCHIDS_SAVE_VERSION 6
 
 int orchids_save (orchids_t *ctx, char *name)
 {
@@ -533,15 +533,16 @@ int orchids_save (orchids_t *ctx, char *name)
   if (sctx.f==NULL) { if (errno==EINTR) goto reopen; err = errno; goto end; }
   flockfile (sctx.f);
   sctx.fuzz = (unsigned long)random();
+  sctx.postponed = NULL;
   if (fputs (save_magic, sctx.f) < 0) { err = errno; goto errlab; }
   /* Now save various sizes of integer types */
-  if (putc_unlocked (sizeof(size_t), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(int), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(unsigned int), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(long), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(unsigned long), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(time_t), sctx.f) < 0) goto errlab;
-  if (putc_unlocked (sizeof(double), sctx.f) < 0) goto errlab;
+  if (putc_unlocked (sizeof(size_t), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(int), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(unsigned int), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(long), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(unsigned long), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(time_t), sctx.f) < 0) { err = errno; goto errlab; }
+  if (putc_unlocked (sizeof(double), sctx.f) < 0) { err = errno; goto errlab; }
   /* Now we can save the version number (as a size_t) */
   err = save_size_t (&sctx, version);
   if (err) goto errlab;
@@ -555,7 +556,9 @@ int orchids_save (orchids_t *ctx, char *name)
   if (err) goto errlab;
   err = save_gc_struct (&sctx, (gc_header_t *)ctx->thread_queue);
   if (err) goto errlab;
-
+  err = save_flush (&sctx);
+  if (err) goto errlab;
+  
  errlab:
   reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
   reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
@@ -578,6 +581,8 @@ int orchids_save (orchids_t *ctx, char *name)
 	  err = begin_save_module (&sctx, mod->name, &startpos);
 	  if (err) break;
 	  err = (*mod->save_fun) (&sctx, me, me->config);
+	  if (err) break;
+	  err = save_flush (&sctx);
 	  if (err) break;
 	  err = end_save_module (&sctx, startpos);
 	  if (err) break;
@@ -652,7 +657,11 @@ int restore_module (orchids_t *ctx, restore_ctx_t *rctx)
 	break;
     }
   if (m<ctx->loaded_modules) /* found the module */
-    err = (*mod->restore_fun) (rctx, me, me->config);
+    {
+      err = (*mod->restore_fun) (rctx, me, me->config);
+      if (err==0)
+	err = restore_flush (rctx);
+    }
   else /* if not found, then skip whole block of saved data;
 	  this is what 'offset' is for. */
     err = fseeko (rctx->f, (off_t)offset, SEEK_CUR);
@@ -673,6 +682,7 @@ int orchids_restore (orchids_t *ctx, char *name)
   errno = 0;
   rctx.gc_ctx = ctx->gc_ctx;
   rctx.shared_hash = NULL; /* for now */
+  rctx.forward_hash = NULL; /* for now */
   rctx.global_fields = NULL; /* for now */
   rctx.vm_func_tbl = NULL; /* for now */
   rctx.vm_func_tbl_sz = 0; /* for now */
@@ -687,51 +697,54 @@ int orchids_restore (orchids_t *ctx, char *name)
       c = getc_unlocked (rctx.f);
       if (c==EOF) { err = c; goto errlab; }
       if (c!=(int)(unsigned int)save_magic[i])
-	{ errno = restore_bad_magic (); goto errlab; }
+	{ err = restore_bad_magic (); goto errlab; }
     }
   /* Check integer sizes */
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(size_t)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(size_t)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(int)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(int)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(unsigned int)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(unsigned int)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(long)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(long)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(unsigned long)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(unsigned long)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(time_t)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(time_t)) { err = restore_bad_integer_size (); goto errlab; }
   c = getc_unlocked (rctx.f);
   if (c==EOF) { err = c; goto errlab; }
-  if (c!=sizeof(double)) { errno = restore_bad_integer_size (); goto errlab; }
+  if (c!=sizeof(double)) { err = restore_bad_integer_size (); goto errlab; }
   /* Now check version number */
   err = restore_size_t (&rctx, &version);
   if (err) goto errlab;
-  if (version!=ORCHIDS_SAVE_VERSION) { errno = restore_bad_version (); goto errlab; }
+  if (version!=ORCHIDS_SAVE_VERSION) { err = restore_bad_version (); goto errlab; }
   rctx.version = version;
   rctx.externs = ctx->xclasses;
   rctx.rule_compiler = ctx->rule_compiler;
   rctx.new_vm_func_tbl = ctx->vm_func_tbl;
   rctx.new_vm_func_tbl_sz = ctx->vm_func_tbl_sz;
   rctx.shared_hash = new_inthash (ctx->gc_ctx, 1021);
+  rctx.forward_hash = new_inthash (ctx->gc_ctx, 1021);
   rctx.global_fields = (field_record_table_t *)restore_gc_struct (&rctx);
   if (rctx.global_fields==NULL && errno!=0) { err = errno; goto errlab; }
   if (rctx.global_fields==NULL || TYPE(rctx.global_fields)!=T_FIELD_RECORD_TABLE)
     { err = restore_badly_formatted_data (); goto errlab; }
   GC_UPDATE (ctx->gc_ctx, 0, rctx.global_fields);
   rctx.vm_func_tbl = restore_func_tbl (&rctx, &rctx.vm_func_tbl_sz);
-  if (rctx.vm_func_tbl==NULL && errno!=0) goto errlab;
+  if (rctx.vm_func_tbl==NULL && errno!=0) { err = errno; goto errlab; }
   GC_TOUCH (ctx->gc_ctx, ctx->thread_queue = (thread_queue_t *)restore_gc_struct (&rctx));
   if (ctx->thread_queue==NULL && errno!=0) { err = errno; goto errlab; }
   if (ctx->thread_queue!=NULL && TYPE(ctx->thread_queue)!=T_THREAD_QUEUE)
     { err = restore_badly_formatted_data (); ctx->thread_queue = NULL; goto errlab; }
+  err = restore_flush (&rctx);
+  if (err!=0) goto errlab;
   if (rctx.errs & RESTORE_UNKNOWN_FIELD_NAME)
     { err = restore_unknown_record_field_name (); ctx->thread_queue = NULL; goto errlab; }
   if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
@@ -744,7 +757,8 @@ int orchids_restore (orchids_t *ctx, char *name)
       case 'M': /* restore module data */
 	/* For each module, we start from an empty shared_hash table,
 	   since sharing is local to each module (or to whatever
-	   was restored before any module).
+	   was restored before any module).  forward_hash is dealt with
+	   by restore_module().
 	*/
 	clear_inthash (rctx.shared_hash, NULL);
 	err = restore_module (ctx, &rctx);
@@ -760,6 +774,8 @@ int orchids_restore (orchids_t *ctx, char *name)
     }
   if (rctx.shared_hash!=NULL)
     free_inthash (rctx.shared_hash, NULL);
+  if (rctx.forward_hash!=NULL)
+    free_inthash (rctx.forward_hash, restore_forward_free);
   funlockfile (rctx.f);
   (void) fclose (rctx.f);
  end:

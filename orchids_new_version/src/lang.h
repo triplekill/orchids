@@ -74,6 +74,10 @@
 /* not used, only as a tag in functions save_gc_struct() and related */
 #define T_SHARED_USE 126
 /* not used, only as a tag in functions save_gc_struct() and related */
+#define T_SHARED_DEF_FORWARD 125
+/* not used, only as a tag in functions save_gc_struct() and related */
+#define T_SHARED_USE_FORWARD 124
+/* not used, only as a tag in functions save_gc_struct() and related */
 
 #define T_BIND 255
 /* T_BIND is for environments; see env_bind_t in orchids.h */
@@ -938,6 +942,13 @@ ovm_var_t *ovm_release_value (gc_t *gc_ctx, ovm_var_t *env, unsigned long var);
 
 int save_gc_struct (save_ctx_t *sctx, gc_header_t *p);
 gc_header_t *restore_gc_struct (restore_ctx_t *rctx);
+
+/* To handle cycles in save/restore: */
+int save_postpone (save_ctx_t *sctx, postponed_save f, void *p);
+int save_flush (save_ctx_t *sctx);
+int restore_forward (restore_ctx_t *rctx, postponed_restore f, void *data);
+void restore_forward_free (void *e); /* passed to free_inthash() and clear_inthash on forward_hash */
+int restore_flush (restore_ctx_t *rctx);
 
 #endif /* LANG_H */
 

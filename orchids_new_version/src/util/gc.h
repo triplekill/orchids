@@ -36,10 +36,18 @@ struct gc_traverse_ctx_s {
 };
 
 typedef struct save_ctx_s save_ctx_t;
+typedef int (*postponed_save) (save_ctx_t *sctx, void *p);
+struct sctx_list_s {
+  struct sctx_list_s *next;
+  unsigned long id;
+  postponed_save f;
+  void *p;
+};
 struct save_ctx_s {
   gc_t *gc_ctx;
   FILE *f;
   unsigned long fuzz;
+  struct sctx_list_s *postponed;
 };
 
 struct strhash_s; /* in strhash.h */
@@ -50,6 +58,7 @@ struct issdl_function_s; /* in orchids.h */
 
 typedef struct restore_ctx_s restore_ctx_t;
 typedef int (*readc_f) (void *data);
+typedef int (*postponed_restore) (restore_ctx_t *rctx, void *p);
 struct restore_ctx_s {
   gc_t *gc_ctx;
   size_t version;
@@ -62,6 +71,7 @@ struct restore_ctx_s {
   int32_t vm_func_tbl_sz; /* not from orchids_context_t->vm_func_tbl_sz: this one is meant to be restored first */
   struct field_record_table_s *global_fields; /* not from orchids_context_t->global_fields: this one is meant to be restored first */
   struct inthash_s *shared_hash; /* filled in while restoring */
+  struct inthash_s *forward_hash; /* filled in while restoring */
   int32_t errs;
 #define RESTORE_UNKNOWN_FIELD_NAME 0x1
 #define RESTORE_UNKNOWN_PRIMITIVE 0x2

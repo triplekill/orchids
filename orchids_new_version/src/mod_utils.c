@@ -510,7 +510,7 @@ int blox_restore (restore_ctx_t *rctx, blox_config_t *bcfg)
 	      break;
 	    }
 	  /* The blox API usually has hook->remaining be a vstring
-	     pointed into the middle of hook->event->value,
+	     pointing into the middle of hook->event->value,
 	     but the save/restore mechanism does not keep this sharing
 	     (even if we used the estimate_sharing()/reset_sharing()
 	     mechanism).  On restoring, we may therefore use a bit more

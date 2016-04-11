@@ -987,8 +987,6 @@ int restore_string (restore_ctx_t *rctx, char **sp)
   return 0;
 }
 
-
-
 /*
 ** Copyright (c) 2014-2015 by Jean GOUBAULT-LARRECQ, Laboratoire Spécification
 ** et Vérification (LSV), CNRS UMR 8643 & ENS Cachan.

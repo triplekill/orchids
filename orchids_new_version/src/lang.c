@@ -5682,6 +5682,54 @@ int save_gc_struct (save_ctx_t *sctx, gc_header_t *p)
   return err;
 }
 
+int save_postpone (save_ctx_t *sctx, postponed_save f, void *p)
+{
+  struct sctx_list_s *l;
+  unsigned long id;
+
+  l = gc_base_malloc (sctx->gc_ctx, sizeof (struct sctx_list_s));
+  l->next = sctx->postponed;
+  l->f = f;
+  l->p = p;
+  sctx->postponed = l;
+  if (putc_unlocked (T_SHARED_USE_FORWARD, sctx->f) < 0) return errno;
+  id = ((unsigned long)p) ^ sctx->fuzz;
+  l->id = id;
+  return save_ulong (sctx, id);
+}
+
+int save_flush (save_ctx_t *sctx)
+{
+  struct sctx_list_s *l;
+  postponed_save f;
+  unsigned long id;
+  gc_header_t *p;
+  int err;
+
+  err = 0;
+  while ((l = sctx->postponed)!=NULL)
+    {
+      f = l->f;
+      p = l->p;
+      id = l->id;
+      sctx->postponed = l->next;
+      gc_base_free (l);
+      if (putc_unlocked (T_SHARED_DEF_FORWARD, sctx->f) < 0) { err = errno; goto errlab; }
+      err = save_ulong (sctx, id);
+      if (err!=0) goto errlab;
+      err = (*f) (sctx, p);
+      if (err!=0) goto errlab;
+    }
+  if (putc_unlocked (T_NOTHING, sctx->f) < 0) { err = errno; goto errlab; }
+ errlab:
+  while ((l = sctx->postponed)!=NULL)
+    {
+      sctx->postponed = l->next;
+      gc_base_free (l);
+    }
+  return err;
+}
+
 /* Before calling restore_gc_struct(), set errno=0,
    get back ctx->xclasses and put it into rctx.
 */
@@ -5695,6 +5743,59 @@ gc_header_t *restore_gc_struct (restore_ctx_t *rctx)
   if (c<0 || c>=256 || (gccl = gc_classes[c])==NULL || gccl->restore==NULL)
     { errno = restore_badly_formatted_data (); return NULL; }
   return (*gccl->restore) (rctx);
+}
+
+struct restore_forward_s {
+  postponed_restore f;
+  void *data;
+};
+  
+int restore_forward (restore_ctx_t *rctx, postponed_restore f, void *data)
+{
+  int c;
+  unsigned long id;
+  struct restore_forward_s *fwd;
+
+  c = getc_unlocked (rctx->f);
+  if (c==EOF) return c;
+  if (c!=T_SHARED_USE_FORWARD) return restore_badly_formatted_data ();
+  errno = restore_ulong (rctx, &id);
+  if (errno!=0) return errno;
+  fwd = gc_base_malloc (rctx->gc_ctx, sizeof (struct restore_forward_s));
+  fwd->f = f;
+  fwd->data = data;
+  inthash_add (rctx->gc_ctx, rctx->forward_hash, fwd, id);
+  return 0;
+}
+
+void restore_forward_free (void *e)
+{
+  gc_base_free (e);
+}
+
+int restore_flush (restore_ctx_t *rctx)
+{
+  int c;
+  unsigned long id;
+  struct restore_forward_s *fwd;
+  int err;
+
+  err = 0;
+  while (1)
+    {
+      c = getc_unlocked (rctx->f);
+      if (c==EOF) { err = c; break; }
+      if (c==T_NOTHING) break; /* finished */
+      if (c!=T_SHARED_DEF_FORWARD) { err = restore_badly_formatted_data (); break; }
+      err = restore_ulong (rctx, &id);
+      if (err!=0) break;
+      fwd = inthash_get (rctx->forward_hash, id);
+      if (fwd==NULL) { err = restore_badly_formatted_data (); break; }
+      err = (*fwd->f) (rctx, fwd->data);
+      if (err!=0) break;
+    }
+  clear_inthash (rctx->forward_hash, restore_forward_free);
+  return err;
 }
 
 /*

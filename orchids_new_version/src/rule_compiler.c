@@ -8396,12 +8396,32 @@ static int rule_sync_lock_save_walk (void *key, void *elmt, void *data)
   return err;
 }
 
+static int postponed_rule_save (save_ctx_t *sctx, void *p)
+{
+  rule_t *rule = (rule_t *)p;
+  objhash_t *sync_lock;
+  size_t n;
+  int err;
+
+  sync_lock = rule->sync_lock;
+  if (sync_lock==NULL)
+    err = save_size_t (sctx, 0);
+  else
+    {
+      n = sync_lock->elmts;
+      err = save_size_t (sctx, n);
+      if (err) return err;
+      err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
+			  (void *)sctx);
+    }
+  return err;
+}
+
 static int rule_save (save_ctx_t *sctx, gc_header_t *p)
 {
   rule_t *rule = (rule_t *)p;
   size_t i, n;
   int32_t var, nvars;
-  objhash_t *sync_lock;
   int err;
 
   err = save_string (sctx, rule->filename);
@@ -8452,18 +8472,12 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
       err = save_int32 (sctx, rule->sync_vars[var]);
       if (err) return err;
     }
-  sync_lock = rule->sync_lock;
-  if (sync_lock==NULL)
-    err = save_size_t (sctx, 0);
-  else
-    {
-      n = sync_lock->elmts;
-      err = save_size_t (sctx, n);
-      if (err) return err;
-      err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
-			  (void *)sctx);
-    }
   err = save_ulong (sctx, rule->complexity_degree);
+  if (err) return err;
+  /* Break cycles between state_instances, pids (thread_groups) and rules:
+     if there is a sync_lock table, save it later and leave a mark here,
+     tagged T_SHARED_USE_FORWARD */
+  err = save_postpone (sctx, postponed_rule_save, rule);
   /*
     if (err) return err;
     err = save_gc_struct (sctx, (gc_header_t *)rule->next);
@@ -8851,6 +8865,48 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
       }
 }
 
+static int postponed_rule_restore (restore_ctx_t *rctx, void *p)
+{
+  rule_t *rule = (rule_t *)p;
+  gc_t *gc_ctx = rctx->gc_ctx;
+  size_t i, n;
+  gc_header_t *si, *pid;
+  int err;
+
+  GC_START (gc_ctx, 2);
+  err = restore_size_t (rctx, &n);
+  if (err) goto end;
+  if (n!=0 && rule->sync_vars==0) { err = restore_badly_formatted_data (); goto end; }
+  if (rule->sync_vars!=NULL)
+    {
+      if (rule->sync_lock==NULL)
+	{
+	  rule->sync_lock = new_objhash (gc_ctx, 1021);
+	  rule->sync_lock->hash = objhash_rule_instance;
+	  rule->sync_lock->cmp = objhash_rule_instance_cmp;
+	}
+      for (i=0; i<n; i++)
+	{
+	  si = restore_gc_struct (rctx);
+	  if (si==NULL || TYPE(si)!=T_STATE_INSTANCE)
+	    { err = restore_badly_formatted_data (); goto end; }
+	  if (errno) { err = errno; goto end; }
+	  GC_UPDATE (gc_ctx, 0, si);
+	  if (objhash_get (rule->sync_lock, si)!=NULL) /* duplicate entry */
+	    { err = restore_badly_formatted_data (); goto end; }
+	  pid = restore_gc_struct (rctx);
+	  if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
+	    { err = restore_badly_formatted_data (); goto end; }
+	  if (errno) { err = errno; goto end; }
+	  GC_UPDATE (gc_ctx, 1, pid);
+	  objhash_add (gc_ctx, rule->sync_lock, pid, si);
+	}
+    }
+ end:
+  GC_END (gc_ctx);
+  return err;
+}
+
 static gc_header_t *rule_restore (restore_ctx_t *rctx)
 {
   gc_t *gc_ctx = rctx->gc_ctx;
@@ -8863,7 +8919,6 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   gc_header_t *p;
   int32_t var, nvars;
   char *s;
-  gc_header_t *si, *pid;
   int32_t save_errs;
 
   GC_START(gc_ctx, 3);
@@ -8970,39 +9025,15 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	  if (err) { rule = NULL; errno = err; goto end; }
 	}
     }
-  err = restore_size_t (rctx, &n);
-  if (err) { rule = NULL; errno = err; goto end; }
-  if (n!=0 && rule->sync_vars==0) { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
-  if (rule->sync_vars!=NULL)
-    {
-      rule->sync_lock = new_objhash (gc_ctx, 1021);
-      rule->sync_lock->hash = objhash_rule_instance;
-      rule->sync_lock->cmp = objhash_rule_instance_cmp;
-      for (i=0; i<n; i++)
-	{
-	  si = restore_gc_struct (rctx);
-	  if (si==NULL || TYPE(si)!=T_STATE_INSTANCE)
-	    { errno = restore_badly_formatted_data (); rule = NULL; goto end; }
-	  if (errno) { rule = NULL; goto end; }
-	  GC_UPDATE (gc_ctx, 1, si);
-	  if (objhash_get (rule->sync_lock, si)!=NULL) /* duplicate entry */
-	    { rule = NULL; errno = restore_badly_formatted_data (); goto end; }
-	  pid = restore_gc_struct (rctx);
-	  if (pid==NULL || TYPE(pid)!=T_THREAD_GROUP)
-	    { errno = restore_badly_formatted_data (); rule = NULL; goto end; }
-	  if (errno) { rule = NULL; goto end; }
-	  GC_UPDATE (gc_ctx, 2, pid);
-	  objhash_add (gc_ctx, rule->sync_lock, pid, si);
-	}
-    }
   err = restore_ulong (rctx, &rule->complexity_degree);
   if (err) { rule = NULL; errno = err; goto end; }
-  /*
-    p = restore_gc_struct (rctx);
-    if (p==NULL && errno!=0) { rule = NULL; goto end; }
-    rule->next = (rule_t *)p;
-    No: since we don't save the next field, don't restore it.
-  */
+
+  /* By now, rule has been restored, except for the sync_lock table, which is
+     a forward pointer. */
+  /* We first install the restored rule.  This way, rule may be changed to
+     an older rule, and we shall call restore_forward() so that it later
+     installs all need sync_lock entries directly into the old rule's sync_lock
+     table. */
   if (rctx->errs!=0)
     {
       if (rctx->errs & RESTORE_UNKNOWN_FIELD_NAME)
@@ -9013,6 +9044,16 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
     }
   else
     rule = install_restored_rule (rctx->rule_compiler, rule);
+  /* We can now call restore_forward(), so that all sync_lock entries will
+     be inserted later, directly into the right rule. */
+  err = restore_forward (rctx, postponed_rule_restore, rule);
+  if (err) { rule = NULL; errno = err; goto end; }
+  /*
+    p = restore_gc_struct (rctx);
+    if (p==NULL && errno!=0) { rule = NULL; goto end; }
+    rule->next = (rule_t *)p;
+    No: since we don't save the next field, don't restore it.
+  */
  end:
   rctx->errs = save_errs;
   GC_END (gc_ctx);
