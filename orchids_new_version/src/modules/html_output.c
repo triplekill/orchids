@@ -813,7 +813,7 @@ static int generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 	      p, r->trans_nb,
 	      p, r->static_env_sz,
 	      p, r->dynamic_env_sz,
-	      p, r->instances,
+	      p, r->thread_queue->nelts,
 	      p, r->filename, r->lineno,
 	      p, basefile);
     }

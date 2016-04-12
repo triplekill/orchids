@@ -373,9 +373,6 @@ struct state_s
 /**   @var rule_s::next
  **     Next rule in list (used for complete enumeration).
  **/
-/**   @var rule_s::instances
- **     Number of active instances of this rule.
- **/
 /**   @var rule_s::id
  **     Rule identifier.
  **/
@@ -401,8 +398,12 @@ struct rule_s
 				      be enough anyway */
   char            **var_name;
   rule_t           *next;
-  size_t            instances;
   int32_t           id;
+  unsigned long complexity_degree;
+  int32_t          *sync_vars;
+  size_t           sync_vars_sz;
+
+  /* The following are used at runtime */
   int               flags;
   /* The following two flags are taken from gc.h, and
      are only used at restore() time */
@@ -413,9 +414,7 @@ struct rule_s
 #define RULE_INITIAL_ALREADY_LAUNCHED 0x80
 
   objhash_t        *sync_lock;
-  int32_t          *sync_vars;
-  size_t           sync_vars_sz;
-  unsigned long complexity_degree;
+  struct thread_queue_s *thread_queue;
 };
 
 typedef struct env_bind_s env_bind_t;
@@ -539,6 +538,7 @@ ovm_var_t *handle_get_rd (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
 /* Get object referenced by handle --- we may write into the object */
 ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
 
+void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t *all);
 
 /* ------------------------------------------------------ */
 
@@ -1547,6 +1547,7 @@ int issdlparse(void *__compiler_ctx_g); /* really of type rule_compiler_t * */
 
 type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
 			   unsigned char tag);
+objhash_t *create_sync_lock_if_needed (gc_t *gc_ctx, rule_t *rule);
 
 /* ovm.h */
 

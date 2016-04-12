@@ -8414,6 +8414,8 @@ static int postponed_rule_save (save_ctx_t *sctx, void *p)
       err = objhash_walk (sync_lock, rule_sync_lock_save_walk,
 			  (void *)sctx);
     }
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)rule->thread_queue);
   return err;
 }
 
@@ -8457,8 +8459,6 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
       err = save_string (sctx, rule->var_name[var]);
       if (err) return err;
     }
-  err = save_size_t (sctx, rule->instances);
-  if (err) return err;
   err = save_int32 (sctx, rule->id); /* saved, but useless (will be restored, but then
 					recomputed by install_rule()) */
   if (err) return err;
@@ -8839,7 +8839,7 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
        We must decide whether it is the same rule, or a modified rule. */
     if (equal_rules (rule, oldrule))
       { /* If so, we merge the two rules, and keep the old one. */
-	oldrule->instances += rule->instances;
+	thread_enqueue_all (ctx->gc_ctx, oldrule->thread_queue, rule->thread_queue);
 	if (rule->flags & RULE_INITIAL_ALREADY_LAUNCHED)
 	  oldrule->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
 	sld.gc_ctx = ctx->gc_ctx;
@@ -8865,12 +8865,24 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
       }
 }
 
+objhash_t *create_sync_lock_if_needed (gc_t *gc_ctx, rule_t *rule)
+{
+  if (rule->sync_lock==NULL)
+    {
+      rule->sync_lock = new_objhash (gc_ctx, 1021);
+      rule->sync_lock->hash = objhash_rule_instance;
+      rule->sync_lock->cmp = objhash_rule_instance_cmp;
+      /* XXX: should dynamically resize sync_lock hash. */
+    }
+  return rule->sync_lock;
+}
+
 static int postponed_rule_restore (restore_ctx_t *rctx, void *p)
 {
   rule_t *rule = (rule_t *)p;
   gc_t *gc_ctx = rctx->gc_ctx;
   size_t i, n;
-  gc_header_t *si, *pid;
+  gc_header_t *si, *pid, *tq;
   int err;
 
   GC_START (gc_ctx, 2);
@@ -8879,12 +8891,7 @@ static int postponed_rule_restore (restore_ctx_t *rctx, void *p)
   if (n!=0 && rule->sync_vars==0) { err = restore_badly_formatted_data (); goto end; }
   if (rule->sync_vars!=NULL)
     {
-      if (rule->sync_lock==NULL)
-	{
-	  rule->sync_lock = new_objhash (gc_ctx, 1021);
-	  rule->sync_lock->hash = objhash_rule_instance;
-	  rule->sync_lock->cmp = objhash_rule_instance_cmp;
-	}
+      create_sync_lock_if_needed (gc_ctx, rule);
       for (i=0; i<n; i++)
 	{
 	  si = restore_gc_struct (rctx);
@@ -8902,6 +8909,10 @@ static int postponed_rule_restore (restore_ctx_t *rctx, void *p)
 	  objhash_add (gc_ctx, rule->sync_lock, pid, si);
 	}
     }
+  tq = restore_gc_struct (rctx);
+  if (errno) { err = errno; goto end; }
+  if (tq==NULL || TYPE(tq)!=T_THREAD_QUEUE) { err = restore_badly_formatted_data (); goto end; }
+  thread_enqueue_all (gc_ctx, rule->thread_queue, (thread_queue_t *)tq);
  end:
   GC_END (gc_ctx);
   return err;
@@ -8963,13 +8974,13 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   rule->dynamic_env_sz = 0; /* will be set below */
   rule->var_name = NULL;
   rule->next = NULL;
-  rule->instances = 0; /* will be set below */
   rule->id = 0; /* will be set below */
-  rule->flags = 0; /* will be set below */
-  rule->sync_lock = NULL;
+  rule->complexity_degree = ULONG_MAX; /* will be set below */
   rule->sync_vars = NULL;
   rule->sync_vars_sz = 0; /* will be set below */
-  rule->complexity_degree = ULONG_MAX; /* will be set below */
+  rule->flags = 0; /* will be set below */
+  rule->sync_lock = NULL;
+  rule->thread_queue = NULL;
   GC_UPDATE (gc_ctx, 0, rule);
   rule->state = gc_base_malloc (gc_ctx, nstates*sizeof(state_t));
   for (i=0; i<nstates; )
@@ -9002,8 +9013,6 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
       rule->var_name[var] = s;
       rule->dynamic_env_sz = ++var;
     }
-  err = restore_size_t (rctx, &rule->instances);
-  if (err) { rule = NULL; errno = err; goto end; }
   err = restore_int32 (rctx, &rule->id); /* restored, but this is useless: it will be
 					    recomputed by install_rule(), as called by
 					    install_restored_rule() */
@@ -9116,6 +9125,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
   rule->sync_vars_sz = 0;
+  rule->thread_queue = NULL;
   GC_UPDATE(ctx->gc_ctx, 0, rule);
   rule->complexity_degree = node_rule->complexity_degree;
 
@@ -9153,7 +9163,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   }
 
   /* Create synchronization array */
-  if (node_rule->sync_vars)
+  if (node_rule->sync_vars!=NULL)
     {
       DebugLog(DF_OLC, DS_INFO, "Creating synchronization array\n");
       rule->sync_vars_sz = node_rule->sync_vars->vars_nb;
@@ -9165,10 +9175,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
 	    get_and_check_syncvar (ctx, node_rule,
 				   node_rule->sync_vars->vars[s]);
 	}
-      rule->sync_lock = new_objhash (ctx->gc_ctx, 1021);
-      rule->sync_lock->hash = objhash_rule_instance;
-      rule->sync_lock->cmp = objhash_rule_instance_cmp;
-      /* XXX: should dynamically resize sync_lock hash. */
+      create_sync_lock_if_needed (ctx->gc_ctx, rule);
     }
 
   /* Compile init state */
@@ -10786,7 +10793,7 @@ fprintf_rule_stats(const orchids_t *ctx, FILE *fp)
       fprintf(fp, " %3i | %12.12s | %3zi | %3zi | %3zu | %3i | %3zi | %.24s:%i\n",
               rn, r->name, r->state_nb, r->trans_nb,
               r->static_env_sz, r->dynamic_env_sz,
-              r->instances, r->filename, r->lineno);
+              r->thread_queue->nelts, r->filename, r->lineno);
     }
   fprintf(fp, "-----+--------------+-----+-----+-----+-----+-----+-----------------------------\n");
 }

@@ -439,10 +439,7 @@ static state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq)
     {
       GC_TOUCH (gc_ctx, tq->first = qe->next);
       if (si!=NULL)
-	{
-	  si->pid->rule->instances--;
-	  tq->nelts--;
-	}
+	tq->nelts--;
     }
   return si;
 }
@@ -461,10 +458,7 @@ static void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *
   qe->next = NULL; /* no need to GC_TOUCH() NULL */
   GC_TOUCH (gc_ctx, qe->thread = si);
   if (si!=NULL)
-    {
-      tq->nelts++;
-      si->pid->rule->instances++;
-    }
+    tq->nelts++;
   if (THREAD_QUEUE_IS_EMPTY(tq))
     {
       GC_TOUCH (gc_ctx, tq->first = qe);
@@ -476,7 +470,7 @@ static void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *
   GC_TOUCH (gc_ctx, tq->last = qe);
 }
 
-static void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t *all)
+void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t *all)
 { /* concatenate the 'all' queue to the end of tq;
      'all' is destroyed after that;
      if last element of tq is BUMP and first element of 'all' is BUMP, remove one of
@@ -523,8 +517,8 @@ void emergency_drop_threads (orchids_t *ctx)
   rule_t *rule;
   struct rule_size_s *rule_sizes, *rs;
   size_t total_rule_sizes;
+  size_t nelts;
   int i, n;
-  int drop;
 
 #define SI_SIZE_ESTIMATE (sizeof(thread_queue_elt_t) + sizeof(state_instance_t))
   
@@ -545,23 +539,24 @@ void emergency_drop_threads (orchids_t *ctx)
       rs->allowed = ULONG_MAX;
       rs->rule = NULL;
     }
-  queue = ctx->thread_queue;
-  /* Now estimate size taken by each rule */
-  for (qe = queue->first; qe!=NULL; qe=qe->next)
+  for (rule=ctx->rule_compiler->first_rule; rule!=NULL; rule = rule->next)
     {
-      si = qe->thread;
-      if (si==NULL)
-	continue;
-      pid = si->pid;
-      rule = pid->rule;
+      i = rule->id;
       if (rule->complexity_degree==0)
 	continue; /* do not count rules with complexity degree 0: they are benign */
-      i = rule->id;
-      if (i>=0 && i<n)
+      if (i<0 || i>=n)
+	continue;
+      rs = &rule_sizes[i];
+      rs->rule = rule;
+      queue = rule->thread_queue;
+      /* Now estimate size taken by each rule */
+      for (qe = queue->first; qe!=NULL; qe=qe->next)
 	{
-	  rs = &rule_sizes[i];
+	  si = qe->thread;
+	  if (si==NULL)
+	    continue;
+	  pid = si->pid;
 	  rs->occupied += SI_SIZE_ESTIMATE;
-	  rs->rule = rule;
 	}
       /* This is conservative (too low): ignores sizes of environments (si->env),
 	 of thread_groups (si->pid), and also of overhead data structures used by
@@ -601,51 +596,52 @@ void emergency_drop_threads (orchids_t *ctx)
 		   (rs->occupied - rs->allowed)/SI_SIZE_ESTIMATE, rs->rule->name,
 		   rs->allowed/SI_SIZE_ESTIMATE);
 	}
-    }
-  last = NULL;
-  for (qe = queue->first; qe!=NULL; qe=qe->next)
-    {
-      si = qe->thread;
-      if (si==NULL)
+      queue = rule->thread_queue;
+      rs = &rule_sizes[i];
+      last = NULL;
+      nelts = 0;
+      for (qe = queue->first; qe!=NULL; qe=qe->next)
 	{
-	  if (last!=NULL && last->thread==NULL)
-	    { /* If both last and si are BUMPs, remove the second one. */
-	      GC_TOUCH (gc_ctx, last->next = qe->next);
-	      // queue->nelts--;  No, only non-BUMP threads are counted
+	  si = qe->thread;
+	  if (si==NULL)
+	    {
+	      if (last!=NULL && last->thread==NULL)
+		{ /* If both last and si are BUMPs, remove the second one. */
+		  GC_TOUCH (gc_ctx, last->next = qe->next);
+		  // queue->nelts--;  No, only non-BUMP threads are counted
+		}
+	      else
+		last = qe; /* keep BUMP threads, unless previous one
+			      was already a BUMP */
+	      continue;
 	    }
-	  else
-	    last = qe; /* keep BUMP threads, unless previous one
-			  was already a BUMP */
-	  continue;
-	}
-      pid = si->pid;
-      rule = pid->rule;
-      i = rule->id;
-      drop = 0;
-      if (i>=0 && i<n)
-	{
-	  rs = &rule_sizes[i];
 	  rs->occurs += SI_SIZE_ESTIMATE;
-	  if (rs->occurs>=rs->allowed)
-	    drop = 1;
+	  if (rs->occurs>=rs->allowed) /* drop remaining queue elements */
+	    break;
+	  nelts++;
+	  last = qe;
 	}
-      if (drop)
-	{
-	  if (last==NULL)
-	    {
-	      GC_TOUCH (gc_ctx, queue->first = qe->next);
-	    }
-	  else
-	    {
-	      GC_TOUCH (gc_ctx, last->next = qe->next);
-	    }
-	  rule->instances--;
-	  queue->nelts--;
+      /* Here qe is first queue element to drop, and last is the one before (if any). */
+      for (; qe!=NULL; qe=qe->next)
+	{ /* cleanup all state_instances that will be dropped. */
+	  si = qe->thread;
+	  if (si==NULL)
+	    continue;
 	  cleanup_state_instance (si);
+	} /* and chop off queue: */
+      if (last==NULL)
+	{
+	  queue->nelts = 0;
+	  queue->first = NULL;
+	  queue->last = NULL;
 	}
-      else last = qe;
+      else
+	{
+	  queue->nelts = nelts;
+	  GC_TOUCH (gc_ctx, queue->last = last);
+	  last->next = NULL;
+	}
     }
-  GC_TOUCH (gc_ctx, queue->last = last);
   gc_full (gc_ctx);
   gc_full (gc_ctx);
   gc_recuperate (gc_ctx);
@@ -789,7 +785,7 @@ static int enter_state_and_follow_epsilon_transitions (orchids_t *ctx,
 	     Finally, we were also checking whether the rule is actually synchronized
 	     (lock_table!=NULL), but again this will always be the case.
 	  */
-	  lock_table = si->pid->rule->sync_lock;
+	  lock_table = create_sync_lock_if_needed (gc_ctx, si->pid->rule);
 	  sync_lock = objhash_get (lock_table, si);
 	  if (sync_lock!=NULL)
 	    { /* Somebody already holds the lock. */
@@ -1017,9 +1013,8 @@ static int simulate_state_and_create_threads_verbose (orchids_t *ctx,
 						      simulate_state_and_create_threads_verbose(ctx,si,tq): \
 						      simulate_state_and_create_threads(ctx,si,tq))
 
-static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
+static void create_rule_initial_threads (orchids_t *ctx, rule_t *r, thread_queue_t *tq)
 {
-  rule_t *r;
   thread_group_t *pid;
   state_instance_t *init;
   state_t *q;
@@ -1027,37 +1022,34 @@ static void create_rule_initial_threads (orchids_t *ctx, thread_queue_t *tq)
   gc_t *gc_ctx = ctx->gc_ctx;
 
   GC_START (gc_ctx, 1);
-  for (r = ctx->rule_compiler->first_rule; r!=NULL; r = r->next)
+  if (r->flags & RULE_INITIAL_ALREADY_LAUNCHED)
+    return; /* The 'anchored' rules of the spec, that is, the rules
+	       that should start to be monitored at the very beginning,
+	       but should never be relaunched later on. */
+  pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
+  pid->gc.type = T_THREAD_GROUP;
+  GC_TOUCH (gc_ctx, pid->rule = r);
+  pid->nsi = 0;
+  pid->flags.i = 0;
+  GC_UPDATE (gc_ctx, 0, pid);
+  q = &r->state[0];
+  if (q->flags & STATE_COMMIT) /* 'anchored' rule */
+    r->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
+  init = create_state_instance (ctx, pid, q, NULL, NULL, 0, 0);
+  /* create state instance, in state q, waiting for no transition yet (NULL),
+     and with empty environment (NULL) */
+  GC_UPDATE (gc_ctx, 0, init);
+  ret = enter_state_and_follow_epsilon_transitions (ctx, init, tq, 1);
+  if (ctx->verbose>=2 && ret!=0)
     {
-      if (r->flags & RULE_INITIAL_ALREADY_LAUNCHED)
-	continue; /* The 'anchored' rules of the spec, that is, the rules
-		     that should start to be monitored at the very beginning,
-		     but should never be relaunched later on. */
-      pid = gc_alloc (gc_ctx, sizeof(thread_group_t), &thread_group_class);
-      pid->gc.type = T_THREAD_GROUP;
-      GC_TOUCH (gc_ctx, pid->rule = r);
-      pid->nsi = 0;
-      pid->flags.i = 0;
-      GC_UPDATE (gc_ctx, 0, pid);
-      q = &r->state[0];
-      if (q->flags & STATE_COMMIT) /* 'anchored' rule */
-	r->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
-      init = create_state_instance (ctx, pid, q, NULL, NULL, 0, 0);
-      /* create state instance, in state q, waiting for no transition yet (NULL),
-	 and with empty environment (NULL) */
-      GC_UPDATE (gc_ctx, 0, init);
-      ret = enter_state_and_follow_epsilon_transitions (ctx, init, tq, 1);
-      if (ctx->verbose>=2 && ret!=0)
-	{
-	  fprintf (stderr, "+ %s: %c> ", r->name, (init->q==q)?'-':'~');
-	  if (init->q->name!=NULL)
-	    fprintf (stderr, "%s", init->q->name);
-	  else fprintf (stderr, "(line %d)", init->q->line);
-	  if (ctx->verbose>=3)
-	    fprintf (stderr, " [grp=%c]", pid_code (pid));
-	  fprintf (stderr, "\n");
-	  fprintf_env (stderr, ctx, init->q->rule, init->env, NULL, "  - ", "\n");
-	}
+      fprintf (stderr, "+ %s: %c> ", r->name, (init->q==q)?'-':'~');
+      if (init->q->name!=NULL)
+	fprintf (stderr, "%s", init->q->name);
+      else fprintf (stderr, "(line %d)", init->q->line);
+      if (ctx->verbose>=3)
+	fprintf (stderr, " [grp=%c]", pid_code (pid));
+      fprintf (stderr, "\n");
+      fprintf_env (stderr, ctx, init->q->rule, init->env, NULL, "  - ", "\n");
     }
   GC_END (gc_ctx);
 }
@@ -1085,10 +1077,14 @@ static void engine_activity_monitor (orchids_t *ctx, state_instance_t *si, struc
 
 static void collect_actmon (orchids_t *ctx, struct engine_actmon_s *monp)
 {
-  thread_queue_elt_t *qe = ctx->thread_queue->first;
+  rule_t *rule;
+  thread_queue_elt_t *qe;
 
-  for (; qe!=NULL; qe=qe->next)
-    engine_activity_monitor (ctx, qe->thread, monp);
+  for (rule=ctx->rule_compiler->first_rule; rule!=NULL; rule=rule->next)
+    {
+      for (qe = rule->thread_queue->first; qe!=NULL; qe=qe->next)
+	engine_activity_monitor (ctx, qe->thread, monp);
+    }
 }
 
 static void fprintf_actmon (FILE *f, struct engine_actmon_s *monp)
@@ -1146,6 +1142,7 @@ void inject_event(orchids_t *ctx, event_t *event)
   state_instance_t *si;
   struct engine_actmon_s actmon;
   thread_group_t *pid;
+  rule_t *rule;
 
   GC_TOUCH (gc_ctx, ctx->current_event = event);
   ctx->events++;
@@ -1163,12 +1160,14 @@ void inject_event(orchids_t *ctx, event_t *event)
     GC_TOUCH (gc_ctx, fields[e->field_id].val = e->value);
 
   GC_START (gc_ctx, 4);
-  new_queue = new_thread_queue (gc_ctx);
-  GC_UPDATE (gc_ctx, 0, new_queue);
-  unsorted = new_thread_queue (gc_ctx);
-  GC_UPDATE (gc_ctx, 1, unsorted);
-  next = new_thread_queue (gc_ctx);
-  GC_UPDATE (gc_ctx, 2, next);
+  for (rule=ctx->rule_compiler->first_rule; rule!=NULL; rule=rule->next)
+    {
+      new_queue = new_thread_queue (gc_ctx);
+      GC_UPDATE (gc_ctx, 0, new_queue);
+      unsorted = new_thread_queue (gc_ctx);
+      GC_UPDATE (gc_ctx, 1, unsorted);
+      next = new_thread_queue (gc_ctx);
+      GC_UPDATE (gc_ctx, 2, next);
 
 #define BUMP() do {						   \
     thread_enqueue_all (gc_ctx, new_queue, unsorted);		   \
@@ -1177,30 +1176,31 @@ void inject_event(orchids_t *ctx, event_t *event)
     thread_enqueue (gc_ctx, new_queue, NULL); /* enqueue 'BUMP' */ \
   } while(0)
 
-  old_queue = ctx->thread_queue;
-  if (old_queue!=NULL)
-    {
-      while (!THREAD_QUEUE_IS_EMPTY(old_queue))
+      old_queue = rule->thread_queue;
+      if (old_queue!=NULL)
 	{
-	  si = thread_dequeue (gc_ctx, old_queue);
-	  GC_UPDATE (gc_ctx, 3, si);
-	  if (si==NULL) /* This is a BUMP */
+	  while (!THREAD_QUEUE_IS_EMPTY(old_queue))
 	    {
-	      BUMP();
-	      continue;
+	      si = thread_dequeue (gc_ctx, old_queue);
+	      GC_UPDATE (gc_ctx, 3, si);
+	      if (si==NULL) /* This is a BUMP */
+		{
+		  BUMP();
+		  continue;
+		}
+	      pid = si->pid;
+	      if (SI_AGE(si)!=THREAD_AGE(pid))
+		continue; /* This si is killed.  No need to cleanup_instance(): this would not do
+			     anything anyway. */
+	      (void) SIMULATE_STATE_AND_CREATE_THREADS (ctx, si, unsorted);
 	    }
-	  pid = si->pid;
-	  if (SI_AGE(si)!=THREAD_AGE(pid))
-	    continue; /* This si is killed.  No need to cleanup_instance(): this would not do
-			 anything anyway. */
-	  (void) SIMULATE_STATE_AND_CREATE_THREADS (ctx, si, unsorted);
 	}
-    }
-  BUMP();
-  create_rule_initial_threads (ctx, new_queue);
-  BUMP();
+      BUMP();
+      create_rule_initial_threads (ctx, rule, new_queue);
+      BUMP();
 
-  GC_TOUCH (gc_ctx, ctx->thread_queue = new_queue);
+      GC_TOUCH (gc_ctx, rule->thread_queue = new_queue);
+    }
   GC_END (gc_ctx);
 
   execute_post_inject_hooks(ctx, event);

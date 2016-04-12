@@ -511,7 +511,7 @@ static int save_func_tbl (save_ctx_t *sctx, issdl_function_t *functbl, int32_t n
 }
 
 static char save_magic[] = "0RXZ";
-#define ORCHIDS_SAVE_VERSION 6
+#define ORCHIDS_SAVE_VERSION 7
 
 int orchids_save (orchids_t *ctx, char *name)
 {
