@@ -60,7 +60,7 @@ static int period_htmloutput(orchids_t *ctx, mod_entry_t *mod,
 	  "<a href=\"orchids-period.html\" "
           "target=\"main\">Periods</a><br/>\n");
 
-  fp = create_html_file(htmlcfg, "orchids-period.html", NO_CACHE);
+  fp = create_html_file (ctx, htmlcfg, "orchids-period.html", NO_CACHE);
   if (fp==NULL)
     return -1;
   fprintf_html_header(fp, "Orchids frequencies / phase tables");

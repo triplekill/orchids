@@ -79,7 +79,7 @@ static int create_sockunix_socket(const char *path)
         // was: sizeof(sunx.sun_family) + strlen(sunx.sun_path)); // jgl, 30 mai 2012
 
   Xchmod(path, 0666);
-  // Xconnect(fd, (struct sockaddr *)&sunx, len); // was added by jgl, but does not seen necessary
+  // Xconnect(fd, (struct sockaddr *)&sunx, len); // was added by jgl, but does not seem necessary
 
   return fd;
 }
@@ -145,14 +145,17 @@ static void add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t
   ovm_var_t *var;
   size_t len;
   int sd;
+  char *s;
 
   DebugLog(DF_MOD, DS_INFO, "Add unix socket port [%s]\n", dir->args);
 
-  sd = create_sockunix_socket(dir->args);
+  s = adjust_path (ctx, dir->args);
+  sd = create_sockunix_socket(s);
   GC_START(ctx->gc_ctx, 1);
-  len = strlen(dir->args);
+  len = strlen(s);
   var = ovm_str_new (ctx->gc_ctx, len);
-  memcpy (STR(var), dir->args, len);
+  memcpy (STR(var), s, len);
+  gc_base_free (s);
   GC_UPDATE(ctx->gc_ctx, 0, var);
   add_input_descriptor(ctx, mod, sockunix_callback, sd, (void *)var);
   GC_END(ctx->gc_ctx);

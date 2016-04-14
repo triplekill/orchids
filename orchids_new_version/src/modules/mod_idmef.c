@@ -621,17 +621,24 @@ static void dir_set_analyzer_info(orchids_t *ctx, mod_entry_t *mod, config_direc
 static void dir_set_report_dir(orchids_t *ctx, mod_entry_t *mod,
 			       config_directive_t *dir)
 {
-  idmef_cfg_t*	cfg = mod->config;
-  struct stat	s;
+  idmef_cfg_t* cfg = mod->config;
+  struct stat s;
+  char *path;
 
-  Xstat(dir->args, &s);
-
+  path = adjust_path (ctx, dir->args);
+  if (stat(path, &s) < 0)
+    {
+      fprintf (stderr, "IDMEFOutputDir: cannot find '%s'.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
   if (!(s.st_mode & S_IFDIR))
-  {
-    DebugLog(DF_MOD, DS_ERROR, "%s is not a directory\n", dir->args);
-    exit(EXIT_FAILURE);
-  }
-  cfg->report_dir = dir->args;
+    {
+      fprintf (stderr, "IDMEFOutputDir: '%s' is not a directory.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  cfg->report_dir = path;
 }
 
 static mod_cfg_cmd_t idmef_cfgcmds[] = {

@@ -306,7 +306,7 @@ static void add_input_binfile(orchids_t *ctx, mod_entry_t *mod, config_directive
       fflush (stderr);
       exit (EXIT_FAILURE);
     }
-  if (realpath(filename, filepath)==NULL)
+  if (orchids_realpath (ctx, filename, filepath)==NULL)
     {
       fprintf (stderr, "%s:%u: could not find real path of file '%s'\n",
 	       dir->file, dir->line, dir->args);

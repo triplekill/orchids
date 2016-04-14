@@ -87,7 +87,7 @@ extern input_module_t mod_sockunix;
  ** @return                 RETURN_SUCCESS in case of success, an error code
  **                         otherwise.
  **/
-static int build_config_tree(gc_t *gc_ctx,
+static int build_config_tree(orchids_t *ctx,
 			     const char *config_filepath,
 			     config_directive_t **root);
 
@@ -114,7 +114,7 @@ static void proceed_config_tree(orchids_t *ctx);
  **                   being parsed.
  ** @return           RETURN_SUCCESS on success, an error code otherwise.
  **/
-static int build_config_tree_sub(gc_t *gc_ctx,
+static int build_config_tree_sub(orchids_t *ctx,
 				 FILE *fp,
 				 config_directive_t **sect_root,
 				 config_directive_t *parent,
@@ -186,7 +186,7 @@ static config_directive_t *get_last_dir(config_directive_t *list);
  ** @return        RETURN_SUCCESS on success.  On error, the return error
  **                code of build_config_tree().
  **/
-static int proceed_includes(gc_t *gc_ctx,
+static int proceed_includes(orchids_t *ctx,
 			    char *pattern, config_directive_t **root,
 			    config_directive_t **last);
 
@@ -368,7 +368,7 @@ void proceed_pre_config(orchids_t *ctx)
 //gc_check(ctx->gc_ctx);
   if (ctx->off_line_mode == MODE_ONLINE)
     {
-      build_config_tree(ctx->gc_ctx, ctx->config_file, &ctx->cfg_tree);
+      build_config_tree(ctx, ctx->config_file, &ctx->cfg_tree);
       proceed_config_tree(ctx);
     }
   else
@@ -415,7 +415,7 @@ void proceed_pre_config(orchids_t *ctx)
            (diff_time.tv_sec * 1000) + (diff_time.tv_usec) / 1000);
 }
 
-static int build_config_tree(gc_t *gc_ctx,
+static int build_config_tree(orchids_t *ctx,
 			     const char *config_filepath,
 			     config_directive_t **root)
 {
@@ -424,7 +424,7 @@ static int build_config_tree(gc_t *gc_ctx,
 
   fp = Xfopen(config_filepath, "r");
   line = 0;
-  return build_config_tree_sub(gc_ctx, fp, root, NULL, config_filepath, &line);
+  return build_config_tree_sub(ctx, fp, root, NULL, config_filepath, &line);
 }
 
 static config_directive_t *get_last_dir(config_directive_t *list)
@@ -436,27 +436,29 @@ static config_directive_t *get_last_dir(config_directive_t *list)
   return list;
 }
 
-static int proceed_includes(gc_t *gc_ctx,
+static int proceed_includes(orchids_t *ctx,
 			    char *pattern, config_directive_t **root,
 			    config_directive_t **last)
 {
   int ret;
   int i;
+  char *s;
   glob_t globbuf;
   config_directive_t *new_root;
 
   DebugLog(DF_CORE, DS_DEBUG, "Include config file pattern '%s'\n", pattern);
 
-  ret = glob(pattern, 0, NULL, &globbuf);
-  //gc_check(gc_ctx);
+  s = adjust_path (ctx, pattern);
+  ret = glob(s, 0, NULL, &globbuf);
+  gc_base_free (s);
   if (ret)
     {
       if (ret == GLOB_NOMATCH)
 	fprintf(stderr,
-		"WARNING: no match found for 'Include %s'\n", pattern);
+		"Warning: no match found for 'Include %s'\n", pattern);
       else
 	fprintf(stderr,
-		"WARNING: glob() error.\n");
+		"Warning: glob() error: %s.\n", strerror(errno));
     }
 
   for (i = 0; i < globbuf.gl_pathc; i++)
@@ -464,7 +466,7 @@ static int proceed_includes(gc_t *gc_ctx,
       DebugLog(DF_CORE, DS_DEBUG, "Include config file '%s'\n",
 	       globbuf.gl_pathv[i]);
       new_root = NULL;
-      ret = build_config_tree(gc_ctx, globbuf.gl_pathv[i], &new_root);
+      ret = build_config_tree(ctx, globbuf.gl_pathv[i], &new_root);
       if (ret)
 	return ret;
       if (new_root == NULL)
@@ -480,13 +482,14 @@ static int proceed_includes(gc_t *gc_ctx,
 }
 
 
-static int build_config_tree_sub(gc_t *gc_ctx,
+static int build_config_tree_sub(orchids_t *ctx,
 				 FILE *fp,
 				 config_directive_t **sect_root,
 				 config_directive_t *parent,
 				 const char *file,
 				 int *lineno)
 {
+  gc_t *gc_ctx = ctx->gc_ctx;
   char line[LINE_MAX];
   char *directive;
   char *arguments;
@@ -541,7 +544,7 @@ static int build_config_tree_sub(gc_t *gc_ctx,
 	    last_dir = new_dir;
 
 	    /* Read section recursively */
-	    ret = build_config_tree_sub(gc_ctx, fp,
+	    ret = build_config_tree_sub(ctx, fp,
 					&new_dir->first_child,
 					new_dir,
 					file,
@@ -551,9 +554,9 @@ static int build_config_tree_sub(gc_t *gc_ctx,
 	    continue;
 	  }
 	else if (parent!=NULL
-		 && !strncmp(directive + 2,
-			     parent->directive + 1,
-			     len - 3))
+		 && strncmp(directive + 2,
+			    parent->directive + 1,
+			    len - 3)==0)
 	  {
 	    /* close a section */
 	    return RETURN_SUCCESS;
@@ -567,9 +570,9 @@ static int build_config_tree_sub(gc_t *gc_ctx,
 	  }
     }
 
-    if (!strcmp("Include", directive))
+    if (strcmp("Include", directive)==0)
       {
-	proceed_includes(gc_ctx, arguments, sect_root, &last_dir);
+	proceed_includes(ctx, arguments, sect_root, &last_dir);
       }
     else
       {
@@ -772,7 +775,7 @@ static void add_rule_file(orchids_t *ctx, mod_entry_t *mod,
   DebugLog(DF_CORE, DS_INFO, "Adding rule file %s\n", dir->args);
 
   rulefile = Xmalloc(sizeof (rulefile_t));
-  rulefile->name = dir->args;
+  rulefile->name = adjust_path (ctx, dir->args);
   rulefile->next = NULL;
 
   if (ctx->rulefile_list == NULL)
@@ -794,10 +797,13 @@ static void add_rule_files(orchids_t *ctx, mod_entry_t *mod,
   int ret;
   int i;
   glob_t globbuf;
+  char *pattern;
 
   DebugLog(DF_CORE, DS_INFO, "Adding rule files '%s'\n", dir->args);
 
-  ret = glob(dir->args, 0, NULL, &globbuf);
+  pattern = adjust_path (ctx, dir->args);
+  ret = glob(pattern, 0, NULL, &globbuf);
+  gc_base_free (pattern);
   if (ret)
     {
       if (ret == GLOB_NOMATCH)
@@ -989,16 +995,21 @@ static void add_preproc_cmd(orchids_t *ctx, mod_entry_t *mod,
 static void set_modules_dir(orchids_t *ctx, mod_entry_t *mod,
 			    config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "Setting module directory to '%s'\n", dir->args);
-  ctx->modules_dir = dir->args;
+  char *s;
+
+  s = adjust_path (ctx, dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting module directory to '%s'\n", s);
+  ctx->modules_dir = s;
 }
 
 static void set_lock_file(orchids_t *ctx, mod_entry_t *mod,
 			  config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "Setting lock file to '%s'\n", dir->args);
+  char *s;
 
-  ctx->lockfile = dir->args;
+  s = adjust_path (ctx, dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting lock file to '%s'\n", s);
+  ctx->lockfile = s;
 }
 
 static void set_max_memory_limit(orchids_t *ctx, mod_entry_t *mod,
@@ -1066,8 +1077,11 @@ static void set_resolve_ip(orchids_t *ctx, mod_entry_t *mod,
 static void set_save_file (orchids_t *ctx, mod_entry_t *mod,
 			   config_directive_t *dir)
 {
-  DebugLog(DF_CORE, DS_INFO, "Setting save file to '%s'\n", dir->args);
-  ctx->save_file = dir->args;
+  char *s;
+
+  s = adjust_path (ctx, dir->args);
+  DebugLog(DF_CORE, DS_INFO, "Setting save file to '%s'\n", s);
+  ctx->save_file = s;
 }
 
 static void set_save_interval (orchids_t *ctx, mod_entry_t *mod,
@@ -1354,7 +1368,7 @@ static mod_cfg_cmd_t config_dir_g[] =
   { "LoadModule" , config_load_module, "Load a shared object module"},
   { "<module"   , module_config  , "Configuration section for a module" },
   { "AddRuleFile", add_rule_file , "Add a rule file" },
-  { "AddRuleFiles", add_rule_files , "Add a rule files with a pattern" },
+  { "AddRuleFiles", add_rule_files , "Add rule files with a pattern" },
   { "RuntimeUser", set_runtime_user, "Set the runtime user." },
 #ifdef OBSOLETE
   { "SetDefaultPreprocessorCmd", set_default_preproc_cmd, "Set the preprocessor command" },

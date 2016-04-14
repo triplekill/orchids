@@ -721,7 +721,7 @@ static int iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
       DebugLog(DF_MOD, DS_ERROR, strerror(errno));
       return 0;
     }
-  fp = create_html_file(htmlcfg, "orchids-iodef.html", NO_CACHE);
+  fp = create_html_file (ctx, htmlcfg, "orchids-iodef.html", NO_CACHE);
   if (fp==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, "Cannot open file orchids-iodef.html\n");
@@ -777,20 +777,48 @@ static int iodef_htmloutput(orchids_t *ctx, mod_entry_t *mod, FILE *menufp,
 static void set_iodef_conf_dir(orchids_t *ctx, mod_entry_t *mod,
 			       config_directive_t *dir)
 {
-  iodef_cfg_t *cfg;
+  iodef_cfg_t *cfg = (iodef_cfg_t *)mod->config;
+  struct stat s;
+  char *path;
 
-  cfg = (iodef_cfg_t *)mod->config;
-  cfg->iodef_conf_dir = gc_strdup(ctx->gc_ctx, dir->args);
+  path = adjust_path (ctx, dir->args);
+  if (stat(path, &s) < 0)
+    {
+      fprintf (stderr, "IODEFTemplatesDir: cannot find '%s'.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  if (!(s.st_mode & S_IFDIR))
+    {
+      fprintf (stderr, "IODEFTemplatesDir: '%s' is not a directory.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  cfg->iodef_conf_dir = path;
   cfg->iodef_conf_dir_len = strlen(cfg->iodef_conf_dir);
 }
 
 static void set_report_dir(orchids_t *ctx, mod_entry_t *mod,
 			   config_directive_t *dir)
 {
-  iodef_cfg_t *cfg;
+  iodef_cfg_t *cfg = (iodef_cfg_t *)mod->config;
+  struct stat s;
+  char *path;
 
-  cfg = (iodef_cfg_t *)mod->config;
-  cfg->report_dir = gc_strdup(ctx->gc_ctx, dir->args);
+  path = adjust_path (ctx, dir->args);
+  if (stat(path, &s) < 0)
+    {
+      fprintf (stderr, "IODEFOutputDir: cannot find '%s'.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  if (!(s.st_mode & S_IFDIR))
+    {
+      fprintf (stderr, "IODEFOutputDir: '%s' is not a directory.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  cfg->report_dir = path;
 }
 
 static void set_csirt_name(orchids_t *ctx, mod_entry_t *mod,

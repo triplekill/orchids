@@ -8162,6 +8162,7 @@ static void rule_mark_subfields (gc_t *gc_ctx, gc_header_t *p)
 			   rule_sync_lock_mark_walk,
 			   (void *)gc_ctx);
     }
+  GC_TOUCH (gc_ctx, rule->thread_queue);
 }
 
 static void transition_finalize (transition_t *trans)
@@ -8280,6 +8281,9 @@ static int rule_traverse (gc_traverse_ctx_t *gtc, gc_header_t *p,
 			  rule_traverse_hash_walk_func,
 			  (void *)&walk_data);
     }
+  if (err)
+    return err;
+  err = (*do_subfield) (gtc, (gc_header_t *)rule->thread_queue, data);
   return err;
 }
 
@@ -8476,14 +8480,11 @@ static int rule_save (save_ctx_t *sctx, gc_header_t *p)
   if (err) return err;
   /* Break cycles between state_instances, pids (thread_groups) and rules:
      if there is a sync_lock table, save it later and leave a mark here,
-     tagged T_SHARED_USE_FORWARD */
+     tagged T_SHARED_USE_FORWARD;
+     similarly, thread_queue will be saved later. */
   err = save_postpone (sctx, postponed_rule_save, rule);
-  /*
-    if (err) return err;
-    err = save_gc_struct (sctx, (gc_header_t *)rule->next);
-    No: do not save rule->next; this is only used to traverse
-    the first_rule list in the compiler context.
-  */
+  if (err) return err;
+  err = save_gc_struct (sctx, (gc_header_t *)rule->next);
   return err;
 }
 
@@ -8820,12 +8821,39 @@ static int do_merge_sync_lock (void *key, void *elmt, void *data)
   return 0;
 }
 
-static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
+static thread_queue_t *merge_thread_queues (gc_t *gc_ctx, rule_t *rule, thread_queue_t *tq)
+{
+  state_instance_t *si;
+  thread_group_t *pid;
+  thread_queue_elt_t *qe;
+  thread_queue_t *oldtq;
+
+  for (qe=tq->first; qe!=NULL; qe=qe->next)
+    {
+      si = qe->thread;
+      if (si==NULL)
+	continue;
+      pid = si->pid;
+      GC_TOUCH (gc_ctx, pid->rule = rule);
+    }
+  thread_enqueue_all (gc_ctx, tq, rule->thread_queue);
+  /* concatenate tq *before* rule-thread_queue:
+     rule is typically a rule that we have just created,
+     and tq is a restored rule's thread_queue, hence older.
+     In practice, this does not make a difference, since rule->thread_queue
+     will typically be empty. */
+  oldtq = rule->thread_queue; /* this is now an empty queue */
+  GC_TOUCH (gc_ctx, rule->thread_queue = tq);
+  return oldtq;
+}
+
+rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
 {
   rule_t *oldrule;
   size_t number = 1;
   char *s, *start, *newname;
   struct merge_sync_lock_data sld;
+  thread_queue_t *oldtq;
 
  again:
   oldrule = strhash_get (ctx->rulenames_hash, rule->name);
@@ -8839,7 +8867,11 @@ static rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule)
        We must decide whether it is the same rule, or a modified rule. */
     if (equal_rules (rule, oldrule))
       { /* If so, we merge the two rules, and keep the old one. */
-	thread_enqueue_all (ctx->gc_ctx, oldrule->thread_queue, rule->thread_queue);
+	oldtq = merge_thread_queues (ctx->gc_ctx, oldrule, rule->thread_queue);
+	GC_TOUCH (ctx->gc_ctx, rule->thread_queue = oldtq); /* install (empty) queue into
+							       obsolete rule->thread_queue;
+							       this should be unnecessary,
+							       as rule with be thrown away */
 	if (rule->flags & RULE_INITIAL_ALREADY_LAUNCHED)
 	  oldrule->flags |= RULE_INITIAL_ALREADY_LAUNCHED;
 	sld.gc_ctx = ctx->gc_ctx;
@@ -8912,7 +8944,7 @@ static int postponed_rule_restore (restore_ctx_t *rctx, void *p)
   tq = restore_gc_struct (rctx);
   if (errno) { err = errno; goto end; }
   if (tq==NULL || TYPE(tq)!=T_THREAD_QUEUE) { err = restore_badly_formatted_data (); goto end; }
-  thread_enqueue_all (gc_ctx, rule->thread_queue, (thread_queue_t *)tq);
+  GC_TOUCH (gc_ctx, rule->thread_queue = (thread_queue_t *)tq);
  end:
   GC_END (gc_ctx);
   return err;
@@ -9037,8 +9069,8 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
   err = restore_ulong (rctx, &rule->complexity_degree);
   if (err) { rule = NULL; errno = err; goto end; }
 
-  /* By now, rule has been restored, except for the sync_lock table, which is
-     a forward pointer. */
+  /* By now, rule has been restored, except for the sync_lock table and for
+     thread_queue, which are forward pointers. */
   /* We first install the restored rule.  This way, rule may be changed to
      an older rule, and we shall call restore_forward() so that it later
      installs all need sync_lock entries directly into the old rule's sync_lock
@@ -9051,18 +9083,17 @@ static gc_header_t *rule_restore (restore_ctx_t *rctx)
 	rule->flags |= RESTORE_UNKNOWN_PRIMITIVE;
       /* And do not install the restored rule */
     }
+  /*
   else
     rule = install_restored_rule (rctx->rule_compiler, rule);
-  /* We can now call restore_forward(), so that all sync_lock entries will
-     be inserted later, directly into the right rule. */
+  */
+  /* We can now call restore_forward(), so that all sync_lock entries
+     and thread_queue will be inserted later, directly into the right rule. */
   err = restore_forward (rctx, postponed_rule_restore, rule);
   if (err) { rule = NULL; errno = err; goto end; }
-  /*
-    p = restore_gc_struct (rctx);
-    if (p==NULL && errno!=0) { rule = NULL; goto end; }
-    rule->next = (rule_t *)p;
-    No: since we don't save the next field, don't restore it.
-  */
+  p = restore_gc_struct (rctx);
+  if (p==NULL && errno!=0) { rule = NULL; goto end; }
+  rule->next = (rule_t *)p;
  end:
   rctx->errs = save_errs;
   GC_END (gc_ctx);
@@ -9085,6 +9116,7 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   int32_t tid;
   struct stat filestat;
   node_expr_t *l;
+  thread_queue_t *tq;
 
   DebugLog(DF_OLC, DS_INFO,
            "----- compiling rule \"%s\" (from file %s:%i) -----\n",
@@ -9125,9 +9157,11 @@ void compile_and_add_rule_ast(rule_compiler_t *ctx, node_rule_t *node_rule)
   rule->sync_lock = NULL;
   rule->sync_vars = NULL;
   rule->sync_vars_sz = 0;
-  rule->thread_queue = NULL;
+  rule->thread_queue = NULL; /* for now */
   GC_UPDATE(ctx->gc_ctx, 0, rule);
   rule->complexity_degree = node_rule->complexity_degree;
+  tq = new_thread_queue (ctx->gc_ctx);
+  GC_TOUCH (ctx->gc_ctx, rule->thread_queue = tq);
 
   rule->filename = gc_strdup (ctx->gc_ctx, node_rule->real_file);
   rule->file_mtime = filestat.st_mtime;

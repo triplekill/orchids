@@ -538,7 +538,14 @@ ovm_var_t *handle_get_rd (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
 /* Get object referenced by handle --- we may write into the object */
 ovm_var_t *handle_get_wr (gc_t *gc_ctx, state_instance_t *si, uint16_t k);
 
+thread_queue_t *new_thread_queue (gc_t *gc_ctx);
+void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *si);
 void thread_enqueue_all (gc_t *gc_ctx, thread_queue_t *tq, thread_queue_t *all);
+ /* thread_enqueue_all(): concatenate the 'all' queue to the end of tq;
+    'all' is destroyed after that;
+    if last element of tq is BUMP and first element of 'all' is BUMP, remove one of
+    them */
+state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq);
 
 /* ------------------------------------------------------ */
 
@@ -1137,6 +1144,7 @@ struct orchids_s
   ovm_var_t *zero;
   ovm_var_t *minusone;
   ovm_var_t *empty_string;
+  char *orchids_app_path;
   timeval_t    start_time;
   char        *config_file;
   mod_entry_t  mods[MAX_MODULES];
@@ -1170,7 +1178,6 @@ struct orchids_s
   bool_t              daemon;
   bool_t              actmon;
 
-  struct thread_queue_s *thread_queue;
   event_t *current_event;
 
   timeval_t  preconfig_time;
@@ -1548,6 +1555,7 @@ int issdlparse(void *__compiler_ctx_g); /* really of type rule_compiler_t * */
 type_t *stype_from_string (gc_t *gc_ctx, char *type_name, int forcenew,
 			   unsigned char tag);
 objhash_t *create_sync_lock_if_needed (gc_t *gc_ctx, rule_t *rule);
+rule_t *install_restored_rule (rule_compiler_t *ctx, rule_t *rule);
 
 /* ovm.h */
 
@@ -1720,6 +1728,9 @@ register_core_functions(orchids_t *ctx);
 #endif /* DEBUG */
 
 /* In orchids_api.c: */
+char *adjust_path (orchids_t *ctx, char *path); /* expand initial ':' if necessary */
+char *orchids_realpath (orchids_t *ctx, char *file_name,
+			char *resolved_name);
 event_t *new_event (gc_t *gc_ctx, int32_t field_id, ovm_var_t *val,
 		    event_t *event);
 

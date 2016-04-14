@@ -5409,9 +5409,14 @@ void register_lang_function(orchids_t *ctx,
   issdl_function_t *f;
   size_t array_size;
 
+#ifdef OBSOLETE
+  /* Do not use DebugLog(), as register_lang_function() can be called
+     from register_core_functions(), itself called from orchids_new_context(),
+     which will run while the debuglog facility has not been installed. */
   DebugLog(DF_ENG, DS_INFO,
            "Registering language function %s/%i @ %p\n",
            name, arity, func);
+#endif
   array_size = (ctx->vm_func_tbl_sz + 1) * sizeof (issdl_function_t);
   ctx->vm_func_tbl = gc_base_realloc (ctx->gc_ctx,
 				      ctx->vm_func_tbl, array_size);

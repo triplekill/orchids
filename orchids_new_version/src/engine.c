@@ -386,7 +386,15 @@ static gc_header_t *thread_queue_restore (restore_ctx_t *rctx)
       last = NULL;
       n = 0;
     }
-  else for (n=1, last=qe; (next = last->next)!=NULL; last=next);
+  else
+    {
+      n = 0;
+      if (qe->thread!=NULL)
+	n++;
+      for (last=qe; (next = last->next)!=NULL; last=next)
+	if (next->thread!=NULL)
+	  n++;
+    }
   tq = gc_alloc (gc_ctx, sizeof(thread_queue_t), &thread_queue_class);
   tq->gc.type = T_THREAD_QUEUE;
   GC_TOUCH (gc_ctx, tq->first = qe);
@@ -406,7 +414,7 @@ gc_class_t thread_queue_class = {
   thread_queue_restore
 };
 
-static thread_queue_t *new_thread_queue (gc_t *gc_ctx)
+thread_queue_t *new_thread_queue (gc_t *gc_ctx)
 {
   thread_queue_t *tq;
 
@@ -420,7 +428,7 @@ static thread_queue_t *new_thread_queue (gc_t *gc_ctx)
 
 #define THREAD_QUEUE_IS_EMPTY(tq) ((tq)->first==NULL)
 
-static state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq)
+state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq)
 { /* tq should not be empty here,
      in the sense that THREAD_QUEUE_IS_EMPTY(tq) should be false */
   thread_queue_elt_t *qe, *last;
@@ -444,7 +452,7 @@ static state_instance_t *thread_dequeue (gc_t *gc_ctx, thread_queue_t *tq)
   return si;
 }
 
-static void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *si)
+void thread_enqueue (gc_t *gc_ctx, thread_queue_t *tq, state_instance_t *si)
 { /* add si to the end of queue tq,
      unless si==NULL (BUMP) and last element of tq is already BUMP */
   thread_queue_elt_t *qe;

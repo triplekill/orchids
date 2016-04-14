@@ -42,9 +42,5 @@ orchidsconfd_DATA =         \
 
 
 %.conf: $(srcdir)/%.conf.dist $(srcdir)/../../config.log
-	sed -e 's#@@VARDIR@@#$(localstatedir)#g' \
-            -e 's#@@ETCDIR@@#$(sysconfdir)#g' \
-            -e 's#@@LIBDIR@@#$(libdir)#g' \
-            -e 's#@@RUNUSER@@#$(ORCHIDS_RUNTIME_USER)#g' \
-           $< \
-           > $@
+	source ../distpatch.sh ${prefix} $(localstatedir) $(sysconfdir) $(libdir) $(ORCHIDS_RUNTIME_USER) \
+	$<  >  $@

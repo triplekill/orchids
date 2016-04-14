@@ -58,62 +58,23 @@ struct html_output_cfg_s
   char* report_prefix;
 };
 
-
-
-void
-html_output_add_menu_entry(orchids_t *ctx,
-			   mod_entry_t *mod,
-			   mod_htmloutput_t outputfunc);
-
-
-int
-rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he);
-
-
-int
-rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he);
-
-void
-html_output_preconfig(orchids_t *ctx);
-
-void
-html_output_postconfig(orchids_t *ctx, html_output_cfg_t  *cfg);
-
-void
-html_output(orchids_t *ctx, html_output_cfg_t  *cfg);
-
-FILE *
-create_html_file(html_output_cfg_t  *cfg, char *file, int cache);
-
-int
-cached_html_file(html_output_cfg_t  *cfg, char *file);
-
-
-void
-fprintf_html_header(FILE *fp, char *title /*, int refresh_delay */);
-
-
-void
-fprintf_html_trailer(FILE *fp);
-
-
-int generate_htmlfile_hardlink(html_output_cfg_t  *cfg,
+void html_output_add_menu_entry(orchids_t *ctx,
+				mod_entry_t *mod,
+				mod_htmloutput_t outputfunc);
+int rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he);
+int rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he);
+void html_output_preconfig(orchids_t *ctx);
+void html_output_postconfig(orchids_t *ctx, html_output_cfg_t  *cfg);
+void html_output(orchids_t *ctx, html_output_cfg_t  *cfg);
+FILE *create_html_file(orchids_t *ctx, html_output_cfg_t  *cfg, char *file, int cache);
+int cached_html_file(orchids_t *ctx, html_output_cfg_t  *cfg, char *file);
+void fprintf_html_header(FILE *fp, char *title /*, int refresh_delay */);
+void fprintf_html_trailer(FILE *fp);
+int generate_htmlfile_hardlink(orchids_t *ctx, html_output_cfg_t  *cfg,
 			       char *file, char *link);
-
-
-void
-generate_html_report_cb(orchids_t *ctx, mod_entry_t *mod, void *data, state_instance_t *state);
-
-void
-html_output_cache_cleanup(html_output_cfg_t  *cfg);
-
-
-void
-html_output_cache_flush(html_output_cfg_t  *cfg);
-
-
-
-
-
+void generate_html_report_cb(orchids_t *ctx, mod_entry_t *mod, void *data,
+			     state_instance_t *state);
+void html_output_cache_cleanup(orchids_t *ctx, html_output_cfg_t  *cfg);
+void html_output_cache_flush(orchids_t *ctx, html_output_cfg_t  *cfg);
 
 #endif /* HTML_OUTPUT_H */

@@ -26,20 +26,10 @@
 #define F_MSG      3
 
 
-static int
-create_sockunix_socket(const char *path);
-
-
-static int
-sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
-
-
-static void *
-sockunix_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
-
-static void
-add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
+static int create_sockunix_socket(const char *path);
+static int sockunix_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
+static void *sockunix_preconfig(orchids_t *ctx, mod_entry_t *mod);
+static void add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 
 #endif /* MOD_SOCKUNIX_H */

@@ -42,6 +42,7 @@ AC_SEARCH_LIBS(dlopen,c dl,,)
 LTDL_INIT([])
 AC_CHECK_HEADERS(dlfcn.h)
 AC_CHECK_HEADERS(ltdl.h)
+AC_CHECK_HEADERS(libproc.h, [LDFLAGS="$LDFLAGS -lproc"], [])
 
 dnl AM_MAINTAINER_MODE
 
@@ -87,7 +88,7 @@ dnl AC_DEFINE_UNQUOTED([PATH_TO_DOT], "$DOT", [Path to Dot])
 
 
 AC_ARG_ENABLE(debug,
-              [  --enable-debug    Turn on debugging],
+              [--enable-debug    Turn on debugging],
               [case "${enableval}" in
                 yes) debug=true ;;
                 no)  debug=false ;;
@@ -370,9 +371,19 @@ AC_SUBST(PCRE_LDFLAGS)
 
 dnl AC_CHECK_HEADERS(libaudit.h)
 
-AC_CHECK_FUNCS([regnexec strptime], [], [])
 
-CFLAGS="$CFLAGS -Wall -DPKGDATADIR=\\\"$datadir\\\" -DSYSCONFDIR=\\\"$sysconfdir\\\" -DLOCALSTATEDIR=\\\"$localstatedir\\\" -DLIBDIR=\\\"$libdir\\\""
+AC_CHECK_FUNCS([regnexec strptime], [], [])
+AC_CHECK_FUNCS([proc_pidpath], [], [])
+
+dnl Do not remove the following comment!
+dnl EXTRA_CONFIG_CHECKS
+
+relative_datadir=`echo $datadir | sed -e 's#^\${prefix}#:#'`
+relative_sysconfdir=`echo $sysconfdir | sed -e 's#^\${prefix}#:#'`
+relative_localstatedir=`echo $localstatedir | sed -e 's#^\${prefix}#:#'`
+relative_libdir=`echo $libdir | sed -e 's#^\${exec_prefix}#:#'`
+
+CFLAGS="$CFLAGS -Wall -DPKGDATADIR=\\\"$datadir\\\" -DREL_PKGDATADIR=\\\"$relative_datadir\\\" -DSYSCONFDIR=\\\"$sysconfdir\\\" -DREL_SYSCONFDIR=\\\"$relative_sysconfdir\\\" -DLOCALSTATEDIR=\\\"$localstatedir\\\" -DREL_LOCALSTATEDIR=\\\"$relative_localstatedir\\\" -DLIBDIR=\\\"$libdir\\\" -DREL_LIBDIR=\\\"$relative_libdir\\\""
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile

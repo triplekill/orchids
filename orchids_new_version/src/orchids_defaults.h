@@ -19,63 +19,63 @@
 #define ORCHIDS_DEFAULTS_H
 
 #ifndef SYSCONFDIR
-#define SYSCONFDIR "/etc"
+#define SYSCONFDIR "/usr/local/etc"
+#endif
+
+#ifndef REL_SYSCONFDIR
+#define REL_SYSCONFDIR ":etc"
 #endif
 
 #ifndef PKGDATADIR
+/* unused */
 #define PKGDATADIR "/usr/share/orchids"
 #endif
 
+#ifndef REL_PKGDATADIR
+/* unused */
+#define REL_PKGDATADIR ":"
+#endif
+
 #ifndef LOCALSTATEDIR
-#define LOCALSTATEDIR "/var"
+#define LOCALSTATEDIR "/usr/local/var"
+#endif
+
+#ifndef REL_LOCALSTATEDIR
+#define REL_LOCALSTATEDIR ":var"
 #endif
 
 #ifndef LIBDIR
-#define LIBDIR "/usr/lib"
+#define LIBDIR "/usr/local/lib"
 #endif
 
-#define DEFAULT_CONFIG_FILE SYSCONFDIR "/orchids/orchids.conf"
+#ifndef REL_LIBDIR
+#define REL_LIBDIR ":lib"
+#endif
 
-#define DEFAULT_MODULES_DIR LIBDIR "/orchids/modules"
+#define DEFAULT_CONFIG_FILE REL_SYSCONFDIR "/orchids/orchids.conf"
+
+#define DEFAULT_MODULES_DIR REL_LIBDIR "/orchids"
 
 #define DEFAULT_IN_PERIOD 5
-#define DEFAULT_RULE_DIR "./rules"
+#define DEFAULT_RULE_DIR REL_SYSCONFDIR "/orchids/rules"
+/* DEFAULT_RULE_DIR seems to be unushed */
 #define DEFAULT_FIELD_ACTIVATION 1
 
 #ifdef TIMEOUT_OBSOLETE
 #define DEFAULT_TIMEOUT 600
 #endif
 
-/* #define PATH_TO_DOT "/usr/local/bin/dot" */
-/* #define PATH_TO_EPSTOPDF "/usr/bin/epstopdf" */
-/* #define PATH_TO_CONVERT "/usr/X11R6/bin/convert" */
-
 #define COMMAND_PREFIX "nice -15 "
 
-#ifndef PATH_TO_DOT
-# define PATH_TO_DOT "dot"
-#endif /* PATH_TO_DOT */
-
-#ifndef PATH_TO_EPSTOPDF
-# define PATH_TO_EPSTOPDF "epstopdf"
-#endif /* PATH_TO_EPSTOPDF */
-
-#ifndef PATH_TO_CONVERT
-# define PATH_TO_CONVERT "convert"
-#endif /* PATH_TO_CONVERT */
-
-#ifndef PATH_TO_CPP
-# define PATH_TO_CPP "cpp"
-#endif /* PATH_TO_CPP */
-
 #define DEFAULT_PREPROC_CMD "cat"
+/* unused */
 
 #ifndef PATH_TO_SENDMAIL
 # define PATH_TO_SENDMAIL "/usr/sbin/sendmail"
 #endif /* PATH_TO_SENDMAIL */
 
-#define DEFAULT_ORCHIDS_LOCKFILE    LOCALSTATEDIR "/run/orchids/orchids.lock"
-#define DEFAULT_OUTPUTHTML_LOCKFILE LOCALSTATEDIR "/run/orchids/orchids-outputhtml.lock"
+#define DEFAULT_ORCHIDS_LOCKFILE    REL_LOCALSTATEDIR "/run/orchids/orchids.lock"
+#define DEFAULT_OUTPUTHTML_LOCKFILE REL_LOCALSTATEDIR "/run/orchids/orchids-outputhtml.lock"
 
 #define ORCHIDS_TMPDIR "/tmp"
 #define ORCHIDS_SENDMAIL_TEMPFILE \

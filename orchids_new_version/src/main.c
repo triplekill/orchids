@@ -188,23 +188,20 @@ int main(int argc, char *argv[])
 {
   orchids_t *ctx;
   int err;
+  char *orchidslog;
 
-  
+  ctx = new_orchids_context(argv[0]);
+  orchidslog = adjust_path (ctx, REL_LOCALSTATEDIR "/orchids/log/orchids.log");
 #ifdef ORCHIDS_DEBUG
   debuglog_enable_all(); /* enable ALL messages in debug mode */
-  libdebug_openlog("orchids",
-                   LOCALSTATEDIR "/orchids/log/orchids.log",
-                   DLO_NEWLOG | DLO_LINEBUFF);
+  libdebug_openlog("orchids", orchidslog, DLO_NEWLOG | DLO_LINEBUFF);
 #else
   libdebug_setopt("all:notice,ovm:none");
-  libdebug_openlog("orchids",
-                   LOCALSTATEDIR "/orchids/log/orchids.log",
-                   DLO_LINEBUFF);
+  libdebug_openlog("orchids", orchidslog, DLO_LINEBUFF);
 #endif /* ORCHIDS_DEBUG */
-
+  gc_base_free (orchidslog);
   DebugLog(DF_CORE, DS_NOTICE, "ORCHIDS -- starting\n");
 
-  ctx = new_orchids_context();
   parse_cmdline(ctx, argc, argv);
   if (ctx->verbose)
     {
@@ -214,8 +211,15 @@ int main(int argc, char *argv[])
 
   install_signals();
   if (ctx->daemon)
-    daemonize(LOCALSTATEDIR "/orchids/log/orchids.stdout",
-              LOCALSTATEDIR "/orchids/log/orchids.stderr");
+    {
+      char *out, *err;
+
+      out = adjust_path (ctx, REL_LOCALSTATEDIR "/orchids/log/orchids.stdout");
+      err = adjust_path (ctx, REL_LOCALSTATEDIR "/orchids/log/orchids.stderr");
+      daemonize(out, err);
+      gc_base_free (out);
+      gc_base_free (err);
+    }
 
   proceed_pre_config(ctx);
 
@@ -266,8 +270,7 @@ int main(int argc, char *argv[])
   return (0);
 }
 
-static void
-parse_cmdline(orchids_t *ctx, int argc, char **argv)
+static void parse_cmdline(orchids_t *ctx, int argc, char **argv)
 {
   char opt;
 
@@ -280,7 +283,13 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       break;
 
     case 'c':
-      ctx->config_file = strdup(optarg);
+      if (ctx->config_file!=NULL)
+	{
+          fprintf (stderr, "-c: configuration file already defined to '%s'\n",
+                   ctx->config_file);
+          exit(EXIT_FAILURE);
+        }
+      ctx->config_file = adjust_path(ctx, optarg);
       break;
 
     case 'o':
@@ -290,7 +299,7 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       else if (!strcmp("snare", optarg))
         ctx->off_line_mode = MODE_SNARE;
       else {
-        DebugLog(DF_CORE, DS_FATAL, "unknown off-line mode '%s'\n", optarg);
+        fprintf (stderr, "-o: unknown off-line mode '%s'\n", optarg);
         exit(EXIT_FAILURE);
       }
       break;
@@ -309,14 +318,18 @@ parse_cmdline(orchids_t *ctx, int argc, char **argv)
       do {
         char filepath[PATH_MAX];
 
-        if (ctx->off_line_input_file) {
-          DebugLog(DF_CORE, DS_FATAL,
-                   "offline input file already defined to '%s'\n",
-                   ctx->off_line_input_file);
-          exit(EXIT_FAILURE);
-        }
+        if (ctx->off_line_input_file!=NULL)
+	  {
+	    fprintf (stderr, "-f: offline input file already defined to '%s'\n",
+		     ctx->off_line_input_file);
+	    exit(EXIT_FAILURE);
+	  }
 
-        Xrealpath(optarg, filepath);
+        if (orchids_realpath (ctx, optarg, filepath)==NULL)
+	  {
+	    fprintf (stderr, "-f cannot expand path '%s'.\n", optarg);
+	    exit (EXIT_FAILURE);
+	  }
         DebugLog(DF_CORE, DS_NOTICE, "set input file to %s\n", filepath);
         ctx->off_line_input_file = gc_strdup(ctx->gc_ctx, filepath);
 
@@ -367,8 +380,7 @@ orchids_usage(char *prg)
 }
 
 
-static void
-daemonize(const char *stdout_file, const char *stderr_file)
+static void daemonize(const char *stdout_file, const char *stderr_file)
 {
   pid_t pid;
   int stdout_fd;

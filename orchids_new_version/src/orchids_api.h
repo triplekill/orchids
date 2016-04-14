@@ -124,8 +124,9 @@ void orchids_lock(const char *lockfile);
  ** default values.
  **
  ** @return A new allocated application context structure.
+ ** @param The argv[0] of the program.
  **/
-orchids_t *new_orchids_context(void);
+orchids_t *new_orchids_context(char *argv0);
 
 /**
  ** Save the current state of Orchids to file <name>.

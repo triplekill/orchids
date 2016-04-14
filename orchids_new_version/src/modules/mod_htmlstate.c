@@ -101,8 +101,23 @@ static void enable_cache(orchids_t *ctx, mod_entry_t *mod, config_directive_t *d
 static void set_HTML_output_dir(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)
 {
   html_output_cfg_t *cfg = (html_output_cfg_t *)mod->config;
+  struct stat s;
+  char *path;
 
-  cfg->html_output_dir = gc_strdup(ctx->gc_ctx, dir->args);
+  path = adjust_path (ctx, dir->args);
+  if (stat(path, &s) < 0)
+    {
+      fprintf (stderr, "HTMLOutputDir: cannot find '%s'.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  if (!(s.st_mode & S_IFDIR))
+    {
+      fprintf (stderr, "HTMLOutputDir: '%s' is not a directory.\n", path);
+      fflush (stderr);
+      exit(EXIT_FAILURE);
+    }
+  cfg->html_output_dir = path;
 }
 
 static void set_HTML_auto_refresh_delay(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir)

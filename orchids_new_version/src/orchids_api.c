@@ -22,7 +22,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <limits.h>
+#include <limits.h> // for PATH_MAX
+#ifndef PATH_MAX
+#define PATH_MAX 8192
+/* PATH_MAX is undefined on systems without a limit of filename length,
+   such as GNU/Hurd.  Also, defining _XOPEN_SOURCE on Linux will make
+   PATH_MAX undefined.
+*/
+#endif
 
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -38,6 +45,14 @@
 #ifdef linux
 #include "linux_process_info.h"
 #endif /* linux */
+
+#if HAVE_LIBPROC_H
+int proc_pidpath(int pid, void * buffer, uint32_t  buffersize);
+/* Do not include
+   #include "libproc.h"
+   since this uses macros that conflict with util/slist.h
+*/
+#endif
 
 #include "orchids.h"
 #include "orchids_defaults.h"
@@ -295,9 +310,118 @@ gc_class_t field_record_table_class = {
   field_record_table_restore
 };
 
-orchids_t *new_orchids_context(void)
+char *adjust_path (orchids_t *ctx, char *path)
+{
+  char *s;
+  size_t app_len, len;
+  
+  if (path[0]==':') /* an initial ':' means ctx->orchids_app_path
+		       (typically /usr/local/) */
+    {
+      path++;
+      app_len = strlen (ctx->orchids_app_path);
+      len = strlen (path);
+      s = gc_base_malloc (ctx->gc_ctx, app_len + len + 1);
+      memcpy (s, ctx->orchids_app_path, app_len);
+      if (path[0]=='/')
+	{
+	  app_len--; /* remove duplicate '/', just in case */
+	}
+      memcpy (s+app_len, path, len+1);
+    }
+  else
+    s = gc_strdup (ctx->gc_ctx, path);
+  return s;
+
+}
+
+char *orchids_realpath (orchids_t *ctx, char *file_name,
+			char *resolved_name)
+{
+  char *s, *res;
+
+  s = adjust_path (ctx, file_name);
+  res = realpath (s, resolved_name);
+  gc_base_free (s);
+  return res;
+}
+
+/* Find path to Orchids executable, assuming argv[0] known.
+   There is no portable way of doing this, and argv[0] may not be reliable.
+*/
+
+static char *self_path (char *argv0)
+{
+  char *path;
+  char *dir;
+  char *attempt, *res, *s;
+  size_t dirlen, len;
+  struct stat st;
+  
+#if HAVE_LIBPROC_H && HAVE_PROC_PIDPATH
+  /* If libproc is available, there is a much better solution: call proc_pidpath() */
+  {
+    pid_t pid;
+    
+    path = Xmalloc (PATH_MAX); /* normally, PROC_PIDPATHINFO_MAXSIZE */
+    pid = getpid ();
+    if (proc_pidpath (pid, path, PATH_MAX) > 0)
+      return path;
+    Xfree (path);
+  }
+#endif
+#ifdef linux
+  path = Xmalloc (PATH_MAX);
+  if (readlink("/proc/self/exe", path, PATH_MAX) >= 0)
+    return path;
+  Xfree (path);
+  /* XXX
+     On FreeBSD: readlink("/proc/curproc/file", buf, bufsize)
+     On Solaris: readlink("/proc/self/path/a.out", buf, bufsize)
+     On Windows: GetModuleFileName(NULL, buf, bufsize)
+   */
+#endif
+  if (strchr(argv0, '/')!=NULL) /* if argv0 starts with '/', this is an absolute path;
+				   if it contains '/', this is a relative path (relative
+				   to the current working directory);
+				   in any case, calling realpath() will return the real
+				   absolute path */
+    return realpath (argv0, NULL);
+  /* Otherwise, imitate 'which'. */
+  path = getenv("PATH");
+  if (path==NULL)
+    path = "/bin:/usr/bin"; /* When PATH==NULL, most Unixes default to that;
+			       they also usually add ".", but I don't recommend this. */
+  s = path = Xstrdup (path);
+  len = strlen(argv0);
+  /* Imitate the 'which' utility */
+  while (dir = strsep(&s, ":"), dir!=NULL)
+    {
+      if (dir[0]=='\0')
+	dir = "."; /* apparently 'which' understands an empty directory as the current directory */
+      dirlen = strlen(dir);
+      attempt = Xmalloc (dirlen+len+2);
+      memcpy (attempt, dir, dirlen);
+      attempt[dirlen] = '/';
+      strcpy (attempt+dirlen+1, argv0);
+      res = realpath (attempt, NULL);
+      Xfree (attempt);
+      if (res!=NULL && access(res, X_OK)==0 &&
+	  stat(res, &st)==0 && S_ISREG(st.st_mode) &&
+	  (getuid () != 0 || (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))!=0))
+	{
+	  Xfree (path);
+	  return res;
+	}
+    }
+  Xfree (path);
+  return NULL;
+}
+
+orchids_t *new_orchids_context(char *argv0)
 {
   orchids_t *ctx;
+  char *s;
 
   ctx = Xmalloc(sizeof (orchids_t));
   ctx->gc_ctx = gc_init();
@@ -312,7 +436,34 @@ orchids_t *new_orchids_context(void)
 
   /* do default initialisation here */
   gettimeofday(&ctx->start_time, NULL);
-  ctx->config_file = DEFAULT_CONFIG_FILE;
+  ctx->orchids_app_path = self_path (argv0);
+  if (ctx->orchids_app_path==NULL)
+    {
+      fprintf (stderr, "could not find absolute path to executable '%s': exit.\n", argv0);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  s = strrchr (ctx->orchids_app_path, '/');
+  if (s==NULL)
+    {
+      fprintf (stderr, "path to executable has no '/' (?): %s\n", ctx->orchids_app_path);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  s[0] = '\0'; /* remove executable name and final slash, e.g., from
+		/usr/local/bin/orchids, we obtain:
+		/usr/local/bin
+	       */
+  s = strrchr (ctx->orchids_app_path, '/');
+  if (s==NULL || strcmp (s, "/bin")!=0)
+    {
+      fprintf (stderr, "path to executable does not end with /bin: %s\n", ctx->orchids_app_path);
+      fflush (stderr);
+      exit (EXIT_FAILURE);
+    }
+  s[1] = '\0'; /* remove final 'bin', e.g., obtain /usr/local/ */
+  
+  ctx->config_file = adjust_path (ctx, DEFAULT_CONFIG_FILE);
   ctx->loaded_modules = 0;
   ctx->last_poll = 0;
   ctx->realtime_handler_list = NULL;
@@ -364,8 +515,6 @@ orchids_t *new_orchids_context(void)
   ctx->active_event_cur = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->active_event_cur);
 #endif
-  ctx->thread_queue = NULL;
-  gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->thread_queue);
   ctx->current_event = NULL;
   gc_add_root(ctx->gc_ctx, (gc_header_t **)&ctx->current_event);
   ctx->preconfig_time.tv_sec = 0;
@@ -392,8 +541,8 @@ orchids_t *new_orchids_context(void)
   ctx->default_preproc_cmd = DEFAULT_PREPROC_CMD;
 #endif
   ctx->cur_loop_time = ctx->start_time;
-  ctx->modules_dir = DEFAULT_MODULES_DIR;
-  ctx->lockfile = DEFAULT_ORCHIDS_LOCKFILE;
+  ctx->modules_dir = adjust_path (ctx, DEFAULT_MODULES_DIR);
+  ctx->lockfile = adjust_path (ctx, DEFAULT_ORCHIDS_LOCKFILE);
   SLIST_INIT(&ctx->pre_evt_hook_list);
   SLIST_INIT(&ctx->post_evt_hook_list);
   SLIST_INIT(&ctx->reportmod_list);
@@ -548,20 +697,20 @@ int orchids_save (orchids_t *ctx, char *name)
   if (err) goto errlab;
 
   estimate_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
-  estimate_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
+  estimate_sharing (ctx->gc_ctx, (gc_header_t *)ctx->rule_compiler->first_rule);
 
   err = save_gc_struct (&sctx, (gc_header_t *)ctx->global_fields);
   if (err) goto errlab;
   err = save_func_tbl (&sctx, ctx->vm_func_tbl, ctx->vm_func_tbl_sz);
   if (err) goto errlab;
-  err = save_gc_struct (&sctx, (gc_header_t *)ctx->thread_queue);
+  err = save_gc_struct (&sctx, (gc_header_t *)ctx->rule_compiler->first_rule);
   if (err) goto errlab;
   err = save_flush (&sctx);
   if (err) goto errlab;
   
  errlab:
   reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->global_fields);
-  reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->thread_queue);
+  reset_sharing (ctx->gc_ctx, (gc_header_t *)ctx->rule_compiler->first_rule);
   /* Now save the internal states of modules that are able to.
      We reset_sharing() before, since modules can be restored
      independently. */
@@ -677,8 +826,10 @@ int orchids_restore (orchids_t *ctx, char *name)
   int c;
   size_t i;
   size_t version;
+  rule_t *rules;
 
-  GC_START (ctx->gc_ctx, 1);
+  GC_START (ctx->gc_ctx, 2);
+  rules = NULL;
   errno = 0;
   rctx.gc_ctx = ctx->gc_ctx;
   rctx.shared_hash = NULL; /* for now */
@@ -739,16 +890,17 @@ int orchids_restore (orchids_t *ctx, char *name)
   GC_UPDATE (ctx->gc_ctx, 0, rctx.global_fields);
   rctx.vm_func_tbl = restore_func_tbl (&rctx, &rctx.vm_func_tbl_sz);
   if (rctx.vm_func_tbl==NULL && errno!=0) { err = errno; goto errlab; }
-  GC_TOUCH (ctx->gc_ctx, ctx->thread_queue = (thread_queue_t *)restore_gc_struct (&rctx));
-  if (ctx->thread_queue==NULL && errno!=0) { err = errno; goto errlab; }
-  if (ctx->thread_queue!=NULL && TYPE(ctx->thread_queue)!=T_THREAD_QUEUE)
-    { err = restore_badly_formatted_data (); ctx->thread_queue = NULL; goto errlab; }
+  rules = (rule_t *)restore_gc_struct (&rctx);
+  if (rules==NULL && errno!=0) { err = errno; goto errlab; }
+  if (rules!=NULL && TYPE(rules)!=T_RULE)
+    { err = restore_badly_formatted_data (); goto errlab; }
+  GC_UPDATE (ctx->gc_ctx, 1, rules);
   err = restore_flush (&rctx);
   if (err!=0) goto errlab;
   if (rctx.errs & RESTORE_UNKNOWN_FIELD_NAME)
-    { err = restore_unknown_record_field_name (); ctx->thread_queue = NULL; goto errlab; }
+    { err = restore_unknown_record_field_name (); goto errlab; }
   if (rctx.errs & RESTORE_UNKNOWN_PRIMITIVE)
-    { err = restore_unknown_primitive (); ctx->thread_queue = NULL; goto errlab; }
+    { err = restore_unknown_primitive (); goto errlab; }
   /* Now we look for modules requiring to be restored. */
   while (err==0)
     switch (getc_unlocked (rctx.f))
@@ -766,6 +918,11 @@ int orchids_restore (orchids_t *ctx, char *name)
       default: err = restore_badly_formatted_data (); break;
       }
  errlab:
+  if (err==0)
+    {
+      for (; rules!=NULL; rules=rules->next)
+	(void) install_restored_rule (ctx->rule_compiler, rules);
+    }
   if (rctx.vm_func_tbl!=NULL)
     {
       for (i=0; i<rctx.vm_func_tbl_sz; i++)

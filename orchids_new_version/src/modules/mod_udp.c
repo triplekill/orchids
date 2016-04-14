@@ -39,11 +39,8 @@
 input_module_t mod_udp;
 
 static int create_udp_socket(const char *file, uint32_t line, int udp_port);
-
 static int udp_callback(orchids_t *ctx, mod_entry_t *mod, int fd, void *data);
-
 static void *udp_preconfig(orchids_t *ctx, mod_entry_t *mod);
-
 static void add_listen_port(orchids_t *ctx, mod_entry_t *mod, config_directive_t *dir);
 
 static int create_udp_socket(const char *file, uint32_t line, int udp_port)

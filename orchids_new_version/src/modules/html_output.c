@@ -111,7 +111,7 @@ int rtaction_html_cache_cleanup(orchids_t *ctx, heap_entry_t *he)
   DebugLog(DF_MOD, DS_TRACE,
            "HTML cache cleanup...\n");
 
-  html_output_cache_cleanup(he->data);
+  html_output_cache_cleanup(ctx, he->data);
   gettimeofday(&he->date, NULL);
   he->date.tv_sec += 60; /* XXX: use a customizable parameter */
   register_rtaction(ctx, he);
@@ -136,18 +136,21 @@ int rtaction_html_regeneration(orchids_t *ctx, heap_entry_t *he)
 void html_output_preconfig(orchids_t *ctx)
 {
   int ret;
+  char *s;
 
   /* XXX: TODO: Check that lockdir is accessible */
 
   /* if an old lockfile exists, try to remove it */
-  ret = unlink(DEFAULT_OUTPUTHTML_LOCKFILE);
+  s = adjust_path (ctx, DEFAULT_OUTPUTHTML_LOCKFILE);
+  ret = unlink(s);
   if (ret == -1 && errno != ENOENT)
     {
       fprintf(stderr,
 	      "unlink(pathname=\"%s\"): error %i: %s\n",
-	      DEFAULT_OUTPUTHTML_LOCKFILE, errno, strerror(errno));
+	      s, errno, strerror(errno));
       exit(EXIT_FAILURE);
     }
+  gc_base_free (s);
 }
 
 void html_output(orchids_t *ctx, html_output_cfg_t *cfg)
@@ -188,13 +191,13 @@ void html_output(orchids_t *ctx, html_output_cfg_t *cfg)
 }
 
 
-FILE *create_html_file(html_output_cfg_t  *cfg, char *file, int cache)
+FILE *create_html_file(orchids_t *ctx, html_output_cfg_t  *cfg, char *file, int cache)
 {
   char absolute_dir[PATH_MAX];
   char absolute_filepath[2*PATH_MAX+1];
   FILE *fp;
 
-  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+  if (orchids_realpath(ctx, cfg->html_output_dir, absolute_dir)==NULL)
     return NULL;
   snprintf(absolute_filepath, 2*PATH_MAX+1, "%s/%s", absolute_dir, file);
 
@@ -206,12 +209,12 @@ FILE *create_html_file(html_output_cfg_t  *cfg, char *file, int cache)
 }
 
 
-int cached_html_file(html_output_cfg_t  *cfg, char *file)
+int cached_html_file(orchids_t *ctx, html_output_cfg_t  *cfg, char *file)
 {
   char absolute_dir[PATH_MAX];
   char absolute_filepath[2*PATH_MAX+1];
 
-  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+  if (orchids_realpath (ctx, cfg->html_output_dir, absolute_dir)==NULL)
     return 0;
   snprintf(absolute_filepath, 2*PATH_MAX+1, "%s/%s", absolute_dir, file);
 
@@ -279,14 +282,15 @@ void fprintf_html_trailer(FILE *fp)
 }
 
 
-int generate_htmlfile_hardlink(html_output_cfg_t  *cfg,
+int generate_htmlfile_hardlink(orchids_t *ctx,
+			       html_output_cfg_t  *cfg,
 			       char *file, char *linkfile)
 {
   char abs_dir[PATH_MAX];
   char abs_file[2*PATH_MAX+1];
   char abs_link[2*PATH_MAX+1];
 
-  if (realpath(cfg->html_output_dir, abs_dir)==NULL)
+  if (orchids_realpath (ctx, cfg->html_output_dir, abs_dir)==NULL)
     {
       DebugLog (DF_MOD, DS_ERROR, strerror(errno));
       return -1;
@@ -312,10 +316,10 @@ static int generate_html_orchids_modules(orchids_t *ctx,
 
   Timer_to_NTP(&ctx->cur_loop_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-modules-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-modules.html");
     }
   fprintf_html_header(fp, "Orchids Modules");
 
@@ -344,7 +348,7 @@ static int generate_html_orchids_modules(orchids_t *ctx,
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-modules.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-modules.html");
 }
 
 #ifdef GENERATE_HTML_FIELDS_OBSOLETE
@@ -362,10 +366,10 @@ static int generate_html_orchids_fields(orchids_t *ctx,
 
   Timer_to_NTP(&ctx->start_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-fields-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-fields.html");
     }
 
   fprintf_html_header(fp, "Orchids Data Fields");
@@ -426,7 +430,7 @@ static int generate_html_orchids_fields(orchids_t *ctx,
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-fields.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-fields.html");
 }
 #endif
 
@@ -446,10 +450,10 @@ static int generate_html_orchids_functions(orchids_t *ctx,
   snprintf(file, sizeof (file),
            "orchids-functions-%08lx-%08lx.html",
            ntph, ntpl);
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-functions.html");
     }
   fprintf_html_header(fp, "Orchids Registered Language Functions");
 
@@ -487,7 +491,7 @@ static int generate_html_orchids_functions(orchids_t *ctx,
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-functions.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-functions.html");
 }
 #endif
 
@@ -506,10 +510,10 @@ static int generate_html_orchids_datatypes(orchids_t *ctx,
   snprintf(file, sizeof (file),
            "orchids-datatypes-%08lx-%08lx.html",
            ntph, ntpl);
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-datatypes.html");
     }
   fprintf_html_header(fp, "Orchids Registered Data Types");
 
@@ -541,7 +545,7 @@ static int generate_html_orchids_datatypes(orchids_t *ctx,
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-datatypes.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-datatypes.html");
 }
 #endif
 
@@ -559,16 +563,18 @@ static int generate_html_orchids_stats(orchids_t *ctx,
 #endif
   char file[PATH_MAX];
   unsigned long ntpl, ntph;
+  rule_t *rule;
+  size_t nthreads;
 
   gettimeofday(&curr_time, NULL);
 
   Timer_to_NTP(&curr_time, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-stats-%08lx-%08lx.html", ntph, ntpl);
   /* cache never hit here... just add USE_CACHE for backlogging statistics */
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-stats.html");
     }
 
   fprintf_html_header(fp, "Orchids statistics");
@@ -707,12 +713,15 @@ static int generate_html_orchids_stats(orchids_t *ctx,
           "<td class=\"v0\"> %zu </td> "
           "</tr>\n",
           ctx->events);
+  nthreads = 0;
+  for (rule=ctx->rule_compiler->first_rule; rule!=NULL; rule=rule->next)
+    nthreads += rule->thread_queue->nelts;
   fprintf(fp,
           "  <tr> "
           "<td class=\"e0\"> threads </td> "
           "<td class=\"v0\"> %zu </td> "
           "</tr>\n",
-          ctx->thread_queue->nelts);
+          nthreads);
   fprintf(fp,
           "  <tr> "
           "<td class=\"e1\"> reports </td> "
@@ -740,7 +749,7 @@ static int generate_html_orchids_stats(orchids_t *ctx,
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-stats.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-stats.html");
 }
 
 
@@ -757,10 +766,10 @@ static int generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
 
   Timer_to_NTP(&ctx->last_rule_act, ntph, ntpl);
   snprintf(file, sizeof (file), "orchids-rules-%08lx-%08lx.html", ntph, ntpl);
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-rules.html");
     }
 
   fprintf_html_header(fp, "Orchids rules");
@@ -823,7 +832,7 @@ static int generate_html_rule_list(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-rules.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-rules.html");
 }
 
 
@@ -862,7 +871,7 @@ static int generate_html_rules(orchids_t *ctx, html_output_cfg_t  *cfg)
   if (ctx->rule_compiler->first_rule == NULL)
     return -1;
 
-  if (realpath(cfg->html_output_dir, absolute_dir)==NULL)
+  if (orchids_realpath (ctx, cfg->html_output_dir, absolute_dir)==NULL)
     {
       DebugLog(DF_MOD, DS_ERROR, strerror (errno));
       return -1;
@@ -1426,10 +1435,10 @@ static int generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
     }
   snprintf(file, sizeof (file), "orchids-reports-%08lx.html", s.st_mtime);
 
-  fp = create_html_file(cfg, file, USE_CACHE);
+  fp = create_html_file (ctx, cfg, file, USE_CACHE);
   if (fp == CACHE_HIT || fp == NULL)
     {
-      return generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
+      return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-reports.html");
     }
   fprintf_html_header(fp, "Orchids reports");
 
@@ -1491,7 +1500,7 @@ static int generate_html_report_list(orchids_t *ctx, html_output_cfg_t  *cfg)
   fprintf_html_trailer(fp);
   (void) fclose(fp);
 
-  return generate_htmlfile_hardlink(cfg, file, "orchids-reports.html");
+  return generate_htmlfile_hardlink (ctx, cfg, file, "orchids-reports.html");
 }
 
 
@@ -1500,7 +1509,7 @@ static int generate_html_config(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
 
-  fp = create_html_file(cfg, "orchids-config.html", NO_CACHE);
+  fp = create_html_file (ctx, cfg, "orchids-config.html", NO_CACHE);
   if (fp==NULL)
     return -1;
 
@@ -1633,7 +1642,7 @@ static int generate_html_menu_timestamps(orchids_t *ctx,
   unsigned long ntpl, ntph;
   htmloutput_list_t *m;
 
-  fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
+  fp = create_html_file (ctx, cfg, "orchids-menu.html", NO_CACHE);
   if (fp==NULL)
     return -1;
 
@@ -1688,12 +1697,12 @@ static int generate_html_menu_timestamps(orchids_t *ctx,
 #endif
 
 
-static int generate_html_menu(orchids_t *ctx, html_output_cfg_t  *cfg)
+static int generate_html_menu (orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   FILE *fp;
   htmloutput_list_t *m;
 
-  fp = create_html_file(cfg, "orchids-menu.html", NO_CACHE);
+  fp = create_html_file (ctx, cfg, "orchids-menu.html", NO_CACHE);
   if (fp==NULL)
     return -1;
 
@@ -1760,10 +1769,13 @@ static int do_html_output(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   int fd;
   int ret = 0;
+  char *s;
 
   /* Acquire lock or return */
  reopen:
-  fd = open(DEFAULT_OUTPUTHTML_LOCKFILE, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  s = adjust_path (ctx, DEFAULT_OUTPUTHTML_LOCKFILE);
+  fd = open(s, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
+  gc_base_free (s);
   if (fd<0)
     {
       if (errno==EINTR) goto reopen;
@@ -1823,12 +1835,16 @@ static void convert_filename(char *file)
 }
 
 
-void html_output_cache_cleanup(html_output_cfg_t  *cfg)
+void html_output_cache_cleanup (orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
   char dir[PATH_MAX];
 
-  Xrealpath(cfg->html_output_dir, base_dir);
+  if (orchids_realpath (ctx, cfg->html_output_dir, base_dir)==NULL)
+    {
+      DebugLog (DF_MOD, DS_ERROR, "cannot find real path for '%s'\n", cfg->html_output_dir);
+      return;
+    }
 
   cache_gc(base_dir, "orchids-modules-",  4, 128 * 1024, 24 * 3600);
 #ifdef GENERATE_HTML_FIELDS_OBSOLETE
@@ -1844,12 +1860,16 @@ void html_output_cache_cleanup(html_output_cfg_t  *cfg)
 }
 
 
-void html_output_cache_flush(html_output_cfg_t  *cfg)
+void html_output_cache_flush(orchids_t *ctx, html_output_cfg_t  *cfg)
 {
   char base_dir[PATH_MAX];
   char dir[2*PATH_MAX+2];
 
-  Xrealpath(cfg->html_output_dir, base_dir);
+  if (orchids_realpath (ctx, cfg->html_output_dir, base_dir)==NULL)
+    {
+      DebugLog (DF_MOD, DS_ERROR, "cannot find real path for '%s'\n", cfg->html_output_dir);
+      return;
+    }    
 
   cache_gc(base_dir, "orchids-modules-",  0, 0, 0);
 #ifdef GENERATE_HTML_FIELDS_OBSOLETE
