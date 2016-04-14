@@ -149,14 +149,14 @@ static void add_unix_socket(orchids_t *ctx, mod_entry_t *mod, config_directive_t
 
   DebugLog(DF_MOD, DS_INFO, "Add unix socket port [%s]\n", dir->args);
 
+  GC_START(ctx->gc_ctx, 1);
   s = adjust_path (ctx, dir->args);
   sd = create_sockunix_socket(s);
-  GC_START(ctx->gc_ctx, 1);
   len = strlen(s);
   var = ovm_str_new (ctx->gc_ctx, len);
   memcpy (STR(var), s, len);
-  gc_base_free (s);
   GC_UPDATE(ctx->gc_ctx, 0, var);
+  gc_base_free (s);
   add_input_descriptor(ctx, mod, sockunix_callback, sd, (void *)var);
   GC_END(ctx->gc_ctx);
 }

@@ -8827,12 +8827,21 @@ static thread_queue_t *merge_thread_queues (gc_t *gc_ctx, rule_t *rule, thread_q
   thread_group_t *pid;
   thread_queue_elt_t *qe;
   thread_queue_t *oldtq;
+  state_t *q;
 
   for (qe=tq->first; qe!=NULL; qe=qe->next)
     {
       si = qe->thread;
       if (si==NULL)
 	continue;
+      q = si->q;
+      if (q!=NULL)
+	{
+	  si->q = &rule->state[q->id];
+	  if (si->t!=NULL)
+	    si->t = &si->q->trans[si->t->id];
+	}
+      else si->t = NULL; /* Cannot have si->t!=NULL if si->q==NULL */
       pid = si->pid;
       GC_TOUCH (gc_ctx, pid->rule = rule);
     }

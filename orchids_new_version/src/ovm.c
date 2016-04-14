@@ -53,7 +53,7 @@ void ovm_exec_base(orchids_t *ctx, state_instance_t *s, bytecode_t *bytecode)
     {
       if (*isn_param.ip >= OPCODE_NUM)
 	{
-	  DebugLog(DF_OVM, DS_ERROR, "unknown opcode 0x%02lx\n", *isn_param.ip);
+	  DebugLog(DF_OVM, DS_FATAL, "unknown opcode 0x%02lx\n", *isn_param.ip);
 	  return;
 	}
       (void) (*ops_g[*isn_param.ip].insn) (&isn_param);
