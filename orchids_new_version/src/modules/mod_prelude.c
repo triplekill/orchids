@@ -228,7 +228,7 @@ static void process_idmef_alert(orchids_t *ctx,
 				mod_entry_t	*mod,
 				idmef_message_t	*message,
 				int dissection_level,
-				mod_prelude_t *config)
+				modprelude_t *config)
 {
   size_t c;
 #ifdef OBSOLETE
@@ -293,7 +293,7 @@ static int rtaction_recv_idmef(orchids_t *ctx, heap_entry_t *he)
   return 0;
 }
 
-static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *message, *val;
   idmef_message_t	*idmef;
@@ -318,7 +318,7 @@ static void issdl_idmef_message_new (orchids_t *ctx, state_instance_t *state)
   GC_END (gc_ctx);
 }
 
-static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_message_set(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t *idmef;
   ovm_var_t *path;
@@ -476,7 +476,7 @@ static void issdl_idmef_message_print(orchids_t *ctx, state_instance_t *state, v
   PUSH_RETURN_TRUE(ctx);
 }
 
-static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *state)
+static void issdl_idmef_message_get_string(orchids_t *ctx, state_instance_t *state, void *data)
 {
   ovm_var_t	*idmef;
   ovm_var_t *doc1;
@@ -704,36 +704,40 @@ static void mod_prelude_postconfig(orchids_t *ctx, mod_entry_t *mod)
                          "prelude_message_new",
 			 0, prelude_new_sigs,
 			 m_random,
-                         "Create a new prelude idmef report");
+                         "Create a new prelude idmef report",
+			 config);
 
   register_lang_function(ctx,
                          issdl_idmef_message_set,
                          "prelude_message_set",
 			 3, prelude_set_sigs,
 			 m_prelude_set,
-                         "set a value in the idmef report");
+                         "set a value in the idmef report",
+			 config);
 
   register_lang_function(ctx,
                          issdl_idmef_message_send,
                          "prelude_message_send",
 			 1, prelude_send_sigs,
 			 m_random_thrash,
-                         "send message to the prelude manager");
+                         "send message to the prelude manager",
+			 config);
 
   register_lang_function(ctx,
                          issdl_idmef_message_get_string,
                          "prelude_message_get_string",
 			 2, prelude_get_sigs,
 			 m_random,
-                         "get a string from an idmef message using an xpath request");
+                         "get a string from an idmef message using an xpath request",
+			 config);
 
   register_lang_function(ctx,
                          issdl_idmef_message_print,
                          "prelude_message_print",
 			 1, prelude_print_sigs,
 			 m_random_thrash,
-                         "Debug function : print the idmef alert on stderr");
-
+                         "Debug function : print the idmef alert on stderr",
+			 config);
 }
 
 
