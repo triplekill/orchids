@@ -521,7 +521,6 @@ void emergency_drop_threads (orchids_t *ctx)
   thread_queue_t *queue;
   thread_queue_elt_t *qe, *last;
   state_instance_t *si;
-  thread_group_t *pid;
   rule_t *rule;
   struct rule_size_s *rule_sizes, *rs;
   size_t total_rule_sizes;
@@ -563,7 +562,6 @@ void emergency_drop_threads (orchids_t *ctx)
 	  si = qe->thread;
 	  if (si==NULL)
 	    continue;
-	  pid = si->pid;
 	  rs->occupied += SI_SIZE_ESTIMATE;
 	}
       /* This is conservative (too low): ignores sizes of environments (si->env),

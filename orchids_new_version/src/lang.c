@@ -4615,7 +4615,7 @@ void add_slashes (char *s, size_t len, char *t)
      From http://docstore.mik.ua/orelly/webprog/php/ch04_05.htm
      The addcslashes( ) function escapes arbitrary characters by placing backslashes
      before them. With the exception of the characters in Table 4-4 (note: characters
-     7-13), characters with ASCII values less than 32 or above 126 are encoded with
+     number 7-13), characters with ASCII values less than 32 or above 126 are encoded with
      their octal values (e.g., "\002")
    */
   for (i=0; i<len; i++)
@@ -4644,6 +4644,7 @@ void add_slashes (char *s, size_t len, char *t)
 	      octal[1] = ((c >> 6) & 7) + '0';
 	      octal[2] = ((c >> 3) & 7) + '0';
 	      octal[3] = (c & 7) + '0';
+	      block = octal;
 	      blocklen = 4;
 	      goto write_block;
 	    }
